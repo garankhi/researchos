@@ -7,6 +7,8 @@ Kiến trúc nền đã thống nhất: Next.js + NestJS, monorepo pnpm, backend
 Tham khảo quyết định: [ADR-0001](./adr/0001-modular-monolith-and-vps-worker.md).
 Tạo project: [Hướng dẫn CLI chính chủ](./scaffolding.md).
 Quản lý monorepo: [pnpm workspace và Turborepo](./workspace.md).
+Tham khảo sản phẩm tương tự: [Công nghệ công khai của ResearchGate](./researchgate-tech-review.md).
+Khuyến nghị UI: [Viewport, infinite scroll và virtualization](./frontend-viewport.md).
 Nguồn nghiệp vụ: SRS PDF hiện có trong docs (119 trang); PDF tiếp tục được Git bỏ qua.
 
 ## Thành phần và trách nhiệm
