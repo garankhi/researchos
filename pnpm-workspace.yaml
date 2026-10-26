@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Preserve the dependency build-script choices from the generated web project.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

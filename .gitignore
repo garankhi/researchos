@@ -1,0 +1,32 @@
+# Keep the original SRS and other source documents local.
+docs/*
+!docs/*.md
+!docs/adr/
+!docs/adr/*.md
+
+# Dependencies and generated output.
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/out/
+**/coverage/
+**/*.tsbuildinfo
+.pnpm-store/
+**/.turbo/
+**/.cache/
+**/.swc/
+**/.vercel/
+.eslintcache
+
+# Local configuration.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.log
+
+# Operating system metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini
