@@ -1,24 +1,17 @@
 import axios from 'axios';
+import type { ApiErrorResponseDto } from '@/lib/api/models';
 
 /**
  * The body the API returns for a failed request.
  *
- * This mirrors the error envelope the backend produces
+ * This is the type the backend generates from the error envelope
  * (`ApiErrorResponseDto` in `apps/api/src/common/dto/api-response.dto.ts`).
- * It is declared here rather than imported from the generated client
- * because `src/lib/api/` is owned by Orval and only re-exports the
- * operations — and because a failed request never reaches the typed client
- * anyway: axios rejects with the raw response body.
+ * It is imported as a type only: a failed request never reaches the typed
+ * client — axios rejects with the raw response body — but the type still
+ * keeps the frontend's view of the error contract in sync with the spec
+ * instead of duplicating the shape by hand.
  */
-export interface ApiErrorBody {
-  success: false;
-  data: null;
-  message: string;
-  statusCode: number;
-  path: string;
-  timestamp: string;
-  errors?: Array<{ field: string; messages: string[] }>;
-}
+export type ApiErrorBody = ApiErrorResponseDto;
 
 /**
  * Extracts a human readable message from a failed API request.

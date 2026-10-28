@@ -32,7 +32,10 @@ tiên.
 - **`src/lib/api/` là của Orval, không sửa tay.** Xem `.prettierignore` và
   quy tắc `no-restricted-imports` trong `eslint.config.mjs`. Code viết tay
   của feature đặt ở `hooks/` hoặc `components/`, không đặt trong
-  `src/lib/api/`.
+  `src/lib/api/`. Ngoại lệ duy nhất là **import kiểu** (`import type`):
+  type bị xoá lúc build nên không kéo file đã bị xoá vào bundle, và giữ
+  cho frontend nhìn thấy contract của API đúng với spec thay vì copy
+  shape thủ công. Import *giá trị* từ `@/lib/api/*` vẫn bị chặn.
 
 ## Tách lớp
 

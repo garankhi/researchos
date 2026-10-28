@@ -404,6 +404,7 @@ pnpm build && pnpm lint && pnpm test
 | Spinner bound to `isPending` on an `enabled: false` query | Spinner never stops; button can never be clicked |
 | Hand-written file under `src/lib/api/` | Deleted on the next Orval run (`clean: true`) |
 | Deep import `@/lib/api/profiles/profiles` | Blocked by eslint; import from `@/lib/api` |
+| Value import from `@/lib/api/models` | Blocked by eslint; a *type-only* import is allowed |
 | Reading `query.data.data` | The mutator already unwrapped the envelope |
 | `String(error)` in an error state | Shows `"AxiosError: Request failed with status code 500"` instead of the server's message |
 | Building `{ success, data }` in a controller | Double-wrapped — the interceptor does it |
