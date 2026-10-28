@@ -19,6 +19,10 @@ docs/*
 **/.vercel/
 .eslintcache
 
+# Generated Prisma client. It is rebuilt from prisma/schema.prisma by
+# `pnpm db:generate` and by the prebuild step of @researchos/database.
+packages/database/src/generated/
+
 # Local configuration.
 .env
 .env.*
