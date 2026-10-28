@@ -38,6 +38,23 @@ Four rules that the tooling enforces or that keep the codebase navigable:
    every hand-written file there is deleted on the next codegen. The eslint
    rule `no-restricted-imports` blocks `@/lib/api/*` deep imports — import
    values from `@/lib/api` instead.
+
+   The one exception is a **type-only** import, which the rule permits via
+   `allowTypeImports`:
+
+   ```typescript
+   import type { ApiErrorResponseDto } from '@/lib/api/models';
+   ```
+
+   A type is erased at build time, so it cannot pull a deleted runtime
+   module into the bundle — which is the actual risk the rule guards
+   against. Importing a *value* from `@/lib/api/*` is still an error.
+
+   There are two generated barrels and they export **disjoint** sets:
+   `@/lib/api` holds the operations (hooks, API functions), while
+   `@/lib/api/models` holds the types. Neither re-exports the other, so a
+   type-only import has to name the models barrel explicitly.
+
 2. **`components/ui/` knows nothing about a domain.** A file there must not
    mention `Profile`, `Opportunity` or `Taxonomy`. Same principle as
    `src/common/` in the backend.
@@ -411,7 +428,8 @@ access boundaries. Use it to confirm a change behaves.
 - [ ] No hand-written file under `src/lib/api/`
 - [ ] No manual unwrapping of the envelope — `query.data` is already the payload
 - [ ] Error messages read through `apiErrorMessage()`, never `String(error)`
-- [ ] Loading uses skeletons sized like the real content- [ ] Every error state offers a retry or another way forward
+- [ ] Loading uses skeletons sized like the real content
+- [ ] Every error state offers a retry or another way forward
 - [ ] Route errors handled by the narrowest `error.tsx`
 - [ ] MUI layout props passed through `sx`
 - [ ] MUI links use the `components/ui/link` wrapper
