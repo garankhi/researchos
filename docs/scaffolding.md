@@ -159,6 +159,22 @@ Worker xử lý queue trên VPS sau này cũng dùng code này, chạy bằng pr
 
 ## 9. Sinh module nghiệp vụ bằng Nest CLI
 
+Cấu trúc thư mục của `apps/api` và `apps/worker` dùng module theo nghiệp vụ: mỗi
+nghiệp vụ là một thư mục trong `src/modules/`, phần dùng chung không thuộc
+nghiệp vụ nào nằm trong `src/common/`.
+
+~~~text
+apps/api/src/
+  main.ts
+  app.module.ts          Chỉ nối các module nghiệp vụ
+  common/                Guard, decorator, filter, interceptor, pipe
+    filters/
+  modules/
+    health/              health.controller.ts, health.service.ts, dto/
+    demo/                demo.controller.ts, demo.service.ts
+    profiles/            Thêm sau khi chốt trách nhiệm
+~~~
+
 Ví dụ sau khi chốt tên module và trách nhiệm:
 
 ~~~powershell
@@ -168,6 +184,41 @@ pnpm --dir apps/api exec nest generate module modules/opportunities
 ~~~
 
 CLI sẽ sinh module và cập nhật import theo cấu trúc ứng dụng. Không cần tạo đồng loạt tất cả module của mọi phase ngay từ đầu.
+
+Luôn kèm cờ `--flat` khi sinh controller, service, guard hoặc class. Không có
+cờ này, CLI tạo thêm một thư mục trùng tên và lặp lại hậu tố:
+
+~~~powershell
+# Không --flat -> src/modules/profiles/profiles/profiles.controller.ts (sai)
+pnpm --dir apps/api exec nest generate controller modules/profiles/profiles --flat
+# Có --flat  -> src/modules/profiles/profiles.controller.ts (đúng)
+pnpm --dir apps/api exec nest generate service modules/profiles/profiles --flat
+
+# DTO, entity và phần dùng chung cũng dùng --flat.
+pnpm --dir apps/api exec nest generate class modules/profiles/dto/create-profile.dto --flat
+pnpm --dir apps/api exec nest generate class modules/profiles/entities/profile.entity --flat
+pnpm --dir apps/api exec nest generate guard common/guards/roles --flat
+~~~
+
+Lệnh sau sinh trọn CRUD (module + controller + service + dto + entities) trong
+một lần:
+
+~~~powershell
+pnpm --dir apps/api exec nest generate resource modules/profiles
+~~~
+
+Quy tắc giữ khi tổ chức:
+
+- `app.module.ts` chỉ nối module; nghiệp vụ và dependency nằm trong từng
+  module.
+- Module cần service của module khác thì `exports` service đó và `imports`
+  module sở hữu. Không import chéo giữa hai thư mục module.
+- `common/` chỉ chứa code không biết gì về nghiệp vụ. File nào nhắc tới
+  `Profile` hay `Opportunity` thì thuộc module, không thuộc `common/`.
+- Import trong `apps/api` và `apps/worker` dùng hậu tố `.js` vì tsconfig đặt
+  `module: nodenext` và package có `"type": "module"`.
+- Nghiệp vụ dùng chung giữa API và worker đặt ở `packages/backend-core/`,
+  không copy logic và không import thẳng source của app kia.
 
 ## 10. Các lệnh kiểm tra
 
@@ -186,8 +237,9 @@ pnpm --dir apps/worker build
 ## Các bước triển khai tiếp theo
 
 1. Chốt các mâu thuẫn SRS và phạm vi MVP trong architecture.md.
-2. Thiết kế schema PostgreSQL, thêm Prisma và migration.
-3. Cấu hình môi trường, Redis/BullMQ và thử một job xuyên suốt từ API tới worker.
+2. Thiết kế schema PostgreSQL và chạy migration đầu tiên. Prisma đã được cài
+   đặt; xem [database.md](./database.md).
+3. Cấu hình Redis/BullMQ và thử một job xuyên suốt từ API tới worker.
 4. Tích hợp SSO thật và chính sách phân quyền tài nguyên.
 5. Kết nối Next.js với API, xử lý session và cache theo visibility.
 6. Bổ sung OpenAPI, logging, CI và Docker cho môi trường triển khai.
