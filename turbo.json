@@ -24,6 +24,37 @@
       "cache": false,
       "persistent": true,
       "passThroughEnv": ["*"]
+    },
+    "openapi": {
+      "cache": false,
+      "outputs": ["openapi.json"]
+    },
+    "orval": {
+      "dependsOn": ["api#openapi"],
+      "cache": false,
+      "outputs": ["src/lib/api/**"]
+    },
+    "codegen": {
+      "dependsOn": ["web#orval"],
+      "cache": false
+    },
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "db:migrate:deploy": {
+      "cache": false
+    },
+    "db:status": {
+      "cache": false
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    },    "format": {
+      "cache": false
     }
   }
 }
