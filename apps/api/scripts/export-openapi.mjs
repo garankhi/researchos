@@ -8,6 +8,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../dist/app.module.js';
 import { createOpenApiDocument } from '../dist/openapi.js';
 
+// The Prisma client is constructed when the app module is instantiated, and
+// it refuses to start without a connection string. The document export does
+// not query the database, so a placeholder URL is enough to satisfy the
+// constructor and keep this script independent of local credentials.
+process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@localhost:5432/researchos?schema=public';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const outPath = resolve(here, '..', process.argv[2] ?? 'openapi.json');
 

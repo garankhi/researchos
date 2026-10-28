@@ -1,6 +1,8 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { createOpenApiDocument } from './openapi.js';
 
 async function bootstrap() {
@@ -9,6 +11,22 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.WEB_ORIGIN?.split(',') ?? true,
   });
+
+  // Global validation. `whitelist` strips properties that have no matching
+  // DTO decorator, so a client cannot smuggle extra fields into a payload;
+  // `forbidNonWhitelisted` turns that into an explicit error instead of
+  // silently dropping data. `transform` lets DTOs coerce query and body
+  // values into their declared types.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   const document = createOpenApiDocument(app);
   SwaggerModule.setup('docs', app, document, {
