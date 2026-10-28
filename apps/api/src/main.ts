@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor.js';
 import { createOpenApiDocument } from './openapi.js';
 
 async function bootstrap() {
@@ -27,6 +28,11 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Every successful response is wrapped in the API envelope. The filter
+  // above handles failures, so the two never overlap: a thrown exception
+  // never reaches this interceptor.
+  app.useGlobalInterceptors(new ApiResponseInterceptor());
 
   const document = createOpenApiDocument(app);
   SwaggerModule.setup('docs', app, document, {

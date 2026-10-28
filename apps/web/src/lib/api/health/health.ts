@@ -18,7 +18,7 @@ import type {
   UseQueryResult,
 } from '@tanstack/react-query';
 
-import type { HealthStatusDto } from '../models';
+import type { HealthStatusDtoEnvelope } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
 
@@ -49,7 +49,7 @@ export const healthControllerCheck = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<HealthStatusDto>(
+  return axiosInstance<HealthStatusDtoEnvelope>(
     { url: `/health`, method: 'GET', signal },
     options,
   );
@@ -201,7 +201,7 @@ export const healthControllerCheckReadiness = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<HealthStatusDto>(
+  return axiosInstance<HealthStatusDtoEnvelope>(
     { url: `/health/ready`, method: 'GET', signal },
     options,
   );

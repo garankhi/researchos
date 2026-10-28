@@ -18,7 +18,11 @@ import type {
   UseQueryResult,
 } from '@tanstack/react-query';
 
-import type { DemoControllerGetSlowParams } from '../models';
+import type {
+  DemoControllerGetSlowEnvelope,
+  DemoControllerGetSlowParams,
+  DemoControllerGetUnstableEnvelope,
+} from '../models';
 
 import { axiosInstance } from '../../axios-instance';
 
@@ -50,7 +54,7 @@ export const demoControllerGetSlow = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<string>(
+  return axiosInstance<DemoControllerGetSlowEnvelope>(
     { url: `/demo/slow`, method: 'GET', params, signal },
     options,
   );
@@ -364,7 +368,7 @@ export const demoControllerGetUnstable = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<string>(
+  return axiosInstance<DemoControllerGetUnstableEnvelope>(
     { url: `/demo/unstable`, method: 'GET', signal },
     options,
   );

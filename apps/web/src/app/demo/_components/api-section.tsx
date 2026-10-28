@@ -15,6 +15,7 @@ import {
   ListItemSkeleton,
   LoadingSkeleton,
 } from '@/components/ui/feedback';
+import { apiErrorMessage } from '@/lib/api-error';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 
 /**
@@ -123,7 +124,7 @@ export function ApiSection() {
             ) : slow.isError ? (
               <ErrorState
                 title="Tải thất bại"
-                message={String(slow.error)}
+                message={apiErrorMessage(slow.error)}
                 onRetry={() => void slow.refetch()}
               />
             ) : slow.isSuccess ? (
@@ -162,7 +163,7 @@ export function ApiSection() {
             ) : failing.isError ? (
               <ErrorState
                 title="Tải thất bại (expected)"
-                message="Đây là lỗi dự kiến từ endpoint /demo/fail."
+                message={apiErrorMessage(failing.error)}
                 onRetry={() => void failing.refetch()}
               />
             ) : failing.isSuccess ? (
@@ -200,7 +201,7 @@ export function ApiSection() {
             ) : unstable.isError ? (
               <ErrorState
                 title="Lần này thất bại"
-                message="Endpoint này ngẫu nhiên trả về lỗi khoảng 50% số lần."
+                message={apiErrorMessage(unstable.error)}
                 onRetry={() => void unstable.refetch()}
               />
             ) : unstable.isSuccess ? (

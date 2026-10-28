@@ -6,5 +6,10 @@
  * OpenAPI spec version: 0.0.1
  */
 
+export * from './apiErrorResponseDto';
+export * from './apiErrorResponseDtoErrorsItem';
+export * from './demoControllerGetSlowEnvelope';
 export * from './demoControllerGetSlowParams';
+export * from './demoControllerGetUnstableEnvelope';
 export * from './healthStatusDto';
+export * from './healthStatusDtoEnvelope';

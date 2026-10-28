@@ -119,7 +119,35 @@ export class OpportunitiesController {
 Quy tắc:
 
 - `@ApiTags` dùng đúng tên module, không dùng tiếng Việt có dấu.
-- Mỗi route có `@ApiOperation({ summary })` viết bằng tiếng Việt, mô tả hành động.
+- **Mỗi route bắt buộc có `@ApiOperation({ summary })`** với `summary` không rỗng.
+  Không có ngoại lệ nào, kể cả route nhỏ. `summary` là phần mô tả của
+  endpoint: trên Swagger UI nó hiện thành tiêu đề đậm ngay dưới đường dẫn,
+  và là thứ người đọc thấy đầu tiên.
+
+```typescript
+  // Đúng — một dòng, mô tả route làm gì.
+  @ApiOperation({ summary: 'Returns the greeting after a configurable delay' })
+
+  // Sai — thiếu summary, Swagger chỉ hiện đường dẫn trần.
+  @Get(':id')
+  findOne(@Param('id') id: string): Promise<ProfileResponseDto> { /* ... */ }
+
+  // Sai — câu thứ hai thuộc về `description`, không phải `summary`.
+  @ApiOperation({ summary: 'Lấy chi tiết hồ sơ. Trả về 404 nếu không tìm thấy.' })
+```
+
+  Câu giải thích dài hơn nằm ở field `description` của chính decorator đó:
+
+```typescript
+  @ApiOperation({
+    summary: 'Lấy chi tiết một hồ sơ',
+    description:
+      'Trả về 404 nếu hồ sơ không tồn tại hoặc người dùng không có quyền xem.',
+  })
+```
+
+  `summary` được copy nguyên văn vào client Orval sinh ra dưới dạng JSDoc, nên
+  nó cũng là thứ lập trình viên frontend đọc trong `src/lib/api/`.
 - `@ApiOkResponse`/`@ApiCreatedResponse` luôn khai báo `type`.
 - Tham số query dùng **DTO** (`@Query() dto: ListOpportunitiesQueryDto`), không
   dùng `@Query('page') page?: string` rời rạc.
@@ -171,8 +199,10 @@ Mọi lỗi đi qua `HttpExceptionFilter` và có cùng một hình dạng:
 
 ```json
 {
-  "statusCode": 404,
+  "success": false,
+  "data": null,
   "message": "Opportunity not found",
+  "statusCode": 404,
   "path": "/opportunities/abc",
   "timestamp": "2026-10-29T01:30:00.000Z"
 }
@@ -190,6 +220,88 @@ Trong service, dùng exception của NestJS — không trả lỗi bằng `throw
 
 Lỗi trả về **không chứa chi tiết nội bộ** (stack, SQL, tên bảng). Chi tiết
 đi vào log.
+
+Lỗi validation có thêm mảng `errors`, gom theo từng field để form hiển thị
+đúng chỗ:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "title must be a string; title should not be empty",
+  "statusCode": 400,
+  "path": "/opportunities",
+  "timestamp": "2026-10-29T01:30:00.000Z",
+  "errors": [
+    { "field": "title", "messages": ["must be a string", "should not be empty"] }
+  ]
+}
+```
+
+## 6b. Envelope của response thành công
+
+Mọi response thành công đều được bọc trong envelope bởi
+`ApiResponseInterceptor`:
+
+```json
+{
+  "success": true,
+  "data": { "id": "abc", "title": "..." },
+  "message": ""
+}
+```
+
+Controller **trả về payload thô** — không tự dựng envelope. Interceptor và
+filter là hai nơi duy nhất quyết định hình dạng response, nên chúng không
+bao giờ chồng lấn: exception ném ra không đi qua interceptor.
+
+| File | Vai trò |
+| --- | --- |
+| `src/common/interceptors/api-response.interceptor.ts` | Bọc response thành công |
+| `src/common/filters/http-exception.filter.ts` | Bọc lỗi |
+| `src/common/dto/api-response.dto.ts` | Mô tả DTO của envelope |
+| `src/common/openapi/envelope-transform.ts` | Sửa OpenAPI để mô tả đúng envelope |
+
+### Vì sao phải sửa OpenAPI
+
+Swagger chỉ biết payload mà controller khai báo. Nếu không sửa, client
+sinh ra ở frontend sẽ mô tả payload thô, còn server thật lại trả envelope
+— hai bên lệch nhau. `envelope-transform.ts` bọc schema của mọi response
+`2xx` vào envelope, nên `openapi.json` mô tả đúng thứ server thật sự gửi.
+
+Quy tắc của transform:
+
+- **Idempotent.** Chạy hai lần không bọc hai lần.
+- **Payload nguyên thủy không được nâng thành component.** Một payload
+  `type: string` phải nằm inline trong envelope. Nếu nâng thành component
+  tên `String`, Orval sinh ra `models/string.ts` với `export type String =
+  string`, và `export * from './string'` trong barrel sẽ che mất global
+  `String` — một cái bẫy rất khó phát hiện.
+- **`data` của envelope lỗi là `nullable`, không phải `type: "null"`.**
+  OpenAPI 3.0 không có type `null`; dùng `type: "null"` làm Orval validate
+  fail.
+
+### Frontend không cần tự unwrap
+
+Orval sinh operation với **type của envelope** làm generic
+(`axiosInstance<HealthStatusDtoEnvelope>(...)`). Mutator
+`src/lib/axios-instance.ts` bóc một lớp bằng conditional type:
+
+```typescript
+export type Unwrap<T> = T extends { data: infer D } ? D : T;
+```
+
+Nên `query.data` là payload (`HealthStatusDto`), không phải envelope. Toàn
+bộ code frontend cũ tiếp tục chạy mà không cần sửa một dòng nào.
+
+Lỗi thì **không** đi qua mutator: axios reject với body thô, nên
+`error.response.data` vẫn là envelope lỗi đầy đủ. Dùng helper
+`apiErrorMessage(error)` trong `src/lib/api-error.ts` để lấy message, đừng
+dùng `String(error)` — nó ra `"AxiosError: Request failed with status code
+500"`.
+
+> `success` và `data` là tên dành riêng cho envelope. Một DTO nghiệp vụ có
+> đúng hai field đó sẽ bị bóc nhầm một lớp.
 
 ## 7. Service và truy cập dữ liệu
 
@@ -273,8 +385,10 @@ pnpm codegen                  # chạy cả hai
 ## 12. Checklist trước khi mở Pull Request
 
 - [ ] Endpoint có `@ApiTags`, `@ApiOperation` và `@Api*Response` kèm `type`.
+- [ ] **Mọi route đều có `@ApiOperation({ summary })` với `summary` không rỗng.**
 - [ ] DTO có `@ApiProperty`/`@ApiPropertyOptional` cho **mọi** trường.
 - [ ] Controller không chứa truy vấn Prisma.
+- [ ] Controller trả payload thô — không tự dựng envelope.
 - [ ] Lỗi dùng exception của NestJS, không dùng `throw new Error`.
 - [ ] Phân quyền đã được kiểm tra ở backend.
 - [ ] Ghi nhiều bảng dùng `$transaction`.
@@ -282,3 +396,5 @@ pnpm codegen                  # chạy cả hai
 - [ ] `pnpm --filter api test` chạy qua.
 - [ ] `pnpm --filter api openapi` đã chạy và `openapi.json` đã commit.
 - [ ] `pnpm --filter web orval` đã chạy nếu có thay đổi contract.
+- [ ] Kiểm tra `openapi.json`: response `2xx` trỏ tới `*Envelope`, và không
+  có component tên `String`/`Number`/`Boolean` (primitive phải inline).
