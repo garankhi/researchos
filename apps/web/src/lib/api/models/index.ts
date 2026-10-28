@@ -5,3 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+
+export * from './demoControllerGetSlowParams';
+export * from './healthStatusDto';
