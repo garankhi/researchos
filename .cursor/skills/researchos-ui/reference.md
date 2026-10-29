@@ -518,6 +518,167 @@ const element = boxRef.current;
 const computed = window.getComputedStyle(element).backgroundColor;
 ```
 
+## Responsive layout
+
+### Breakpoint values
+
+| | `xs` | `sm` | `md` | `lg` | `xl` |
+| --- | --- | --- | --- | --- | --- |
+| MUI (px) | 0 | 600 | 900 | 1200 | 1536 |
+| Tailwind v4 (rem) | — | 640 | 768 | 1024 | 1280 |
+
+   525|Tailwind also has `2xl` at 1536px. MUI `md` is 900px, Tailwind `md:` is
+768px — they are different lines. Pick one system per component and do not mix
+`sx={{ display: { md: 'none' } }}` with a `md:hidden` class in the same tree.
+
+### The collapse-to-a-menu pattern
+
+`components/ui/header.tsx` and `components/ui/search-bar.tsx` both use it.
+Four parts, always together:
+
+1. **Trigger** — an `IconButton` shown only on small screens.
+2. **Menu** — anchored to the trigger, `keepMounted`.
+3. **Menu visibility** — the `Menu` itself hides on wide screens.
+4. **Inline version** — hidden on small screens.
+
+```typescript
+<IconButton
+  aria-label="open search"
+  aria-controls="search-menu"
+  aria-haspopup="true"
+  onClick={handleOpen}
+  color="inherit"
+  sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+>
+  <SearchIcon />
+</IconButton>
+
+<Menu
+  id="search-menu"
+  anchorEl={anchorEl}
+  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+  keepMounted
+  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+  open={open}
+  onClose={handleClose}
+  disableAutoFocusItem
+  sx={{
+    // Step 3 — without this the kept-mounted popup lingers on desktop.
+    display: { xs: 'block', md: 'none' },
+    mt: 1,
+    p: 1,
+    // Never a fixed width on a phone.
+    width: 'min(92vw, 420px)',
+  }}
+>
+  {/* The same content the inline version renders. */}
+  <Search>...</Search>
+</Menu>
+
+<Search
+  sx={{
+    // Step 4 — the inline version, md and up.
+    display: { xs: 'none', md: 'flex' },
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: { md: 380, lg: 480 },
+  }}
+>
+  ...
+</Search>
+```
+
+### Focus and dismissal
+
+A popover that opens into an input must focus it once the popover has
+rendered:
+
+```typescript
+const inputRef = React.useRef<HTMLInputElement>(null);
+
+React.useEffect(() => {
+  if (open) {
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }
+}, [open]);
+```
+
+`requestAnimationFrame` because the input does not exist on the first paint
+of the popover. `Escape` closes it:
+
+```typescript
+onKeyDown={(e) => {
+  if (e.key === 'Escape') handleClose();
+}}
+```
+
+### Overflow rules
+
+| Rule | Why |
+| --- | --- |
+| Flex child with text gets `minWidth: 0` | Without it the child refuses to shrink and forces a horizontal scrollbar |
+| Truncated label: `noWrap` + `overflow: 'hidden'` + `textOverflow: 'ellipsis'` | Keeps one line instead of wrapping mid-word |
+| Popover width `min(92vw, 420px)` | A fixed px width overflows a 375px phone |
+| Icon buttons on `xs` stay ≥ 40px | Touch target size |
+
+```typescript
+<Box sx={{ flexGrow: 1, minWidth: 0 }}>
+  <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    {title}
+  </Typography>
+</Box>
+```
+
+### `useMediaQuery` is for behaviour, not layout
+
+`useMediaQuery` returns `false` on the server, so a branch on it renders the
+mobile tree during SSR and the desktop tree after hydration — a mismatch.
+   610|
+Use it only when the *rendered output* differs, not the layout:
+
+```typescript
+// Fine — a media element is not a layout decision.
+const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+```
+
+For layout, always use `sx` breakpoints — one tree, CSS decides.
+
+### Verifying
+
+Check the widths that matter, not just the build:
+
+- 375px (phone), 768px (tablet portrait), 1024px (laptop), 1440px (desktop).
+- Resize across a breakpoint while the menu is open — a kept-mounted `Menu`
+  that does not hide itself flashes on the wrong side.
+- Check for a horizontal scrollbar; it means a child is not allowed to shrink.
+
+## Orval imports
+
+The eslint rule `no-restricted-imports` blocks **value** imports from
+`@/lib/api/*`. What it allows, verified against `apps/web/eslint.config.mjs`:
+
+| Import | Allowed |
+| --- | --- |
+| `import { hook } from '@/lib/api'` | ✅ value, from the barrel |
+| `import type { Dto } from '@/lib/api'` | ✅ type |
+| `import type { Dto } from '@/lib/api/models'` | ✅ type |
+| `import type { Dto } from '@/lib/api/models/dto'` | ✅ type |
+| `import { hook } from '@/lib/api/health/health'` | ❌ deep value import |
+| `import { thing } from '@/lib/api/models'` | ❌ deep value import |
+
+A type-only import is permitted via `allowTypeImports` because a type is
+erased at build time, so it cannot pull a deleted runtime module into the
+bundle — which is the actual risk the rule guards against.
+
+**The guard only matches the `@/lib/api/*` alias.** A relative import such as
+`../../lib/api/health/health` passes lint untouched, so the rule cannot catch
+a file that reaches into the generated tree the wrong way — and `clean: true`
+will still delete it on the next codegen. Always use the `@/` alias, so the
+rule can see the import.
+
 ## Commands
 
 ```powershell
@@ -638,6 +799,11 @@ config's `packageJson` is not set.
 | Feature importing another feature's files | Coupling; call the other feature's hook instead |
 | `components/ui/` naming a domain entity | Breaks the shared-primitive boundary |
 | MUI system props passed directly | Invalid HTML attributes leak onto the DOM |
+| `useMediaQuery` branching for layout | The server renders the mobile branch; hydration mismatch and a flash of the wrong layout |
+| A kept-mounted `Menu` without `display` on wide screens | The popup lingers in the DOM and flashes when the window is resized across the breakpoint |
+| A fixed px popover width | Overflows a phone viewport |
+| A flex child with text and no `minWidth: 0` | The row cannot shrink; a horizontal scrollbar appears |
+| Mixing MUI `sx` breakpoints with Tailwind `md:` classes | The two scales differ (MUI `md` is 900px, Tailwind `md:` is 768px) — the breakpoint lands in the wrong place |
 | `component={Link}` with `next/link` | "Functions cannot be passed directly to Client Components" |
 | Reading the theme during render | Hydration mismatch |
 | Exporting a component as `Error` | Shadows the global `Error`; breaks `instanceof` |

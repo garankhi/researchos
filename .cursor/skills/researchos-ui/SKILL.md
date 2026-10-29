@@ -1,6 +1,6 @@
 ---
 name: researchos-ui
-description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, loading skeletons, error boundaries, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, or when the user mentions loading states, error states, React Query, Orval, MUI, dark mode, or Next.js route conventions.
+description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, or when the user mentions loading states, error states, React Query, Orval, MUI, dark mode, responsive design, breakpoints, or Next.js route conventions.
 ---
 
 # ResearchOS UI
@@ -59,22 +59,7 @@ Four rules that the tooling enforces or that keep the codebase navigable:
    `@/lib/api/models` holds the types. Neither re-exports the other, so a
    type-only import has to name the models barrel explicitly.
 
-   What the rule allows and blocks, verified against `apps/web/eslint.config.mjs`:
-
-   | Import | Allowed |
-   | --- | --- |
-   | `import { hook } from '@/lib/api'` | ✅ value, from the barrel |
-   | `import type { Dto } from '@/lib/api'` | ✅ type |
-   | `import type { Dto } from '@/lib/api/models'` | ✅ type |
-   | `import type { Dto } from '@/lib/api/models/dto'` | ✅ type |
-   | `import { hook } from '@/lib/api/health/health'` | ❌ deep value import |
-   | `import { thing } from '@/lib/api/models'` | ❌ deep value import |
-
-   **The guard only matches the `@/lib/api/*` alias.** A relative import
-   such as `../../lib/api/health/health` passes lint untouched, so the
-   rule cannot catch a file that reaches into the generated tree the wrong
-   way — and `clean: true` will still delete it on the next codegen. Always
-   use the `@/` alias, so the rule can see the import.
+   Allowed and blocked import forms: `reference.md`.
 
 2. **`components/ui/` knows nothing about a domain.** A file there must not
    mention `Profile`, `Opportunity` or `Taxonomy`. Same principle as
@@ -142,7 +127,8 @@ A feature folder is `index.ts` (barrel), `types.ts` (domain types), `hooks/`
 (API calls + state normalisation) and `components/`.
 
 The hook is where the DTO becomes a domain type, and where raw query flags
-become explicit ones:
+become explicit ones. Note `enabled: Boolean(id)` — without it, a request
+fires with an empty id.
 
 ```typescript
 'use client';
@@ -153,11 +139,7 @@ export function useProfile(id: string) {
   });
 
   const data: Profile | undefined = query.data
-    ? {
-        id: query.data.id,
-        displayName: query.data.displayName,
-        createdAt: query.data.createdAt,
-      }
+    → { id: query.data.id, displayName: query.data.displayName }
     : undefined;
 
   return {
@@ -173,8 +155,6 @@ export function useProfile(id: string) {
 }
 ```
 
-Note `enabled: Boolean(id)` — without it, a request fires with an empty id.
-
 The barrel is the only import surface other modules may use:
 
 ```typescript
@@ -183,32 +163,9 @@ export type { Profile } from './types';
 ```
 
 The component then branches on the hook's explicit flags, never on
-`query.data` being undefined:
-
-```typescript
-'use client';
-
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
-import { useProfile } from '@/features/profiles';
-
-export function ProfileCard({ id }: { id: string }) {
-  const { data, isPending, isFailed, refetch } = useProfile(id);
-
-  if (isPending) return <LoadingSkeleton variant="rectangular" height={120} />;
-
-  if (isFailed) {
-    return (
-      <ErrorState
-        title="Không tải được hồ sơ"
-        message="Máy chủ không phản hồi. Thử lại sau."
-        onRetry={() => void refetch()}
-      />
-    );
-  }
-
-  return <div>{data?.displayName}</div>;
-}
-```
+`query.data` being undefined — an `isPending` branch renders a
+`LoadingSkeleton`, an `isFailed` branch renders an `ErrorState` with a
+retry, and only then does it read `data`.
 
 Full templates for each file: `reference.md`.
 
@@ -242,21 +199,10 @@ page keeps its content. A spinner belongs *in* the button, not in the page
 body.
 
 MUI v9's `Button` has a built-in `loading` prop that renders a
-`CircularProgress` and disables the button:
-
-```typescript
-<Button variant="contained" loading={mutation.isPending}>
-  Lưu
-</Button>
-```
-
-- `loading` also disables the button, so a second submit cannot fire while
-  the first is in flight.
-- `loadingPosition` controls where the indicator sits — `'start'` keeps the
-  label visible and pushes it right, `'center'` replaces the label with the
-  spinner.
-- For a small inline action, `<CircularProgress size={16} />` inside an
-  `IconButton` works too.
+`CircularProgress` and disables the button, so a second submit cannot fire
+while the first is in flight. `loadingPosition` controls where the indicator
+sits — `'start'` keeps the label visible and pushes it right, `'center'`
+replaces the label with the spinner.
 
 Bind it to the **mutation's** pending flag, not a query's. `isPending` on a
 query with `enabled: false` is `true` forever; a mutation that is disabled
@@ -311,65 +257,22 @@ showSnackbar({ severity: 'success', message: 'Đã lưu hồ sơ.' });
 
 ### Why not a snackbar for errors
 
-A snackbar is a notification channel, not a state channel:
-
-- It auto-hides. An error the user did not read in four seconds is an error
-  they will repeat.
-- It is spatially detached from the cause. An error under a field points at
-  the field; a toast in the corner points at nothing.
-- It cannot hold per-field validation messages legibly. The backend groups
-  them by field — `apiFieldErrors(error)` returns them — and a form needs
-  one message under each input.
+A snackbar is a notification channel, not a state channel. It auto-hides, so
+an error the user did not read in four seconds is an error they will repeat;
+it is spatially detached from the cause, so an error under a field points at
+the field while a toast in the corner points at nothing; and it cannot hold
+per-field validation messages legibly. The backend groups those by field —
+`apiFieldErrors(error)` returns them — and a form needs one message under
+each input.
 
 The exception: an error with no local anchor — a background sync, a bulk
 action, a failed logout — has nowhere to render inline. Then a snackbar with
 `autoHideDuration: null` and a retry action is the right call.
 
-### Wiring it
-
-The Orval mutation hook exposes `mutate`, `mutateAsync` and the callbacks.
-Put the feedback in the hook's `onSuccess` / `onError`, not in the click
-handler, so it fires regardless of how the mutation was triggered:
-
-```typescript
-const mutation = useCreateProfile({
-  onSuccess: () => {
-    showSnackbar({ severity: 'success', message: 'Đã tạo hồ sơ.' });
-  },
-  onError: (error) => {
-    setFieldErrors(apiFieldErrors(error));
-  },
-});
-```
-
-Do not use `onSuccess` to navigate away before the snackbar is queued, and
-do not put the success message in a `useEffect` that depends on
-`mutation.isSuccess` — it fires twice under React Strict Mode.
-
-### Validation errors are inline, always
-
-A `400` from the backend carries `errors`, grouped by field. Render each
-message under its input:
-
-```typescript
-const fieldErrors = apiFieldErrors(error);
-
-{fieldErrors?.map((e) => (
-  <FieldError key={e.field} message={e.messages.join(', ')} />
-))}
-```
-
-Do not collapse them into a single toast line. The point of grouping them
-by field is to put each one next to the input that caused it.
-
-### Checklist for this section
-
-- [ ] Every mutation has a success feedback
-- [ ] Every mutation has an error feedback
-- [ ] Success is a snackbar; error is inline next to the cause
-- [ ] Validation errors are rendered per field, not flattened
-- [ ] The error message comes from `apiErrorMessage(error)`, not `String(error)`
-- [ ] A toast-only error has no local anchor and does not auto-hide
+Validation errors are inline, always: a `400` carries `errors` grouped by
+field, so render each message under its input with `apiFieldErrors(error)`.
+Never collapse them into one toast line. Wiring, snackbar props and the
+Strict Mode pitfall: `reference.md`.
 
 ## Error states
 
@@ -420,7 +323,8 @@ in one feature should not take down the whole app.
 
 `notFound()`, `unauthorized()` and `forbidden()` work by throwing during a
 server render, so they cannot be called from a click handler. Give each one a
-dedicated route that calls it.
+dedicated route that calls it. The backend enforces permission; the frontend
+only reflects it — the route decides, the boundary renders.
 
 In `error.tsx`, `error` is typed `unknown` — narrow it with `instanceof Error`
 before reading `.message`. Do not name the component `Error`: a default export
@@ -432,12 +336,6 @@ re-renders the failed segment and is what a "try again" button should call;
 `reset` clears the boundary state. `app/error.tsx` uses `retry`.
 
 Route templates and the access-boundary routes: `reference.md`.
-
-### Access boundaries
-
-The backend enforces permission. The frontend only reflects it. `notFound()`,
-`unauthorized()` and `forbidden()` are thrown by the server render of the
-route that needs them — the route decides, the boundary renders.
 
 ## MUI and Tailwind
 
@@ -486,6 +384,63 @@ component's own styles without `!important`. This only works while
 `layout.tsx` mounts `AppRouterCacheProvider` with `enableCssLayer: true`.
 Changing either one silently breaks the cascade.
 
+## Responsiveness
+
+A component renders correctly at every width, without a JavaScript branch.
+`components/ui/header.tsx` and `components/ui/search-bar.tsx` are the
+reference implementations — copy their shape.
+
+### Breakpoints
+
+MUI's defaults, in px: `xs` 0, `sm` 600, `md` 900, `lg` 1200, `xl` 1536.
+`xs` is a phone; `md` is where the inline nav and search field appear.
+
+**Tailwind's breakpoints differ**: `sm` 640, `md` 768, `lg` 1024, `xl` 1280,
+`2xl` 1536. MUI `md` is 900, Tailwind `md:` is 768 — they are not the same
+line. Use one system per component; never mix `sx={{ display: { md: 'none' } }}`
+with a `md:hidden` class in the same tree.
+
+### Swap with `sx`, do not measure
+
+```typescript
+// Wrong — a JS branch renders a different tree on the server and the client.
+const isDesktop = useMediaQuery('(min-width:900px)');
+return isDesktop → <DesktopNav /> : <MobileNav />;
+
+// Right — one tree, CSS decides.
+<Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+  <DesktopNav />
+</Box>
+```
+
+`useMediaQuery` is for *behaviour* differences (a different chart, a media
+element), not layout. Its server value is `false`, so the server renders the
+mobile branch; if the difference matters for markup, gate it on mount.
+
+### Collapse to a menu, keep one trigger
+
+The nav links and the search field use the same four-part shape:
+
+1. An `IconButton` trigger with `aria-label`, `aria-controls` and
+   `aria-haspopup`, shown only below the breakpoint.
+2. A `Menu` anchored to it with `keepMounted` and `disableAutoFocusItem`.
+3. The menu's own `sx={{ display: { xs: 'block', md: 'none' } }}` — a
+   kept-mounted popup must be hidden on wide screens, or it lingers in the
+   DOM and can flash on resize.
+4. The inline version, hidden on small screens.
+
+The menu's content is the same component that the inline version renders —
+one source of truth, two presentations.
+
+### Never let a child overflow
+
+A flex child that holds text needs `minWidth: 0`, or it refuses to shrink and
+pushes the row wider than the viewport. Truncating labels use `noWrap` plus
+`overflow: 'hidden'` and `textOverflow: 'ellipsis'`. A popover width is
+`min(92vw, 420px)` — a fixed `420px` overflows a phone.
+
+Details, templates and the breakpoint table: `reference.md`.
+
 ## Dark mode
 
 `components/providers/theme-provider.tsx` bridges next-themes to MUI:
@@ -528,13 +483,16 @@ the `researchos-api-endpoint` skill for the codegen step.
 - [ ] No manual unwrapping of the envelope — `query.data` is already the payload
 - [ ] Error messages read through `apiErrorMessage()`, never `String(error)`
 - [ ] Loading uses skeletons sized like the real content
-- [ ] Mutations show a spinner in the button (`loading={mutation.isPending}`), not a page spinner
+- [ ] Mutations show a spinner in the button or where applicable, not a page spinner
 - [ ] Every mutation has a success feedback (snackbar) and an error feedback (inline)
-- [ ] Validation errors are rendered per field, not flattened into one message
+- [ ] Validation errors are rendered per field, not flattened
 - [ ] Every error state offers a retry or another way forward
 - [ ] Route errors handled by the narrowest `error.tsx`
-- [ ] MUI layout props passed through `sx`
-- [ ] MUI links use the `components/ui/link` wrapper
+- [ ] Localization, refer to the localization skill
+- [ ] MUI layout props passed through `sx`; links use the `components/ui/link` wrapper
+- [ ] Responsive layout uses `sx` breakpoints, not a `useMediaQuery` branch
+- [ ] Collapsed menus hide themselves on wide screens (`display` on the `Menu`)
+- [ ] Flex children that hold text set `minWidth: 0`; popovers use `min(92vw, …)`
 - [ ] `pnpm build`, `pnpm lint`, `pnpm test` pass
 
 ## Reference

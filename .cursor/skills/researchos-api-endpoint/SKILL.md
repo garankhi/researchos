@@ -278,6 +278,10 @@ All three must pass before the change is ready.
 - [ ] Errors throw NestJS exceptions, not `throw new Error`
 - [ ] Permission enforced in the backend
 - [ ] Multi-table writes use `$transaction`
+- [ ] If `message` is not empty, it carries a **code** (`camelCase`, e.g. `opportunityNotFound`), never prose — the FE resolves it against `messages.*.codes`
+- [ ] Every code the API can emit has an entry in `messages/vi.json` **and** `messages/en.json`
+- [ ] The FE falls back to a generic localized message when a code has no catalog entry — it never renders the raw code
+- [ ] Validation messages (`errors[].messages`) are codes too, not validator prose
 - [ ] `openapi.json` regenerated and committed
 - [ ] `openapi.json` has no component named `String`/`Number`/`Boolean` (primitives stay inline)
 - [ ] Orval client regenerated; no hand-written file inside `src/lib/api/`
