@@ -20,7 +20,7 @@ Nguồn nghiệp vụ: SRS PDF hiện có trong docs (119 trang); PDF tiếp t�
 | API | NestJS + REST/OpenAPI | Nghiệp vụ, phân quyền, validation, transaction và tích hợp |
 | Worker | NestJS application context + BullMQ | Xử lý job nền, chạy độc lập với HTTP API |
 | Database | PostgreSQL | Dữ liệu nghiệp vụ, ràng buộc, audit và provenance |
-| Data access | Prisma, kết hợp SQL khi cần | ORM và migration; bổ sung sau khi chốt schema |
+| Data access | Prisma 7, kết hợp SQL khi cần | ORM và migration trong `packages/database`; xem [database.md](./database.md) |
 | Queue | Redis + BullMQ | Lưu/điều phối job, retry, theo dõi trạng thái |
 | Files | Object storage tương thích S3 | Evidence, dataset và file export; database lưu metadata |
 | Search | PostgreSQL search/trigram, thêm vector khi cần | Điểm khởi đầu cho MVP nếu tiêu chí search cho phép |
@@ -53,14 +53,38 @@ flowchart TD
 researchos/
   apps/
     web/                  Next.js
+      src/
+        app/              Route; Next.js sở hữu cây này
+          _components/    Chỉ dùng trong segment gốc
+        components/
+          ui/             Primitive dùng chung, không biết nghiệp vụ
+          providers/      Client provider toàn app
+        features/         Một thư mục cho mỗi nghiệp vụ
+        lib/              Hạ tầng; api/ do Orval sinh ra
+        theme/            Cấu hình theme MUI
     api/                  NestJS HTTP API
+      src/
+        main.ts
+        app.module.ts     Chỉ nối các module nghiệp vụ
+        common/           Guard, decorator, filter, interceptor, pipe
+        modules/          Một thư mục cho mỗi nghiệp vụ
     worker/               NestJS background worker
-  packages/               Chỉ tạo khi có code dùng chung thực sự
+      src/
+        main.ts
+        app.module.ts
+        common/
+        modules/
+        processors/        Một file cho mỗi loại job
+  packages/
+    config/               Cách tìm và nạp file .env dùng chung
+    database/             Prisma schema, migration, client dùng chung API/worker
     contracts/            API contracts/client; không đưa ORM entities ra frontend
     backend-core/         Nghiệp vụ backend dùng chung cho API/worker nếu cần
   docs/
     architecture.md
     scaffolding.md
+    api-convention.md
+    database.md
     adr/
   package.json
   pnpm-workspace.yaml
@@ -69,6 +93,55 @@ researchos/
 ~~~
 
 Đây là pnpm workspace chứa các ứng dụng độc lập. Không cần chuyển riêng backend sang Nest CLI monorepo bằng lệnh generate app.
+
+Trong `apps/api` và `apps/worker`, module nghiệp vụ nằm trong `src/modules/<tên-nghiệp-vụ>/` với tên file theo tên nghiệp vụ (`profiles.controller.ts`, `profiles.service.ts`, `profiles.module.ts`). Phần dùng chung không thuộc nghiệp vụ nào nằm ở `src/common/`; `src/common/` không được biết tới `Profile` hay `Opportunity`. `app.module.ts` chỉ nối module, không chứa logic nghiệp vụ. Chi tiết lệnh sinh code: [scaffolding.md](./scaffolding.md).
+
+### Cấu trúc frontend
+
+`apps/web` dùng cùng nguyên tắc phân tách như backend: nghiệp vụ và phần dùng chung không trộn lẫn.
+
+~~~text
+apps/web/src/
+  app/                      Route; Next.js sở hữu cây này
+    _components/            Chỉ dùng trong segment gốc
+    <segment>/_components/  Chỉ dùng trong segment đó
+  components/
+    ui/                     Primitive dùng chung: LoadingSkeleton, ErrorState, EmptyState
+    providers/              Client provider toàn app: theme, query
+  features/                 Một thư mục cho mỗi nghiệp vụ
+    <nghiệp-vụ>/
+      index.ts              Barrel — điểm import duy nhất từ bên ngoài
+      types.ts              Kiểu dữ liệu UI dùng
+      hooks/                Hook gọi API và chuẩn hoá trạng thái
+      components/           Component riêng của nghiệp vụ
+  lib/                      Hạ tầng, không có logic nghiệp vụ
+    api/                    DO ORVAL SINH RA — không sửa tay
+    axios-instance.ts       Mutator cho Orval; phải nằm ngoài api/
+  theme/                    Cấu hình theme MUI
+~~~
+
+Quy tắc giữ khi tổ chức frontend:
+
+- **`src/lib/api/` là của Orval.** Config Orval chạy với `clean: true`, nên lần
+  codegen sau sẽ xóa sạch thư mục đó rồi sinh lại. Mọi file viết tay đặt
+  trong đó sẽ bị xóa. Quy tắc `no-restricted-imports` trong
+  `apps/web/eslint.config.mjs` chặn import trực tiếp vào `src/lib/api/*`;
+  import qua barrel `@/lib/api`.
+- **`components/ui/` không biết gì về nghiệp vụ.** Cùng nguyên tắc với
+  `src/common/` của backend: file ở đây không được nhắc tới `Profile`,
+  `Opportunity`, `Taxonomy`.
+- **`features/<nghiệp-vụ>/` đặt tên theo đúng module ở
+  `apps/api/src/modules/<tên-nghiệp-vụ>/`** để tra nghiệp vụ được nhanh.
+- **Feature không import chéo lẫn nhau.** Cần dữ liệu của feature khác thì
+  gọi qua hook của feature đó.
+- **Tách lớp transport và domain.** Orval sinh ra tầng transport: request,
+  cache key, query lifecycle. Tầng domain nằm ở `features/<nghiệp-vụ>/hooks/`
+  ánh xạ DTO sang kiểu domain và chuẩn hoá trạng thái để UI không phải
+  phân biệt `isPending` (chưa có data) với `isFetching` (đang có request).
+  `isPending` với query `enabled: false` đúng mãi, là nguồn lỗi "spinner
+  không bao giờ dừng" quen thuộc.
+
+Chi tiết thư mục `features/`: [apps/web/src/features/README.md](../apps/web/src/features/README.md).
 
 Next.js gọi API NestJS; nghiệp vụ và quyết định phân quyền cuối cùng tập trung ở NestJS. Route Handler hoặc Server Action nếu dùng chỉ đảm nhiệm phần cần cho giao diện. API và worker dùng chung nghiệp vụ thông qua package backend có chủ sở hữu rõ ràng, tránh copy logic hoặc import thẳng source của ứng dụng kia.
 

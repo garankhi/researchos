@@ -1,0 +1,81 @@
+// ResearchOS data model.
+//
+// Ownership rules for this file:
+// - Every table lives in the `public` schema. No schema-per-tenant.
+// - Enums are declared next to the models that use them, not in a shared dump.
+// - Three independent axes are tracked separately, per docs/architecture.md:
+//   `validationStatus`, `visibility` and `publicationStatus`. Never collapse
+//   them into one `status` field.
+// - Every record that can be user-entered, imported or AI-inferred keeps its
+//   provenance: `sourceKind`, `sourceRef` and `verificationStatus`.
+// - Timestamps are stored in UTC. `createdAt`/`updatedAt` are mandatory.
+//
+// The schema is intentionally empty of domain tables at this stage: the SRS
+// contradictions listed in docs/architecture.md ("Những điểm SRS cần chốt")
+// are not resolved yet, so locking in tables now would encode wrong decisions.
+// Run `prisma migrate dev --create-only` to capture the first real migration
+// once a domain area is confirmed.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Shared building blocks
+// ---------------------------------------------------------------------------
+
+/// Where a piece of data came from. Self-declared data is not trusted by
+/// default; imported and AI-inferred rows are always reviewable.
+enum SourceKind {
+  SELF_DECLARED
+  IMPORTED
+  AI_INFERRED
+  SYSTEM
+}
+
+/// How far a row has been verified by someone with authority.
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+/// Who may see a record. Independent from publication and validation state.
+enum Visibility {
+  PRIVATE
+  GROUP
+  INSTITUTION
+  PUBLIC
+}
+
+/// Whether a record is considered published. Independent from visibility and
+/// validation state.
+enum PublicationStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Generic audit trail. Every domain table that records a meaningful change
+/// references an entry here so that provenance is queryable.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @map("actor_id")
+  action    String   @db.VarChar(64)
+  entity    String   @db.VarChar(64)
+  entityId  String   @map("entity_id")
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

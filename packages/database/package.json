@@ -1,0 +1,57 @@
+{
+  "name": "@researchos/database",
+  "version": "0.0.1",
+  "description": "Prisma schema, generated client and Nest integration for ResearchOS",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./prisma": {
+      "types": "./dist/generated/prisma/client.d.ts",
+      "default": "./dist/generated/prisma/client.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:validate": "prisma validate",
+    "format": "prisma format",
+    "build": "tsc -p tsconfig.build.json",
+    "prebuild": "pnpm run db:generate",
+    "lint": "oxlint --type-aware src/",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "pg": "8.23.1",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@researchos/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.6",
+    "dotenv": "18.0.9",
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "prisma": "7.10.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.2"
+  }
+}

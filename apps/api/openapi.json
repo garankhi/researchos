@@ -1,0 +1,290 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/demo/slow": {
+      "get": {
+        "operationId": "DemoController_getSlow",
+        "parameters": [
+          {
+            "name": "delay",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 2000,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Greeting message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoControllerGetSlowEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Returns the greeting after a configurable delay",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/demo/fail": {
+      "get": {
+        "operationId": "DemoController_getFail",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Always fails with a 500 to exercise the error state",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/demo/unstable": {
+      "get": {
+        "operationId": "DemoController_getUnstable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Greeting message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoControllerGetUnstableEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Alternates between success and failure",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness probe for the API process",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_checkReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness probe including a database round trip",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "ResearchOS API",
+    "description": "ResearchOS backend API",
+    "version": "0.0.1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "HealthStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok",
+            "description": "ok when healthy, degraded when a dependency is unreachable"
+          },
+          "service": {
+            "type": "string",
+            "example": "researchos-api"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "example": 42,
+            "description": "Process uptime in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-29T01:30:00.000Z"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "uptimeSeconds",
+          "timestamp"
+        ]
+      },
+      "ApiErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ],
+            "default": false
+          },
+          "data": {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "statusCode": {
+            "type": "number"
+          },
+          "path": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "field",
+                "messages"
+              ]
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message",
+          "statusCode",
+          "path",
+          "timestamp"
+        ]
+      },
+      "DemoControllerGetSlowEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "DemoControllerGetUnstableEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "HealthStatusDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      }
+    }
+  }
+}

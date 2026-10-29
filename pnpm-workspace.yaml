@@ -3,6 +3,12 @@ packages:
   - 'packages/*'
 
 # Preserve the dependency build-script choices from the generated web project.
+# Prisma needs its postinstall to download the query engine binaries.
 allowBuilds:
   sharp: false
   unrs-resolver: false
+  esbuild: true
+  '@scarf/scarf': false
+  '@prisma/engines': true
+  '@prisma/client': true
+  prisma: true
