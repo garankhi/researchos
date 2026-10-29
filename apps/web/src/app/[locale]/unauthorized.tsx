@@ -1,5 +1,6 @@
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { Login } from '@mui/icons-material';
+import { getTranslations } from 'next-intl/server';
 import NextLink from '@/components/ui/link';
 
 /**
@@ -14,20 +15,22 @@ import NextLink from '@/components/ui/link';
  * Replace the `/login` href with the real SSO entry point once FPTU SSO is
  * integrated.
  */
-export default function Unauthorized() {
+export default async function Unauthorized() {
+  const t = await getTranslations('unauthorized');
+
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
       <Stack spacing={2} sx={{ alignItems: 'center', textAlign: 'center' }}>
         <Login color="disabled" sx={{ fontSize: 48 }} />
         <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          Cần đăng nhập
+          {t('title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Bạn cần đăng nhập bằng tài khoản trường để xem nội dung này.
+          {t('description')}
         </Typography>
         <Box>
           <Button variant="contained" component={NextLink} href="/login">
-            Đăng nhập
+            {t('action')}
           </Button>
         </Box>
       </Stack>

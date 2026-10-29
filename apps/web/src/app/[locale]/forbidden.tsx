@@ -1,5 +1,6 @@
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { LockOutlined } from '@mui/icons-material';
+import { getTranslations } from 'next-intl/server';
 import NextLink from '@/components/ui/link';
 
 /**
@@ -11,21 +12,23 @@ import NextLink from '@/components/ui/link';
  * Next.js returns a 403 status before streaming starts, and injects a
  * `<meta name="robots" content="noindex" />` tag.
  */
-export default function Forbidden() {
+export default async function Forbidden() {
+  const t = await getTranslations('forbidden');
+  const tCommon = await getTranslations('common');
+
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
       <Stack spacing={2} sx={{ alignItems: 'center', textAlign: 'center' }}>
         <LockOutlined color="disabled" sx={{ fontSize: 48 }} />
         <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          Không có quyền truy cập
+          {t('title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Tài nguyên này bị giới hạn theo vai trò hoặc phạm vi hiển thị. Nếu bạn
-          cần quyền truy cập, hãy liên hệ quản trị viên.
+          {t('description')}
         </Typography>
         <Box>
           <Button variant="contained" component={NextLink} href="/">
-            Về trang chủ
+            {tCommon('backToHome')}
           </Button>
         </Box>
       </Stack>

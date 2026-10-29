@@ -1,5 +1,6 @@
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { SearchOff } from '@mui/icons-material';
+import { getTranslations } from 'next-intl/server';
 import NextLink from '@/components/ui/link';
 
 /**
@@ -9,21 +10,23 @@ import NextLink from '@/components/ui/link';
  * match no route. Next.js adds a `<meta name="robots" content="noindex" />`
  * tag when the 404 is streamed.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslations('notFound');
+  const tCommon = await getTranslations('common');
+
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
       <Stack spacing={2} sx={{ alignItems: 'center', textAlign: 'center' }}>
         <SearchOff color="disabled" sx={{ fontSize: 48 }} />
         <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          Không tìm thấy trang
+          {t('title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Trang bạn tìm không tồn tại, đã bị xóa hoặc đã được chuyển sang địa
-          chỉ khác.
+          {t('description')}
         </Typography>
         <Box>
           <Button variant="contained" component={NextLink} href="/">
-            Về trang chủ
+            {tCommon('backToHome')}
           </Button>
         </Box>
       </Stack>

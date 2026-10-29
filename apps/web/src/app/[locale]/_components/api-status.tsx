@@ -2,6 +2,7 @@
 
 import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
 import { useApiHealth } from '@/features/health';
+import { useTranslations } from 'next-intl';
 
 /**
  * Temporary scaffold component that checks API connectivity.
@@ -14,6 +15,8 @@ import { useApiHealth } from '@/features/health';
  * how API health is modelled.
  */
 export function ApiStatus() {
+  const t = useTranslations('errors');
+  const tHome = useTranslations('home');
   const { data, isPending, isFailed, refetch } = useApiHealth();
 
   if (isPending) return <LoadingSkeleton variant="text" width={220} />;
@@ -21,8 +24,8 @@ export function ApiStatus() {
   if (isFailed) {
     return (
       <ErrorState
-        title="Không kết nối được API"
-        message="Hãy chắc chắn API đang chạy tại cổng 4000, rồi thử lại."
+        title={t('apiUnreachableTitle')}
+        message={t('apiUnreachableDescription')}
         onRetry={() => void refetch()}
       />
     );
@@ -30,7 +33,10 @@ export function ApiStatus() {
 
   return (
     <p>
-      API trả về: {data?.status} ({data?.service})
+      {tHome('apiResponse', {
+        status: data?.status ?? '',
+        service: data?.service ?? '',
+      })}
     </p>
   );
 }

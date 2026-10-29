@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { ErrorOutlined } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
 
 /**
  * Route-level error boundary.
@@ -28,6 +29,8 @@ export default function RouteError({
   error: unknown;
   retry: () => void;
 }) {
+  const t = useTranslations('errors');
+
   useEffect(() => {
     // Replace with your error reporting service. In production the message
     // is stripped, so correlate using `error.digest` instead.
@@ -43,15 +46,14 @@ export default function RouteError({
       >
         <ErrorOutlined color="error" sx={{ fontSize: 48 }} />
         <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          Đã xảy ra lỗi khi tải trang
+          {t('title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Lỗi tạm thời. Vui lòng thử lại, nếu vấn đề vẫn tiếp diễn hãy báo cho
-          quản trị viên.
+          {t('description')}
         </Typography>
         <Box>
           <Button variant="contained" onClick={() => retry()}>
-            Thử lại
+            {t('retry')}
           </Button>
         </Box>
       </Stack>
