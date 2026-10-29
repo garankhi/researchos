@@ -1,0 +1,180 @@
+{
+  "common": {
+    "appName": "ResearchOS",
+    "loading": "Đang tải…",
+    "retry": "Thử lại",
+    "cancel": "Huỷ",
+    "save": "Lưu",
+    "close": "Đóng",
+    "backToHome": "Về trang chủ"
+  },
+  "nav": {
+    "products": "Sản phẩm",
+    "pricing": "Bảng giá",
+    "blog": "Blog",
+    "profile": "Hồ sơ",
+    "account": "Tài khoản",
+    "dashboard": "Bảng điều khiển",
+    "logout": "Đăng xuất",
+    "openSettings": "Mở cài đặt",
+    "openMenu": "Mở menu",
+    "accountOfCurrentUser": "Tài khoản của người dùng hiện tại"
+  },
+  "search": {
+    "open": "Mở tìm kiếm",
+    "label": "tìm kiếm",
+    "placeholder": "Tìm nghiên cứu, tạp chí, nhà khoa học…"
+  },
+  "theme": {
+    "label": "Đổi giao diện sáng/tối",
+    "toLight": "Chuyển sang chế độ sáng",
+    "toDark": "Chuyển sang chế độ tối",
+    "lightMode": "Chế độ sáng",
+    "darkMode": "Chế độ tối",
+    "systemMode": "Theo hệ thống"
+  },
+  "language": {
+    "label": "Ngôn ngữ",
+    "current": "Ngôn ngữ hiện tại"
+  },
+  "home": {
+    "apiStatus": "Trạng thái API",
+    "apiResponse": "API trả về: {status} ({service})"
+  },
+  "errors": {
+    "title": "Đã xảy ra lỗi khi tải trang",
+    "description": "Lỗi tạm thời. Vui lòng thử lại, nếu vấn đề vẫn tiếp diễn hãy báo cho quản trị viên.",
+    "globalTitle": "Ứng dụng gặp sự cố",
+    "globalDescription": "Đã xảy ra lỗi không mong muốn. Vui lòng tải lại trang hoặc thử lại.",
+    "unknown": "Đã xảy ra lỗi không xác định.",
+    "componentTitle": "Lỗi ở cấp component",
+    "apiUnreachableTitle": "Không kết nối được API",
+    "apiUnreachableDescription": "Hãy chắc chắn API đang chạy tại cổng 4000, rồi thử lại.",
+    "loadFailedTitle": "Không tải được dữ liệu",
+    "loadFailedDescription": "Mô tả cụ thể: máy chủ từ chối kết nối sau 3 lần thử.",
+    "requestFailedTitle": "Tải thất bại"
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "description": "Trang bạn tìm không tồn tại, đã bị xóa hoặc đã được chuyển sang địa chỉ khác."
+  },
+  "unauthorized": {
+    "title": "Cần đăng nhập",
+    "description": "Bạn cần đăng nhập bằng tài khoản trường để xem nội dung này.",
+    "action": "Đăng nhập"
+  },
+  "forbidden": {
+    "title": "Không có quyền truy cập",
+    "description": "Tài nguyên này bị giới hạn theo vai trò hoặc phạm vi hiển thị. Nếu bạn cần quyền truy cập, hãy liên hệ quản trị viên."
+  },
+  "demo": {
+    "title": "Demo & kiểm thử",
+    "description": "Trang này tập hợp các quy ước của frontend: MUI, Tailwind, dark mode, loading, error, truy cập và API client. Dùng để kiểm tra nhanh sau mỗi thay đổi.",
+    "sections": {
+      "mui": {
+        "title": "MUI components",
+        "description": "Mẫu các component và variant để kiểm tra theme và emotion cache."
+      },
+      "cascade": {
+        "title": "Tailwind x MUI cascade",
+        "description": "Utility class của Tailwind phải thắng style mặc định của MUI, không cần !important."
+      },
+      "theme": {
+        "title": "Theme & dark mode",
+        "description": "Kiểm tra next-themes và MUI dùng chung một color scheme."
+      },
+      "api": {
+        "title": "API client (Orval + TanStack Query)",
+        "description": "Mọi nút bên dưới gọi endpoint thật trên apps/api thông qua hook do Orval sinh ra."
+      },
+      "loading": {
+        "title": "Loading states",
+        "description": "Skeleton theo hình dạng nội dung, không dùng spinner — tránh layout shift."
+      },
+      "error": {
+        "title": "Error states",
+        "description": "Mỗi lỗi phải nói rõ lỗi gì và luôn có đường đi tiếp."
+      },
+      "access": {
+        "title": "Access boundaries (404 / 401 / 403)",
+        "description": "Các route riêng gọi notFound(), unauthorized() và forbidden() trong lúc server render."
+      },
+      "suspense": {
+        "title": "Suspense fallback"
+      }
+    },
+    "actions": {
+      "callAgain": "Gọi lại",
+      "invalidateAll": "Invalidate toàn bộ",
+      "clearCache": "Xóa cache",
+      "changeDelay": "Đổi độ trễ",
+      "loadAfter": "Tải sau {ms}ms",
+      "callFailing": "Gọi endpoint lỗi",
+      "callRandom": "Gọi ngẫu nhiên",
+      "throwError": "Ném lỗi",
+      "openRouteError": "Mở route lỗi cấp route"
+    },
+    "states": {
+      "success": "thành công",
+      "expectedFailure": "Tải thất bại (expected)",
+      "noError": "Không có lỗi",
+      "randomFailure": "Lần này thất bại",
+      "notCalled": "Chưa gọi — bấm nút để gửi request.",
+      "loaded": "Đã tải xong",
+      "resolvedAfter": "Component server đã resolve sau {seconds} giây."
+    },
+    "labels": {
+      "buttons": "Buttons",
+      "chips": "Chips",
+      "inputs": "Inputs",
+      "typography": "Typography",
+      "computedBackground": "Computed background",
+      "reference": "Tham chiếu: {value}",
+      "tailwindWins": "Tailwind thắng",
+      "notMatching": "Chưa khớp",
+      "themeSwitcher": "Chủ đề",
+      "systemPreference": "System preference",
+      "light": "Sáng",
+      "dark": "Tối",
+      "system": "Theo hệ thống",
+      "followSystem": "Bật để theo hệ thống",
+      "state": "Trạng thái",
+      "componentBoundary": "Component boundary",
+      "segmentError": "Route lỗi cấp segment"
+    },
+    "notes": {
+      "cancelOnNavigate": "Bấm rồi điều hướng đi nơi khác trước khi response về: request sẽ bị huỷ và component không báo lỗi.",
+      "noRetry": "Endpoint này dùng `retry: false` để lỗi hiện ra ngay. Mặc định TanStack Query retry 3 lần với backoff luỹ thừa.",
+      "cascade": "Nếu kết quả là “Chưa khớp”, layer `mui` đang nằm trên `utilities` — kiểm tra lại `@layer` trong globals.css và `enableCssLayer` trong layout.tsx.",
+      "themeBridge": "Nếu class trên <html> không khớp với next-themes thì bridge trong theme-provider.tsx đã hỏng.",
+      "themeHydrating": "Đang chờ mount — không thể đọc trạng thái phía client.",
+      "errorBoundary": "Ném lỗi một lần; nút “Thử lại” trong boundary gọi `retry()` và component hoạt động trở lại. Boundary dùng `catchError` từ `next/error`: `redirect()` và `notFound()` vẫn đi xuyên qua thay vì bị nuốt thành lỗi chung.",
+      "authInterrupts": "`forbidden()` và `unauthorized()` cần `experimental.authInterrupts: true` trong next.config.ts — thiếu thì Next sẽ báo lỗi build.",
+      "skeletonShape": "Skeleton phải giữ nguyên kích thước so với nội dung thật, nếu không trang sẽ nhảy layout khi dữ liệu tới.",
+      "muiSystemProps": "MUI v9 bỏ các system props (gap, flex, py, px, alignItems) khỏi prop surface trực tiếp — chúng phải đi qua `sx`, nếu không sẽ lọt ra DOM dưới dạng HTML attribute không hợp lệ."
+    },
+    "typography": {
+      "body1": "Body 1 — dòng chữ chuẩn để dùng.",
+      "body2": "Body 2 — phụ, dành cho mô tả.",
+      "caption": "Caption — chú thích nhỏ."
+    },
+    "alerts": {
+      "successTitle": "Thành công",
+      "successBody": "Thông báo thành công.",
+      "warningTitle": "Cảnh báo",
+      "warningBody": "Thông báo cảnh báo.",
+      "infoBody": "Thông tin bổ sung."
+    },
+    "loading": {
+      "toggle": "Ẩn/hiện",
+      "rectangularCircular": "Rectangular + circular",
+      "multipleLines": "Nhiều dòng",
+      "listItem": "List item",
+      "emptyState": "Empty state (dữ liệu rỗng — không phải lỗi)",
+      "hidden": "(Skeleton đã bị ẩn)",
+      "emptyTitle": "Chưa có kết quả",
+      "emptyMessage": "Bộ lọc hiện tại không khớp mục nào.",
+      "clearFilters": "Xóa bộ lọc"
+    }
+  }
+}

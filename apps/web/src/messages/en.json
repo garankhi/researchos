@@ -1,0 +1,181 @@
+{
+  "common": {
+    "appName": "ResearchOS",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "backToHome": "Back to home"
+  },
+  "nav": {
+    "products": "Products",
+    "pricing": "Pricing",
+    "blog": "Blog",
+    "profile": "Profile",
+    "account": "Account",
+    "dashboard": "Dashboard",
+    "logout": "Log out",
+    "openSettings": "Open settings",
+    "openMenu": "Open menu",
+    "accountOfCurrentUser": "Account of current user"
+  },
+  "search": {
+    "open": "Open search",
+    "label": "search",
+    "placeholder": "Search for research, journals, people…"
+  },
+  "theme": {
+    "label": "Toggle light/dark mode",
+    "toLight": "Switch to light mode",
+    "toDark": "Switch to dark mode",
+    "lightMode": "Light mode",
+    "darkMode": "Dark mode",
+    "systemMode": "Follow system"
+  },
+  "language": {
+    "label": "Language",
+    "switchTo": "Switch to Vietnamese",
+    "current": "Current language"
+  },
+  "home": {
+    "apiStatus": "API status",
+    "apiResponse": "API returned: {status} ({service})"
+  },
+  "errors": {
+    "title": "An error occurred while loading the page",
+    "description": "This is a temporary problem. Please try again — if it persists, contact an administrator.",
+    "globalTitle": "The application ran into a problem",
+    "globalDescription": "An unexpected error occurred. Please reload the page or try again.",
+    "unknown": "An unknown error occurred.",
+    "componentTitle": "Error at the component level",
+    "apiUnreachableTitle": "Could not reach the API",
+    "apiUnreachableDescription": "Make sure the API is running on port 4000, then try again.",
+    "loadFailedTitle": "Could not load the data",
+    "loadFailedDescription": "Specifically: the server refused the connection after 3 attempts.",
+    "requestFailedTitle": "Request failed"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you are looking for does not exist, was deleted, or has moved to another address."
+  },
+  "unauthorized": {
+    "title": "Sign in required",
+    "description": "You need to sign in with your institutional account to view this content.",
+    "action": "Sign in"
+  },
+  "forbidden": {
+    "title": "Access denied",
+    "description": "This resource is restricted by role or visibility scope. If you need access, contact an administrator."
+  },
+  "demo": {
+    "title": "Demo & testing",
+    "description": "This page collects the frontend conventions: MUI, Tailwind, dark mode, loading, error, access boundaries and the API client. Use it to verify a change quickly.",
+    "sections": {
+      "mui": {
+        "title": "MUI components",
+        "description": "A sample of components and variants to check the theme and the emotion cache."
+      },
+      "cascade": {
+        "title": "Tailwind x MUI cascade",
+        "description": "A Tailwind utility class must beat the MUI default style, without !important."
+      },
+      "theme": {
+        "title": "Theme & dark mode",
+        "description": "Verify that next-themes and MUI share one color scheme."
+      },
+      "api": {
+        "title": "API client (Orval + TanStack Query)",
+        "description": "Every button below calls a real endpoint on apps/api through the Orval-generated hooks."
+      },
+      "loading": {
+        "title": "Loading states",
+        "description": "Skeletons match the shape of the content — no spinner, so no layout shift."
+      },
+      "error": {
+        "title": "Error states",
+        "description": "Every error says what went wrong and always offers a way forward."
+      },
+      "access": {
+        "title": "Access boundaries (404 / 401 / 403)",
+        "description": "Dedicated routes call notFound(), unauthorized() and forbidden() during a server render."
+      },
+      "suspense": {
+        "title": "Suspense fallback"
+      }
+    },
+    "actions": {
+      "callAgain": "Call again",
+      "invalidateAll": "Invalidate all",
+      "clearCache": "Clear cache",
+      "changeDelay": "Change delay",
+      "loadAfter": "Load after {ms}ms",
+      "callFailing": "Call the failing endpoint",
+      "callRandom": "Call at random",
+      "throwError": "Throw an error",
+      "openRouteError": "Open the route-level error"
+    },
+    "states": {
+      "success": "success",
+      "expectedFailure": "Request failed (expected)",
+      "noError": "No error",
+      "randomFailure": "This one failed",
+      "notCalled": "Not called yet — press the button to send a request.",
+      "loaded": "Loaded",
+      "resolvedAfter": "The server component resolved after {seconds} seconds."
+    },
+    "labels": {
+      "buttons": "Buttons",
+      "chips": "Chips",
+      "inputs": "Inputs",
+      "typography": "Typography",
+      "computedBackground": "Computed background",
+      "reference": "Reference: {value}",
+      "tailwindWins": "Tailwind wins",
+      "notMatching": "Not matching",
+      "themeSwitcher": "Theme",
+      "systemPreference": "System preference",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System",
+      "followSystem": "Enable to follow the system",
+      "state": "State",
+      "componentBoundary": "Component boundary",
+      "segmentError": "Segment-level error route"
+    },
+    "notes": {
+      "cancelOnNavigate": "Press it and navigate away before the response arrives: the request is aborted and the component reports no error.",
+      "noRetry": "This endpoint uses `retry: false` so the error shows immediately. TanStack Query retries 3 times with exponential backoff by default.",
+      "cascade": "If the result is “Not matching”, the `mui` layer sits above `utilities` — re-check `@layer` in globals.css and `enableCssLayer` in layout.tsx.",
+      "themeBridge": "If the class on <html> does not match next-themes, the bridge in theme-provider.tsx is broken.",
+      "themeHydrating": "Waiting for mount — client-side state cannot be read yet.",
+      "errorBoundary": "The error is thrown once; the “Try again” button in the boundary calls `retry()` and the component works again. The boundary uses `catchError` from `next/error`: `redirect()` and `notFound()` still pass through instead of being swallowed as a generic error.",
+      "authInterrupts": "`forbidden()` and `unauthorized()` require `experimental.authInterrupts: true` in next.config.ts — otherwise the build fails.",
+      "skeletonShape": "A skeleton must keep the size of the real content, otherwise the page jumps when the data arrives.",
+      "muiSystemProps": "MUI v9 removed the system props (gap, flex, py, px, alignItems) from the direct prop surface — they must go through `sx`, or they leak onto the DOM as invalid HTML attributes."
+    },
+    "typography": {
+      "body1": "Body 1 — the standard line of text.",
+      "body2": "Body 2 — secondary, for descriptions.",
+      "caption": "Caption — a small annotation."
+    },
+    "alerts": {
+      "successTitle": "Success",
+      "successBody": "A success message.",
+      "warningTitle": "Warning",
+      "warningBody": "A warning message.",
+      "infoBody": "Additional information."
+    },
+    "loading": {
+      "toggle": "Show/hide",
+      "rectangularCircular": "Rectangular + circular",
+      "multipleLines": "Multiple lines",
+      "listItem": "List item",
+      "emptyState": "Empty state (no data — not an error)",
+      "hidden": "(Skeleton hidden)",
+      "emptyTitle": "No results yet",
+      "emptyMessage": "The current filters match nothing.",
+      "clearFilters": "Clear filters"
+    }
+  }
+}
