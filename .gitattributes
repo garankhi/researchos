@@ -1,0 +1,33 @@
+# Normalise line endings for every text file in the repository.
+#
+# Without this, `core.autocrlf=true` on Windows makes the working tree CRLF
+# while the index stays LF. Git then reports the file as modified even though
+# `git diff` is empty, so every Orval regeneration shows the whole generated
+# client as dirty. `text=auto` normalises to LF in the index;
+# `eol=lf` keeps the working tree LF as well, so the files stay consistent
+# across Windows and Unix.
+* text=auto eol=lf
+
+# Files that must keep their exact bytes.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+
+# The lockfile is generated; keep it as plain text but never let a tool
+# reformat it.
+pnpm-lock.yaml text eol=lf
+
+# PowerShell scripts are read by both Windows PowerShell and pwsh.
+*.ps1 text eol=crlf
+
+# Batch files and cmd shims need CRLF to work on Windows.
+*.cmd text eol=crlf
+*.bat text eol=crlf
