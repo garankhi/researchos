@@ -4,11 +4,12 @@ import { useEffect } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { ErrorOutlined } from '@mui/icons-material';
 import { catchError, type ErrorInfo } from 'next/error';
+import { useTranslations } from 'next-intl';
 
 /**
  * Component-level error boundary for ResearchOS.
  *
- * `catchError` (stable since Next 16.3) is preferred over a hand-rolled React
+ * `catchError` (stable since Next 16.3) is preferred over a hand-rolled
  * error boundary class because it:
  * - re-renders inside a Transition, so Client Component state outside the
  *   boundary survives a recoverable error;
@@ -27,6 +28,8 @@ function ErrorFallback(
   { title, message }: { title: string; message?: string },
   { error, retry }: ErrorInfo,
 ) {
+  const t = useTranslations('common');
+
   useEffect(() => {
     // Replace with your error reporting service. `error.digest` correlates
     // a production error with the server-side log entry.
@@ -56,7 +59,7 @@ function ErrorFallback(
           </Typography>
         ) : null}
         <Button variant="outlined" size="small" onClick={() => retry()}>
-          Thử lại
+          {t('retry')}
         </Button>
       </Stack>
     </Box>

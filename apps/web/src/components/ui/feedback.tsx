@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 
 /**
  * Shared loading and error display primitives.
@@ -105,6 +106,8 @@ export function ErrorState({
   action?: ReactNode;
   onRetry?: () => void;
 }) {
+  const t = useTranslations('common');
+
   return (
     <Alert
       severity="error"
@@ -113,7 +116,7 @@ export function ErrorState({
       action={
         onRetry ? (
           <Button color="inherit" size="small" onClick={onRetry}>
-            Thử lại
+            {t('retry')}
           </Button>
         ) : null
       }
