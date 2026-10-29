@@ -19,7 +19,11 @@ export default defineConfig({
           name: 'axiosInstance',
         },
         query: {
-          useQuery: true,
+          // Orval picks the hook shape from the HTTP verb: `GET` becomes a
+          // `useQuery` hook, `POST`/`PATCH`/`DELETE` become `useMutation`
+          // hooks. Setting `useQuery: true` globally would force writes to
+          // be generated as query hooks — cached, with no `mutate` and no
+          // `onSuccess`/`onError` mutation callbacks.
           signal: true,
         },
       },

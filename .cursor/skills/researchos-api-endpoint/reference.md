@@ -263,66 +263,6 @@ export class ProfileResponseDto {
 }
 ```
 
-## Error response shape
-
-`HttpExceptionFilter` in `apps/api/src/common/filters/http-exception.filter.ts`
-produces one shape for every failure:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "Profile not found",
-  "statusCode": 404,
-  "path": "/profiles/abc",
-  "timestamp": "2026-10-29T01:30:00.000Z"
-}
-```
-
-`message` is a string, or several validation messages joined with `; `.
-
-A validation failure adds an `errors` array, grouped by field, so the frontend
-can show each message next to the input that caused it:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "title must be a string; title should not be empty",
-  "statusCode": 400,
-  "path": "/profiles",
-  "timestamp": "2026-10-29T01:30:00.000Z",
-  "errors": [
-    { "field": "title", "messages": ["must be a string", "should not be empty"] }
-  ]
-}
-```
-
-The frontend reads `message`, `statusCode` and `errors` from this shape.
-Changing it is a breaking change for every screen.
-
-## Success response shape
-
-`ApiResponseInterceptor` wraps every successful response:
-
-```json
-{ "success": true, "data": { "id": "abc" }, "message": "" }
-```
-
-The controller returns the **bare payload** — never the envelope. See the
-`researchos-api-endpoint` skill for how the OpenAPI document is rewritten to
-match.
-
-## Where each piece lives
-
-| File | Role |
-| --- | --- |
-| `common/interceptors/api-response.interceptor.ts` | Wraps successful responses |
-| `common/filters/http-exception.filter.ts` | Wraps failures |
-| `common/dto/api-response.dto.ts` | Describes the envelope for Swagger |
-| `common/openapi/envelope-transform.ts` | Rewrites the OpenAPI document so it describes the envelope |
-| `src/openapi.ts` | Applies the transform after `SwaggerModule.createDocument` |
-
 ## URL patterns
 
 | Method | Path | Meaning |
@@ -352,8 +292,6 @@ pnpm --dir apps/api exec nest generate service modules/profiles/profiles --flat
 pnpm --dir apps/api exec nest generate class modules/profiles/dto/create-profile.dto --flat
 
 # Regenerate the contract
-pnpm --filter api openapi
-pnpm --filter web orval
 pnpm codegen
 
 # Verify
@@ -373,11 +311,10 @@ pnpm build && pnpm lint && pnpm test
 | `@ApiProperty` without a class-validator decorator on a request DTO | `400` — the whitelist rejects the field as unknown |
 | A class-validator decorator without `@ApiProperty` | The field is missing from the OpenAPI spec; the client types it as `any` |
 | `throw new Error(...)` in a service | Returns a 500 with a generic body; the client cannot distinguish cases |
-| Building `{ success, data, message }` in a controller | Double-wrapped — the interceptor applies the envelope globally |
-| `@ApiOkResponse({ type: SomeDtoEnvelope })` | Double-wrapped in the spec too; annotate the **payload** type |
 | Prisma query inside a controller | Business logic leaks out of the service; hard to test |
 | Manual permission check in a controller | Easily bypassed and duplicated |
 | Returning a raw Prisma entity | Leaks internal columns to the client |
-| Editing a file under `src/lib/api/` | Deleted on the next Orval run (`clean: true`) |
 | Missing `.js` on a local import | ESM resolution fails at runtime, not at build time |
 | Deleting a published field | Breaks a frontend that has not been redeployed yet |
+
+The envelope mistakes live in `researchos-contract`'s reference.

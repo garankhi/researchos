@@ -14,9 +14,13 @@ import type { ReactNode } from 'react';
  * Shared loading and error display primitives.
  *
  * Standards for ResearchOS screens:
- * - Loading states are skeletons that match the shape of the content they
- *   replace, not spinners. A spinner hides the layout; a skeleton reserves
- *   the space and avoids a layout shift when data arrives.
+ * - Block loading states are skeletons that match the shape of the content
+ *   they replace. A spinner hides the layout; a skeleton reserves the space
+ *   and avoids a layout shift when data arrives. Skeletons are for content
+ *   that occupies an area of the page — a list, a card, a detail panel.
+ * - Mutations do not change the layout, so their indicator belongs in the
+ *   button: `<Button loading={mutation.isPending}>`. See the
+ *   `researchos-ui` skill.
  * - Every error state offers a way forward. A dead-end message with no
  *   recovery action is a bug, not an error state.
  * - Errors are scoped: say what failed, not "something went wrong".

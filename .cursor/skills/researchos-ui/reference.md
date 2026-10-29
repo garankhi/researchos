@@ -1,7 +1,7 @@
-# ResearchOS frontend — reference
+# ResearchOS UI — reference
 
-Templates and lookup tables for `researchos-frontend`. Read the section you
-need; do not read this file end to end.
+Templates and lookup tables for `researchos-ui`. Read the section you need;
+do not read this file end to end.
 
 ## Feature folder template
 
@@ -123,6 +123,8 @@ For a query with `enabled: false`, use `isFetching` to detect a manual
 
 ## Loading primitives
 
+Skeletons for block loading:
+
 ```typescript
 import {
   EmptyState,
@@ -156,6 +158,139 @@ import {
 
 `EmptyState` is not an error. A list that loaded with zero rows is a success
 state.
+
+## Mutation indicators
+
+A spinner belongs in the button that triggered the mutation.
+
+```typescript
+import { Button, CircularProgress, IconButton } from '@mui/material';
+
+// MUI v9 renders a CircularProgress and disables the button.
+<Button variant="contained" loading={mutation.isPending}>
+  Lưu
+</Button>
+
+// The label stays visible, the spinner pushes it right.
+<Button variant="contained" loading={mutation.isPending} loadingPosition="start">
+  Lưu
+</Button>
+
+// A small inline action.
+<IconButton aria-label="Lưu" disabled={mutation.isPending}>
+  {mutation.isPending ? <CircularProgress size={16} /> : <SaveIcon />}
+</IconButton>
+```
+
+`loading` implies `disabled`, so a double submit is impossible while the
+mutation is in flight.
+
+### Query flags vs mutation flags
+
+| | Query | Mutation |
+| --- | --- | --- |
+| Pending flag | `isPending` — **true forever** on an `enabled: false` query | `isPending` — true only while the mutation runs |
+| Correct binding | A skeleton, when the query is enabled | A button spinner |
+| Never bind a spinner to | `query.isPending` on a disabled query | — |
+
+A disabled mutation has not fired, so its `isPending` is the correct signal
+for a button spinner. A disabled *query* has never resolved, so its
+`isPending` is meaningless.
+
+```typescript
+// Wrong — query.isPending can be true forever on a disabled query.
+<Button loading={query.isPending}>Lưu</Button>
+
+// Right — a mutation is either fired or not.
+<Button loading={mutation.isPending}>Lưu</Button>
+```
+
+## Mutation feedback
+
+Success → snackbar. Error → inline, next to the cause.
+
+| Outcome | Where | How long |
+| --- | --- | --- |
+| Success | Snackbar | Auto-hides (~4s) |
+| Error | Inline, next to what failed | Stays until resolved or dismissed |
+| Validation error | Under each invalid input | Stays |
+| Error with no local anchor | Snackbar, `autoHideDuration: null` | Stays until dismissed |
+
+### Why the asymmetry
+
+A snackbar is a notification channel, not a state channel. It auto-hides, it
+is spatially detached from the cause, and it cannot hold per-field messages
+legibly. An error the user did not read in four seconds is an error they
+will repeat.
+
+Success is different: the page is already correct, so a transient
+confirmation is all that is needed.
+
+### MUI Snackbar details
+
+`SnackbarContent` defaults to `role="alert"`. That is right for an error but
+wrong for a success — a success should not interrupt a screen reader.
+Override it through the `content` slot:
+
+```typescript
+<Snackbar
+  open={open}
+  autoHideDuration={4000}
+  onClose={handleClose}
+  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+  slotProps={{
+    content: {
+      role: 'status',
+      sx: { bgcolor: 'success.main', color: 'success.contrastText' },
+    },
+  }}
+  message="Đã lưu hồ sơ."
+/>
+```
+
+| Prop | Note |
+| --- | --- |
+| `role` | `'alert'` for errors (assertive), `'status'` for success (polite) |
+| `autoHideDuration` | `null` disables auto-hide — use it for errors |
+| `anchorOrigin` | Defaults to bottom-left; bottom-right is the common choice |
+| `message` | Plain text. For rich content, pass a child instead |
+| `key` | Give each message a distinct key so consecutive toasts do not merge |
+
+### Field-level errors
+
+`apiFieldErrors(error)` returns the backend's grouped validation messages:
+
+```typescript
+import { apiErrorMessage, apiFieldErrors } from '@/lib/api-error';
+
+const fieldErrors = apiFieldErrors(mutation.error);
+
+{fieldErrors?.map((e) => (
+  <FieldError key={e.field} message={e.messages.join(', ')} />
+))}
+```
+
+The backend groups by field precisely so each message can sit under its
+input. Do not flatten them into one toast line.
+
+### Where to put the callbacks
+
+In the mutation hook's `onSuccess` / `onError`, not in the click handler —
+so the feedback fires however the mutation was triggered:
+
+```typescript
+const mutation = useCreateProfile({
+  onSuccess: () => {
+    showSnackbar({ severity: 'success', message: 'Đã tạo hồ sơ.' });
+  },
+  onError: (error) => {
+    setFieldErrors(apiFieldErrors(error));
+  },
+});
+```
+
+Do not derive the success message from a `useEffect` on `mutation.isSuccess`
+— it fires twice under React Strict Mode.
 
 ## Error patterns
 
@@ -386,28 +521,119 @@ const computed = window.getComputedStyle(element).backgroundColor;
 ## Commands
 
 ```powershell
-# Regenerate the API client after a backend contract change
-pnpm --filter api openapi
-pnpm --filter web orval
-pnpm codegen
-
 # Verify
 pnpm --filter web lint
 pnpm --filter web build
 pnpm build && pnpm lint && pnpm test
 ```
 
+Regenerating the API client is a backend-side step — see the
+`researchos-api-endpoint` skill.
+
+## Orval: query hooks vs mutation hooks
+
+Orval decides per operation whether to emit a **query** hook or a **mutation**
+hook, based on the HTTP verb and the `override.query.useQuery` /
+`override.query.useMutation` flags.
+
+| Config | `GET` | `POST` / `PATCH` / `DELETE` |
+| --- | --- | --- |
+| Default (no `override.query`) | `useQuery` hook | `useMutation` hook |
+| `override.query.useQuery: true` | `useQuery` hook | **`useQuery` hook** |
+
+Verified by generating the same spec both ways. With `useQuery: true`, a
+`POST` operation is emitted as a query hook: the cache key is
+`["POST", "/profiles", body]`, the hook is backed by `useQuery`, and there is
+no `mutate`, no `mutateAsync`, and no `onSuccess` / `onError` mutation
+callback.
+
+That is wrong for a write. A `POST` behind a query hook **caches the
+response**, re-runs the request when the query key is invalidated, and gives
+the caller no mutation handle.
+
+`useQuery: true` was set when the client was first added (commit `9125889`),
+when the project only had `GET` endpoints. It was harmless then — for the
+current spec it makes **no difference at all**, and the generated output is
+byte-identical with and without it.
+
+### The fix
+
+Delete the blanket `useQuery: true` from `apps/web/orval.config.ts` and let
+Orval decide by verb:
+
+```typescript
+override: {
+  mutator: {
+    path: './src/lib/axios-instance.ts',
+    name: 'axiosInstance',
+  },
+  query: {
+    signal: true,
+  },
+},
+```
+
+`signal: true` stays — it makes the request cancellable via the `AbortSignal`
+that React Query passes to the query function.
+
+`useQuery: true` should only ever be scoped to individual operations, never
+set globally.
+
+### Verifying the change
+
+Regenerating must produce **no diff** while the project has only `GET`
+endpoints:
+
+```powershell
+pnpm --filter web orval
+git diff --stat apps/web/src/lib/api
+```
+
+A diff on `GET` operations means something else changed. A diff that shows
+`useMutation` appearing is the expected result once a `POST` exists.
+
+### Version detection
+
+Orval reads `package.json` to decide which React Query version's option
+types to emit. It cannot always find it — when it cannot, it falls back to
+v4 shapes and warns:
+
+```text
+Could not determine the installed @tanstack/react-query version, so hooks are
+generated for v4. If the project is on v5, set `override.query.version: 5`
+(or point `output.packageJson` at the package.json that declares the
+dependency)
+```
+
+The v4 shapes are wrong for this project: they omit the `Partial<>` wrapper
+around the options object, so the generated option types do not accept a
+partial `query` object. This project is on `@tanstack/react-query@5.105.0`,
+so the generated code must use `Partial<UseQueryOptions<...>>`.
+
+If the warning appears during a normal `pnpm --filter web orval` run, the
+config is fine — it resolves `package.json` from the config's own directory.
+The warning only shows up when Orval is run from elsewhere, or when the
+config's `packageJson` is not set.
+
 ## Common mistakes
 
 | Mistake | Consequence |
 | --- | --- |
 | Spinner bound to `isPending` on an `enabled: false` query | Spinner never stops; button can never be clicked |
+| `loading={query.isPending}` on a submit button | Same trap, on the button this time — bind the mutation's flag |
+| A page-level spinner while a block of content loads | The layout jumps when the data arrives; use a skeleton |
+| A mutation with no success feedback | The user cannot tell the click registered |
+| A mutation with no error feedback | The user retries blindly against a failure they never saw |
+| A snackbar for an error that has a local anchor | The message auto-hides and points at nothing |
+| Validation errors flattened into one toast line | Defeats the backend's per-field grouping; the user cannot tell which input is wrong |
+| A success message derived from a `useEffect` on `isSuccess` | Fires twice under React Strict Mode |
+| `override.query.useQuery: true` set globally in the Orval config | `POST`/`PATCH`/`DELETE` are generated as query hooks — cached, no `mutate`, no `onSuccess`/`onError` |
 | Hand-written file under `src/lib/api/` | Deleted on the next Orval run (`clean: true`) |
 | Deep import `@/lib/api/profiles/profiles` | Blocked by eslint; import from `@/lib/api` |
 | Value import from `@/lib/api/models` | Blocked by eslint; a *type-only* import is allowed |
+| Relative import `../../lib/api/profiles/profiles` | **Passes lint** — the rule only matches the `@/` alias, and `clean: true` still deletes the file |
 | Reading `query.data.data` | The mutator already unwrapped the envelope |
 | `String(error)` in an error state | Shows `"AxiosError: Request failed with status code 500"` instead of the server's message |
-| Building `{ success, data }` in a controller | Double-wrapped — the interceptor does it |
 | UI branching on raw query flags | Every screen repeats the state logic and its bugs |
 | Feature importing another feature's files | Coupling; call the other feature's hook instead |
 | `components/ui/` naming a domain entity | Breaks the shared-primitive boundary |
