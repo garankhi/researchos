@@ -3,6 +3,13 @@ docs/*
 !docs/*.md
 !docs/adr/
 !docs/adr/*.md
+!docs/database/
+!docs/database/*.md
+!docs/database/*.dbml
+!docs/database/*.sql
+!docs/database/*.ps1
+!docs/database/*.py
+!docs/database/*.cjs
 
 # Dependencies and generated output.
 **/node_modules/

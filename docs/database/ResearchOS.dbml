@@ -1,0 +1,1085 @@
+// ResearchOS v4.3 - FPTU internal research network - 2026-10-30
+// Paste this entire file into dbdiagram.io.
+// PostgreSQL-only partial/GIN indexes, role view and timestamp triggers are
+// included in ResearchOS.sql. This diagram is not an authorization engine.
+Project researchos {
+  database_type: 'PostgreSQL'
+  Note: '''Fresh database design. MVP uses provisioned email/password accounts; OIDC is a future alternative on the same user. Active faculty are researchers; students/staff need a RESEARCHER grant. ADMIN is independent and does not bypass resource ownership/visibility. Personal output releases require output ownership, not group approval. Group leaders accept a pinned released revision for their group only. Other creates LOCAL topics immediately. Taxonomy: OpenAlex Field -> Subfield -> Topic, without Domain. SQL adds constraints, triggers and query helpers; backend authenticates the actor and applies authorization.'''
+}
+
+Enum user_type { 
+  FACULTY
+  STUDENT
+  STAFF
+}
+Enum access_role {
+  RESEARCHER
+  ADMIN
+}
+Enum handover_basis {
+  HOLDER_CONSENT
+  INSTITUTIONAL_AUTHORIZATION
+}
+Enum role_grant_source {
+  MANUAL
+  SYSTEM
+}
+Enum authentication_method {
+  LOCAL
+  OIDC
+}
+Enum taxonomy_source {
+  LOCAL
+  OPENALEX
+}
+Enum visibility_level {
+  PRIVATE
+  RESEARCH_GROUP
+  FPTU_COMMUNITY
+}
+Enum data_provenance_type {
+  PAPER
+  AI_TRACE
+  AI_INF
+  HUMAN
+  EXT
+  UNK
+}
+Enum interest_source {
+  DECLARED
+  INFERRED
+}
+Enum interest_status {
+  SUGGESTED
+  ACTIVE
+  REJECTED
+}
+Enum claim_status {
+  SUGGESTED
+  CONFIRMED
+  REJECTED
+}
+Enum availability_status_type {
+  OPEN_FOR_COLLABORATION
+  SEEKING_GROUP
+  MENTORING_ONLY
+  LIMITED_AVAILABILITY
+  NOT_AVAILABLE
+}
+Enum group_member_role {
+  CORE_MEMBER
+  COLLABORATOR
+  STUDENT_MEMBER
+}
+Enum post_type {
+  GENERAL_NEWS
+  PUBLICATION
+  AWARD
+  PROJECT_UPDATE
+}
+Enum opportunity_kind {
+  RESEARCH_COLLABORATION
+  PROJECT_FORMATION
+  DATA_METHOD_EXCHANGE
+  FUNDING_CALL
+}
+Enum target_audience {
+  FACULTY
+  STUDENT
+  ANY_RESEARCHER
+}
+Enum opportunity_status {
+  DRAFT
+  OPEN
+  FILLED
+  CLOSED
+  EXPIRED
+}
+Enum opportunity_application_status {
+  PENDING
+  INVITED_TO_DISCUSS
+  DECLINED
+  WITHDRAWN
+}
+Enum expected_role_type {
+  CO_PI
+  METHODOLOGY_LEAD
+  DOMAIN_EXPERT
+  DATA_ENGINEER
+  STUDENT_RESEARCHER
+  CO_AUTHOR
+  ADVISOR_CONSULTANT
+}
+Enum project_type {
+  UNIVERSITY_GRANT
+  MINISTRY_GRANT
+  STATE_GRANT
+  INDUSTRY_LAB
+  INTERNATIONAL_JOINT
+  COLLABORATIVE_RESEARCH
+}
+Enum milestone_status {
+  ON_TRACK
+  DELAYED
+  BLOCKED
+  COMPLETED
+}
+Enum project_status {
+  PROPOSAL_DRAFT
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  PUBLISHED_DELIVERED
+  CANCELLED
+}
+Enum record_status {
+  DRAFT
+  RESEARCHER_CONFIRMED
+  VALIDATED
+  ARCHIVED
+}
+Enum publication_status {
+  UNPUBLISHED
+  PUBLISHED
+}
+Enum output_sharing_status {
+  DRAFT
+  SHARED
+  ARCHIVED
+}
+Enum group_output_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REMOVED
+}
+Enum edge_type {
+  CITES
+  RELATED_TO
+  ADDRESSES
+  ANSWERS
+  USES_METHOD
+  USES_DATASET
+  INHERITS_METHOD
+  INHERITS_DATA
+  EXTENDS
+}
+Enum edge_validation_status {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+Enum seminar_type {
+  RESEARCH_SEMINAR
+  PAPER_SHARING
+  METHOD_SHARING
+  WORKSHOP
+  PROGRESS_SEMINAR
+  GROUP_MEETING
+}
+Enum entity_types {
+  RESEARCHER
+  GROUP
+  PROJECT
+  TOPIC
+  OUTPUT
+}
+Enum research_update_type {
+  OUTPUT_SHARED
+  OUTPUT_REVISION_RELEASED
+  OUTPUT_LINKED_TO_GROUP
+  OPPORTUNITY_OPENED
+  SEMINAR_PUBLISHED
+  PROJECT_UPDATED
+}
+Enum digest_subject_type {
+  OUTPUT
+  OPPORTUNITY
+  SEMINAR
+  PROJECT
+}
+Enum delivery_status {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  fptu_guid varchar(100) [unique, note: 'Nullable until institutional ID is verified; never invent a placeholder. Do not infer authorization from email domain alone.']
+  user_type user_type [not null]
+  email varchar(255) [not null, note: 'SQL normalizes lowercase/trim; this is the sole local login identifier.']
+  full_name varchar(255) [not null]
+  academic_title varchar(100) [note: 'Academic title, e.g. GS/PGS.']
+  academic_degree varchar(100) [note: 'Academic degree, e.g. ThS/TS.']
+  department_unit varchar(255) [not null]
+  is_active boolean [not null, default: true]
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (`lower(btrim(email))`) [unique, name: 'uq_users_email_normalized'] }
+  Note: 'Active FACULTY baseline = RESEARCHER without an automatic grant. STUDENT/STAFF baseline = authenticated GUEST. ADMIN and RESEARCHER grants are independent; STAFF is not automatically ADMIN. Inactive users have no effective roles or sessions. Provisioned/invited accounts only; backend controls user_type and roles.'
+}
+
+Table user_role_assignments {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  role access_role [not null]
+  grant_source role_grant_source [not null, default: 'MANUAL']
+  granted_by uuid
+  granted_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  revoked_by uuid
+  revoked_at timestamptz
+  reason text
+  checks {
+    `(grant_source = 'MANUAL' AND granted_by IS NOT NULL) OR (grant_source = 'SYSTEM' AND granted_by IS NULL)` [name: 'ck_grant_source_actor']
+    `grant_source <> 'MANUAL' OR user_id <> granted_by` [name: 'ck_no_self_grant']
+    `(revoked_at IS NULL AND revoked_by IS NULL) OR (revoked_at IS NOT NULL AND revoked_by IS NOT NULL AND revoked_at >= granted_at)` [name: 'ck_grant_revocation']
+  }
+  indexes { (user_id, role) }
+  Note: 'One unrevoked assignment per user/role. Explicit role required. MANUAL requires a different granting user; backend enforces ADMIN policy. SYSTEM is only for trusted server commands such as first-admin bootstrap, never a client-selectable source. Grants activate at granted_at. Revoke retains history and does not remove faculty baseline RESEARCHER. No bootstrap endpoint/seed is implemented.'
+}
+
+Table local_credentials {
+  user_id uuid [pk]
+  password_hash text [not null, note: 'One-way password hash generated by a vetted backend password library. Never plaintext or reversible encryption.']
+  password_changed_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  must_change_password boolean [not null, default: true]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `length(btrim(password_hash)) > 0` [name: 'ck_password_hash_nonempty']
+    `password_changed_at >= created_at` [name: 'ck_password_changed_time']
+  }
+  Note: 'One credential row per user; email stays in users. Initial/reset credentials require password change. SQL stamps hash changes and revokes all existing app sessions (LOCAL/OIDC) atomically. Backend verifies password, gates must_change_password, authorizes resets and locks credentials during login/password changes. Hashing, login APIs and invitation/reset delivery are not implemented.'
+}
+
+Table oidc_identities {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  issuer text [not null]
+  subject varchar(255) [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (issuer, subject) [unique]
+    (id, user_id) [unique]
+  }
+  Note: 'OIDC identity is the verified (iss, sub) pair, not email. Issuer/client configuration and secrets are server-side. Link to institutional user only after trusted identity verification.'
+}
+
+Table oidc_login_attempts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  state_hash char(64) [not null, unique]
+  nonce_hash char(64) [not null]
+  browser_binding_hash char(64) [not null]
+  issuer text [not null]
+  redirect_uri text [not null]
+  pkce_verifier_ciphertext text [not null]
+  encryption_key_id varchar(100) [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  expires_at timestamptz [not null]
+  consumed_at timestamptz
+  checks { `expires_at > created_at` [name: 'ck_oidc_attempt_expiry']
+    `consumed_at IS NULL OR (consumed_at >= created_at AND consumed_at < expires_at)` [name: 'ck_oidc_attempt_consumption']
+  }
+  Note: 'Short-lived Authorization Code + PKCE S256 state. Hash state/nonce/browser-binding secrets; encrypt verifier using a key outside DB. Atomic consume prevents replay. Validate issuer, signature, audience, azp/exp/nonce and browser binding before creating session. No authorization code or raw ID/access/refresh token stored.'
+}
+
+Table user_sessions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  auth_method authentication_method [not null]
+  identity_id uuid
+  session_token_hash char(64) [not null, unique]
+  idp_sid text
+  authenticated_at timestamptz [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  last_seen_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  expires_at timestamptz [not null]
+  idle_expires_at timestamptz [not null]
+  revoked_at timestamptz
+  revocation_reason text
+  checks {
+    `(auth_method = 'LOCAL' AND identity_id IS NULL) OR (auth_method = 'OIDC' AND identity_id IS NOT NULL)` [name: 'ck_session_auth_identity']
+    `expires_at > created_at AND idle_expires_at > created_at AND idle_expires_at <= expires_at` [name: 'ck_session_expiry']
+    `authenticated_at <= created_at AND last_seen_at >= created_at` [name: 'ck_session_times']
+    `revoked_at IS NULL OR revoked_at >= created_at` [name: 'ck_session_revocation']
+  }
+  indexes { (user_id, expires_at)
+    (identity_id, idp_sid)
+  }
+  Note: 'Shared app session for LOCAL and future OIDC. LOCAL has no identity; OIDC identity must belong to user (composite FK). Direct user FK also protects LOCAL sessions. SQL INSERT guard locks the user FOR SHARE and rejects inactive accounts; auth/account transactions use READ COMMITTED. Backend locks users before local_credentials, verifies authentication, then inserts and commits. Partial index on unrevoked user sessions is in SQL. Opaque cookie hash only; no role snapshot. Each request validates expiry, active account, current roles and mandatory password change for LOCAL. Logout/password change/deactivation revoke sessions. Backend authentication is not implemented by this table.'
+}
+
+Table researcher_profiles {
+  user_id uuid [pk]
+  orcid_id varchar(19) [unique]
+  scopus_author_id varchar(50)
+  google_scholar_url text
+  availability_status availability_status_type [not null, default: 'NOT_AVAILABLE']
+  bio text
+  avatar_storage_key text
+  profile_confirmed_at timestamptz
+  papers_reviewed_at timestamptz [note: 'May be set after explicitly confirming no matching publications.']
+  onboarding_completed_at timestamptz
+  last_synced_at timestamptz
+  llkh_last_exported_at timestamptz
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Shared by faculty, students and staff. Profile existence does not grant researcher/admin access. API completes researcher onboarding only after profile/paper review and at least one ACTIVE interest.'
+}
+
+Table research_fields {
+  id uuid [pk, default: `gen_random_uuid()`]
+  internal_code varchar(50) [unique]
+  name varchar(255) [not null]
+  name_vi varchar(255)
+  description text
+  source taxonomy_source [not null, default: 'OPENALEX']
+  external_id varchar(255)
+  source_updated_at timestamptz
+  last_synced_at timestamptz
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks { `(source = 'LOCAL' AND external_id IS NULL) OR (source <> 'LOCAL' AND external_id IS NOT NULL AND length(btrim(external_id)) > 0)` [name: 'ck_field_source'] }
+  indexes { (source, external_id) [unique] }
+  Note: 'OpenAlex Field, not Domain. internal_code is optional FPTU code, never the provider ID. Upsert imported nodes using (source,external_id), not name.'
+}
+
+Table research_subfields {
+  id uuid [pk, default: `gen_random_uuid()`]
+  field_id uuid [not null]
+  internal_code varchar(50) [unique]
+  name varchar(255) [not null]
+  name_vi varchar(255)
+  description text
+  source taxonomy_source [not null, default: 'OPENALEX']
+  external_id varchar(255)
+  source_updated_at timestamptz
+  last_synced_at timestamptz
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks { `(source = 'LOCAL' AND external_id IS NULL) OR (source <> 'LOCAL' AND external_id IS NOT NULL AND length(btrim(external_id)) > 0)` [name: 'ck_subfield_source'] }
+  indexes { (source, external_id) [unique]
+    field_id
+  }
+  Note: 'OpenAlex Subfield belongs to exactly one Field. Import parent by its external ID before child. No Area Owner.'
+}
+
+Table research_topics {
+  id uuid [pk, default: `gen_random_uuid()`]
+  subfield_id uuid [not null]
+  name varchar(255) [not null]
+  description text
+  source taxonomy_source [not null, default: 'LOCAL']
+  external_id varchar(255)
+  source_updated_at timestamptz
+  created_by uuid
+  is_active boolean [not null, default: true]
+  last_synced_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `length(btrim(name)) > 0` [name: 'ck_topic_nonempty']
+    `(source = 'LOCAL' AND external_id IS NULL AND created_by IS NOT NULL) OR (source <> 'LOCAL' AND external_id IS NOT NULL AND length(btrim(external_id)) > 0)` [name: 'ck_topic_source']
+  }
+  indexes {
+    (source, external_id) [unique]
+    (subfield_id, `lower(btrim(name))`) [name: 'idx_topic_subfield_name']
+  }
+  Note: 'Other creates an active LOCAL topic immediately. SQL partial UNIQUE(subfield_id,lower(name)) WHERE source=LOCAL prevents duplicate local names. Imported IDs may share labels with LOCAL or other imported IDs without merging; UI displays source/ID. Import never updates by name or overwrites LOCAL. No taxonomy approval queue.'
+}
+
+Table research_interests {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  topic_id uuid [not null]
+  source_type interest_source [not null]
+  status interest_status [not null, default: 'SUGGESTED']
+  provenance_tag data_provenance_type [not null, default: 'HUMAN']
+  evidence_note text
+  declared_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  reviewed_at timestamptz
+  indexes {
+    (user_id, topic_id) [unique]
+    (topic_id, user_id)
+  }
+  Note: 'One effective interest per user/topic. User selection, even of OPENALEX topics, is DECLARED/ACTIVE. Personal inference is INFERRED/SUGGESTED; acceptance preserves INFERRED and sets ACTIVE. Rejection keeps negative feedback. Guest cannot write interests.'
+}
+
+Table research_groups {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(50) [not null, unique]
+  name varchar(255) [not null]
+  lead_id uuid [not null, note: 'Single authority for group leadership; LEAD is not duplicated in group_members.role.']
+  description text
+  is_active boolean [not null, default: true]
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Every active researcher, including a granted student/staff researcher, may create a group with themselves as Leader. No minimum members. Backend authenticates creator; SQL requires eligible leader. Membership queries include lead_id. Handover through resource_handovers preserves history; inactive leader does not delete/archive the group.'
+}
+
+Table group_members {
+  group_id uuid [not null]
+  user_id uuid [not null]
+  role group_member_role [not null, default: 'COLLABORATOR']
+  joined_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (group_id, user_id) [pk]
+    (user_id, group_id)
+  }
+}
+
+Table group_directions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  group_id uuid [not null]
+  topic_id uuid
+  title varchar(255) [not null]
+  description text
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (id, group_id) [unique] }
+}
+
+Table research_outputs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  doi varchar(255) [unique, note: 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Duplicate DOI reuses existing work; backend checks visibility and offers authorship claim, never ownership. No DOI: warn on suspected duplicates, do not auto-merge.']
+  owner_id uuid [note: 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.']
+  created_by uuid
+  sharing_status output_sharing_status [not null, default: 'DRAFT']
+  current_release_id uuid
+  visibility visibility_level [not null, default: 'PRIVATE']
+  access_group_id uuid
+  provenance_tag data_provenance_type [not null, default: 'PAPER']
+  last_synced_at timestamptz
+  first_shared_at timestamptz
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)` [name: 'ck_shared_output']
+    `(sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)` [name: 'ck_output_archive']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_output_access_scope']
+  }
+  indexes { owner_id }
+  Note: 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.'
+}
+
+Table resource_handovers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid
+  group_id uuid
+  previous_user_id uuid [not null]
+  new_user_id uuid [not null]
+  performed_by uuid [not null]
+  basis handover_basis [not null]
+  authorization_reference text [not null, note: 'Reference to verified consent/official authorization, not a client assertion. Backend verifies evidence before insert.']
+  reason text [not null]
+  performed_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `num_nonnulls(output_id, group_id) = 1` [name: 'ck_handover_one_resource']
+    `previous_user_id <> new_user_id` [name: 'ck_handover_different_holder']
+    `performed_by <> new_user_id` [name: 'ck_handover_no_self_acquisition']
+    `length(btrim(reason)) > 0 AND length(btrim(authorization_reference)) > 0` [name: 'ck_handover_evidence']
+  }
+  indexes {
+    (performed_by, performed_at)
+  }
+  Note: 'Append-only owner/Leader handover ledger, not generic audit. BEFORE INSERT prepares evidence/time; AFTER INSERT locks resource, compares expected previous holder, checks declared actor is active ADMIN and recipient active researcher, and updates holder. Skipped ON CONFLICT inserts have no holder side effects; errors roll back history and holder together. SQL has partial history indexes for non-null output_id/group_id. Backend verifies authenticated actor/evidence; inactive previous holder requires institutional authorization. No automatic transfer or private-content bypass. Runtime must route all existing-holder changes through this table, never direct owner_id/lead_id updates.'
+}
+
+Table output_revisions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid [not null]
+  revision_no int [not null]
+  title varchar(500) [not null]
+  abstract text
+  venue varchar(255)
+  publisher varchar(255)
+  publication_year int
+  publication_status publication_status [not null, default: 'UNPUBLISHED']
+  output_type varchar(50) [not null, default: 'PAPER']
+  external_url text
+  authors_snapshot jsonb [not null, default: `'[]'::jsonb`]
+  created_by uuid [not null]
+  released_by uuid
+  released_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `revision_no > 0` [name: 'ck_output_revision_no']
+    `publication_year IS NULL OR publication_year BETWEEN 1000 AND 9999` [name: 'ck_publication_year']
+    `jsonb_typeof(authors_snapshot) = 'array'` [name: 'ck_revision_authors']
+    `(released_at IS NULL AND released_by IS NULL) OR (released_at IS NOT NULL AND released_by IS NOT NULL AND released_at >= created_at)` [name: 'ck_revision_release']
+  }
+  indexes { (output_id, revision_no) [unique]
+    (output_id, id) [unique]
+  }
+  Note: 'NULL released_at = editable draft. Release is an owner action, not a review. SQL freezes released metadata and revision-topic/file links. Publish revision and current_release_id atomically. New draft does not change current personal/group release.'
+}
+
+Table output_external_ids {
+  output_id uuid [not null]
+  source varchar(50) [not null, note: 'E.g. OPENALEX, SCOPUS, CROSSREF. Presence here records metadata origin, not a quality certification.']
+  external_id varchar(255) [not null]
+  last_synced_at timestamptz
+  indexes {
+    (source, external_id) [pk]
+    (output_id, source)
+  }
+}
+
+Table output_authors {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid [not null]
+  user_id uuid [note: 'Optional internal account mapping; external coauthors need no login.']
+  author_name_string varchar(255) [not null]
+  author_order int [not null]
+  is_corresponding_author boolean [not null, default: false]
+  checks { `author_order > 0` [name: 'ck_author_order'] }
+  indexes {
+    (output_id, author_order) [unique]
+    (output_id, user_id) [unique]
+    (user_id, output_id)
+    (id, output_id) [unique]
+  }
+}
+
+Table publication_claims {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid [not null]
+  user_id uuid [not null]
+  author_id uuid [note: 'Stable authorship identifier; must belong to output_id.']
+  status claim_status [not null, default: 'SUGGESTED']
+  match_source varchar(50) [not null]
+  reviewed_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `(status = 'SUGGESTED' AND reviewed_at IS NULL) OR (status IN ('CONFIRMED', 'REJECTED') AND reviewed_at IS NOT NULL)` [name: 'ck_claim_review']
+    `status <> 'CONFIRMED' OR author_id IS NOT NULL` [name: 'ck_confirmed_claim_author']
+  }
+  indexes { (output_id, user_id) [unique] }
+  Note: 'API confirms the claim and maps output_authors.user_id in one transaction after resolving author conflicts. A claim never approves institutional publication.'
+}
+
+Table output_topics {
+  output_id uuid [not null]
+  revision_id uuid [not null]
+  topic_id uuid [not null]
+  added_by uuid [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (revision_id, topic_id) [pk]
+    (topic_id, revision_id)
+  }
+  Note: 'Topics of a specific output revision. Filter Discovery only through current released revision; draft tags never affect shared search. SQL freezes links once revision is released.'
+}
+
+Table output_files {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid [not null]
+  uploaded_by uuid [not null]
+  storage_key text [not null, unique]
+  file_name text [not null]
+  mime_type varchar(100) [not null]
+  size_bytes bigint [not null]
+  sha256 varchar(64) [not null]
+  visibility visibility_level [not null, default: 'PRIVATE']
+  access_group_id uuid
+  is_available boolean [not null, default: true]
+  uploaded_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks { `size_bytes > 0` [name: 'ck_file_size']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_file_access_scope']
+  }
+  indexes { (output_id, id) [unique] }
+  Note: 'Immutable payload metadata; visibility/availability may be restricted immediately. Download requires BOTH output access and file access, plus a released revision attachment unless requester is manager. Group approval never grants file access.'
+}
+
+Table output_revision_files {
+  output_id uuid [not null]
+  revision_id uuid [not null]
+  file_id uuid [not null]
+  indexes { (revision_id, file_id) [pk] }
+  Note: 'Reuse one immutable stored file in multiple revisions. Composite FKs ensure revision and file belong to the same output. Frozen after release.'
+}
+
+Table group_output_links {
+  output_id uuid [not null]
+  group_id uuid [not null]
+  requested_revision_id uuid [not null]
+  requested_by uuid [not null]
+  requested_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  status group_output_status [not null, default: 'PENDING']
+  decided_by uuid
+  decided_at timestamptz
+  decision_note text
+  accepted_revision_id uuid
+  accepted_by uuid
+  accepted_at timestamptz
+  removed_by uuid
+  removed_at timestamptz
+  checks {
+    `(accepted_revision_id IS NULL AND accepted_by IS NULL AND accepted_at IS NULL) OR (accepted_revision_id IS NOT NULL AND accepted_by IS NOT NULL AND accepted_at IS NOT NULL)` [name: 'ck_group_accepted_pin']
+    `status <> 'ACCEPTED' OR (accepted_revision_id IS NOT NULL AND accepted_revision_id = requested_revision_id)` [name: 'ck_group_accept_requested']
+    `(status = 'PENDING' AND decided_by IS NULL AND decided_at IS NULL) OR (status IN ('ACCEPTED','REJECTED','REMOVED') AND decided_by IS NOT NULL AND decided_at IS NOT NULL)` [name: 'ck_group_decision']
+    `(status = 'REMOVED' AND removed_by IS NOT NULL AND removed_at IS NOT NULL AND accepted_revision_id IS NULL) OR (status <> 'REMOVED' AND removed_by IS NULL AND removed_at IS NULL)` [name: 'ck_group_removal']
+  }
+  indexes {
+    (output_id, group_id) [pk]
+    (group_id, status, requested_at)
+  }
+  Note: 'Group curation only. Leader may directly insert ACCEPTED for an owned released work; no self-application. Pending/rejected new request preserves previous accepted pin. Removal clears ONLY this group pin. New released revision needs separate acceptance to replace group content. Root visibility always applies. No minimum group size.'
+}
+
+Table achievement_posts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  group_id uuid
+  project_id uuid
+  output_id uuid
+  title varchar(255) [not null]
+  post_type post_type [not null, default: 'GENERAL_NEWS']
+  content text [not null]
+  award_issuer varchar(255)
+  award_year int
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table research_opportunities {
+  id uuid [pk, default: `gen_random_uuid()`]
+  group_id uuid
+  project_id uuid
+  creator_id uuid [not null]
+  title varchar(255) [not null]
+  opportunity_kind opportunity_kind [not null]
+  target_audience target_audience [not null, default: 'ANY_RESEARCHER']
+  expected_role varchar(255)
+  required_expertise_tags text[]
+  description text
+  response_sla_days int [not null, default: 5]
+  application_deadline timestamptz
+  status opportunity_status [not null, default: 'DRAFT']
+  published_at timestamptz
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `response_sla_days > 0` [name: 'ck_opportunity_sla']
+    `status = 'DRAFT' OR (application_deadline IS NOT NULL AND published_at IS NOT NULL AND length(btrim(title)) > 0 AND description IS NOT NULL AND length(btrim(description)) > 0)` [name: 'ck_published_opportunity']
+    `expected_role IS NULL OR length(btrim(expected_role)) > 0` [name: 'ck_expected_role_text']
+  }
+  indexes { group_id
+    project_id
+    (status, application_deadline)
+  }
+  Note: 'Personal opportunities allow NULL group/project and are managed by creator. Group/project scope requires its management rights; creator alone grants no scoped authority. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
+}
+
+Table opportunity_applications {
+  id uuid [pk, default: `gen_random_uuid()`]
+  opportunity_id uuid [not null]
+  applicant_id uuid [not null]
+  applicant_note text [not null]
+  status opportunity_application_status [not null, default: 'PENDING']
+  response_note text
+  response_due_at timestamptz [not null, note: 'SQL insert trigger sets applied_at and snapshots SLA in calendar days (Asia/Ho_Chi_Minh). Never recalculated on opportunity edit.']
+  responded_by uuid
+  applied_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  responded_at timestamptz
+  withdrawn_at timestamptz
+  checks {
+    `response_due_at >= applied_at` [name: 'ck_response_deadline']
+    `(status IN ('PENDING', 'WITHDRAWN') AND responded_by IS NULL AND responded_at IS NULL) OR (status IN ('INVITED_TO_DISCUSS', 'DECLINED') AND responded_by IS NOT NULL AND responded_at IS NOT NULL AND responded_at >= applied_at)` [name: 'ck_application_response']
+    `(status = 'WITHDRAWN' AND withdrawn_at IS NOT NULL AND withdrawn_at >= applied_at) OR (status <> 'WITHDRAWN' AND withdrawn_at IS NULL)` [name: 'ck_application_withdrawal']
+  }
+  indexes {
+    (opportunity_id, applicant_id, applied_at)
+    (applicant_id, applied_at)
+    (opportunity_id, status, applied_at)
+  }
+  Note: 'SQL partial UNIQUE(opportunity_id,applicant_id) WHERE status <> WITHDRAWN. Resubmission inserts new ID only after previous withdrawal. Terminal rows are immutable; transition only from PENDING. SQL locks parent when inserting, checks OPEN/deadline/archive and researcher eligibility. Backend authenticates withdrawal actor and response handler; conditional updates prevent response/withdraw races. Closing does not decline old applications.'
+}
+
+Table research_projects {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar(100) [unique]
+  title varchar(500) [not null]
+  project_type project_type [not null]
+  group_id uuid
+  direction_id uuid
+  lead_id uuid [not null]
+  funding_source varchar(255)
+  budget_amount decimal(15,2)
+  start_date date
+  end_date date
+  status project_status [not null, default: 'PROPOSAL_DRAFT']
+  archived_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `budget_amount IS NULL OR budget_amount >= 0` [name: 'ck_project_budget']
+    `start_date IS NULL OR end_date IS NULL OR end_date >= start_date` [name: 'ck_project_dates']
+    `direction_id IS NULL OR group_id IS NOT NULL` [name: 'ck_direction_needs_group']
+  }
+}
+
+Table project_members {
+  project_id uuid [not null]
+  user_id uuid [not null]
+  role expected_role_type [not null]
+  joined_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (project_id, user_id) [pk]
+    (user_id, project_id)
+  }
+  Note: 'Project leadership remains research_projects.lead_id; membership is independent of group membership.'
+}
+
+Table project_milestones {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null]
+  title varchar(255) [not null]
+  due_date date [not null]
+  status milestone_status [not null, default: 'ON_TRACK']
+  notes text
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (id, project_id) [unique]
+    project_id
+  }
+}
+
+Table mentoring_records {
+  id uuid [pk, default: `gen_random_uuid()`]
+  mentor_id uuid [not null]
+  student_user_id uuid
+  project_id uuid
+  student_name varchar(255) [not null]
+  student_id_code varchar(50)
+  level varchar(50) [not null]
+  thesis_title text [not null]
+  academic_year int [not null]
+  rbl_origin_id varchar(100)
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table interest_circles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(255) [not null]
+  primary_topic_id uuid [not null]
+  initiator_id uuid [not null]
+  upgraded_to_group_id uuid
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+Table interest_circle_members {
+  circle_id uuid [not null]
+  user_id uuid [not null]
+  joined_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { (circle_id, user_id) [pk] }
+}
+
+Table research_records {
+  id uuid [pk, default: `gen_random_uuid()`]
+  title varchar(500) [not null]
+  project_id uuid
+  milestone_id uuid
+  owner_id uuid [not null]
+  group_id uuid [note: 'Explicit access scope for RESEARCH_GROUP visibility, even without a project.']
+  topic_id uuid [note: 'Subfield and Field are derived from this Topic.']
+  problem_statement text
+  research_questions text[]
+  claim text
+  evidence text
+  methodology text
+  finding text
+  evidence_of_ai_use boolean [not null, default: false]
+  ai_task_description text
+  ai_contribution_summary text
+  human_decision_points text
+  record_status record_status [not null, default: 'DRAFT']
+  visibility visibility_level [not null, default: 'PRIVATE']
+  pub_status publication_status [not null, default: 'UNPUBLISHED']
+  trace_id varchar(100)
+  provenance_tag data_provenance_type [not null, default: 'HUMAN']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `milestone_id IS NULL OR project_id IS NOT NULL` [name: 'ck_milestone_needs_project']
+    `visibility <> 'RESEARCH_GROUP' OR group_id IS NOT NULL` [name: 'ck_record_group_scope']
+  }
+  indexes { owner_id }
+  Note: 'Retained advanced-phase module; not the publication table. API enforces validation transitions, group/project access and audit history.'
+}
+Table record_lineage {
+  id uuid [pk, default: `gen_random_uuid()`]
+  successor_record_id uuid [not null]
+  predecessor_record_id uuid
+  inheritance_type varchar(100) [not null]
+  rbl_origin_flag boolean [not null, default: false]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks { `successor_record_id <> predecessor_record_id` [name: 'ck_lineage_not_self'] }
+}
+Table knowledge_graph_edges {
+  id uuid [pk, default: `gen_random_uuid()`]
+  source_entity_type varchar(50) [not null]
+  source_entity_id uuid [not null]
+  target_entity_type varchar(50) [not null]
+  target_entity_id uuid [not null]
+  relationship_type edge_type [not null]
+  ai_confidence_score decimal(3,2)
+  validation_status edge_validation_status [not null, default: 'PENDING']
+  confirmed_by_user_id uuid
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `validation_status <> 'CONFIRMED' OR confirmed_by_user_id IS NOT NULL` [name: 'ck_edge_confirmation']
+    `ai_confidence_score IS NULL OR ai_confidence_score BETWEEN 0 AND 1` [name: 'ck_edge_confidence']
+    `source_entity_type IN ('RESEARCH_RECORD', 'OUTPUT', 'PROJECT') AND target_entity_type IN ('RESEARCH_RECORD', 'OUTPUT', 'PROJECT')` [name: 'ck_edge_entity_types']
+  }
+  indexes { (source_entity_type, source_entity_id)
+    (target_entity_type, target_entity_id)
+    (source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type) [unique]
+  }
+  Note: 'Polymorphic endpoints intentionally retained; backend validates existence, access and deletion handling. There are no database FKs for these endpoint UUIDs.'
+}
+
+Table user_follows {
+  follower_id uuid [not null]
+  entity_type entity_types [not null]
+  entity_id uuid [not null]
+  followed_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks { `entity_type <> 'RESEARCHER' OR follower_id <> entity_id` [name: 'ck_follow_not_self'] }
+  indexes { (follower_id, entity_type, entity_id) [pk]
+    (entity_type, entity_id, follower_id)
+  }
+  Note: 'OUTPUT supports following a paper. API validates polymorphic target, visibility and cleanup. Follow does not grant access.'
+}
+Table research_seminars {
+  id uuid [pk, default: `gen_random_uuid()`]
+  group_id uuid
+  organizer_id uuid [not null, note: 'Always a user; group affiliation is group_id. Removed ambiguous organizer_type.']
+  title varchar(255) [not null]
+  seminar_type seminar_type [not null]
+  scheduled_at timestamptz [not null]
+  published_at timestamptz
+  location_or_link text [not null]
+  research_context text
+  follow_up_actions text
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table digest_preferences {
+  user_id uuid [pk]
+  enabled boolean [not null, default: false]
+  timezone varchar(100) [not null, default: 'Asia/Ho_Chi_Minh']
+  language varchar(10) [not null, default: 'vi']
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.'
+}
+Table research_updates {
+  id uuid [pk, default: `gen_random_uuid()`]
+  event_key varchar(255) [not null, unique]
+  event_type research_update_type [not null]
+  actor_id uuid [not null]
+  output_id uuid
+  revision_id uuid
+  group_id uuid
+  opportunity_id uuid
+  seminar_id uuid
+  project_id uuid
+  occurred_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes { occurred_at }
+  Note: 'Small durable feed of meaningful sharing actions, NOT a general event bus. SQL records personal releases, accepted group revisions, opportunity opens and seminar publication in the same transaction. Project events are explicit future-module writes. No events on ordinary updated_at/sync. Typed target shape constrained in SQL.'
+}
+Table digest_deliveries {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  period_start timestamptz [not null]
+  period_end timestamptz [not null]
+  status delivery_status [not null, default: 'PENDING']
+  attempts int [not null, default: 0]
+  next_attempt_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  locked_until timestamptz
+  provider_message_id text
+  last_error text
+  sent_at timestamptz
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `period_end > period_start` [name: 'ck_digest_period']
+    `attempts BETWEEN 0 AND 5` [name: 'ck_digest_attempts']
+    `(status = 'SENT' AND sent_at IS NOT NULL) OR (status <> 'SENT' AND sent_at IS NULL)` [name: 'ck_digest_sent']
+  }
+  indexes { (user_id, period_start, period_end) [unique] }
+  Note: 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs; DB ledger persists attempts (max 5), leases and delivery result. id is provider idempotency key. SENT is terminal; unknown provider outcome requires reconciliation, not blind resend. Transactional application responses are independent.'
+}
+Table digest_items {
+  delivery_id uuid [not null]
+  subject_type digest_subject_type [not null]
+  subject_id uuid [not null]
+  event_id uuid [not null]
+  matched_reasons jsonb [not null, default: `'[]'::jsonb`]
+  content_snapshot jsonb [not null]
+  checks {
+    `jsonb_typeof(matched_reasons) = 'array' AND jsonb_typeof(content_snapshot) = 'object'` [name: 'ck_digest_item_json']
+  }
+  indexes { (delivery_id, subject_type, subject_id) [pk] }
+  Note: 'SQL derives subject type/ID from event_id. A work matched by multiple follows/group events remains one item. Worker chooses latest relevant event, merges reasons, and renders authorized released content; snapshot records content selected for delivery. Recheck/prune before send. Event FK traces the selected event; no draft payloads.'
+}
+
+// All references are declared here once. Delete policies preserve research history.
+// Optional parent references use >?; required references keep >.
+// Composite references follow the editor's tuple-nullability rules.
+Ref: user_role_assignments.user_id > users.id [delete: restrict]
+Ref: user_role_assignments.granted_by >? users.id [delete: restrict]
+Ref: user_role_assignments.revoked_by >? users.id [delete: restrict]
+Ref: users.id - researcher_profiles.user_id [delete: cascade]
+Ref: users.id - local_credentials.user_id [delete: cascade]
+Ref: oidc_identities.user_id > users.id [delete: restrict]
+Ref: user_sessions.user_id > users.id [delete: restrict]
+Ref: user_sessions.(identity_id, user_id) > oidc_identities.(id, user_id) [delete: restrict]
+Ref: research_subfields.field_id > research_fields.id [delete: restrict]
+Ref: research_topics.subfield_id > research_subfields.id [delete: restrict]
+Ref: research_topics.created_by >? users.id [delete: restrict]
+Ref: research_interests.user_id > users.id [delete: cascade]
+Ref: research_interests.topic_id > research_topics.id [delete: restrict]
+Ref: research_groups.lead_id > users.id [delete: restrict]
+Ref: group_members.group_id > research_groups.id [delete: cascade]
+Ref: group_members.user_id > users.id [delete: restrict]
+Ref: group_directions.group_id > research_groups.id [delete: restrict]
+Ref: group_directions.topic_id >? research_topics.id [delete: restrict]
+Ref: research_outputs.created_by >? users.id [delete: restrict]
+Ref: research_outputs.owner_id >? users.id [delete: restrict]
+Ref: research_outputs.access_group_id >? research_groups.id [delete: restrict]
+Ref: resource_handovers.output_id >? research_outputs.id [delete: restrict]
+Ref: resource_handovers.group_id >? research_groups.id [delete: restrict]
+Ref: resource_handovers.previous_user_id > users.id [delete: restrict]
+Ref: resource_handovers.new_user_id > users.id [delete: restrict]
+Ref: resource_handovers.performed_by > users.id [delete: restrict]
+Ref: research_outputs.(id, current_release_id) > output_revisions.(output_id, id) [delete: restrict]
+Ref: output_revisions.output_id > research_outputs.id [delete: restrict]
+Ref: output_revisions.created_by > users.id [delete: restrict]
+Ref: output_revisions.released_by >? users.id [delete: restrict]
+Ref: output_external_ids.output_id > research_outputs.id [delete: cascade]
+Ref: output_authors.output_id > research_outputs.id [delete: restrict]
+Ref: output_authors.user_id >? users.id [delete: set null]
+Ref: publication_claims.output_id > research_outputs.id [delete: restrict]
+Ref: publication_claims.user_id > users.id [delete: restrict]
+Ref: publication_claims.(author_id, output_id) > output_authors.(id, output_id) [delete: restrict]
+Ref: output_topics.(output_id, revision_id) > output_revisions.(output_id, id) [delete: restrict]
+Ref: output_topics.topic_id > research_topics.id [delete: restrict]
+Ref: output_topics.added_by > users.id [delete: restrict]
+Ref: output_files.output_id > research_outputs.id [delete: restrict]
+Ref: output_files.uploaded_by > users.id [delete: restrict]
+Ref: output_files.access_group_id >? research_groups.id [delete: restrict]
+Ref: output_revision_files.(output_id, revision_id) > output_revisions.(output_id, id) [delete: restrict]
+Ref: output_revision_files.(output_id, file_id) > output_files.(output_id, id) [delete: restrict]
+Ref: group_output_links.output_id > research_outputs.id [delete: restrict]
+Ref: group_output_links.group_id > research_groups.id [delete: restrict]
+Ref: group_output_links.(output_id, requested_revision_id) > output_revisions.(output_id, id) [delete: restrict]
+Ref: group_output_links.(output_id, accepted_revision_id) > output_revisions.(output_id, id) [delete: restrict]
+Ref: group_output_links.requested_by > users.id [delete: restrict]
+Ref: group_output_links.decided_by >? users.id [delete: restrict]
+Ref: group_output_links.accepted_by >? users.id [delete: restrict]
+Ref: group_output_links.removed_by >? users.id [delete: restrict]
+Ref: achievement_posts.user_id > users.id [delete: restrict]
+Ref: achievement_posts.group_id >? research_groups.id [delete: set null]
+Ref: achievement_posts.project_id >? research_projects.id [delete: set null]
+Ref: achievement_posts.output_id >? research_outputs.id [delete: set null]
+Ref: research_opportunities.group_id >? research_groups.id [delete: restrict]
+Ref: research_opportunities.project_id >? research_projects.id [delete: restrict]
+Ref: research_opportunities.creator_id > users.id [delete: restrict]
+Ref: opportunity_applications.opportunity_id > research_opportunities.id [delete: restrict]
+Ref: opportunity_applications.applicant_id > users.id [delete: restrict]
+Ref: opportunity_applications.responded_by >? users.id [delete: restrict]
+Ref: research_projects.group_id >? research_groups.id [delete: restrict]
+Ref: research_projects.(direction_id, group_id) >? group_directions.(id, group_id) [delete: restrict]
+Ref: research_projects.lead_id > users.id [delete: restrict]
+Ref: project_members.project_id > research_projects.id [delete: restrict]
+Ref: project_members.user_id > users.id [delete: restrict]
+Ref: project_milestones.project_id > research_projects.id [delete: restrict]
+Ref: mentoring_records.mentor_id > users.id [delete: restrict]
+Ref: mentoring_records.student_user_id >? users.id [delete: set null]
+Ref: mentoring_records.project_id >? research_projects.id [delete: restrict]
+Ref: interest_circles.primary_topic_id > research_topics.id [delete: restrict]
+Ref: interest_circles.initiator_id > users.id [delete: restrict]
+Ref: interest_circles.upgraded_to_group_id >? research_groups.id [delete: restrict]
+Ref: interest_circle_members.circle_id > interest_circles.id [delete: cascade]
+Ref: interest_circle_members.user_id > users.id [delete: restrict]
+Ref: research_records.project_id >? research_projects.id [delete: restrict]
+Ref: research_records.(milestone_id, project_id) >? project_milestones.(id, project_id) [delete: restrict]
+Ref: research_records.owner_id > users.id [delete: restrict]
+Ref: research_records.group_id >? research_groups.id [delete: restrict]
+Ref: research_records.topic_id >? research_topics.id [delete: restrict]
+Ref: record_lineage.successor_record_id > research_records.id [delete: cascade]
+Ref: record_lineage.predecessor_record_id >? research_records.id [delete: restrict]
+Ref: knowledge_graph_edges.confirmed_by_user_id >? users.id [delete: restrict]
+Ref: user_follows.follower_id > users.id [delete: cascade]
+Ref: research_seminars.group_id >? research_groups.id [delete: restrict]
+Ref: research_seminars.organizer_id > users.id [delete: restrict]
+Ref: users.id - digest_preferences.user_id [delete: cascade]
+Ref: research_updates.actor_id > users.id [delete: restrict]
+Ref: research_updates.output_id >? research_outputs.id [delete: restrict]
+Ref: research_updates.(output_id, revision_id) >? output_revisions.(output_id, id) [delete: restrict]
+Ref: research_updates.group_id >? research_groups.id [delete: restrict]
+Ref: research_updates.opportunity_id >? research_opportunities.id [delete: restrict]
+Ref: research_updates.seminar_id >? research_seminars.id [delete: restrict]
+Ref: research_updates.project_id >? research_projects.id [delete: restrict]
+Ref: digest_deliveries.user_id > users.id [delete: restrict]
+Ref: digest_items.delivery_id > digest_deliveries.id [delete: restrict]
+Ref: digest_items.event_id > research_updates.id [delete: restrict]
+
+TableGroup Identity {
+  users
+  user_role_assignments
+  local_credentials
+  researcher_profiles
+  oidc_identities
+  oidc_login_attempts
+  user_sessions
+}
+TableGroup Taxonomy {
+  research_fields
+  research_subfields
+  research_topics
+  research_interests
+}
+TableGroup Publications {
+  research_outputs
+  output_revisions
+  output_external_ids
+  output_authors
+  publication_claims
+  output_topics
+  output_files
+  output_revision_files
+  group_output_links
+  achievement_posts
+}
+TableGroup Groups_Opportunities {
+  research_groups
+  group_members
+  group_directions
+  research_opportunities
+  opportunity_applications
+  research_seminars
+}
+TableGroup Administration {
+  resource_handovers
+}
+TableGroup Follow_Digest {
+  user_follows
+  digest_preferences
+  research_updates
+  digest_deliveries
+  digest_items
+}
+TableGroup Advanced_Phase {
+  research_projects
+  project_members
+  project_milestones
+  mentoring_records
+  interest_circles
+  interest_circle_members
+  research_records
+  record_lineage
+  knowledge_graph_edges
+}
