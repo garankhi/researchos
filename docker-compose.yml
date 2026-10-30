@@ -1,0 +1,68 @@
+# Local infrastructure for ResearchOS.
+#
+# PostgreSQL and Redis only. The apps (apps/api, apps/worker, apps/web) run
+# on the host via `pnpm dev` so that hot reload works; only the stateful
+# services are containerised.
+#
+# Usage from the repository root:
+#   docker compose up -d
+#   docker compose ps
+#   docker compose down          # stop, keep data
+#   docker compose down -v       # stop and delete the volumes
+#
+# The database schema itself is NOT managed here. `ResearchOS.sql` is the
+# source of truth and is applied by `pnpm --filter @researchos/database
+# db:reset`. Prisma Migrate is deliberately not used, because the schema
+# contains CHECK constraints, DEFERRABLE foreign keys and expression indexes
+# that Prisma cannot represent, and its differ would try to drop them.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: researchos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: researchos
+    ports:
+      # The host already runs a native PostgreSQL 17 service on 5432, so the
+      # container keeps 5432 internally and publishes 5433. Keep DATABASE_URL
+      # in sync with this mapping.
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d researchos']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: researchos-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      # BullMQ stores job state as Redis keys. If Redis is allowed to evict
+      # keys under memory pressure it will silently drop jobs, so eviction
+      # must be disabled for this instance.
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  pgdata:
+  redisdata:
