@@ -218,8 +218,22 @@ Trong service, dùng exception của NestJS — không trả lỗi bằng `throw
 | Chưa đăng nhập | `UnauthorizedException` |
 | Xung đột với dữ liệu đã có | `ConflictException` |
 
-Lỗi trả về **không chứa chi tiết nội bộ** (stack, SQL, tên bảng). Chi tiết
-đi vào log.
+Lỗi trả về **không chứa chi tiết nội bộ** (stack, SQL, tên bảng, tên
+constraint). Chi tiết đi vào log.
+
+Lỗi từ database cũng đi qua filter và được map sang status code phù hợp, để
+một lỗi dữ liệu người dùng nhập sai không bị báo thành 500:
+
+| Mã lỗi Postgres | Ý nghĩa | Status |
+| --- | --- | --- |
+| `23514` | Vi phạm `CHECK` constraint, hoặc lỗi do trigger ném | 400 |
+| `23503` | Vi phạm foreign key | 400 |
+| `23505` | Vi phạm unique constraint | 409 |
+| `23502` | `NOT NULL` bị vi phạm | 400 |
+
+Message do PostgreSQL sinh ra được thay bằng message chung; message do trigger
+viết thì được giữ lại (UUID thành `<id>`). Chi tiết gốc vẫn vào log. Xem
+`docs/database.md` §8.2.
 
 Lỗi validation có thêm mảng `errors`, gom theo từng field để form hiển thị
 đúng chỗ:

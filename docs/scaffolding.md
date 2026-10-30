@@ -237,8 +237,9 @@ pnpm --dir apps/worker build
 ## Các bước triển khai tiếp theo
 
 1. Chốt các mâu thuẫn SRS và phạm vi MVP trong architecture.md.
-2. Thiết kế schema PostgreSQL và chạy migration đầu tiên. Prisma đã được cài
-   đặt; xem [database.md](./database.md).
+2. Thiết kế schema PostgreSQL trong `ResearchOS.sql` và dựng database bằng
+   `pnpm db:reset`. Prisma đã được cài đặt làm ORM client; xem
+   [database.md](./database.md).
 3. Cấu hình Redis/BullMQ và thử một job xuyên suốt từ API tới worker.
 4. Tích hợp SSO thật và chính sách phân quyền tài nguyên.
 5. Kết nối Next.js với API, xử lý session và cache theo visibility.
