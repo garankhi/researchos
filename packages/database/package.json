@@ -23,10 +23,9 @@
   ],
   "scripts": {
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:status": "prisma migrate status",
-    "db:reset": "prisma migrate reset",
+    "db:schema": "node scripts/introspect-schema.mjs",
+    "db:reset": "node scripts/reset-database.mjs",
+    "db:drift": "node scripts/drift-check.mjs",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "format": "prisma format",

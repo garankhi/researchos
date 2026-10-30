@@ -13,9 +13,9 @@
     "test": "turbo run test",
     "codegen": "turbo run codegen",
     "db:generate": "turbo run db:generate",
-    "db:migrate": "turbo run db:migrate",
-    "db:migrate:deploy": "turbo run db:migrate:deploy",
-    "db:status": "turbo run db:status",
+    "db:schema": "turbo run db:schema",
+    "db:reset": "turbo run db:reset",
+    "db:drift": "turbo run db:drift",
     "db:studio": "turbo run db:studio",
     "format": "turbo run format"
   },

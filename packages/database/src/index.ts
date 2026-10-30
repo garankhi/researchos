@@ -9,12 +9,39 @@ export { PrismaModule } from './prisma.module.js';
 export { PrismaService } from './prisma.service.js';
 
 // The generated enums are part of the domain contract: feature modules use
-// them for DTOs and query filters.
+// them for DTOs and query filters. The list mirrors the enums of
+// `ResearchOS.sql`, which is the source of truth for the schema.
 export {
+  AccessRole,
+  AvailabilityStatusType,
+  ClaimStatus,
+  DataProvenanceType,
+  DeliveryStatus,
+  DigestSubjectType,
+  EdgeType,
+  EdgeValidationStatus,
+  EntityTypes,
+  ExpectedRoleType,
+  GroupMemberRole,
+  GroupOutputStatus,
+  InterestSource,
+  InterestStatus,
+  MilestoneStatus,
+  OpportunityApplicationStatus,
+  OpportunityKind,
+  OpportunityStatus,
+  OutputSharingStatus,
+  PostType,
+  ProjectStatus,
+  ProjectType,
   PublicationStatus,
-  SourceKind,
-  VerificationStatus,
-  Visibility,
+  RecordStatus,
+  ResearchUpdateType,
+  SeminarType,
+  TargetAudience,
+  TaxonomySource,
+  UserType,
+  VisibilityLevel,
 } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';

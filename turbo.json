@@ -41,13 +41,13 @@
     "db:generate": {
       "cache": false
     },
-    "db:migrate": {
+    "db:schema": {
       "cache": false
     },
-    "db:migrate:deploy": {
+    "db:reset": {
       "cache": false
     },
-    "db:status": {
+    "db:drift": {
       "cache": false
     },
     "db:studio": {
