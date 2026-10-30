@@ -103,6 +103,7 @@ Kết quả mong đợi là `"status":"ok"`. Nếu là `"degraded"`, xem
 | `pnpm db:schema` | Sinh lại `prisma/schema.prisma` từ database đang chạy |
 | `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp `ResearchOS.sql` không |
 | `pnpm db:studio` | Prisma Studio |
+| `pnpm jira:report` | Sinh báo cáo commit để đăng lên Jira |
 | `docker compose up -d` | Bật PostgreSQL + Redis |
 | `docker compose down` | Tắt container, giữ dữ liệu |
 | `docker compose down -v` | Tắt container và xoá volume |
@@ -186,6 +187,7 @@ database production rồi khởi động app version mới. Điều này đòi h
 | Đổi schema hoặc dùng Prisma | [docs/database.md](./docs/database.md) |
 | Tạo scaffold mới | [docs/scaffolding.md](./docs/scaffolding.md) |
 | Thêm package vào workspace | [docs/workspace.md](./docs/workspace.md) |
+| Commit hoặc báo cáo việc lên Jira | [docs/jira-workflow.md](./docs/jira-workflow.md) |
 
 Chi tiết đầy đủ về kiến trúc database, các quirk của Prisma và cách xử lý lỗi
 nằm ở [docs/database.md](./docs/database.md). Đó là nơi duy nhất cần đọc khi

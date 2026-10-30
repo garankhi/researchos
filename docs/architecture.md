@@ -141,7 +141,7 @@ Quy tắc giữ khi tổ chức frontend:
   `isPending` với query `enabled: false` đúng mãi, là nguồn lỗi "spinner
   không bao giờ dừng" quen thuộc.
 
-Chi tiết thư mục `features/`: [apps/web/src/features/README.md](../apps/web/src/features/README.md).
+Chi tiết cách viết feature (barrel, domain hook, loading/mutation/error states): skill `researchos-ui`.
 
 Next.js gọi API NestJS; nghiệp vụ và quyết định phân quyền cuối cùng tập trung ở NestJS. Route Handler hoặc Server Action nếu dùng chỉ đảm nhiệm phần cần cho giao diện. API và worker dùng chung nghiệp vụ thông qua package backend có chủ sở hữu rõ ràng, tránh copy logic hoặc import thẳng source của ứng dụng kia.
 

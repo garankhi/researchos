@@ -7,8 +7,7 @@ description: Builds Next.js App Router screens in the ResearchOS web app — fol
 
 How to build a screen in `apps/web` against the generated API client.
 
-Canonical rules live in `docs/architecture.md` and
-`apps/web/src/features/README.md`. This skill is the *how*.
+Canonical rules live in `docs/architecture.md`. This skill is the *how*.
 
 The response envelope is not described here — it is produced by the backend
 but owned by the `researchos-contract` skill. Read that skill when a response
@@ -500,5 +499,4 @@ the `researchos-api-endpoint` skill for the codegen step.
 Component templates and the route-convention table:
 [reference.md](reference.md).
 
-Rules and rationale: `docs/architecture.md`,
-`apps/web/src/features/README.md`.
+Rules and rationale: `docs/architecture.md`.

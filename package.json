@@ -17,6 +17,7 @@
     "db:reset": "turbo run db:reset",
     "db:drift": "turbo run db:drift",
     "db:studio": "turbo run db:studio",
+    "jira:report": "node scripts/jira-commit-report.mjs",
     "format": "turbo run format"
   },
   "keywords": [],
