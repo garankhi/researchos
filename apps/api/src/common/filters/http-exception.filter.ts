@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { mapDatabaseError } from './database-error.js';
 
 /**
  * The error body returned for every failed request.
@@ -35,6 +36,13 @@ export interface ErrorResponseBody {
  *
  * The filter runs before the response interceptor, so a thrown exception
  * never reaches the success envelope logic — the two never overlap.
+ *
+ * Database failures get special treatment. `ResearchOS.sql` defines 47 CHECK
+ * constraints, 91 DEFERRABLE foreign keys, a trigger and two views, none of
+ * which Prisma can represent. A write rejected by one of those arrives as a
+ * Prisma error, not as a NestJS exception, so without the mapping below it
+ * would be reported as a 500 and the client would be shown raw SQL that
+ * names internal tables and rows.
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -45,15 +53,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = http.getResponse<Response>();
     const request = http.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const databaseError = mapDatabaseError(exception);
+
+    const status = databaseError?.status ?? this.resolveStatus(exception);
 
     const body: ErrorResponseBody = {
       success: false,
       data: null,
-      message: this.resolveMessage(exception),
+      message: databaseError?.message ?? this.resolveMessage(exception),
       statusCode: status,
       path: request.url,
       timestamp: new Date().toISOString(),
@@ -69,9 +76,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `${request.method} ${request.url} -> ${status}`,
         exception instanceof Error ? exception.stack : undefined,
       );
+    } else if (databaseError) {
+      // A rejected write is a client mistake, not a server fault, so it is
+      // logged as a warning. The stack still goes to the log so the failure
+      // can be traced, but the response only carries the safe message.
+      this.logger.warn(
+        `${request.method} ${request.url} -> ${status} ${body.message}`,
+      );
     }
 
     response.status(status).json(body);
+  }
+
+  private resolveStatus(exception: unknown): number {
+    if (exception instanceof HttpException) {
+      return exception.getStatus();
+    }
+
+    return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 
   private resolveMessage(exception: unknown): string {
