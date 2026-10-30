@@ -1,0 +1,71 @@
+name: Database drift
+
+# `ResearchOS.sql` owns the schema. `packages/database/prisma/schema.prisma`
+# is a generated artifact, so the only way it can go stale is if somebody
+# edits the SQL and forgets to regenerate the datamodel. This job rebuilds a
+# scratch database from the SQL, introspects it and fails when the result no
+# longer matches the committed file.
+#
+# The check deliberately does not use `prisma migrate diff`: the schema
+# contains CHECK constraints, DEFERRABLE foreign keys, expression indexes,
+# views and triggers that the Prisma schema language cannot represent.
+# Prisma 7's differ is blind to those objects, so it would never report a
+# change to them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: db-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Schema matches ResearchOS.sql
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL
+        run: docker compose up -d postgres
+        # The container publishes 5433 because a native PostgreSQL already
+        # occupies 5432 on a developer machine.
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/researchos?schema=public
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose exec -T postgres pg_isready -U postgres -d researchos; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready in time."
+          exit 1
+
+      - name: Check for drift
+        run: pnpm --filter @researchos/database db:drift
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/researchos?schema=public
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose down -v
