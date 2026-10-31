@@ -167,6 +167,21 @@ CREATE TYPE "output_sharing_status" AS ENUM (
   'ARCHIVED'
 );
 
+CREATE TYPE "output_import_state" AS ENUM (
+  'NONE',
+  'CANDIDATE',
+  'ACCEPTED',
+  'REJECTED',
+  'DISMISSED'
+);
+
+CREATE TYPE "search_entity_type" AS ENUM (
+  'OUTPUT',
+  'RESEARCHER',
+  'GROUP',
+  'OPPORTUNITY'
+);
+
 CREATE TYPE "group_output_status" AS ENUM (
   'PENDING',
   'ACCEPTED',
@@ -334,6 +349,20 @@ CREATE TABLE "researcher_profiles" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
 
+CREATE TABLE "field_provenance" (
+  "entity_type" varchar(64) NOT NULL,
+  "entity_id" uuid NOT NULL,
+  "field_name" varchar(64) NOT NULL,
+  "source" data_provenance_type NOT NULL,
+  "source_ref" text NOT NULL,
+  "synced_at" timestamptz,
+  "verified_at" timestamptz,
+  "is_locked" boolean NOT NULL DEFAULT false,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_field_provenance_ref" CHECK (length(btrim(source_ref)) > 0),
+  PRIMARY KEY ("entity_type", "entity_id", "field_name", "source_ref")
+);
+
 CREATE TABLE "research_fields" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "internal_code" varchar(50) UNIQUE,
@@ -435,6 +464,7 @@ CREATE TABLE "research_outputs" (
   "visibility" visibility_level NOT NULL DEFAULT 'PRIVATE',
   "access_group_id" uuid,
   "provenance_tag" data_provenance_type NOT NULL DEFAULT 'PAPER',
+  "import_state" output_import_state NOT NULL DEFAULT 'NONE',
   "last_synced_at" timestamptz,
   "first_shared_at" timestamptz,
   "archived_at" timestamptz,
@@ -442,7 +472,8 @@ CREATE TABLE "research_outputs" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_shared_output" CHECK (sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)),
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
-  CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL))
+  CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)),
+  CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL)
 );
 
 CREATE TABLE "resource_handovers" (
@@ -780,6 +811,23 @@ CREATE TABLE "digest_preferences" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
 
+CREATE TABLE "search_index" (
+  "entity_type" search_entity_type NOT NULL,
+  "entity_id" uuid NOT NULL,
+  "revision_id" uuid,
+  "owner_id" uuid,
+  "visibility" visibility_level NOT NULL,
+  "access_group_id" uuid,
+  "title" text NOT NULL,
+  "body" text,
+  "authors_text" text,
+  "doc" tsvector NOT NULL,
+  "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_search_index_entity_type" CHECK (entity_type IN ('OUTPUT','RESEARCHER','GROUP','OPPORTUNITY')),
+  CONSTRAINT "ck_search_index_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)),
+  PRIMARY KEY ("entity_type", "entity_id")
+);
+
 CREATE TABLE "research_updates" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "event_key" varchar(255) UNIQUE NOT NULL,
@@ -834,6 +882,10 @@ CREATE UNIQUE INDEX ON "oidc_identities" ("id", "user_id");
 CREATE INDEX ON "user_sessions" ("user_id", "expires_at");
 
 CREATE INDEX ON "user_sessions" ("identity_id", "idp_sid");
+
+CREATE INDEX "idx_field_provenance_entity" ON "field_provenance" ("entity_type", "entity_id");
+
+CREATE INDEX "idx_field_provenance_source" ON "field_provenance" ("source");
 
 CREATE UNIQUE INDEX ON "research_fields" ("source", "external_id");
 
@@ -937,6 +989,8 @@ COMMENT ON TABLE "researcher_profiles" IS 'Shared by faculty, students and staff
 
 COMMENT ON COLUMN "researcher_profiles"."papers_reviewed_at" IS 'May be set after explicitly confirming no matching publications.';
 
+COMMENT ON TABLE "field_provenance" IS 'Field-level provenance for auto-generated data. source classifies WHO STANDS BEHIND the value (PAPER/AI_TRACE/AI_INF/HUMAN/EXT/UNK), not the channel the data travelled through; sourceKind/sourceRef carry the channel. PK includes source_ref so an overwritten field keeps its history. Only auto-generated fields get a row - a field typed by a user is HUMAN by definition. is_locked is set when a human confirms a value: a sync job must never overwrite a locked field. AI without a replayable trace is AI_INF, never UNK; UNK means the value exists but its origin cannot be traced.';
+
 COMMENT ON TABLE "research_fields" IS 'OpenAlex Field, not Domain. internal_code is optional FPTU code, never the provider ID. Upsert imported nodes using (source,external_id), not name.';
 
 COMMENT ON TABLE "research_subfields" IS 'OpenAlex Subfield belongs to exactly one Field. Import parent by its external ID before child. No Area Owner.';
@@ -955,13 +1009,15 @@ COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes whitespace/case an
 
 COMMENT ON COLUMN "research_outputs"."owner_id" IS 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.';
 
+COMMENT ON COLUMN "research_outputs"."import_state" IS 'State of the external ingest for this work. NONE: not from an external pull. CANDIDATE: pulled from OpenAlex, not yet reviewed. ACCEPTED: the researcher confirmed it is theirs; owner_id is set. REJECTED: the researcher said it is not their work; recorded in publication_claims as REJECTED and never suggested to them again. DISMISSED: the researcher did not want it in their profile; kept aside and may be offered again. A rejected candidate is still stored - the rejection is a state, not a deletion.';
+
 COMMENT ON TABLE "resource_handovers" IS 'Append-only owner/Leader handover ledger, not generic audit. BEFORE INSERT prepares evidence/time; AFTER INSERT locks resource, compares expected previous holder, checks declared actor is active ADMIN and recipient active researcher, and updates holder. Skipped ON CONFLICT inserts have no holder side effects; errors roll back history and holder together. SQL has partial history indexes for non-null output_id/group_id. Backend verifies authenticated actor/evidence; inactive previous holder requires institutional authorization. No automatic transfer or private-content bypass. Runtime must route all existing-holder changes through this table, never direct owner_id/lead_id updates.';
 
 COMMENT ON COLUMN "resource_handovers"."authorization_reference" IS 'Reference to verified consent/official authorization, not a client assertion. Backend verifies evidence before insert.';
 
 COMMENT ON TABLE "output_revisions" IS 'NULL released_at = editable draft. Release is an owner action, not a review. SQL freezes released metadata and revision-topic/file links. Publish revision and current_release_id atomically. New draft does not change current personal/group release.';
 
-COMMENT ON COLUMN "output_external_ids"."source" IS 'E.g. OPENALEX, SCOPUS, CROSSREF. Presence here records metadata origin, not a quality certification.';
+COMMENT ON COLUMN "output_external_ids"."source" IS 'E.g. OPENALEX, SCOPUS. Presence here records metadata origin, not a quality certification.';
 
 COMMENT ON COLUMN "output_authors"."user_id" IS 'Optional internal account mapping; external coauthors need no login.';
 
@@ -998,6 +1054,16 @@ COMMENT ON TABLE "user_follows" IS 'OUTPUT supports following a paper. API valid
 COMMENT ON COLUMN "research_seminars"."organizer_id" IS 'Always a user; group affiliation is group_id. Removed ambiguous organizer_type.';
 
 COMMENT ON TABLE "digest_preferences" IS 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.';
+
+COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table.';
+
+COMMENT ON COLUMN "search_index"."entity_type" IS 'Which tab the row belongs to: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. Constrained by the search_entity_type enum. Researcher, group and opportunity have no visibility column of their own - their access is derived from state (confirmed profile, active group, OPEN opportunity).';
+
+COMMENT ON COLUMN "search_index"."entity_id" IS 'Primary key of the source row, together with entity_type. Polymorphic, so it carries no foreign key; guard_search_index_entity verifies it and sync_search_index_delete cleans it up.';
+
+COMMENT ON COLUMN "search_index"."authors_text" IS 'Author names joined for searching. Primary source is output_authors.author_name_string ordered by author_order; authors_snapshot is the fallback because it is free-form JSON with no guaranteed schema.';
+
+COMMENT ON COLUMN "search_index"."doc" IS 'Stored tsvector of title + abstract + author names, built with to_tsvector(''simple'', ...). Query with websearch_to_tsquery and rank with ts_rank. Never use a user-supplied string directly in to_tsquery.';
 
 COMMENT ON TABLE "research_updates" IS 'Small durable feed of meaningful sharing actions, NOT a general event bus. SQL records personal releases, accepted group revisions, opportunity opens and seminar publication in the same transaction. Project events are explicit future-module writes. No events on ordinary updated_at/sync. Typed target shape constrained in SQL.';
 
@@ -1201,6 +1267,10 @@ ALTER TABLE "digest_items" ADD FOREIGN KEY ("delivery_id") REFERENCES "digest_de
 
 ALTER TABLE "digest_items" ADD FOREIGN KEY ("event_id") REFERENCES "research_updates" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
+ALTER TABLE "search_index" ADD FOREIGN KEY ("revision_id") REFERENCES "output_revisions" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "search_index" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE SET NULL DEFERRABLE INITIALLY IMMEDIATE;
+
 -- PostgreSQL supplement to ResearchOS.dbml. Build into ResearchOS.sql, not standalone.
 -- Predicates take a TRUSTED backend actor. They are not RLS or SQL authentication.
 CREATE UNIQUE INDEX uq_unrevoked_user_role ON user_role_assignments(user_id, role) WHERE revoked_at IS NULL;
@@ -1216,6 +1286,12 @@ CREATE INDEX idx_group_display ON group_output_links(group_id, accepted_revision
 CREATE INDEX idx_unrevoked_sessions_user ON user_sessions(user_id) WHERE revoked_at IS NULL;
 CREATE INDEX idx_handover_output_history ON resource_handovers(output_id, performed_at) WHERE output_id IS NOT NULL;
 CREATE INDEX idx_handover_group_history ON resource_handovers(group_id, performed_at) WHERE group_id IS NOT NULL;
+CREATE INDEX idx_revision_fts ON output_revisions USING gin(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(abstract,''))) WHERE released_at IS NOT NULL;
+CREATE INDEX idx_output_visibility_lookup ON research_outputs(visibility, sharing_status) WHERE sharing_status = 'SHARED';
+CREATE INDEX idx_search_index_doc ON search_index USING gin(doc);
+CREATE INDEX idx_search_index_title_trgm ON search_index USING gin(title gin_trgm_ops);
+CREATE INDEX idx_search_index_scope ON search_index(visibility, access_group_id);
+CREATE INDEX idx_search_index_type ON search_index(entity_type);
 
 CREATE VIEW effective_user_access AS
 SELECT u.id AS user_id, u.user_type, u.is_active,
@@ -1497,8 +1573,36 @@ CREATE VIEW group_output_releases AS
 CREATE FUNCTION visible_output_releases(actor uuid) RETURNS SETOF released_output_versions LANGUAGE sql STABLE AS $$
  SELECT r.* FROM released_output_versions r WHERE can_view_output(actor,r.output_id);
 $$;
+-- The owner's own working copy: an accepted F0 work that is not published yet.
+-- It stays out of released_output_versions so it never reaches Discovery or Search,
+-- but the researcher can still see it in their own profile.
+-- The working copy is the editable draft revision (uq_output_editable_draft allows
+-- one per output); current_release_id is only set once the revision is released.
+CREATE VIEW owner_output_versions AS
+ SELECT o.id AS output_id,o.owner_id,o.doi,o.visibility,o.access_group_id,o.first_shared_at,o.import_state,
+ r.id AS revision_id,r.revision_no,r.title,r.abstract,r.venue,r.publisher,r.publication_year,r.publication_status,
+ r.output_type,r.external_url,r.authors_snapshot,r.released_at
+ FROM research_outputs o
+ LEFT JOIN output_revisions r ON r.output_id = o.id
+  AND (r.id = o.current_release_id OR (o.current_release_id IS NULL AND r.released_at IS NULL))
+ WHERE o.sharing_status <> 'SHARED';
+CREATE FUNCTION visible_owner_output_versions(actor uuid) RETURNS SETOF owner_output_versions LANGUAGE sql STABLE AS $$
+ SELECT r.* FROM owner_output_versions r WHERE r.owner_id = actor AND can_view_output(actor,r.output_id);
+$$;
 CREATE FUNCTION visible_group_output_releases(actor uuid,target_group uuid) RETURNS SETOF group_output_releases LANGUAGE sql STABLE AS $$
  SELECT r.* FROM group_output_releases r WHERE r.group_id=target_group AND can_view_output(actor,r.output_id);
+$$;
+-- Search index permission filter. Mirrors can_view_output exactly: the owner
+-- always sees the record, FPTU_COMMUNITY is visible to everyone, RESEARCH_GROUP
+-- is visible to the members of access_group_id. The owner case matters - a
+-- PRIVATE-visibility work stays findable by its owner in search.
+-- The four entity types carry the same visibility triple, so one filter covers
+-- all of them.
+CREATE FUNCTION visible_search_index(actor uuid) RETURNS SETOF search_index LANGUAGE sql STABLE AS $$
+ SELECT s.* FROM search_index s
+ WHERE s.owner_id = actor
+    OR s.visibility = 'FPTU_COMMUNITY'
+    OR (s.visibility = 'RESEARCH_GROUP' AND is_group_member(actor, s.access_group_id));
 $$;
 CREATE FUNCTION can_view_output_file(actor uuid,target_file uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM output_files f JOIN research_outputs o ON o.id=f.output_id
@@ -1681,5 +1785,154 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER guard_digest_delivery BEFORE INSERT OR UPDATE ON digest_deliveries FOR EACH ROW EXECUTE FUNCTION guard_digest_delivery();
+
+-- Search index maintenance. The index is a plain table so a publish shows up
+-- immediately instead of waiting for a refresh schedule. Triggers own it:
+--   OUTPUT        indexed when the work is SHARED and the revision is the
+--                 current release. The owner is the researcher themselves.
+--   RESEARCHER    indexed when the group is active and not archived. A group
+--                 is a public research unit, so visibility is FPTU_COMMUNITY.
+--                 The owner is the group leader.
+--   OPPORTUNITY   indexed when status = 'OPEN' and not archived. Visibility is
+--                 FPTU_COMMUNITY - an open call for collaboration is public.
+--                 The owner is the creator.
+--
+-- Drafts (accepted but not published), unconfirmed profiles, archived groups
+-- and non-open opportunities stay out of the index by design.
+CREATE FUNCTION sync_search_index() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  r output_revisions%ROWTYPE;
+  o research_outputs%ROWTYPE;
+  u users%ROWTYPE;
+  g research_groups%ROWTYPE;
+  op research_opportunities%ROWTYPE;
+  p researcher_profiles%ROWTYPE;
+  authors text;
+  etype search_entity_type;
+  eid uuid;
+  eowner uuid;
+  evis visibility_level;
+  egroup uuid;
+  etitle text;
+  ebody text;
+  eauthors text;
+BEGIN
+  etype := NULL;
+  IF TG_TABLE_NAME='output_revisions' THEN
+    SELECT * INTO o FROM research_outputs WHERE id=NEW.output_id;
+    IF NOT FOUND THEN RETURN NEW; END IF;
+    IF o.sharing_status<>'SHARED' OR o.current_release_id IS DISTINCT FROM NEW.id THEN RETURN NEW; END IF;
+    SELECT * INTO r FROM output_revisions WHERE id=NEW.id;
+    IF NOT FOUND THEN RETURN NEW; END IF;
+    etype:='OUTPUT'; eid:=o.id;
+  ELSIF TG_TABLE_NAME='research_outputs' THEN
+    IF NEW.sharing_status<>'SHARED' THEN
+      DELETE FROM search_index WHERE entity_type='OUTPUT' AND entity_id=NEW.id;
+      RETURN NEW;
+    END IF;
+    SELECT * INTO r FROM output_revisions WHERE id=NEW.current_release_id;
+    IF NOT FOUND THEN RETURN NEW; END IF;
+    SELECT * INTO o FROM research_outputs WHERE id=NEW.id;
+    IF NOT FOUND THEN RETURN NEW; END IF;
+    etype:='OUTPUT'; eid:=o.id;
+  ELSIF TG_TABLE_NAME='users' THEN
+    SELECT * INTO p FROM researcher_profiles WHERE user_id=NEW.id;
+    IF NOT FOUND OR p.profile_confirmed_at IS NULL OR NEW.is_active=false THEN
+      DELETE FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=NEW.id;
+      RETURN NEW;
+    END IF;
+    etype:='RESEARCHER'; eid:=NEW.id; eowner:=NEW.id; evis:='FPTU_COMMUNITY'; egroup:=NULL;
+    etitle:=btrim(regexp_replace(coalesce(nullif(btrim(NEW.academic_title),''),'')||' '||NEW.full_name,'[[:space:]]+',' ','g'));
+    ebody:=coalesce(p.bio,'');
+    eauthors:=NEW.full_name;
+  ELSIF TG_TABLE_NAME='researcher_profiles' THEN
+    SELECT * INTO u FROM users WHERE id=NEW.user_id;
+    IF NOT FOUND THEN RETURN NEW; END IF;
+    IF u.is_active=false OR NEW.profile_confirmed_at IS NULL THEN
+      DELETE FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=NEW.user_id;
+      RETURN NEW;
+    END IF;
+    etype:='RESEARCHER'; eid:=NEW.user_id; eowner:=NEW.user_id; evis:='FPTU_COMMUNITY'; egroup:=NULL;
+    etitle:=btrim(regexp_replace(coalesce(nullif(btrim(u.academic_title),''),'')||' '||u.full_name,'[[:space:]]+',' ','g'));
+    ebody:=coalesce(NEW.bio,'');
+    eauthors:=u.full_name;
+  ELSIF TG_TABLE_NAME='research_groups' THEN
+    IF NOT NEW.is_active OR NEW.archived_at IS NOT NULL THEN
+      DELETE FROM search_index WHERE entity_type='GROUP' AND entity_id=NEW.id;
+      RETURN NEW;
+    END IF;
+    etype:='GROUP'; eid:=NEW.id; eowner:=NEW.lead_id; evis:='FPTU_COMMUNITY'; egroup:=NULL;
+    etitle:=NEW.name; ebody:=coalesce(NEW.description,'');
+    eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=NEW.lead_id),'');
+  ELSIF TG_TABLE_NAME='research_opportunities' THEN
+    IF NEW.status<>'OPEN' OR NEW.archived_at IS NOT NULL THEN
+      DELETE FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=NEW.id;
+      RETURN NEW;
+    END IF;
+    etype:='OPPORTUNITY'; eid:=NEW.id; eowner:=NEW.creator_id;
+    -- A group-scoped opportunity is visible to that group's members only;
+    -- a personal one is public. The scope lives on the opportunity row.
+    IF NEW.group_id IS NOT NULL THEN
+      evis:='RESEARCH_GROUP'; egroup:=NEW.group_id;
+    ELSE
+      evis:='FPTU_COMMUNITY'; egroup:=NULL;
+    END IF;
+    etitle:=NEW.title; ebody:=coalesce(NEW.description,'');
+    eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=NEW.creator_id),'');
+  END IF;
+  IF etype IS NULL THEN RETURN NEW; END IF;
+  IF etype='OUTPUT' THEN
+    authors := coalesce(
+      (SELECT string_agg(a.author_name_string, ' ' ORDER BY a.author_order)
+         FROM output_authors a WHERE a.output_id=o.id),
+      coalesce((SELECT string_agg(x->>'name', ' ') FROM jsonb_array_elements(r.authors_snapshot) x
+         WHERE x ? 'name'), ''));
+    etitle:=r.title; ebody:=coalesce(r.abstract,''); eauthors:=authors;
+    eowner:=o.owner_id; evis:=o.visibility; egroup:=o.access_group_id;
+  END IF;
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
+  VALUES (etype,eid,CASE WHEN etype='OUTPUT' THEN r.id ELSE NULL END,eowner,evis,egroup,
+          etitle, ebody, eauthors,
+          to_tsvector('simple', coalesce(etitle,'') || ' ' || coalesce(ebody,'') || ' ' || coalesce(eauthors,'')))
+  ON CONFLICT (entity_type,entity_id) DO UPDATE SET
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
+    authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
+  RETURN NEW;
+END $$;
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON output_revisions FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON research_outputs FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON users FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON researcher_profiles FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON research_groups FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON research_opportunities FOR EACH ROW EXECUTE FUNCTION sync_search_index();
+CREATE TRIGGER sync_search_index_ri BEFORE UPDATE ON search_index FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- Source-row deletes remove the index row. entity_id has no foreign key
+-- because it is polymorphic, so the delete has to be handled explicitly.
+CREATE FUNCTION sync_search_index_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM search_index WHERE entity_type=TG_ARGV[0]::search_entity_type AND entity_id=OLD.id;
+  RETURN OLD;
+END $$;
+CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_outputs FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('OUTPUT');
+CREATE TRIGGER sync_search_index_del AFTER DELETE ON users FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('RESEARCHER');
+CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_groups FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('GROUP');
+CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_opportunities FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('OPPORTUNITY');
+
+-- Integrity check for the polymorphic entity reference.
+CREATE FUNCTION guard_search_index_entity() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.entity_type='OUTPUT' AND NOT EXISTS (SELECT 1 FROM research_outputs WHERE id=NEW.entity_id) THEN
+    RAISE EXCEPTION 'Search index OUTPUT points at a missing work' USING ERRCODE='23503'; END IF;
+  IF NEW.entity_type='RESEARCHER' AND NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.entity_id) THEN
+    RAISE EXCEPTION 'Search index RESEARCHER points at a missing user' USING ERRCODE='23503'; END IF;
+  IF NEW.entity_type='GROUP' AND NOT EXISTS (SELECT 1 FROM research_groups WHERE id=NEW.entity_id) THEN
+    RAISE EXCEPTION 'Search index GROUP points at a missing group' USING ERRCODE='23503'; END IF;
+  IF NEW.entity_type='OPPORTUNITY' AND NOT EXISTS (SELECT 1 FROM research_opportunities WHERE id=NEW.entity_id) THEN
+    RAISE EXCEPTION 'Search index OPPORTUNITY points at a missing opportunity' USING ERRCODE='23503'; END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER guard_search_index BEFORE INSERT OR UPDATE ON search_index FOR EACH ROW EXECUTE FUNCTION guard_search_index_entity();
 
 COMMIT;

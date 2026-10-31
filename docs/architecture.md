@@ -40,7 +40,7 @@ flowchart TD
     API --> Queue["Redis / BullMQ"]
     Queue --> Worker["NestJS worker"]
     Worker --> DB
-    Worker --> External["Crossref / ORCID / HR / Email / AI"]
+    Worker --> External["OpenAlex / Email / AI"]
     API --> Files["Object storage"]
     Worker --> Files
     API --> Search["Search / Retrieval"]
@@ -157,11 +157,43 @@ Ban đầu có thể chạy web, API, worker, PostgreSQL và Redis trên một V
 
 Với job nghiệp vụ, dùng transaction/ràng buộc database, idempotency và retry có giới hạn. Dùng transactional outbox cho trường hợp cần đảm bảo phát job sau khi ghi dữ liệu. Gửi email không được mặc định coi là exactly-once chỉ nhờ queue; cần ledger/idempotency và khả năng của nhà cung cấp email.
 
+## Đồng bộ dữ liệu nền (F0)
+
+Nền dữ liệu đến từ nguồn ngoài, nhưng **người dùng kéo, không phải cron tải**.
+
+| Nguồn | Vai trò | Cơ chế |
+| --- | --- | --- |
+| OpenAlex | Taxonomy `research_fields` / `research_subfields` / `research_topics` | **Seed 1 lần** trong migration, không cần duyệt |
+| OpenAlex | Danh sách ứng viên công bố + metadata công bố | Người dùng kéo ở onboarding hoặc từ màn sửa hồ sơ; metadata gọi sau khi người dùng tick |
+| HR | Nguồn chuẩn cho đơn vị, học hàm học vị | **Hoãn** — chờ tài liệu SSO FPTU. Tạm thời seed thủ công `users` + `researcher_profiles` |
+| Hồ sơ nhóm hiện có | Nội dung mồi (D1) | Seed 1 lần bởi ops |
+
+OpenAlex là **nguồn duy nhất** cho cả taxonomy lẫn dữ liệu công bố — không có
+lệnh gọi nào tới nhà xuất bản hay cơ sở dữ liệu trích dẫn khác. Tác giả được
+tìm trong chính OpenAlex theo định danh người dùng tự nhập trong hồ sơ, rồi
+lấy danh sách công bố qua `GET /authors?filter=display_name.search:<tên>,last_known_institutions.id:I109689652`.
+
+Cron chỉ làm một việc: **làm mới các bài đã được chấp nhận** và đã lưu trong
+database, theo chu kỳ tuần. Nó không tạo bài mới, không gợi ý bài mới và không
+chạm vào bài bị từ chối.
+
+Hai điểm bắt buộc:
+
+- **Job đồng bộ không ghi đè giá trị người đã xác nhận.** Cột `is_locked`
+  trong `field_provenance` là cơ chế: đọc nó trước mỗi lần ghi.
+- **Mỗi field tự động sinh đều ghi provenance**, trong cùng transaction với
+  bộ ghi field. Xem [database.md §5.2](database.md#52-mọi-dữ-liệu-có-nguồn-gốc).
+
+Cơ chế "chờ xác nhận" dùng lại pattern `SUGGESTED` đã có: `publication_claims`
+cho quyền tác giả, `research_interests` cho sở thích. Bị từ chối cũng được
+lưu, kèm trạng thái, để không gợi ý lại.
+
 ## Các nguyên tắc phải giữ từ đầu
 
 - Backend kiểm tra role, ownership, membership và visibility cho từng tài nguyên.
 - Search, Assistant, export và digest dùng cùng chính sách quyền; lọc dữ liệu trước khi đưa vào prompt hoặc gửi email.
 - Dữ liệu tự nhập, imported và AI-inferred có nguồn gốc, thời điểm và trạng thái xác nhận riêng.
+- `provenance` phân loại **chủ thể đứng sau nội dung**; `sourceKind`/`sourceRef` mới là kênh dữ liệu đến. Hai trục tách biệt, không gộp.
 - Record validation status, visibility và publication status là ba trục độc lập.
 - AI tạo gợi ý; người có thẩm quyền xác nhận taxonomy, quan hệ tri thức và nghiên cứu chính thức.
 - Lỗi nguồn dữ liệu bên ngoài không chặn việc đọc dữ liệu đã lưu.
@@ -171,7 +203,7 @@ Với job nghiệp vụ, dùng transaction/ràng buộc database, idempotency v�
 
 | Mục tiêu | Phạm vi và mức đầu tư |
 | --- | --- |
-| MVP/đồ án | Tập trung SSO, profile, taxonomy, discovery, group hub, opportunities, follow/digest, LLKH thô và Assistant tra cứu; vận hành đơn giản |
+| MVP/đồ án | Tập trung profile, taxonomy, discovery, group hub, opportunities, follow/digest, LLKH thô và Assistant tra cứu; vận hành đơn giản. Đăng nhập dùng tài khoản local (SSO FPTU chưa chốt giao thức), nền tảng để sau đổi sang SSO mà không migrate dữ liệu |
 | Dùng thực tế trong trường | Có thể giữ cùng phạm vi MVP, nhưng cần staging, CI/CD, backup đã thử khôi phục, monitoring, rollback và người phụ trách vận hành |
 | Toàn bộ SRS/quy mô lớn | Bổ sung các phase nâng cao, mở rộng API/worker/search theo tải và đo các tiêu chí nghiệm thu; không mặc định buộc phải microservices |
 
