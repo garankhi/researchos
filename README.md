@@ -1,7 +1,7 @@
 # ResearchOS
 
 Monorepo pnpm gồm Next.js (web), NestJS (API) và NestJS (worker), dùng
-PostgreSQL và Prisma.
+PostgreSQL và Prisma. PostgreSQL và Redis chạy bằng Docker Compose ở local.
 
 ## Cấu trúc
 
@@ -24,12 +24,15 @@ docs/
 ## Chạy lần đầu
 
 ```powershell
-pnpm install
 Copy-Item .env.example .env
-pwsh packages/database/scripts/setup-database.ps1
+pnpm install --frozen-lockfile
+pnpm infra:up
+pnpm db:migrate:deploy
 ```
 
-Sau đó điền `DATABASE_URL` trong `.env` bằng mật khẩu PostgreSQL của bạn.
+Mở Docker Desktop trước khi chạy. Cấu hình mẫu dùng một database `researchos`
+ở `localhost:55432` và Redis ở `localhost:6379`, chỉ cho phép kết nối từ máy
+local. Không cần cài PostgreSQL hoặc Redis trực tiếp trên máy.
 
 ```powershell
 pnpm dev
@@ -38,10 +41,22 @@ pnpm dev
 Web chạy ở http://localhost:3000, API ở http://localhost:4000, tài liệu
 Swagger ở http://localhost:4000/docs.
 
+Nếu cổng web/API đang có ứng dụng khác dùng, cần chọn cổng trống trước khi chạy.
+Worker hiện vẫn là scaffold, chưa có BullMQ processor; `REDIS_URL` chuẩn bị cho
+lần tích hợp queue đầu tiên.
+
+`pnpm infra:down` dừng Docker và giữ dữ liệu trong volume. Khi deploy, server
+sẽ có Docker, biến môi trường và volume riêng; không dùng lại dữ liệu local.
+Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
+
 ## Lệnh thường dùng
 
 | Lệnh | Tác dụng |
 | --- | --- |
+| `pnpm infra:up` | Chạy PostgreSQL/Redis và chờ healthcheck |
+| `pnpm infra:down` | Dừng hạ tầng local, giữ dữ liệu |
+| `pnpm infra:status` | Xem trạng thái PostgreSQL/Redis |
+| `pnpm infra:logs` | Xem log PostgreSQL/Redis |
 | `pnpm dev` | Chạy web và API |
 | `pnpm dev:worker` | Chạy worker |
 | `pnpm build` | Build toàn workspace |

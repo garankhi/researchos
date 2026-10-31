@@ -8,6 +8,8 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   esbuild: true
+  '@swc/core': true
+  '@parcel/watcher': true
   '@scarf/scarf': false
   '@prisma/engines': true
   '@prisma/client': true

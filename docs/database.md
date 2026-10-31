@@ -1,6 +1,6 @@
 # Database và Prisma
 
-Ngày ghi nhận: 29/10/2026.
+Ngày cập nhật: 31/10/2026.
 
 Prisma 7.10.1 đã được cài đặt trong `packages/database`. Package này giữ
 schema, migration và client dùng chung cho cả `apps/api` và `apps/worker`.
@@ -38,7 +38,7 @@ packages/database/
 
 ## 2. Yêu cầu
 
-- PostgreSQL 14 trở lên. Đã kiểm tra với PostgreSQL 17.
+- Docker Desktop đang chạy; Compose dùng PostgreSQL 18.6.
 - Node.js 24, pnpm 12.15.0.
 
 ## 3. Thiết lập lần đầu
@@ -50,27 +50,54 @@ worker và Prisma CLI:
 Copy-Item .env.example .env
 ```
 
-Bước 2 — tạo database và chạy migration. Script hỏi mật khẩu, không nhận
-mật khẩu qua tham số để nó không bị lưu vào history:
+Bước 2 — chạy PostgreSQL/Redis bằng Docker và áp dụng migration đã commit:
 
 ```powershell
-pwsh packages/database/scripts/setup-database.ps1
+pnpm install --frozen-lockfile
+pnpm infra:up
+pnpm db:migrate:deploy
 ```
 
-Bước 3 — điền `DATABASE_URL` trong `.env` bằng mật khẩu thật của bạn:
+Bản mẫu `.env` đã khớp với Docker: PostgreSQL ở `localhost:55432` để tránh
+trùng PostgreSQL cài sẵn, database `researchos`, một tài khoản `postgres`
+cho local. Không cần tạo các database dev/test/staging riêng.
 
 ```dotenv
-DATABASE_URL="postgresql://postgres:<password>@localhost:5432/researchos?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:55432/researchos?schema=public"
 ```
 
-Bước 4 — kiểm tra:
+Nếu đổi `POSTGRES_PASSWORD`/`POSTGRES_PORT`, sửa `DATABASE_URL` cho khớp.
+`POSTGRES_PASSWORD` chỉ thiết lập mật khẩu khi volume còn rỗng; đổi biến
+này không tự đổi mật khẩu trong database đã có dữ liệu.
+
+Bước 3 — kiểm tra và chạy app:
 
 ```powershell
 pnpm db:status
+pnpm dev
+```
+
+Ở terminal khác:
+
+```powershell
 Invoke-WebRequest 'http://localhost:4000/health/ready' | Select-Object -ExpandProperty Content
 ```
 
 Kết quả mong đợi là `"status":"ok"`. Nếu là `"degraded"`, xem mục "Xử lý sự cố".
+
+`pnpm infra:down` dừng container và giữ volume. Khi deploy, server có
+Docker và volume riêng, dùng credentials riêng. Chưa cần tách tài khoản
+migration hoặc tự chỉnh connection pool cho local.
+
+Migration đầu tiên chỉ tạo enum và `audit_logs` đúng với `schema.prisma`
+hiện tại. Bản SQL nghiệp vụ trong `docs/database/ResearchOS.sql` chưa được
+đưa vào Prisma/migration; Compose không tự import bản SQL đó. Việc đồng bộ
+schema nghiệp vụ là bước riêng, không được chạy cả hai cách khởi tạo lên
+cùng database.
+
+Nếu vẫn muốn dùng PostgreSQL cài trực tiếp trên máy, script
+`packages/database/scripts/setup-database.ps1` vẫn dùng được; cập nhật
+`DATABASE_URL` theo host/cổng/mật khẩu của bản cài đó.
 
 ## 4. Lệnh thường dùng
 
@@ -185,6 +212,10 @@ Quy tắc:
 | Biến | Dùng ở đâu | Bắt buộc |
 | --- | --- | --- |
 | `DATABASE_URL` | Prisma CLI, API, worker | Có (khi cần database) |
+| `POSTGRES_PASSWORD` | Docker PostgreSQL local | Có |
+| `POSTGRES_PORT` | Cổng PostgreSQL trên máy local, mặc định 55432 | Không |
+| `REDIS_PORT` | Cổng Redis trên máy local, mặc định 6379 | Không |
+| `REDIS_URL` | Dành cho BullMQ khi tích hợp processor đầu tiên | Chưa dùng |
 | `SHADOW_DATABASE_URL` | `prisma migrate dev` | Không |
 | `WEB_ORIGIN` | CORS của API | Không |
 | `PORT` | Cổng lắng nghe | Không |
@@ -210,17 +241,17 @@ pnpm db:status
 **`DATABASE_URL is not set`.** File `.env` ở root chưa có, hoặc chạy lệnh từ
 thư mục khác root. File `.env` phải ở root workspace.
 
-**`database "researchos" does not exist`.** Chạy
-`pwsh packages/database/scripts/setup-database.ps1`.
+**`database "researchos" does not exist`.** Chạy `pnpm infra:up`, kiểm tra
+`DATABASE_URL` trỏ đúng Docker ở cổng `55432`.
 
-**`Error: P1001: Can't reach database server`.** PostgreSQL chưa chạy. Kiểm tra
-bằng `Get-Service postgresql*` trên Windows.
+**`Error: P1001: Can't reach database server`.** Kiểm tra Docker Desktop đang
+chạy, rồi dùng `pnpm infra:status` và `pnpm infra:logs`.
 
 **Sau khi đổi `schema.prisma`, app báo lỗi type.** Chạy `pnpm db:generate`.
 Client được sinh lại tự động trước mỗi lần build của package database, nhưng
 IDE cần chạy lệnh này để cập nhật type.
 
-**Migration bị lệch.** `pnpm --filter @researchos/database db:migrate:reset`
+**Migration bị lệch.** `pnpm --filter @researchos/database db:reset`
 xoá và dựng lại database từ đầu. Chỉ dùng ở máy dev.
 
 ## 9. Migration và production

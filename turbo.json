@@ -39,18 +39,27 @@
       "cache": false
     },
     "db:generate": {
+      "dependsOn": ["^build"],
       "cache": false
     },
     "db:migrate": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL", "SHADOW_DATABASE_URL"],
       "cache": false
     },
     "db:migrate:deploy": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
     "db:status": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
     "db:studio": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
       "cache": false,
       "persistent": true
     },

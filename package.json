@@ -4,6 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "infra:status": "docker compose ps",
+    "infra:logs": "docker compose logs --tail=100 -f",
     "dev": "turbo run dev --filter=web --filter=api",
     "dev:web": "turbo run dev --filter=web",
     "dev:api": "turbo run dev --filter=api",
