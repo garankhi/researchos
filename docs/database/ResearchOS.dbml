@@ -148,6 +148,19 @@ Enum output_sharing_status {
   SHARED
   ARCHIVED
 }
+Enum output_import_state {
+  NONE
+  CANDIDATE
+  ACCEPTED
+  REJECTED
+  DISMISSED
+}
+Enum search_entity_type {
+  OUTPUT
+  RESEARCHER
+  GROUP
+  OPPORTUNITY
+}
 Enum group_output_status {
   PENDING
   ACCEPTED
@@ -330,6 +343,27 @@ Table researcher_profiles {
   Note: 'Shared by faculty, students and staff. Profile existence does not grant researcher/admin access. API completes researcher onboarding only after profile/paper review and at least one ACTIVE interest.'
 }
 
+Table field_provenance {
+  entity_type varchar(64) [not null]
+  entity_id uuid [not null]
+  field_name varchar(64) [not null]
+  source data_provenance_type [not null]
+  source_ref text [not null]
+  synced_at timestamptz
+  verified_at timestamptz
+  is_locked boolean [not null, default: false]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (entity_type, entity_id, field_name, source_ref) [pk]
+    (entity_type, entity_id) [name: 'idx_field_provenance_entity']
+    (source) [name: 'idx_field_provenance_source']
+  }
+  checks {
+    `length(btrim(source_ref)) > 0` [name: 'ck_field_provenance_ref']
+  }
+  Note: 'Field-level provenance for auto-generated data. source classifies WHO STANDS BEHIND the value (PAPER/AI_TRACE/AI_INF/HUMAN/EXT/UNK), not the channel the data travelled through; sourceKind/sourceRef carry the channel. PK includes source_ref so an overwritten field keeps its history. Only auto-generated fields get a row - a field typed by a user is HUMAN by definition. is_locked is set when a human confirms a value: a sync job must never overwrite a locked field. AI without a replayable trace is AI_INF, never UNK; UNK means the value exists but its origin cannot be traced.'
+}
+
 Table research_fields {
   id uuid [pk, default: `gen_random_uuid()`]
   internal_code varchar(50) [unique]
@@ -454,6 +488,7 @@ Table research_outputs {
   visibility visibility_level [not null, default: 'PRIVATE']
   access_group_id uuid
   provenance_tag data_provenance_type [not null, default: 'PAPER']
+  import_state output_import_state [not null, default: 'NONE', note: 'State of the external ingest for this work. NONE: not from an external pull. CANDIDATE: pulled from OpenAlex, not yet reviewed. ACCEPTED: the researcher confirmed it is theirs; owner_id is set. REJECTED: the researcher said it is not their work; recorded in publication_claims as REJECTED and never suggested to them again. DISMISSED: the researcher did not want it in their profile; kept aside and may be offered again. A rejected candidate is still stored - the rejection is a state, not a deletion.']
   last_synced_at timestamptz
   first_shared_at timestamptz
   archived_at timestamptz
@@ -463,6 +498,7 @@ Table research_outputs {
     `sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)` [name: 'ck_shared_output']
     `(sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)` [name: 'ck_output_archive']
     `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_output_access_scope']
+    `import_state <> 'ACCEPTED' OR owner_id IS NOT NULL` [name: 'ck_output_import_owner']
   }
   indexes { owner_id }
   Note: 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.'
@@ -523,7 +559,7 @@ Table output_revisions {
 
 Table output_external_ids {
   output_id uuid [not null]
-  source varchar(50) [not null, note: 'E.g. OPENALEX, SCOPUS, CROSSREF. Presence here records metadata origin, not a quality certification.']
+  source varchar(50) [not null, note: 'E.g. OPENALEX, SCOPUS. Presence here records metadata origin, not a quality certification.']
   external_id varchar(255) [not null]
   last_synced_at timestamptz
   indexes {
@@ -875,6 +911,29 @@ Table digest_preferences {
   updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   Note: 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.'
 }
+
+Table search_index {
+  entity_type search_entity_type [not null, note: 'Which tab the row belongs to: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. Constrained by the search_entity_type enum. Researcher, group and opportunity have no visibility column of their own - their access is derived from state (confirmed profile, active group, OPEN opportunity).']
+  entity_id uuid [not null, note: 'Primary key of the source row, together with entity_type. Polymorphic, so it carries no foreign key; guard_search_index_entity verifies it and sync_search_index_delete cleans it up.']
+  revision_id uuid
+  owner_id uuid
+  visibility visibility_level [not null]
+  access_group_id uuid
+  title text [not null]
+  body text
+  authors_text text [note: 'Author names joined for searching. Primary source is output_authors.author_name_string ordered by author_order; authors_snapshot is the fallback because it is free-form JSON with no guaranteed schema.']
+  doc tsvector [not null, note: 'Stored tsvector of title + abstract + author names, built with to_tsvector(\'simple\', ...). Query with websearch_to_tsquery and rank with ts_rank. Never use a user-supplied string directly in to_tsquery.']
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (entity_type, entity_id) [pk]
+  }
+  checks {
+    `entity_type IN ('OUTPUT','RESEARCHER','GROUP','OPPORTUNITY')` [name: 'ck_search_index_entity_type']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_search_index_scope']
+  }
+  Note: 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table.'
+}
+
 Table research_updates {
   id uuid [pk, default: `gen_random_uuid()`]
   event_key varchar(255) [not null, unique]
@@ -1026,6 +1085,8 @@ Ref: research_updates.project_id >? research_projects.id [delete: restrict]
 Ref: digest_deliveries.user_id > users.id [delete: restrict]
 Ref: digest_items.delivery_id > digest_deliveries.id [delete: restrict]
 Ref: digest_items.event_id > research_updates.id [delete: restrict]
+Ref: search_index.revision_id >? output_revisions.id [delete: cascade]
+Ref: search_index.owner_id >? users.id [delete: set null]
 
 TableGroup Identity {
   users
@@ -1071,6 +1132,9 @@ TableGroup Follow_Digest {
   research_updates
   digest_deliveries
   digest_items
+}
+TableGroup Search {
+  search_index
 }
 TableGroup Advanced_Phase {
   research_projects

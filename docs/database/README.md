@@ -13,6 +13,7 @@ Cập nhật ngày 30/10/2026. Bản 4.3 sửa bàn giao khi INSERT bị bỏ qu
 - [schema-smoke.sql](schema-smoke.sql): kiểm tra nghiệp vụ, tự rollback fixtures.
 - [schema-auth-smoke.sql](schema-auth-smoke.sql): kiểm tra STAFF/ADMIN, grant MANUAL/SYSTEM, credentials, session LOCAL/OIDC và không vượt quyền tài nguyên; tự rollback fixtures.
 - [schema-policy-smoke.sql](schema-policy-smoke.sql): kiểm tra policy, DOI gồm tab/CR/LF, group singleton của sinh viên researcher, giữ nội dung khi inactive, bàn giao và conflict không gây đổi người thiếu lịch sử; tự rollback fixtures.
+- [schema-search-smoke.sql](schema-search-smoke.sql): kiểm tra phần F0 mới: `output_import_state`, `field_provenance`, `search_index` (4 loại entity) và `owner_output_versions`; tự rollback fixtures.
 - [schema-concurrency.py](schema-concurrency.py): kiểm tra bằng hai kết nối thật; **chỉ dùng database thử nghiệm**, fixtures được giữ lại.
 
 DBML không biểu diễn đầy đủ partial index, trigger và chính sách truy vấn của PostgreSQL. Vì vậy dùng DBML để xem sơ đồ; dùng **ResearchOS.sql** khi tạo database. Không dùng riêng SQL export từ web rồi cho rằng đã có các ràng buộc bổ sung.
@@ -173,7 +174,7 @@ flowchart LR
 | `digest_frequency` / preference frequency | Bỏ, MVP cố định hàng tuần | Không còn lựa chọn ngày/tháng |
 | Seminar chưa có mốc đăng | `research_seminars.published_at` | Phân biệt tạo nháp với đăng seminar |
 
-Các FK, index, TableGroup và test đã dùng tên mới. `output_external_ids.source` vẫn có thể ghi nguồn metadata bài như SCOPUS/CROSSREF; đây không phải enum nguồn taxonomy.
+Các FK, index, TableGroup và test đã dùng tên mới. `output_external_ids.source` vẫn có thể ghi nguồn metadata bài như SCOPUS/OPENALEX; đây không phải enum nguồn taxonomy.
 
 ## Flow đăng bài và liên kết group
 
@@ -485,6 +486,24 @@ Opt-out/quyền thay đổi sau khi email đã gửi không thể thu hồi emai
 
 Các function đều chạy theo quyền SQL caller mặc định; **chưa bật RLS, chưa tạo runtime DB roles hoặc API phân quyền**. Trường `created_by/released_by/decided_by` là dữ liệu, không chứng minh danh tính người kết nối. Không cấp truy cập SQL trực tiếp cho user cuối; backend phải kiểm tra actor và dùng tài khoản DB tối thiểu quyền. Các test helper quyền xác nhận predicate, không chứng minh API đã an toàn.
 
+## Phần F0 mới: import state, provenance và search index — 31/10/2026
+
+Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchOS.sql`. Nay đã chuyển về đúng nguồn: enum, bảng, check và FK nằm trong `ResearchOS.dbml`; view, function, trigger và index đặc biệt nằm trong `postgres-features.sql`. `ResearchOS.sql` được sinh lại từ hai file đó, nên không còn sửa tay và có thể tái tạo.
+
+| Thành phần | Nguồn | Ghi chú |
+|---|---|---|
+| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED / REJECTED / DISMISSED |
+| `research_outputs.import_state` + `ck_output_import_owner` | DBML | ACCEPTED bắt buộc có `owner_id` |
+| `field_provenance` | DBML | PK 4 cột `(entity_type, entity_id, field_name, source_ref)` để giữ lịch sử khi ghi đè; `ck_field_provenance_ref` chặn `source_ref` trắng |
+| `search_entity_type` | DBML | Enum 4 giá trị: OUTPUT / RESEARCHER / GROUP / OPPORTUNITY |
+| `search_index` | DBML | PK `(entity_type, entity_id)`; `entity_id` đa hình nên không có FK, trigger `guard_search_index_entity` canh giữ |
+| `owner_output_versions` + `visible_owner_output_versions` | postgres-features.sql | Bản làm việc của owner: công trình ACCEPTED chưa publish, không vào Discovery/Search |
+| `visible_search_index` | postgres-features.sql | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity |
+| `sync_search_index` + 13 trigger | postgres-features.sql | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
+| `idx_revision_fts`, `idx_output_visibility_lookup`, `idx_search_index_*` | postgres-features.sql | GIN FTS, GIN trigram và index lọc theo scope |
+
+`search_index.entity_type` dùng enum `search_entity_type` riêng, không dùng lại enum `entity_types` cũ: enum cũ có `PROJECT` và `TOPIC` nhưng thiếu `OPPORTUNITY`, nên tập giá trị không khớp. `ck_search_index_entity_type` được giữ lại như một ràng buộc tường minh, trùng với enum nhưng vẫn trả lỗi `23514` như thiết kế cũ.
+
 ## Kiểm chứng thực tế và cách tái chạy
 
 Đã kiểm tra lại bản 4.3 ngày 30/10/2026:
@@ -494,6 +513,7 @@ Các function đều chạy theo quyền SQL caller mặc định; **chưa bật
 - `schema-auth-smoke.sql`: PASS A–J theo yêu cầu mới: FACULTY baseline; STUDENT/STAFF guest; ADMIN độc lập RESEARCHER; future grant/revoke/inactive; CHECK MANUAL/SYSTEM/actor và role không default; email/mã trường/credentials; session LOCAL/OIDC đúng user; hết hạn/idle/logout; đổi/reset hash revoke session; ADMIN không bypass owner/group/PRIVATE ngay cả khi có cả RESEARCHER.
 - `schema-policy-smoke.sql`: PASS helper admin cuối cùng, sinh viên researcher tạo group singleton, DOI nhiều cách viết gồm tab/CR/LF bị chặn trùng (INSERT/UPDATE và blank → NULL), inactive giữ nội dung và revoke session, bàn giao owner/Leader nguyên tử, ON CONFLICT no-op cho cả output/group, căn cứ, request cũ, lịch sử bất biến và không mở quyền cho admin thực hiện.
 - `schema-smoke.sql`: PASS các nhóm identity/session, taxonomy/interest, publication A–D, opportunity/application, follow/digest. Bao gồm FK, unique, normalization, upsert, LOCAL/imported cùng tồn tại, immutable release, scope file, private/group, SLA, withdrawal/resubmission, opt-out và terminal delivery.
+- `schema-search-smoke.sql` (mới, 31/10/2026): PASS `output_import_state` mặc định NONE và chặn ACCEPTED không owner; `field_provenance` giữ một dòng cho mỗi `source_ref` và chặn ref trắng; `search_index` chặn `RESEARCH_GROUP` thiếu `access_group_id`, chặn entity đa hình trỏ về bản ghi không tồn tại, index/không index theo vòng đời DRAFT → SHARED → ARCHIVED, và payload FTS tra được; `owner_output_versions` hiện bản làm việc của owner nhưng không phải released version, chỉ owner thấy, và không có trong search index.
 - `schema-concurrency.py`: hai kết nối thực; chỉ một đơn chưa rút khi nộp trùng; rút/phản hồi chỉ một bên thắng; insert chờ đóng rồi bị từ chối; hai bàn giao cùng người cũ chỉ một lần thành công; hai transaction dùng helper khóa admin giữ admin cuối cùng. Bổ sung LOCAL/OIDC login–deactivation theo cả hai thứ tự, mở lại tài khoản không hồi sinh phiên; login–reset theo thứ tự khóa user → credentials, login đọc hash mới hoặc session vừa tạo bị revoke. Hash trong test là dữ liệu giả, không phải kiểm thử xác thực mật khẩu.
 - Chưa chạy giao diện dbdiagram.io; xác nhận bằng parser chính thức, không khẳng định đã thao tác trên website.
 - Không chạy vào database có dữ liệu của dự án. Chỉ dùng dữ liệu giả trong cluster mới riêng biệt, không chạy verify mật khẩu/login/API, không gọi IdP/OpenAlex/email/AI. Test quyền là test predicate/ràng buộc DB, không khẳng định API quản trị đã hoạt động. Cluster thử nghiệm được dừng sau kiểm tra.
@@ -510,6 +530,7 @@ psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_te
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-auth-smoke.sql
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-smoke.sql
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-policy-smoke.sql
+psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-search-smoke.sql
 python docs/database/schema-concurrency.py --psql 'C:/Program Files/PostgreSQL/18/bin/psql.exe' --port 55440 --database researchos_test --user schema_test --confirm-disposable
 ```
 
