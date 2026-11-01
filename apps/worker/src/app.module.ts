@@ -3,15 +3,13 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { resolveEnvFilePaths } from '@researchos/config';
 import { PrismaModule } from '@researchos/database';
-import { HealthModule } from './modules/health/health.module.js';
+import { JobsModule } from './modules/jobs/jobs.module.js';
 
 /**
  * Composition root for the worker.
  *
- * The worker is still an HTTP scaffold: it has no queue or processor
- * registered yet, so it keeps a plain HTTP bootstrap. Convert this to
- * `NestFactory.createApplicationContext` when the first BullMQ processor
- * is added — see docs/scaffolding.md.
+ * Runs as an application context. JobsModule registers BullMQ and processors;
+ * this app has no HTTP listener.
  *
  * Processors live in `src/processors/`, one file per job type.
  *
@@ -26,10 +24,12 @@ import { HealthModule } from './modules/health/health.module.js';
       // The workspace root `.env` holds the shared variables; an app-local
       // `.env` overrides them for this app only. This file lives in `src/`,
       // so the package root is two levels up.
-      envFilePath: resolveEnvFilePaths(resolve(import.meta.dirname, '..', '..')),
+      envFilePath: resolveEnvFilePaths(
+        resolve(import.meta.dirname, '..', '..'),
+      ),
     }),
     PrismaModule,
-    HealthModule,
+    JobsModule,
   ],
 })
 export class AppModule {}

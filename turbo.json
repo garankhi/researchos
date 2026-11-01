@@ -19,6 +19,16 @@
       "outputs": [],
       "env": ["CI"]
     },
+    "test:queue": {
+      "dependsOn": ["build", "worker#build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL"]
+    },
+    "queue:probe": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "QUEUE_PREFIX"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,

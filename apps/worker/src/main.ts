@@ -1,12 +1,11 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  // Still an HTTP app: no BullMQ processor is registered yet, so an
-  // application context would exit immediately. Switch to
-  // `NestFactory.createApplicationContext(AppModule)` together with the
-  // first queue processor.
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  const app = await NestFactory.createApplicationContext(AppModule);
+  // Nest/BullMQ close the consumer and Redis connections during shutdown.
+  app.enableShutdownHooks();
+  new Logger('WorkerBootstrap').log('Queue worker started');
 }
 await bootstrap();

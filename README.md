@@ -13,6 +13,7 @@ apps/
 packages/
   config/      Cách tìm và nạp file .env dùng chung
   database/    Prisma schema, migration, client dùng chung API/worker
+  queue/       Cấu hình Redis và hợp đồng job dùng chung API/worker
 docs/
   architecture.md    Kiến trúc tổng thể
   api-convention.md  Quy ước tạo API
@@ -42,8 +43,8 @@ Web chạy ở http://localhost:3000, API ở http://localhost:4000, tài liệu
 Swagger ở http://localhost:4000/docs.
 
 Nếu cổng web/API đang có ứng dụng khác dùng, cần chọn cổng trống trước khi chạy.
-Worker hiện vẫn là scaffold, chưa có BullMQ processor; `REDIS_URL` chuẩn bị cho
-lần tích hợp queue đầu tiên.
+Worker chạy BullMQ bằng application context, không mở HTTP port. Chạy
+`pnpm dev:worker` ở terminal khác; xem [queue và kiểm thử](./docs/queues.md).
 
 `pnpm infra:down` dừng Docker và giữ dữ liệu trong volume. Khi deploy, server
 sẽ có Docker, biến môi trường và volume riêng; không dùng lại dữ liệu local.
@@ -62,6 +63,8 @@ Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
 | `pnpm build` | Build toàn workspace |
 | `pnpm lint` | Lint toàn workspace |
 | `pnpm test` | Test toàn workspace |
+| `pnpm test:queue` | Test API → Redis → worker thật, tự khởi động worker thử |
+| `pnpm queue:probe` | Gửi một job kiểm tra đến worker đang chạy |
 | `pnpm codegen` | Sinh OpenAPI rồi client Orval cho web |
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ ở máy dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |

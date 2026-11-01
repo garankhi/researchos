@@ -94,6 +94,7 @@ hiện tại. Bản SQL nghiệp vụ trong `docs/database/ResearchOS.sql` chưa
 đưa vào Prisma/migration; Compose không tự import bản SQL đó. Việc đồng bộ
 schema nghiệp vụ là bước riêng, không được chạy cả hai cách khởi tạo lên
 cùng database.
+Quy trình cụ thể: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
 
 Nếu vẫn muốn dùng PostgreSQL cài trực tiếp trên máy, script
 `packages/database/scripts/setup-database.ps1` vẫn dùng được; cập nhật
@@ -215,7 +216,8 @@ Quy tắc:
 | `POSTGRES_PASSWORD` | Docker PostgreSQL local | Có |
 | `POSTGRES_PORT` | Cổng PostgreSQL trên máy local, mặc định 55432 | Không |
 | `REDIS_PORT` | Cổng Redis trên máy local, mặc định 6379 | Không |
-| `REDIS_URL` | Dành cho BullMQ khi tích hợp processor đầu tiên | Chưa dùng |
+| `REDIS_URL` | API producer và BullMQ worker | Có |
+| `QUEUE_PREFIX` | Namespace Redis dùng chung API/worker | Không |
 | `SHADOW_DATABASE_URL` | `prisma migrate dev` | Không |
 | `WEB_ORIGIN` | CORS của API | Không |
 | `PORT` | Cổng lắng nghe | Không |

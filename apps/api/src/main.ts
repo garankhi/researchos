@@ -8,6 +8,7 @@ import { createOpenApiDocument } from './openapi.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
 
   app.enableCors({
     origin: process.env.WEB_ORIGIN?.split(',') ?? true,
