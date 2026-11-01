@@ -117,4 +117,127 @@ BEGIN
  PERFORM pg_temp.assert_true(n=0,'the owner working copy is not in the search index');
  RAISE NOTICE 'PASS owner_output_versions visibility and Search exclusion';
 END $$;
+
+-- Visible search rows need an active account, exactly like can_view_output.
+-- A NULL, unknown or inactive actor must not reach community rows, and an
+-- inactive owner must not reach their own private rows either.
+DO $$
+DECLARE
+ u uuid=gen_random_uuid(); inactive uuid=gen_random_uuid(); o uuid; r uuid; n int;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(u,'FACULTY','active-search@test.invalid','Active Searcher','FPTU'),
+      (inactive,'FACULTY','inactive-search@test.invalid','Inactive Searcher','FPTU');
+ UPDATE users SET is_active=false WHERE id=inactive;
+
+ INSERT INTO research_outputs(id,sharing_status,owner_id,created_by)
+ VALUES(gen_random_uuid(),'DRAFT',u,u) RETURNING id INTO o;
+ INSERT INTO output_revisions(id,output_id,revision_no,title,created_by)
+ VALUES(gen_random_uuid(),o,1,'Active Visibility Work',u) RETURNING id INTO r;
+ UPDATE output_revisions SET released_at=clock_timestamp(),released_by=u WHERE id=r;
+ UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=r WHERE id=o;
+
+ -- An active actor sees the community row.
+ SELECT count(*) INTO n FROM visible_search_index(u) WHERE entity_id=o;
+ PERFORM pg_temp.assert_true(n=1,'an active actor sees the shared work');
+
+ -- A NULL actor sees nothing.
+ SELECT count(*) INTO n FROM visible_search_index(NULL) WHERE entity_id=o;
+ PERFORM pg_temp.assert_true(n=0,'a NULL actor sees no search row');
+
+ -- An unknown actor sees nothing.
+ SELECT count(*) INTO n FROM visible_search_index(gen_random_uuid()) WHERE entity_id=o;
+ PERFORM pg_temp.assert_true(n=0,'an unknown actor sees no search row');
+
+ -- An inactive actor sees nothing, not even the community row.
+ SELECT count(*) INTO n FROM visible_search_index(inactive) WHERE entity_id=o;
+ PERFORM pg_temp.assert_true(n=0,'an inactive actor sees no search row');
+
+ -- An inactive owner does not reach their own private row either.
+ UPDATE research_outputs SET visibility='PRIVATE' WHERE id=o;
+ UPDATE users SET is_active=false WHERE id=u;
+ SELECT count(*) INTO n FROM visible_search_index(u) WHERE entity_id=o;
+ PERFORM pg_temp.assert_true(n=0,'an inactive owner does not see their own private work');
+ RAISE NOTICE 'PASS visible_search_index requires an active account';
+END $$;
+
+-- The search document of a work contains its author names, so a change to the
+-- author list has to rebuild the document right away.
+DO $$
+DECLARE
+ u uuid=gen_random_uuid(); o uuid; r uuid; a uuid; n int;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(u,'FACULTY','authors-search@test.invalid','Author Tester','FPTU');
+ INSERT INTO research_outputs(id,sharing_status,owner_id,created_by)
+ VALUES(gen_random_uuid(),'DRAFT',u,u) RETURNING id INTO o;
+ INSERT INTO output_revisions(id,output_id,revision_no,title,created_by)
+ VALUES(gen_random_uuid(),o,1,'Author Document Work',u) RETURNING id INTO r;
+ UPDATE output_revisions SET released_at=clock_timestamp(),released_by=u WHERE id=r;
+ UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=r WHERE id=o;
+
+ -- An added author becomes searchable without touching the work itself.
+ INSERT INTO output_authors(id,output_id,author_name_string,author_order)
+ VALUES(gen_random_uuid(),o,'Kandinsky Author',1) RETURNING id INTO a;
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','kandinsky');
+ PERFORM pg_temp.assert_true(n=1,'an added author is searchable at once');
+
+ -- A second author joins; the document holds both names.
+ INSERT INTO output_authors(id,output_id,author_name_string,author_order)
+ VALUES(gen_random_uuid(),o,'Malevich Author',2);
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','malevich');
+ PERFORM pg_temp.assert_true(n=1,'a second added author is searchable at once');
+
+ -- A renamed author replaces the old name in the document.
+ UPDATE output_authors SET author_name_string='Kandinsky Renamed' WHERE id=a;
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','kandinsky');
+ PERFORM pg_temp.assert_true(n=1,'a renamed author stays searchable');
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','malevich');
+ PERFORM pg_temp.assert_true(n=1,'the other author is unaffected');
+
+ -- A removed author stops matching at once.
+ DELETE FROM output_authors WHERE id=a;
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','kandinsky');
+ PERFORM pg_temp.assert_true(n=0,'a removed author stops matching');
+ SELECT count(*) INTO n FROM search_index
+  WHERE entity_type='OUTPUT' AND entity_id=o AND doc @@ websearch_to_tsquery('simple','malevich');
+ PERFORM pg_temp.assert_true(n=1,'the remaining author is still searchable');
+ RAISE NOTICE 'PASS output_authors changes refresh the search document';
+END $$;
+
+-- Deleting a researcher profile of a retained user removes the search row.
+-- The account stays, but the profile's bio, title and document must not
+-- stay publicly searchable.
+DO $$
+DECLARE
+ u uuid=gen_random_uuid(); o uuid; r uuid; n int;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit,academic_title)
+ VALUES(u,'FACULTY','profile-search@test.invalid','Profile Searcher','FPTU','GS');
+ INSERT INTO researcher_profiles(user_id,bio,profile_confirmed_at)
+ VALUES(u,'A searchable biography',clock_timestamp());
+ INSERT INTO research_outputs(id,sharing_status,owner_id,created_by)
+ VALUES(gen_random_uuid(),'DRAFT',u,u) RETURNING id INTO o;
+ INSERT INTO output_revisions(id,output_id,revision_no,title,created_by)
+ VALUES(gen_random_uuid(),o,1,'Profile Visibility Work',u) RETURNING id INTO r;
+ UPDATE output_revisions SET released_at=clock_timestamp(),released_by=u WHERE id=r;
+ UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=r WHERE id=o;
+
+ SELECT count(*) INTO n FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=u;
+ PERFORM pg_temp.assert_true(n=1,'a confirmed profile is indexed');
+
+ DELETE FROM researcher_profiles WHERE user_id=u;
+ SELECT count(*) INTO n FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=u;
+ PERFORM pg_temp.assert_true(n=0,'deleting the profile removes its search row');
+
+ -- The account itself is untouched.
+ SELECT count(*) INTO n FROM users WHERE id=u;
+ PERFORM pg_temp.assert_true(n=1,'the account survives the profile deletion');
+ RAISE NOTICE 'PASS researcher_profiles deletion clears the search row';
+END $$;
 ROLLBACK;

@@ -498,11 +498,26 @@ Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchO
 | `search_entity_type` | DBML | Enum 4 giá trị: OUTPUT / RESEARCHER / GROUP / OPPORTUNITY |
 | `search_index` | DBML | PK `(entity_type, entity_id)`; `entity_id` đa hình nên không có FK, trigger `guard_search_index_entity` canh giữ |
 | `owner_output_versions` + `visible_owner_output_versions` | postgres-features.sql | Bản làm việc của owner: công trình ACCEPTED chưa publish, không vào Discovery/Search |
-| `visible_search_index` | postgres-features.sql | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity |
-| `sync_search_index` + 13 trigger | postgres-features.sql | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
+| `visible_search_index` | postgres-features.sql | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity, kể cả điều kiện tài khoản active |
+| `sync_search_index` + trigger | postgres-features.sql | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
+| `sync_search_index_output` | postgres-features.sql | Hàm dựng lại dòng index OUTPUT cho một bài; dùng chung cho nhánh publish và cho thay đổi tác giả |
+| `sync_search_index_authors` | postgres-features.sql | Trigger `output_authors` insert/update/delete → dựng lại document của bài |
+| `sync_search_index_profile_del` | postgres-features.sql | Trigger `researcher_profiles` delete → xoá dòng index RESEARCHER kể cả khi account còn lại |
 | `idx_revision_fts`, `idx_output_visibility_lookup`, `idx_search_index_*` | postgres-features.sql | GIN FTS, GIN trigram và index lọc theo scope |
 
 `search_index.entity_type` dùng enum `search_entity_type` riêng, không dùng lại enum `entity_types` cũ: enum cũ có `PROJECT` và `TOPIC` nhưng thiếu `OPPORTUNITY`, nên tập giá trị không khớp. `ck_search_index_entity_type` được giữ lại như một ràng buộc tường minh, trùng với enum nhưng vẫn trả lỗi `23514` như thiết kế cũ.
+
+## Sửa 3 lỗi review của PR #1 — 01/11/2026
+
+Ba nhận xét review trên PR #1 (RES-152) được sửa trong `postgres-features.sql` và `ResearchOS.dbml`; `ResearchOS.sql` được sinh lại từ hai file đó.
+
+| Vấn đề | Sửa |
+|---|---|
+| `visible_search_index` thiếu điều kiện tài khoản active mà `can_view_output` có | Thêm `JOIN users u ON u.id=actor AND u.is_active`; actor `NULL`, không tồn tại hoặc inactive thì không thấy dòng nào, kể cả dòng `PRIVATE` của chính mình |
+| Đổi tác giả làm document tìm kiếm cũ | Tách nhánh OUTPUT thành hàm `sync_search_index_output`; trigger `sync_search_index_authors` gọi hàm đó khi `output_authors` insert/update/delete |
+| Xoá profile researcher còn lại dòng index | Thêm trigger `sync_search_index_profile_del` trên `researcher_profiles` delete, dùng `OLD.user_id` |
+
+Mỗi lỗi có một khối assert riêng trong `schema-search-smoke.sql`, và cả ba khối đều **fail** khi thao tác tạm thời gỡ lại fix — đã kiểm tra trên PostgreSQL 18.6.
 
 ## Kiểm chứng thực tế và cách tái chạy
 
@@ -513,7 +528,7 @@ Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchO
 - `schema-auth-smoke.sql`: PASS A–J theo yêu cầu mới: FACULTY baseline; STUDENT/STAFF guest; ADMIN độc lập RESEARCHER; future grant/revoke/inactive; CHECK MANUAL/SYSTEM/actor và role không default; email/mã trường/credentials; session LOCAL/OIDC đúng user; hết hạn/idle/logout; đổi/reset hash revoke session; ADMIN không bypass owner/group/PRIVATE ngay cả khi có cả RESEARCHER.
 - `schema-policy-smoke.sql`: PASS helper admin cuối cùng, sinh viên researcher tạo group singleton, DOI nhiều cách viết gồm tab/CR/LF bị chặn trùng (INSERT/UPDATE và blank → NULL), inactive giữ nội dung và revoke session, bàn giao owner/Leader nguyên tử, ON CONFLICT no-op cho cả output/group, căn cứ, request cũ, lịch sử bất biến và không mở quyền cho admin thực hiện.
 - `schema-smoke.sql`: PASS các nhóm identity/session, taxonomy/interest, publication A–D, opportunity/application, follow/digest. Bao gồm FK, unique, normalization, upsert, LOCAL/imported cùng tồn tại, immutable release, scope file, private/group, SLA, withdrawal/resubmission, opt-out và terminal delivery.
-- `schema-search-smoke.sql` (mới, 31/10/2026): PASS `output_import_state` mặc định NONE và chặn ACCEPTED không owner; `field_provenance` giữ một dòng cho mỗi `source_ref` và chặn ref trắng; `search_index` chặn `RESEARCH_GROUP` thiếu `access_group_id`, chặn entity đa hình trỏ về bản ghi không tồn tại, index/không index theo vòng đời DRAFT → SHARED → ARCHIVED, và payload FTS tra được; `owner_output_versions` hiện bản làm việc của owner nhưng không phải released version, chỉ owner thấy, và không có trong search index.
+- `schema-search-smoke.sql` (mới, 31/10/2026; mở rộng 01/11/2026): PASS `output_import_state` mặc định NONE và chặn ACCEPTED không owner; `field_provenance` giữ một dòng cho mỗi `source_ref` và chặn ref trắng; `search_index` chặn `RESEARCH_GROUP` thiếu `access_group_id`, chặn entity đa hình trỏ về bản ghi không tồn tại, index/không index theo vòng đời DRAFT → SHARED → ARCHIVED, và payload FTS tra được; `owner_output_versions` hiện bản làm việc của owner nhưng không phải released version, chỉ owner thấy, và không có trong search index. Ba khối mới: `visible_search_index` yêu cầu tài khoản active (actor NULL / không tồn tại / inactive thì không thấy dòng nào, kể cả dòng PRIVATE của chính mình); `output_authors` insert/update/delete dựng lại document ngay (tên thêm vào tra được, tên xoá không còn khớp); xoá `researcher_profiles` xoá dòng index RESEARCHER nhưng account vẫn còn.
 - `schema-concurrency.py`: hai kết nối thực; chỉ một đơn chưa rút khi nộp trùng; rút/phản hồi chỉ một bên thắng; insert chờ đóng rồi bị từ chối; hai bàn giao cùng người cũ chỉ một lần thành công; hai transaction dùng helper khóa admin giữ admin cuối cùng. Bổ sung LOCAL/OIDC login–deactivation theo cả hai thứ tự, mở lại tài khoản không hồi sinh phiên; login–reset theo thứ tự khóa user → credentials, login đọc hash mới hoặc session vừa tạo bị revoke. Hash trong test là dữ liệu giả, không phải kiểm thử xác thực mật khẩu.
 - Chưa chạy giao diện dbdiagram.io; xác nhận bằng parser chính thức, không khẳng định đã thao tác trên website.
 - Không chạy vào database có dữ liệu của dự án. Chỉ dùng dữ liệu giả trong cluster mới riêng biệt, không chạy verify mật khẩu/login/API, không gọi IdP/OpenAlex/email/AI. Test quyền là test predicate/ràng buộc DB, không khẳng định API quản trị đã hoạt động. Cluster thử nghiệm được dừng sau kiểm tra.

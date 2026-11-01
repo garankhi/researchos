@@ -341,6 +341,8 @@ Bảng `search_index` là nguồn dữ liệu cho màn hình Search. Mô hình:
   | `output_revisions` insert/update | index nếu revision đó là `current_release_id` **và** output `SHARED` |
   | `research_outputs` update → `SHARED` | index revision `current_release_id` |
   | `research_outputs` update → không còn `SHARED` (archive) | xoá khỏi index |
+  | `output_authors` insert/update/delete | dựng lại document của bài đó |
+  | `researcher_profiles` delete | xoá dòng index `RESEARCHER` (kể cả khi account còn lại) |
 
   Draft của chính owner (`sharing_status = 'DRAFT'`) **không** vào index —
   đúng với nguyên tắc ở §5.1.1: bài DRAFT chỉ hiện ở hồ sơ cá nhân.
@@ -350,6 +352,11 @@ Bảng `search_index` là nguồn dữ liệu cho màn hình Search. Mô hình:
 - **Tên tác giả lấy từ `output_authors`** (`author_name_string` theo
   `author_order`), fallback sang `authors_snapshot` nếu có key `name`.
   `authors_snapshot` là JSON tự do nên không có schema cố định để truy vấn.
+  Vì tên tác giả nằm trong document, mọi thay đổi ở `output_authors` phải dựng
+  lại document — trigger `sync_search_index_authors` gọi chung hàm
+  `sync_search_index_output` với nhánh publish, nên hai đường không lệch nhau.
+  Nếu không có trigger này, tên mới thêm vào sẽ không tra được và tên đã xoá
+  vẫn còn khớp cho tới lần update bài sau đó.
 
 #### 5.7.1 Bốn loại entity trong một index
 
@@ -446,6 +453,14 @@ ORDER BY rank DESC;
 | `PRIVATE` | chỉ owner (`s.owner_id = actor`) |
 | `RESEARCH_GROUP` | thành viên của `access_group_id` |
 | `FPTU_COMMUNITY` | mọi người |
+
+> **Điều kiện tài khoản active áp cho mọi nhánh.** `can_view_output` bắt buộc
+> actor phải là tài khoản active (`JOIN users u ON u.id=actor AND u.is_active`).
+> `visible_search_index` phải giữ đúng điều kiện đó: actor `NULL`, không có
+> trong hệ thống, hoặc đã bị vô hiệu hoá thì **không thấy dòng nào** — kể cả
+> dòng `FPTU_COMMUNITY`, và kể cả dòng `PRIVATE` của chính mình. Thiếu điều
+> kiện này là lỗ hổng: một tài khoản bị vô hiệu hoá vẫn tra được kết quả
+> công khai, và owner bị vô hiệu hoá vẫn thấy bài riêng của mình.
 
 > **Vì sao cần nhánh `owner`:** một bài `SHARED` nhưng `visibility = 'PRIVATE'`
 > vẫn phải tìm được bởi chính chủ. `released_output_versions` cũng đưa bài đó

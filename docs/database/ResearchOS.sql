@@ -1019,6 +1019,8 @@ COMMENT ON TABLE "output_revisions" IS 'NULL released_at = editable draft. Relea
 
 COMMENT ON COLUMN "output_external_ids"."source" IS 'E.g. OPENALEX, SCOPUS. Presence here records metadata origin, not a quality certification.';
 
+COMMENT ON TABLE "output_authors" IS 'The names here are part of the search document of the work, so an insert, update or delete has to rebuild it (trigger sync_search_index_authors).';
+
 COMMENT ON COLUMN "output_authors"."user_id" IS 'Optional internal account mapping; external coauthors need no login.';
 
 COMMENT ON TABLE "publication_claims" IS 'API confirms the claim and maps output_authors.user_id in one transaction after resolving author conflicts. A claim never approves institutional publication.';
@@ -1055,7 +1057,7 @@ COMMENT ON COLUMN "research_seminars"."organizer_id" IS 'Always a user; group af
 
 COMMENT ON TABLE "digest_preferences" IS 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.';
 
-COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table.';
+COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table. The document contains the author names, so a change to output_authors has to rebuild it (trigger sync_search_index_authors); deleting a researcher profile removes its index row even when the account is retained (trigger sync_search_index_profile_del). visible_search_index applies the same active-account requirement as can_view_output, so an unknown, NULL or inactive actor sees nothing.';
 
 COMMENT ON COLUMN "search_index"."entity_type" IS 'Which tab the row belongs to: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. Constrained by the search_entity_type enum. Researcher, group and opportunity have no visibility column of their own - their access is derived from state (confirmed profile, active group, OPEN opportunity).';
 
@@ -1598,8 +1600,12 @@ $$;
 -- PRIVATE-visibility work stays findable by its owner in search.
 -- The four entity types carry the same visibility triple, so one filter covers
 -- all of them.
+-- The active-user requirement of can_view_output applies to every branch here:
+-- an unknown, NULL or inactive actor sees nothing at all, and an inactive
+-- owner does not reach their own private records either.
 CREATE FUNCTION visible_search_index(actor uuid) RETURNS SETOF search_index LANGUAGE sql STABLE AS $$
  SELECT s.* FROM search_index s
+ JOIN users u ON u.id=actor AND u.is_active
  WHERE s.owner_id = actor
     OR s.visibility = 'FPTU_COMMUNITY'
     OR (s.visibility = 'RESEARCH_GROUP' AND is_group_member(actor, s.access_group_id));
@@ -1799,15 +1805,53 @@ CREATE TRIGGER guard_digest_delivery BEFORE INSERT OR UPDATE ON digest_deliverie
 --
 -- Drafts (accepted but not published), unconfirmed profiles, archived groups
 -- and non-open opportunities stay out of the index by design.
+
+-- Recomputes the OUTPUT row of the index for one work. The work's document
+-- contains the author names, so every change to output_authors has to refresh
+-- it; sharing a work out of the shared helper keeps both paths identical.
+-- A work that is not published (or has no current release) leaves the index.
+CREATE FUNCTION sync_search_index_output(target uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  o research_outputs%ROWTYPE;
+  r output_revisions%ROWTYPE;
+  authors text;
+BEGIN
+  SELECT * INTO o FROM research_outputs WHERE id=target;
+  IF NOT FOUND THEN
+    DELETE FROM search_index WHERE entity_type='OUTPUT' AND entity_id=target;
+    RETURN;
+  END IF;
+  IF o.sharing_status<>'SHARED' THEN
+    DELETE FROM search_index WHERE entity_type='OUTPUT' AND entity_id=target;
+    RETURN;
+  END IF;
+  SELECT * INTO r FROM output_revisions WHERE id=o.current_release_id;
+  IF NOT FOUND THEN
+    DELETE FROM search_index WHERE entity_type='OUTPUT' AND entity_id=target;
+    RETURN;
+  END IF;
+  authors := coalesce(
+    (SELECT string_agg(a.author_name_string, ' ' ORDER BY a.author_order)
+       FROM output_authors a WHERE a.output_id=o.id),
+    coalesce((SELECT string_agg(x->>'name', ' ') FROM jsonb_array_elements(r.authors_snapshot) x
+       WHERE x ? 'name'), ''));
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
+  VALUES ('OUTPUT',o.id,r.id,o.owner_id,o.visibility,o.access_group_id,
+          r.title, coalesce(r.abstract,''), authors,
+          to_tsvector('simple', coalesce(r.title,'') || ' ' || coalesce(r.abstract,'') || ' ' || authors))
+  ON CONFLICT (entity_type,entity_id) DO UPDATE SET
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
+    authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
+END $$;
+
 CREATE FUNCTION sync_search_index() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
-  r output_revisions%ROWTYPE;
   o research_outputs%ROWTYPE;
   u users%ROWTYPE;
   g research_groups%ROWTYPE;
   op research_opportunities%ROWTYPE;
   p researcher_profiles%ROWTYPE;
-  authors text;
   etype search_entity_type;
   eid uuid;
   eowner uuid;
@@ -1821,20 +1865,14 @@ BEGIN
   IF TG_TABLE_NAME='output_revisions' THEN
     SELECT * INTO o FROM research_outputs WHERE id=NEW.output_id;
     IF NOT FOUND THEN RETURN NEW; END IF;
+    -- Only the current release of a shared work is indexed. Any other
+    -- revision leaves the index row alone.
     IF o.sharing_status<>'SHARED' OR o.current_release_id IS DISTINCT FROM NEW.id THEN RETURN NEW; END IF;
-    SELECT * INTO r FROM output_revisions WHERE id=NEW.id;
-    IF NOT FOUND THEN RETURN NEW; END IF;
-    etype:='OUTPUT'; eid:=o.id;
+    PERFORM sync_search_index_output(o.id);
+    RETURN NEW;
   ELSIF TG_TABLE_NAME='research_outputs' THEN
-    IF NEW.sharing_status<>'SHARED' THEN
-      DELETE FROM search_index WHERE entity_type='OUTPUT' AND entity_id=NEW.id;
-      RETURN NEW;
-    END IF;
-    SELECT * INTO r FROM output_revisions WHERE id=NEW.current_release_id;
-    IF NOT FOUND THEN RETURN NEW; END IF;
-    SELECT * INTO o FROM research_outputs WHERE id=NEW.id;
-    IF NOT FOUND THEN RETURN NEW; END IF;
-    etype:='OUTPUT'; eid:=o.id;
+    PERFORM sync_search_index_output(NEW.id);
+    RETURN NEW;
   ELSIF TG_TABLE_NAME='users' THEN
     SELECT * INTO p FROM researcher_profiles WHERE user_id=NEW.id;
     IF NOT FOUND OR p.profile_confirmed_at IS NULL OR NEW.is_active=false THEN
@@ -1881,17 +1919,8 @@ BEGIN
     eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=NEW.creator_id),'');
   END IF;
   IF etype IS NULL THEN RETURN NEW; END IF;
-  IF etype='OUTPUT' THEN
-    authors := coalesce(
-      (SELECT string_agg(a.author_name_string, ' ' ORDER BY a.author_order)
-         FROM output_authors a WHERE a.output_id=o.id),
-      coalesce((SELECT string_agg(x->>'name', ' ') FROM jsonb_array_elements(r.authors_snapshot) x
-         WHERE x ? 'name'), ''));
-    etitle:=r.title; ebody:=coalesce(r.abstract,''); eauthors:=authors;
-    eowner:=o.owner_id; evis:=o.visibility; egroup:=o.access_group_id;
-  END IF;
   INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
-  VALUES (etype,eid,CASE WHEN etype='OUTPUT' THEN r.id ELSE NULL END,eowner,evis,egroup,
+  VALUES (etype,eid,NULL,eowner,evis,egroup,
           etitle, ebody, eauthors,
           to_tsvector('simple', coalesce(etitle,'') || ' ' || coalesce(ebody,'') || ' ' || coalesce(eauthors,'')))
   ON CONFLICT (entity_type,entity_id) DO UPDATE SET
@@ -1908,6 +1937,25 @@ CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON research_groups FOR E
 CREATE TRIGGER sync_search_index AFTER INSERT OR UPDATE ON research_opportunities FOR EACH ROW EXECUTE FUNCTION sync_search_index();
 CREATE TRIGGER sync_search_index_ri BEFORE UPDATE ON search_index FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
+-- The search document of a work contains its author names, so a change to the
+-- author list has to rebuild the document. Without this, an added name stays
+-- unsearchable and a removed name keeps matching until the next output update.
+CREATE FUNCTION sync_search_index_output_authors() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP='DELETE' THEN
+    PERFORM sync_search_index_output(OLD.output_id);
+    RETURN OLD;
+  END IF;
+  PERFORM sync_search_index_output(NEW.output_id);
+  -- An update may move an author to another work; both documents then change.
+  IF TG_OP='UPDATE' AND OLD.output_id IS DISTINCT FROM NEW.output_id THEN
+    PERFORM sync_search_index_output(OLD.output_id);
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER sync_search_index_authors AFTER INSERT OR UPDATE OR DELETE ON output_authors
+ FOR EACH ROW EXECUTE FUNCTION sync_search_index_output_authors();
+
 -- Source-row deletes remove the index row. entity_id has no foreign key
 -- because it is polymorphic, so the delete has to be handled explicitly.
 CREATE FUNCTION sync_search_index_delete() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1919,6 +1967,18 @@ CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_outputs FOR EACH R
 CREATE TRIGGER sync_search_index_del AFTER DELETE ON users FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('RESEARCHER');
 CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_groups FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('GROUP');
 CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_opportunities FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete('OPPORTUNITY');
+
+-- Deleting the profile of a retained user also has to clean up the index.
+-- The delete trigger on users only fires when the account itself goes away;
+-- a researcher profile can be removed while the account stays, and the
+-- profile's bio, title and search document would otherwise stay public.
+CREATE FUNCTION sync_search_index_delete_profile() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=OLD.user_id;
+  RETURN OLD;
+END $$;
+CREATE TRIGGER sync_search_index_profile_del AFTER DELETE ON researcher_profiles
+ FOR EACH ROW EXECUTE FUNCTION sync_search_index_delete_profile();
 
 -- Integrity check for the polymorphic entity reference.
 CREATE FUNCTION guard_search_index_entity() RETURNS trigger LANGUAGE plpgsql AS $$
