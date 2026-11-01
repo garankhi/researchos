@@ -4,6 +4,7 @@ import {
   Alert,
   AlertTitle,
   Button,
+  FormHelperText,
   Skeleton,
   Stack,
   Typography,
@@ -157,5 +158,53 @@ export function EmptyState({
       ) : null}
       {action}
     </Stack>
+  );
+}
+
+/**
+ * A validation message for one field.
+ *
+ * The backend groups validation failures by field — a `400` carries
+ * `errors: [{ field, messages }]` — precisely so each message can sit under
+ * the input that caused it. Render one of these per invalid field instead
+ * of flattening the whole group into a single toast line.
+ *
+ * `messages` holds every message the server sent for that field. Pass them
+ * as separate children so each one gets its own line.
+ *
+ * ```tsx
+ * const t = useTranslations('errors');
+ * const fieldMessages = resolveFieldErrorCodes(
+ *   t,
+ *   apiFieldErrorCodes(mutation.error),
+ *   t('unknown'),
+ * );
+ *
+ * {Object.entries(fieldMessages ?? {}).map(([field, message]) => (
+ *   <FieldError key={field}>{message}</FieldError>
+ * ))}
+ * ```
+ *
+ * Note: in the target contract the validation wording is a **code**, resolved
+ * against the message catalog by `resolveFieldErrorCodes()`. The backend
+ * does not send codes yet, so today every field falls back to a localized
+ * generic message. See the `researchos-localization` skill.
+ */
+export function FieldError({
+  children,
+  id,
+}: {
+  children: ReactNode;
+  /**
+   * Id of the input this message describes. Pass the same value to the
+   * input's `aria-describedby` so a screen reader announces the error with
+   * the field rather than on its own.
+   */
+  id?: string;
+}) {
+  return (
+    <FormHelperText id={id} error sx={{ mx: 0 }}>
+      {children}
+    </FormHelperText>
   );
 }
