@@ -40,7 +40,7 @@ is why the transform must keep primitive payloads inline.
 | --- | --- | --- |
 | `success` | `false` | Always literally `false` on failure |
 | `data` | `null` | Always null — there is no payload on failure |
-| `message` | `string` | What went wrong, in human words |
+| `message` | `string` | One code for what went wrong (`snake_case`) |
 | `statusCode` | `number` | The HTTP status code |
 | `path` | `string` | The path of the failed request |
 | `timestamp` | `string` | ISO timestamp of the response |
@@ -54,17 +54,23 @@ frontend can show each message next to the input that caused it:
 {
   "success": false,
   "data": null,
-  "message": "title must be a string; title should not be empty",
+  "message": "validation_failed",
   "statusCode": 400,
   "path": "/profiles",
   "timestamp": "2026-10-29T01:30:00.000Z",
   "errors": [
-    { "field": "title", "messages": ["must be a string", "should not be empty"] }
+    { "field": "title", "messages": ["title_invalid", "title_required"] }
   ]
 }
 ```
 
-`message` is a string, or several validation messages joined with `; `.
+`message` carries the failure code; `errors[].messages` carries one code
+per field constraint, qualified by the field (`title_invalid`,
+`title_required`). Both are codes the frontend resolves against its
+catalog.
+
+> The backend sends prose in both places today — see "The current gap" in
+> the `researchos-localization` skill. The shape above is the target.
 
 ## The envelope DTOs
 
@@ -154,6 +160,44 @@ The transform derives an envelope component name from the payload schema.
 Only the primary `200` response gets the bare name; a second `2xx` response
 gets the status code so the two cannot collide.
 
+## Error responses always use the shared envelope
+
+Every `4xx` and `5xx` response points at `ApiErrorResponseDto`. The transform
+*overwrites* a route-declared error schema rather than leaving it alone,
+because the exception filter is global: the server never sends anything
+else.
+
+```typescript
+// The route declares a body the server will never send.
+@ApiNotFoundResponse({ description: 'Không tìm thấy', type: ErrorDto })
+```
+
+The transform rewrites that to `ApiErrorResponseDto`, and the
+`researchos-api-endpoint` skill forbids the declaration in the first place.
+
+## The error schema is written by hand in the transform
+
+`ApiErrorResponseDto` is declared in
+`apps/api/src/common/dto/api-response.dto.ts`, but the class is not
+registered with Swagger. The transform writes the component itself, in
+`errorEnvelopeSchema()`.
+
+The two are not identical, and the difference is deliberate:
+
+| | The DTO class | The transform's schema |
+| --- | --- | --- |
+| `success` | `example: false` | `enum: [false], default: false` |
+| `data` | `nullable: true, enum: [null]` | `nullable: true, enum: [null]` |
+| `errors` | `items: { type: 'object' }` | `items` with `field` and `messages` |
+
+The DTO class renders `data` as `type: number` — Swagger infers a type
+from the `null` literal — and `type: "null"` is not valid OpenAPI 3.0 and
+makes Orval's spec validation fail. That is why the transform keeps its own
+copy instead of reusing the class.
+
+`common/openapi/envelope-transform.spec.ts` runs the real exception filter
+and asserts the two agree on the field set, so the copy cannot drift.
+
 ## The frontend mutator
 
 `apps/web/src/lib/axios-instance.ts`:
@@ -207,13 +251,21 @@ export const axiosInstance = <T>(
 export type ApiErrorBody = ApiErrorResponseDto;
 
 export function apiErrorMessage(error: unknown): string;
+export function apiErrorCode(error: unknown): string | undefined;
 export function apiFieldErrors(error: unknown): ApiErrorBody['errors'];
+export function apiFieldErrorCodes(error: unknown): Record<string, string[]> | undefined;
 export function apiStatusCode(error: unknown): number | undefined;
 ```
 
 `apiErrorMessage` reads `error.response.data.message` first, falls back to
-`error.message`, then to a generic Vietnamese message. `apiFieldErrors`
-returns the per-field validation messages.
+`error.message`, then to `unknown_error`. `apiFieldErrors` returns the
+per-field validation messages.
+
+`apiErrorCode` and `apiFieldErrorCodes` are the code-shaped views of the
+same envelope — the top-level code, and the per-field codes grouped by
+field. They exist because the target contract sends codes, and the frontend
+resolves them against the message catalog. See the `researchos-localization`
+skill.
 
 `ApiErrorBody` is a type-only alias of the generated `ApiErrorResponseDto`,
 imported from `@/lib/api/models`. The eslint rule allows type-only imports

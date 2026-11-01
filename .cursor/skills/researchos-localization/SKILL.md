@@ -52,6 +52,29 @@ Everything below `app/` that renders UI is under `app/[locale]/`. The root
 This holds for the same reason it holds in any i18n codebase: a literal is
 one language, and the app has two.
 
+### Where the two skills meet
+
+`researchos-ui` decides *where* a message appears — snackbar, inline error,
+field error, page title. This skill decides *where the wording comes from*.
+A screen never hardcodes copy just because the UI skill showed an example
+that did.
+
+The split, in one line each:
+
+| Concern | Owner |
+| --- | --- |
+| Which channel a message goes through (snackbar vs. inline) | `researchos-ui` |
+| The wording of that message | `researchos-localization` (this skill) |
+
+When the UI skill shows `showSnackbar({ message: 'Đã lưu hồ sơ.' })`, it is
+illustrating the *channel*. The real code uses `t('saved')`.
+
+> **ICU gotcha:** `<` and `>` are rich-text tag delimiters in ICU, not
+> literal characters. A message containing `<html>` fails to parse with
+> `UNCLOSED_TAG` and breaks the build. Wrap the angle brackets in
+> apostrophes: `"'<html>' class: \"{value}\""`. A single `{` or `}` that is
+> not a placeholder has the same problem — escape it as `'{'`.
+
 ## Writing a string
 
 1. Add the key to **every** catalog — `vi.json` and `en.json`. The
@@ -199,10 +222,17 @@ The new locale is prerendered automatically — `generateStaticParams` in
 **The backend does not send prose. It sends a code, and the frontend
 resolves it.**
 
-The error envelope's `message` field carries a machine-readable identifier
-such as `server_error` or `opportunity_not_found` — not an English
-sentence. The frontend looks it up in its catalog and renders the user's
-language.
+This is the contract. It applies to **both** fields the backend uses for
+error text:
+
+| Field | Carries | Example |
+| --- | --- | --- |
+| `message` | One code for the whole failure | `opportunity_not_found` |
+| `errors[].messages` | One code per field per constraint | `title_required` |
+
+A code is a machine-readable identifier such as `server_error` or
+`opportunity_not_found` — never an English sentence. The frontend looks it
+up in its catalog and renders the user's language.
 
 ```json
 // The backend sends this.
@@ -217,6 +247,13 @@ language.
 
 So the frontend never shows an English error to a Vietnamese user, and
 adding a language does not require a backend deploy.
+
+> **The backend does not implement this yet.** It still sends plain English
+> prose in `message`, and its validation pipe still sends validator prose
+> in `errors[].messages`. Everything in this section describes the **target**
+> contract — the shape the code is written against, and the shape the
+> backend must move to. See "The current gap" below for what is true today
+> and what has to change.
 
 ### Why the code lives in `message`
 
@@ -238,45 +275,110 @@ not a message: it is stable, and the wording lives in the catalog.
 | `unauthorized` | Not authenticated |
 | `opportunity_not_found` | Domain-specific: the opportunity does not exist |
 
+Field-level codes follow the same convention, qualified by the field they
+belong to: `title_required`, `title_too_long`, `email_invalid`.
+
 A code is a contract. Renaming one breaks every translation that references
 it — add a new code instead of repurposing an old one.
 
 ### Resolving a code on the frontend
 
 ```typescript
-import { apiErrorMessage } from '@/lib/api-error';
 import { useTranslations } from 'next-intl';
+import { apiErrorCode } from '@/lib/api-error';
+import { resolveErrorCode } from '@/utils/error-messages';
 
 const t = useTranslations('errors');
 
-function resolve(code: string | undefined, fallback: string): string {
-  if (code && t.has(`codes.${code}`)) {
-    return t(`codes.${code}`);
-  }
-  return fallback;
-}
-
-const title = resolve(apiErrorCode(error), t('title'));
+const title = resolveErrorCode(t, apiErrorCode(error), t('unknown'));
 ```
 
 `apiErrorCode(error)` reads the code out of the error envelope;
-`apiErrorMessage(error)` is the raw value the server sent, used as the
-fallback when the catalog has no entry. A missing translation degrades to
-the server's text, never to a blank error.
+`resolveErrorCode(t, code, fallback)` looks it up under `errors.codes`.
+`t.has()` returns `false` for a key that is not in the catalog — it does not
+throw — so the guard is what stops `t()` from rendering a raw key. A missing
+translation degrades to a localized fallback, never to a blank error and
+never to a raw `snake_case` string.
 
-> **Status: not implemented yet.** The backend currently sends plain
-> English text in `message`, and the frontend has no `apiErrorCode`
-> helper. The tables above describe the target shape. When the backend
-> switch lands, add `code` handling to `src/lib/api-error.ts` and the
-> `errors.codes` namespace to both catalogs.
+The same pattern applies per field:
+
+```typescript
+import { apiFieldErrorCodes } from '@/lib/api-error';
+import { resolveFieldErrorCodes } from '@/utils/error-messages';
+
+const messages = resolveFieldErrorCodes(
+  t,
+  apiFieldErrorCodes(mutation.error),
+  t('unknown'),
+);
+
+{Object.entries(messages ?? {}).map(([field, message]) => (
+  <FieldError key={field}>{message}</FieldError>
+))}
+```
+
+### The current gap
+
+What is true today, and what has to change:
+
+| Piece | Today | Target |
+| --- | --- | --- |
+| `message` on the wire | Plain English prose | A `snake_case` code |
+| `errors[].messages` on the wire | Validator prose (`"title must be a string"`) | A `snake_case` code per constraint |
+| `api-error.ts` helpers | `apiErrorMessage`, `apiErrorCode`, `apiFieldErrors`, `apiFieldErrorCodes`, `apiStatusCode` | Done |
+| `utils/error-messages.ts` | `resolveErrorCode`, `resolveFieldErrorCodes` | Done |
+| Catalog | `errors.codes` exists, but only for the generic codes | One entry per code the API can emit |
+| Frontend resolution | Wired, but every code falls back — the server sends prose | The same calls resolve to the catalog |
+
+The backend side of the switch:
+
+- The exception filter must emit a code in `message` instead of the
+  exception's own message. A NestJS exception carries a human message by
+  default, so the filter needs a way to map an exception to a code — an
+  error taxonomy, or a dedicated exception class that carries one.
+- The validation pipe's messages must be mapped to codes too. That means
+  custom validator messages: class-validator lets each decorator take its
+  own `message`, and that message is what the pipe reports.
+- `docs/api-convention.md` shows the prose shape and needs updating with
+  the code shape.
+
+Until the backend switches, the frontend must not render the server's
+string directly to a user — a Vietnamese user would see an English error.
+The frontend is already wired for this: `resolveErrorCode()` falls back to
+a localized message when the server's value has no catalog entry, and the
+server's value is not a code yet, so the fallback is what renders.
 
 ### Validation errors
 
-Field-level messages come through `errors[].messages`. They are strings
-from the validation pipe, not codes, so they are **not** translatable yet
-— a form shows the server's wording for a constraint that failed. Keep the
-per-field grouping (see the `researchos-ui` skill) and treat the wording
-as the fallback until validation messages become codes too.
+Field-level messages come through `errors[].messages`. In the target
+contract each one is a **code**, resolved the same way as `message` — see
+"Resolving a code on the frontend" above.
+
+The field *label* is a UI string and is always translated. Only the
+constraint wording comes from the server, and in the target contract that
+wording is a code resolved against the catalog.
+
+> **Today the server sends prose here, not codes.** The `FieldError`
+> primitive renders whatever string it is given, so it works with either
+> shape. Resolve the value through `resolveFieldErrorCodes()` when you
+> render it, and do not hardcode a catalog lookup for a key that does not
+> exist yet.
+
+### Form validation codes
+
+A client-side form produces the same kind of code. The zod schema's
+message is the code, and it resolves through the same `errors.codes`
+namespace:
+
+```typescript
+const schema = z.object({
+  title: z.string().min(1, 'title_required'),
+});
+```
+
+So `title_required` means the same thing whether the failure came from the
+schema or from the server — one catalog entry covers both. The form
+conventions are in the `researchos-forms` skill.
 
 ## The language toggle
 
@@ -333,6 +435,20 @@ so the proxy does not try to localise `favicon.ico`.
 4. If it needs a locale-aware redirect, use the `redirect` from
    `@/i18n/navigation`.
 
+### Keeping the catalogs in sync
+
+The catalogs must have the same shape. `next-intl` types the keys against
+one of them, so a key missing from one file fails the typecheck — but only
+if the build reaches the typecheck. A quick check that both files agree:
+
+```powershell
+node -e "const fs=require('fs');const k=(o,p='')=>Object.entries(o).flatMap(([a,b])=>b&&typeof b==='object'?k(b,p?p+'.'+a:a):[p?p+'.'+a:a]);const vi=new Set(k(JSON.parse(fs.readFileSync('apps/web/src/messages/vi.json','utf8'))));const en=new Set(k(JSON.parse(fs.readFileSync('apps/web/src/messages/en.json','utf8'))));console.log('only vi:',[...vi].filter(x=>!en.has(x)));console.log('only en:',[...en].filter(x=>!vi.has(x)))"
+```
+
+An ICU parse error (`INVALID_MESSAGE`, `UNCLOSED_TAG`) is a *build* error,
+not a type error — it surfaces when the page is rendered, not when the
+catalog is typechecked. Angle brackets are the usual culprit.
+
 ## Verifying
 
 ```powershell
@@ -362,6 +478,9 @@ Check in a browser too:
 | Mistake | Consequence |
 | --- | --- |
 | A user-facing literal in a component | The string stays in one language forever |
+| Copying an example from the `researchos-ui` skill verbatim | That skill shows the *channel*; the wording comes from this skill's catalog |
+| A `<` or `>` in a message | ICU rich-text tag — the build fails with `UNCLOSED_TAG`. Wrap it: `'<html>'` |
+| Looking a validation message up in the catalog | Validation messages are not codes yet; there is no key for them |
 | Adding a key to only one catalog | The typecheck fails, or the other locale renders the raw key |
 | `next/link` instead of `components/ui/link` | The link drops the locale prefix |
 | `usePathname` from `next/navigation` | Returns the prefixed path, so the link double-prefixes |

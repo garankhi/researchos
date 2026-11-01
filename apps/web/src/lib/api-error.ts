@@ -14,6 +14,18 @@ import type { ApiErrorResponseDto } from '@/lib/api/models';
 export type ApiErrorBody = ApiErrorResponseDto;
 
 /**
+ * A machine-readable backend error identifier, e.g. `opportunity_not_found`.
+ *
+ * In the target contract both `message` and `errors[].messages` carry
+ * codes, not sentences, so the frontend can resolve them against the
+ * message catalog. The backend does not fully implement this yet — today
+ * `message` holds English prose and the validation pipe reports validator
+ * prose — so these helpers return whatever the server sent and the caller
+ * resolves it with a fallback. See the `researchos-localization` skill.
+ */
+export type ErrorCode = string;
+
+/**
  * Extracts a human readable message from a failed API request.
  *
  * The backend returns the error envelope, and axios rejects with the whole
@@ -24,6 +36,10 @@ export type ApiErrorBody = ApiErrorResponseDto;
  * shape itself, and `String(error)` would render
  * "AxiosError: Request failed with status code 500" instead of the message
  * the server actually sent.
+ *
+ * In the target contract this value is a *code*, not a sentence. Resolve it
+ * with `resolveErrorCode()` from `@/utils/error-messages` before showing it
+ * to a user — this raw value is a fallback source, not display text.
  */
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -42,7 +58,25 @@ export function apiErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return 'Đã xảy ra lỗi không xác định.';
+  // Not a literal: the caller resolves this through the catalog, and a
+  // hardcoded string here would be one language forever.
+  return 'unknown_error';
+}
+
+/**
+ * Reads the top-level error code out of a failed request.
+ *
+ * `message` carries the code for the whole failure
+ * (`opportunity_not_found`, `validation_failed`, ...).
+ */
+export function apiErrorCode(error: unknown): ErrorCode | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+
+  const body = error.response?.data as ApiErrorBody | undefined;
+
+  return body?.message || undefined;
 }
 
 /**
@@ -61,6 +95,35 @@ export function apiFieldErrors(
   const body = error.response?.data as ApiErrorBody | undefined;
 
   return body?.errors;
+}
+
+/**
+ * Reads the field-level validation codes out of a failed request, grouped
+ * by the field they belong to.
+ *
+ * Each entry is one code per constraint that failed on that field
+ * (`title_required`, `title_invalid`, ...).
+ */
+export function apiFieldErrorCodes(
+  error: unknown,
+): Record<string, ErrorCode[]> | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+
+  const body = error.response?.data as ApiErrorBody | undefined;
+
+  if (!body?.errors?.length) {
+    return undefined;
+  }
+
+  const grouped: Record<string, ErrorCode[]> = {};
+
+  for (const entry of body.errors) {
+    grouped[entry.field] = [...(grouped[entry.field] ?? []), ...entry.messages];
+  }
+
+  return grouped;
 }
 
 /**

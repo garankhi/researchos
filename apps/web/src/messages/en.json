@@ -52,7 +52,23 @@
     "apiUnreachableDescription": "Make sure the API is running on port 4000, then try again.",
     "loadFailedTitle": "Could not load the data",
     "loadFailedDescription": "Specifically: the server refused the connection after 3 attempts.",
-    "requestFailedTitle": "Request failed"
+    "requestFailedTitle": "Request failed",
+    "codes": {
+      "server_error": "Something went wrong. Please try again later.",
+      "validation_failed": "The submitted data is invalid.",
+      "not_found": "The requested data was not found.",
+      "forbidden": "You are not allowed to perform this action.",
+      "unauthorized": "You need to sign in to continue.",
+      "conflict": "The data already exists.",
+      "title_required": "Title is required.",
+      "title_invalid": "Title must be a string.",
+      "title_too_long": "Title must not exceed 200 characters.",
+      "email_required": "Email is required.",
+      "email_invalid": "Email is invalid.",
+      "status_invalid": "The status is invalid.",
+      "email_already_registered": "This email is already registered.",
+      "status_required": "Status is required."
+    }
   },
   "notFound": {
     "title": "Page not found",

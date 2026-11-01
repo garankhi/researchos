@@ -52,7 +52,23 @@
     "apiUnreachableDescription": "Hãy chắc chắn API đang chạy tại cổng 4000, rồi thử lại.",
     "loadFailedTitle": "Không tải được dữ liệu",
     "loadFailedDescription": "Mô tả cụ thể: máy chủ từ chối kết nối sau 3 lần thử.",
-    "requestFailedTitle": "Tải thất bại"
+    "requestFailedTitle": "Tải thất bại",
+    "codes": {
+      "server_error": "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.",
+      "validation_failed": "Dữ liệu gửi lên không hợp lệ.",
+      "not_found": "Không tìm thấy dữ liệu.",
+      "forbidden": "Bạn không có quyền thực hiện thao tác này.",
+      "unauthorized": "Bạn cần đăng nhập để tiếp tục.",
+      "conflict": "Dữ liệu đã tồn tại.",
+      "title_required": "Tiêu đề là bắt buộc.",
+      "title_invalid": "Tiêu đề phải là chuỗi ký tự.",
+      "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
+      "email_required": "Email là bắt buộc.",
+      "email_invalid": "Email không hợp lệ.",
+      "status_invalid": "Trạng thái không hợp lệ.",
+      "email_already_registered": "Email này đã được đăng ký.",
+      "status_required": "Trạng thái là bắt buộc."
+    }
   },
   "notFound": {
     "title": "Không tìm thấy trang",
