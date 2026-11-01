@@ -117,6 +117,10 @@
       },
       "suspense": {
         "title": "Suspense fallback"
+      },
+      "forms": {
+        "title": "Forms",
+        "description": "zod schema, react-hook-form and MUI form components — the whole form convention."
       }
     },
     "actions": {
@@ -191,6 +195,19 @@
       "emptyTitle": "No results yet",
       "emptyMessage": "The current filters match nothing.",
       "clearFilters": "Clear filters"
+    },
+    "forms": {
+      "titleLabel": "Title",
+      "emailLabel": "Email",
+      "statusLabel": "Status",
+      "statusDraft": "Draft",
+      "statusActive": "Active",
+      "subscribeLabel": "Receive notifications",
+      "hint": "Submit the empty form to see the validation errors under each field.",
+      "actions": "Actions",
+      "submit": "Submit",
+      "reset": "Reset",
+      "note": "The error message is a code (like {unknown}) looked up in the catalog, not an English sentence."
     }
   }
 }

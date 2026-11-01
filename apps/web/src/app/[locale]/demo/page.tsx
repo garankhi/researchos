@@ -5,6 +5,7 @@ import { AccessSection } from './_components/access-section';
 import { ApiSection } from './_components/api-section';
 import { CascadeSection } from './_components/cascade-section';
 import { ErrorSection } from './_components/error-section';
+import { FormSection } from './_components/form-section';
 import { LoadingSection } from './_components/loading-section';
 import { MuiSection } from './_components/mui-section';
 import { SuspendDemo } from './_components/suspend-demo';
@@ -43,6 +44,7 @@ export default function DemoPage() {
         <CascadeSection />
         <ThemeSection />
         <ApiSection />
+        <FormSection />
         <LoadingSection />
         <ErrorSection />
         <AccessSection />

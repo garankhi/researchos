@@ -117,6 +117,10 @@
       },
       "suspense": {
         "title": "Suspense fallback"
+      },
+      "forms": {
+        "title": "Biểu mẫu",
+        "description": "zod schema, react-hook-form và MUI form components — toàn bộ convention của form."
       }
     },
     "actions": {
@@ -191,6 +195,19 @@
       "emptyTitle": "Chưa có kết quả",
       "emptyMessage": "Bộ lọc hiện tại không khớp mục nào.",
       "clearFilters": "Xóa bộ lọc"
+    },
+    "forms": {
+      "titleLabel": "Tiêu đề",
+      "emailLabel": "Email",
+      "statusLabel": "Trạng thái",
+      "statusDraft": "Bản nháp",
+      "statusActive": "Đang hoạt động",
+      "subscribeLabel": "Nhận thông báo",
+      "hint": "Gửi form rỗng để xem lỗi validation hiển thị bên dưới mỗi trường.",
+      "actions": "Hành động",
+      "submit": "Gửi",
+      "reset": "Đặt lại",
+      "note": "Thông báo lỗi là mã (ví dụ {unknown}) được tra cứu trong catalog, không phải câu tiếng Anh."
     }
   }
 }

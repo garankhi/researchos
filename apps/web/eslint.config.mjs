@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import { researchosBoundaryPlugin } from "./eslint-rules/researchos-boundaries.mjs";
+import { researchosFormRules } from "./eslint-rules/researchos-forms.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -81,7 +82,33 @@ const eslintConfig = defineConfig([
       "researchos/no-relative-imports-into-generated-api": "error",
     },
   },
-
+  {
+    // The ResearchOS form rules.
+    //
+    // The form conventions live in the `researchos-forms` skill. These are
+    // the two that a compiler cannot catch: a control that is not bound to
+    // the form, and a raw error code rendered to the user. Both compile
+    // cleanly and both fail at runtime — the first submits an empty field,
+    // the second shows `title_required` to the user.
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: {
+      researchosForms: { rules: researchosFormRules },
+    },
+    rules: {
+      // Form controls are MUI components, so they inherit the theme.
+      "researchosForms/no-native-form-controls": "error",
+      // A `<form>` is driven by `useForm`.
+      "researchosForms/form-must-use-react-hook-form": "error",
+      // A `<form>` handles its submit event.
+      "researchosForms/form-must-handle-submit": "error",
+      // Every MUI control is registered or controlled.
+      "researchosForms/form-control-must-be-wired": "error",
+      // MUI's `select` needs a `Controller`, not `register`.
+      "researchosForms/select-requires-controller": "error",
+      // A field error is resolved through the catalog, never raw.
+      "researchosForms/form-error-must-be-resolved": "error",
+    },
+  },
 ]);
 
 export default eslintConfig;
