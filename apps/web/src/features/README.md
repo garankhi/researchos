@@ -37,6 +37,22 @@ tiên.
   cho frontend nhìn thấy contract của API đúng với spec thay vì copy
   shape thủ công. Import *giá trị* từ `@/lib/api/*` vẫn bị chặn.
 
+### Bốn quy tắc trên đã được eslint ép buộc
+
+Chúng nằm trong plugin local `apps/web/eslint-rules/researchos-boundaries.mjs`
+(cần đọc filesystem nên không viết thẳng vào `eslint.config.mjs`):
+
+| Quy tắc | Báo lỗi khi |
+| --- | --- |
+| `researchos/no-domain-entities-in-ui` | File trong `src/components/ui/` nhắc tới entity nghiệp vụ (`Profile`, `Opportunity`, `Taxonomy`…) |
+| `researchos/no-cross-feature-imports` | `features/a/` import từ `features/b/` |
+| `researchos/feature-name-matches-backend-module` | `features/x/` không có `apps/api/src/modules/x/` |
+| `researchos/no-relative-imports-into-generated-api` | Import tương đối trỏ vào `src/lib/api/` (bổ sung cho `no-restricted-imports`, vốn chỉ khớp alias `@/`) |
+
+Quy tắc về tên feature bỏ qua khi không có thư mục `apps/api/src/modules/`,
+nên checkout chỉ có web vẫn lint được.
+
+
 ## Tách lớp
 
 | Tầng | Nguồn | Chịu trách nhiệm |

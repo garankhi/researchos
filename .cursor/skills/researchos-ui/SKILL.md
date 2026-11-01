@@ -38,6 +38,19 @@ apps/web/src/
 
 Four rules that the tooling enforces or that keep the codebase navigable:
 
+> **Three of the four are enforced by eslint**, in
+> `apps/web/eslint-rules/researchos-boundaries.mjs`. A convention that only
+> lives in prose does not fail a build, so a rule a reviewer has to remember
+> is a rule that eventually gets broken. The table below says which are
+> enforced and which are not.
+
+| # | Rule | Enforced by |
+| --- | --- | --- |
+| 1 | `src/lib/api/` is Orval's | `no-restricted-imports` (eslint core) |
+| 2 | `components/ui/` knows nothing about a domain | `researchos/no-domain-entities-in-ui` |
+| 3 | Features do not import each other | `researchos/no-cross-feature-imports` |
+| 4 | The feature folder name matches the backend module | `researchos/feature-name-matches-backend-module` |
+
 1. **`src/lib/api/` belongs to Orval.** The config runs with `clean: true`, so
    every hand-written file there is deleted on the next codegen. The eslint
    rule `no-restricted-imports` blocks **value** imports from `@/lib/api/*`
@@ -63,12 +76,17 @@ Four rules that the tooling enforces or that keep the codebase navigable:
 
 2. **`components/ui/` knows nothing about a domain.** A file there must not
    mention `Profile`, `Opportunity` or `Taxonomy`. Same principle as
-   `src/common/` in the backend.
+   `src/common/` in the backend. The `researchos/no-domain-entities-in-ui`
+   rule enforces this — it matches the entity name in an import binding, an
+   export name, a type reference, or JSX text.
 3. **Features do not import each other.** If a feature needs another
-   feature's data, call that feature's hook, not its files.
+   feature's data, call that feature's hook, not its files. The
+   `researchos/no-cross-feature-imports` rule enforces this.
 4. **The feature folder name matches the backend module.**
    `features/taxonomy/` ↔ `apps/api/src/modules/taxonomy/`. This is how a
-   reviewer traces a screen back to its backend module.
+   reviewer traces a screen back to its backend module. The
+   `researchos/feature-name-matches-backend-module` rule enforces this — it
+   reads the backend module list from disk.
 
 ## The response envelope in one line
 

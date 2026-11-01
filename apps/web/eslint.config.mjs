@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import { researchosBoundaryPlugin } from "./eslint-rules/researchos-boundaries.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -54,6 +55,33 @@ const eslintConfig = defineConfig([
       "no-restricted-imports": "off",
     },
   },
+  {
+    // The ResearchOS boundary rules.
+    //
+    // These three conventions used to live only in the `researchos-ui`
+    // skill and in `src/features/README.md`. Prose does not fail a build,
+    // so a cross-feature import or a domain entity in a shared primitive
+    // would only be caught in review. The rules live in
+    // `eslint-rules/researchos-boundaries.mjs` because two of them need the
+    // filesystem — the backend module list is read from disk, not
+    // hardcoded.
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: {
+      researchos: researchosBoundaryPlugin,
+    },
+    rules: {
+      // `components/ui/` knows nothing about a domain.
+      "researchos/no-domain-entities-in-ui": "error",
+      // Features do not import each other — call the other feature's hook.
+      "researchos/no-cross-feature-imports": "error",
+      // A feature folder mirrors the backend module of the same name.
+      "researchos/feature-name-matches-backend-module": "error",
+      // Closes the alias-free path into the generated tree. The
+      // `no-restricted-imports` rule above only matches the `@/` alias.
+      "researchos/no-relative-imports-into-generated-api": "error",
+    },
+  },
+
 ]);
 
 export default eslintConfig;

@@ -674,10 +674,37 @@ erased at build time, so it cannot pull a deleted runtime module into the
 bundle — which is the actual risk the rule guards against.
 
 **The guard only matches the `@/lib/api/*` alias.** A relative import such as
-`../../lib/api/health/health` passes lint untouched, so the rule cannot catch
-a file that reaches into the generated tree the wrong way — and `clean: true`
-will still delete it on the next codegen. Always use the `@/` alias, so the
-rule can see the import.
+`../../lib/api/health/health` would pass that rule untouched. The
+`researchos/no-relative-imports-into-generated-api` rule closes that gap —
+it resolves the relative path and fails if it lands inside `src/lib/api/`.
+Always use the `@/` alias regardless, so the rule can see the import.
+
+## The boundary rules
+
+The three boundary conventions are enforced by a local eslint plugin in
+`apps/web/eslint-rules/researchos-boundaries.mjs`. The rules live in a file
+rather than inline in `eslint.config.mjs` because two of them need the
+filesystem — the backend module list is read from disk, not hardcoded.
+
+| Rule | What it fails on |
+| --- | --- |
+| `researchos/no-domain-entities-in-ui` | A domain entity (`Profile`, `Opportunity`, `Taxonomy`, …) in `src/components/ui/` — matched in an import binding, an export name, a type reference, or JSX text |
+| `researchos/no-cross-feature-imports` | `features/a/` importing from `features/b/` — by barrel or by deep path |
+| `researchos/feature-name-matches-backend-module` | `features/x/` with no `apps/api/src/modules/x/` |
+| `researchos/no-relative-imports-into-generated-api` | A relative import resolving into `src/lib/api/` |
+
+The entity list is configurable through the rule's `entities` option, and the
+rule is scoped to `src/components/ui/` only — a domain entity in
+`features/taxonomy/components/` is exactly where it belongs.
+
+The backend-module rule skips silently when `apps/api/src/modules/` is not
+present, so a web-only checkout does not fail every file.
+
+Verifying a rule fires:
+
+```powershell
+pnpm --filter web lint
+```
 
 ## Commands
 
@@ -792,12 +819,15 @@ config's `packageJson` is not set.
 | Hand-written file under `src/lib/api/` | Deleted on the next Orval run (`clean: true`) |
 | Deep import `@/lib/api/profiles/profiles` | Blocked by eslint; import from `@/lib/api` |
 | Value import from `@/lib/api/models` | Blocked by eslint; a *type-only* import is allowed |
-| Relative import `../../lib/api/profiles/profiles` | **Passes lint** — the rule only matches the `@/` alias, and `clean: true` still deletes the file |
+| Relative import `../../lib/api/profiles/profiles` | Blocked by `researchos/no-relative-imports-into-generated-api`; and `clean: true` still deletes the file |
 | Reading `query.data.data` | The mutator already unwrapped the envelope |
 | `String(error)` in an error state | Shows `"AxiosError: Request failed with status code 500"` instead of the server's message |
 | UI branching on raw query flags | Every screen repeats the state logic and its bugs |
-| Feature importing another feature's files | Coupling; call the other feature's hook instead |
-| `components/ui/` naming a domain entity | Breaks the shared-primitive boundary |
+| Feature importing another feature's files | Coupling; call the other feature's hook instead. Blocked by `researchos/no-cross-feature-imports` |
+| `components/ui/` naming a domain entity | Breaks the shared-primitive boundary. Blocked by `researchos/no-domain-entities-in-ui` |
+| A feature folder with no matching backend module | The screen cannot be traced back to its API. Blocked by `researchos/feature-name-matches-backend-module` |
+| A user-facing string literal in a component | The string stays in one language forever. Use `t('…')` |
+| Looking a validation message up in the catalog | Validation messages are not codes yet — there is no key for them |
 | MUI system props passed directly | Invalid HTML attributes leak onto the DOM |
 | `useMediaQuery` branching for layout | The server renders the mobile branch; hydration mismatch and a flash of the wrong layout |
 | A kept-mounted `Menu` without `display` on wide screens | The popup lingers in the DOM and flashes when the window is resized across the breakpoint |
