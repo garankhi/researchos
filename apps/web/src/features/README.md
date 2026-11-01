@@ -13,6 +13,7 @@ src/features/<domain>/
   types.ts        Kiểu dữ liệu mà UI thực sự dùng
   hooks/          Hook gọi API và chuẩn hoá trạng thái
   components/     Component riêng của nghiệp vụ
+  schemas/        zod schema cho các form của nghiệp vụ
 ~~~
 
 Chưa có nghiệp vụ nào thì không tạo thư mục con. `health/` là ví dụ đầu
@@ -52,6 +53,24 @@ Chúng nằm trong plugin local `apps/web/eslint-rules/researchos-boundaries.mjs
 Quy tắc về tên feature bỏ qua khi không có thư mục `apps/api/src/modules/`,
 nên checkout chỉ có web vẫn lint được.
 
+## Biểu mẫu
+
+Form dùng react-hook-form + zod + MUI form components. Quy tắc đầy đủ nằm
+ở skill `researchos-forms`, và eslint ép buộc trong plugin
+`apps/web/eslint-rules/researchos-forms.mjs`:
+
+| Quy tắc | Báo lỗi khi |
+| --- | --- |
+| `researchosForms/no-native-form-controls` | Dùng `<input>` / `<select>` / `<textarea>` thay vì component của MUI (trừ `input type="hidden"`) |
+| `researchosForms/form-must-use-react-hook-form` | Có `<form>` trong file không import `useForm` |
+| `researchosForms/form-must-handle-submit` | `<form>` không có `onSubmit` |
+| `researchosForms/form-control-must-be-wired` | Control của MUI không được bind vào form |
+| `researchosForms/select-requires-controller` | `<TextField select>` dùng `register()` thay vì `Controller` |
+| `researchosForms/form-error-must-be-resolved` | Render thẳng message lỗi thay vì resolve qua catalog |
+
+Component dùng lại: `FormTextField`, `FormSelect`, `FormCheckbox` trong
+`src/components/ui/form.tsx` — chúng tự bind vào form và tự resolve
+message lỗi.
 
 ## Tách lớp
 
@@ -120,12 +139,26 @@ logout thất bại) thì dùng snackbar `autoHideDuration: null` kèm nút th�
 trong click handler, để nó luôn chạy dù mutation được gọi từ đâu:
 
 ```tsx
+const { showSnackbar } = useSnackbar();
+const t = useTranslations('profile');
+const tError = useTranslations('errors');
+
 const mutation = useCreateProfile({
-  onSuccess: () => showSnackbar({ severity: 'success', message: 'Đã tạo hồ sơ.' }),
-  onError: (error) => setFieldErrors(apiFieldErrors(error)),
+  onSuccess: () => showSnackbar({ severity: 'success', message: t('created') }),
+  onError: (error) =>
+    setFieldErrors(
+      resolveFieldErrorCodes(tError, apiFieldErrorCodes(error), tError('unknown')),
+    ),
 });
 ```
 
-Message lỗi lấy từ `apiErrorMessage(error)`, không dùng `String(error)`.
+`showSnackbar` đến từ `components/providers/snackbar-provider.tsx` — provider
+đã được mount trong `app/[locale]/layout.tsx`, không cần tự dựng `Snackbar`.
+
+Message lấy từ catalog (`t('…')`), không viết literal trong component.
+Message lỗi từ server là **code**, phải resolve qua
+`resolveErrorCode()` / `resolveFieldErrorCodes()` (`src/utils/error-messages.ts`)
+trước khi hiển thị — không dùng `String(error)` và không render thẳng giá
+trị server trả về.
 Không dựng message thành công từ `useEffect` theo `mutation.isSuccess` — nó
 chạy hai lần dưới React Strict Mode.

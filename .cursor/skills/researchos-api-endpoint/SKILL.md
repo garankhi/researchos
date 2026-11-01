@@ -137,6 +137,65 @@ Prisma.
 - Return the DTO, or map the Prisma entity to a response DTO before returning.
   Returning the raw entity exposes internal columns.
 
+### Error text is a code, not prose
+
+**The error envelope's `message` carries a `snake_case` code, never an
+English sentence.** The frontend resolves the code against its message
+catalog and renders the user's language. Prose on the wire means an English
+error for every Vietnamese user, and a backend deploy for every new
+language.
+
+```typescript
+// Right — a code the frontend can resolve.
+throw new NotFoundException('opportunity_not_found');
+
+// Wrong — the user sees this string, in whatever language the server wrote it.
+throw new NotFoundException('Không tìm thấy cơ hội');
+```
+
+| Code | Meaning |
+| --- | --- |
+| `server_error` | Unexpected failure |
+| `validation_failed` | The request body did not pass validation |
+| `not_found` | The resource does not exist |
+| `forbidden` | Authenticated, but not allowed |
+| `unauthorized` | Not authenticated |
+| `opportunity_not_found` | Domain-specific: the opportunity does not exist |
+
+Every code the API can emit has an entry in `apps/web/src/messages/vi.json`
+**and** `messages/en.json`, under `errors.codes`. A code is a contract:
+renaming one breaks every translation that references it — add a new code
+instead of repurposing an old one.
+
+> **The backend does not implement this yet.** The global exception filter
+> still copies the exception's own message into the envelope, so what
+> reaches the wire today is prose. The rules above describe the **target**
+> contract — write new endpoints against them, and treat the current
+> behaviour as the gap to close. See "The current gap" in the
+> `researchos-localization` skill for the full picture of what has to change
+> in the filter, the validation pipe, and the frontend helpers.
+
+Validation messages follow the same rule. class-validator lets each
+decorator carry its own `message`, and that message is what the validation
+pipe reports — so the message is where the code goes:
+
+```typescript
+export class CreateOpportunityDto {
+  @ApiProperty({
+    description: 'Human-readable headline of the opportunity, shown in listings.',
+    example: 'Nghiên cứu vật liệu mới cho pinh năng lượng',
+  })
+  @IsString({ message: 'title_invalid' })
+  @IsNotEmpty({ message: 'title_required' })
+  @MaxLength(200, { message: 'title_too_long' })
+  title: string;
+}
+```
+
+The codes are qualified by the field they belong to, so
+`title_required` and `description_required` never collide. The catalog
+holds the wording for each one.
+
 Permission checks that depend on the specific record (does this user see
 *this* row?) are business logic and belong in the service. Cross-cutting
 guards live in `src/common/guards/` and must not name any entity.
@@ -444,10 +503,10 @@ only their documentation.
 - [ ] Errors throw NestJS exceptions, not `throw new Error`
 - [ ] Permission enforced in the backend
 - [ ] Multi-table writes use `$transaction`
-- [ ] If `message` is not empty, it carries a **code** (`camelCase`, e.g. `opportunityNotFound`), never prose — the FE resolves it against `messages.*.codes`
+- [ ] If `message` is not empty, it carries a **code** (`snake_case`, e.g. `opportunity_not_found`), never prose — the FE resolves it against `messages.*.codes`
 - [ ] Every code the API can emit has an entry in `messages/vi.json` **and** `messages/en.json`
 - [ ] The FE falls back to a generic localized message when a code has no catalog entry — it never renders the raw code
-- [ ] Validation messages (`errors[].messages`) are codes too, not validator prose — the class-validator decorator carries the code in its `message` option
+- [ ] Validation messages (`errors[].messages`) are codes too (`{field}_{constraint}`, e.g. `title_required`), not validator prose — the class-validator decorator carries the code in its `message` option
 - [ ] `openapi.json` regenerated and committed
 - [ ] `pnpm --filter api openapi:check` passes
 - [ ] `openapi.json` has no component named `String`/`Number`/`Boolean` (primitives stay inline)

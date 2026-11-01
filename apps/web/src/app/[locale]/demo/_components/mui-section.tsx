@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 
 /**
@@ -19,53 +20,61 @@ import { DemoNote, DemoRow, DemoSection } from './demo-ui';
  * emotion cache or the v9 prop surface shows up immediately.
  */
 export function MuiSection() {
+  const t = useTranslations('demo');
+
   return (
     <DemoSection
       id="mui"
-      title="MUI components"
-      description="Mẫu các component và variant để kiểm tra theme và emotion cache."
+      title={t('sections.mui.title')}
+      description={t('sections.mui.description')}
     >
       <Stack spacing={3}>
-        <DemoRow label="Buttons">
-          <Button variant="contained">Contained</Button>
-          <Button variant="outlined">Outlined</Button>
-          <Button variant="text">Text</Button>
+        <DemoRow label={t('labels.buttons')}>
+          <Button variant="contained">{t('mui.contained')}</Button>
+          <Button variant="outlined">{t('mui.outlined')}</Button>
+          <Button variant="text">{t('mui.text')}</Button>
           <Button variant="contained" color="error">
-            Error
+            {t('mui.error')}
           </Button>
           <Button variant="outlined" disabled>
-            Disabled
+            {t('mui.disabled')}
           </Button>
         </DemoRow>
 
-        <DemoRow label="Chips">
-          <Chip label="Default" />
-          <Chip label="Success" color="success" />
-          <Chip label="Warning" color="warning" variant="outlined" />
-          <Chip label="Deletable" onDelete={() => undefined} />
+        <DemoRow label={t('labels.chips')}>
+          <Chip label={t('mui.chipDefault')} />
+          <Chip label={t('mui.chipSuccess')} color="success" />
+          <Chip
+            label={t('mui.chipWarning')}
+            color="warning"
+            variant="outlined"
+          />
+          <Chip label={t('mui.chipDeletable')} onDelete={() => undefined} />
         </DemoRow>
 
-        <DemoRow label="Inputs">
-          <TextField label="Text" size="small" defaultValue="ResearchOS" />
-          <TextField label="Disabled" size="small" disabled />
+        <DemoRow label={t('labels.inputs')}>
+          <TextField
+            label={t('mui.inputText')}
+            size="small"
+            defaultValue="ResearchOS"
+          />
+          <TextField label={t('mui.inputDisabled')} size="small" disabled />
           <Switch defaultChecked />
         </DemoRow>
 
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            Typography
+            {t('labels.typography')}
           </Typography>
-          <Typography variant="h1">Heading 1</Typography>
-          <Typography variant="h5">Heading 5</Typography>
-          <Typography variant="subtitle1">Subtitle 1</Typography>
-          <Typography variant="body1">
-            Body 1 — dòng chữ chuẩn để đọc.
-          </Typography>
+          <Typography variant="h1">{t('typography.heading1')}</Typography>
+          <Typography variant="h5">{t('typography.heading5')}</Typography>
+          <Typography variant="subtitle1">{t('typography.subtitle1')}</Typography>
+          <Typography variant="body1">{t('typography.body1')}</Typography>
           <Typography variant="body2" color="text.secondary">
-            Body 2 — phụ, dùng cho mô tả.
+            {t('typography.body2')}
           </Typography>
           <Typography variant="caption" color="text.tertiary">
-            Caption — chú thích nhỏ.
+            {t('typography.caption')}
           </Typography>
         </Box>
 
@@ -73,21 +82,17 @@ export function MuiSection() {
 
         <Stack spacing={2}>
           <Alert severity="success">
-            <AlertTitle>Thành công</AlertTitle>
-            Thông báo thành công.
+            <AlertTitle>{t('alerts.successTitle')}</AlertTitle>
+            {t('alerts.successBody')}
           </Alert>
           <Alert severity="warning">
-            <AlertTitle>Cảnh báo</AlertTitle>
-            Thông báo cảnh báo.
+            <AlertTitle>{t('alerts.warningTitle')}</AlertTitle>
+            {t('alerts.warningBody')}
           </Alert>
-          <Alert severity="info">Thông tin bổ sung.</Alert>
+          <Alert severity="info">{t('alerts.infoBody')}</Alert>
         </Stack>
 
-        <DemoNote>
-          MUI v9 bỏ các system props (gap, flex, py, px, alignItems) khỏi prop
-          surface trực tiếp — chúng phải đi qua `sx`, nếu không sẽ lọt ra DOM
-          dưới dạng HTML attribute không hợp lệ.
-        </DemoNote>
+        <DemoNote>{t('notes.muiSystemProps')}</DemoNote>
       </Stack>
     </DemoSection>
   );

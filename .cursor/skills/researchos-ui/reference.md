@@ -226,11 +226,46 @@ will repeat.
 Success is different: the page is already correct, so a transient
 confirmation is all that is needed.
 
-### MUI Snackbar details
+### The snackbar provider
 
-`SnackbarContent` defaults to `role="alert"`. That is right for an error but
-wrong for a success — a success should not interrupt a screen reader.
-Override it through the `content` slot:
+Do not hand-roll a `Snackbar`. The app already has one:
+`components/providers/snackbar-provider.tsx`, mounted in
+`app/[locale]/layout.tsx`.
+
+```typescript
+'use client';
+
+import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { useTranslations } from 'next-intl';
+
+const { showSnackbar } = useSnackbar();
+const t = useTranslations('profile');
+
+showSnackbar({ severity: 'success', message: t('saved') });
+```
+
+| Option | Note |
+| --- | --- |
+| `severity` | `'success' \| 'info' \| 'warning' \| 'error'` |
+| `message` | Plain text. A translated string, never a literal |
+| `autoHideDuration` | Defaults to 4000. `null` disables auto-hide — use it for an error |
+| `actionLabel` + `onAction` | An optional recovery button inside the toast |
+
+The provider handles the details the raw MUI component leaves to you:
+
+- `role="status"` for a success (polite — it should not interrupt a screen
+  reader) and `role="alert"` for an error (assertive).
+- An **error never auto-hides** unless you pass an explicit
+  `autoHideDuration`. A toast that vanishes after four seconds is a message
+  many users never finish reading.
+- `anchorOrigin` is bottom-right.
+
+`useSnackbar()` **throws** outside a `SnackbarProvider` rather than silently
+doing nothing. A missing provider is a wiring bug, and a silent no-op looks
+like a snackbar that never appears.
+
+If you need a raw `Snackbar` for a one-off, `SnackbarContent` defaults to
+`role="alert"` — override it through the `content` slot:
 
 ```typescript
 <Snackbar
@@ -244,34 +279,46 @@ Override it through the `content` slot:
       sx: { bgcolor: 'success.main', color: 'success.contrastText' },
     },
   }}
-  message="Đã lưu hồ sơ."
+  message={t('saved')}
 />
 ```
 
-| Prop | Note |
-| --- | --- |
-| `role` | `'alert'` for errors (assertive), `'status'` for success (polite) |
-| `autoHideDuration` | `null` disables auto-hide — use it for errors |
-| `anchorOrigin` | Defaults to bottom-left; bottom-right is the common choice |
-| `message` | Plain text. For rich content, pass a child instead |
-| `key` | Give each message a distinct key so consecutive toasts do not merge |
-
 ### Field-level errors
 
-`apiFieldErrors(error)` returns the backend's grouped validation messages:
+`apiFieldErrorCodes(error)` returns the backend's grouped validation codes,
+keyed by field. Resolve each code against the catalog, then render one
+`FieldError` per field, under the input that caused it:
 
 ```typescript
-import { apiErrorMessage, apiFieldErrors } from '@/lib/api-error';
+import { useTranslations } from 'next-intl';
+import { apiFieldErrorCodes } from '@/lib/api-error';
+import { resolveFieldErrorCodes } from '@/utils/error-messages';
+import { FieldError } from '@/components/ui/feedback';
 
-const fieldErrors = apiFieldErrors(mutation.error);
+const t = useTranslations('errors');
+const fieldMessages = resolveFieldErrorCodes(
+  t,
+  apiFieldErrorCodes(mutation.error),
+  t('unknown'),
+);
 
-{fieldErrors?.map((e) => (
-  <FieldError key={e.field} message={e.messages.join(', ')} />
+{Object.entries(fieldMessages ?? {}).map(([field, message]) => (
+  <FieldError key={field} id={`${field}-error`}>{message}</FieldError>
 ))}
 ```
 
+`FieldError` renders a MUI `FormHelperText` in the error style. Pass an `id`
+and reference it from the input's `aria-describedby` so a screen reader
+announces the message with the field.
+
 The backend groups by field precisely so each message can sit under its
 input. Do not flatten them into one toast line.
+
+**The wording lives in the catalog.** `errors[].messages` carries codes in
+the target contract, so the constraint text is a catalog entry — one per
+code, in both locales. The backend does not send codes yet, so today every
+code resolves to the fallback; the code path does not change when it
+switches. See the `researchos-localization` skill.
 
 ### Where to put the callbacks
 
@@ -279,12 +326,18 @@ In the mutation hook's `onSuccess` / `onError`, not in the click handler —
 so the feedback fires however the mutation was triggered:
 
 ```typescript
+const { showSnackbar } = useSnackbar();
+const t = useTranslations('profile');
+const tError = useTranslations('errors');
+
 const mutation = useCreateProfile({
   onSuccess: () => {
-    showSnackbar({ severity: 'success', message: 'Đã tạo hồ sơ.' });
+    showSnackbar({ severity: 'success', message: t('created') });
   },
   onError: (error) => {
-    setFieldErrors(apiFieldErrors(error));
+    setFieldErrors(
+      resolveFieldErrorCodes(tError, apiFieldErrorCodes(error), tError('unknown')),
+    );
   },
 });
 ```
@@ -298,8 +351,8 @@ Do not derive the success message from a `useEffect` on `mutation.isSuccess`
 
 ```typescript
 <ErrorState
-  title="Không tải được danh sách hồ sơ"
-  message="Máy chủ không phản hồi. Thử lại sau."
+  title={t('loadFailedTitle')}
+  message={t('loadFailedDescription')}
   onRetry={() => void refetch()}
 />
 ```
