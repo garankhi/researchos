@@ -19,6 +19,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiErrorResponseDto,
   DemoControllerGetSlowEnvelope,
   DemoControllerGetSlowParams,
   DemoControllerGetUnstableEnvelope,
@@ -216,7 +217,7 @@ export const demoControllerGetFail = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<void>(
+  return axiosInstance<unknown>(
     { url: `/demo/fail`, method: 'GET', signal },
     options,
   );
@@ -228,7 +229,7 @@ export const getDemoControllerGetFailQueryKey = () => {
 
 export const getDemoControllerGetFailQueryOptions = <
   TData = Awaited<ReturnType<typeof demoControllerGetFail>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
@@ -257,11 +258,11 @@ export const getDemoControllerGetFailQueryOptions = <
 export type DemoControllerGetFailQueryResult = NonNullable<
   Awaited<ReturnType<typeof demoControllerGetFail>>
 >;
-export type DemoControllerGetFailQueryError = unknown;
+export type DemoControllerGetFailQueryError = ApiErrorResponseDto;
 
 export function useDemoControllerGetFail<
   TData = Awaited<ReturnType<typeof demoControllerGetFail>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   options: {
     query: Partial<
@@ -287,7 +288,7 @@ export function useDemoControllerGetFail<
 };
 export function useDemoControllerGetFail<
   TData = Awaited<ReturnType<typeof demoControllerGetFail>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<
@@ -313,7 +314,7 @@ export function useDemoControllerGetFail<
 };
 export function useDemoControllerGetFail<
   TData = Awaited<ReturnType<typeof demoControllerGetFail>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<
@@ -335,7 +336,7 @@ export function useDemoControllerGetFail<
 
 export function useDemoControllerGetFail<
   TData = Awaited<ReturnType<typeof demoControllerGetFail>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<

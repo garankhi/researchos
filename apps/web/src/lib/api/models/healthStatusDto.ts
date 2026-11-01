@@ -9,8 +9,10 @@
 export interface HealthStatusDto {
   /** ok when healthy, degraded when a dependency is unreachable */
   status: string;
+  /** Name of the service that answered the probe. */
   service: string;
   /** Process uptime in seconds */
   uptimeSeconds: number;
+  /** ISO timestamp of when the probe answered. */
   timestamp: string;
 }

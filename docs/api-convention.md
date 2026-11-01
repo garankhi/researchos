@@ -67,6 +67,8 @@ Import trong `apps/api` và `apps/worker` dùng hậu tố `.js` vì `tsconfig` 
 | `GET` | `/<resource>` | Liệt kê, có phân trang |
 | `GET` | `/<resource>/:id` | Chi tiết một bản ghi |
 | `POST` | `/<resource>` | Tạo mới |
+| `POST` | `/<resource>/:id/<action>` | Hành động không phải CRUD |
+| `PUT` | `/<resource>/:id` | Thay thế toàn bộ bản ghi |
 | `PATCH` | `/<resource>/:id` | Cập nhật một phần |
 | `DELETE` | `/<resource>/:id` | Xoá mềm nếu có `deletedAt` |
 
@@ -149,10 +151,53 @@ Quy tắc:
   `summary` được copy nguyên văn vào client Orval sinh ra dưới dạng JSDoc, nên
   nó cũng là thứ lập trình viên frontend đọc trong `src/lib/api/`.
 - `@ApiOkResponse`/`@ApiCreatedResponse` luôn khai báo `type`.
+- **Response lỗi không khai báo `type`.** Filter là global: server luôn trả
+  `ApiErrorResponseDto` cho mọi lỗi, bất kể route khai báo gì. Khai báo
+  `type` riêng là mô tả một body mà server không bao giờ gửi.
+
+```typescript
+  // Đúng — description chỉ gán nhãn cho mã trạng thái.
+  @ApiNotFoundResponse({ description: 'Không tìm thấy cơ hội' })
+
+  // Sai — server không bao giờ gửi body này.
+  @ApiNotFoundResponse({ description: 'Không tìm thấy', type: ErrorDto })
+```
+
 - Tham số query dùng **DTO** (`@Query() dto: ListOpportunitiesQueryDto`), không
   dùng `@Query('page') page?: string` rời rạc.
 - `@Param('id') id: string` — không ép kiểu ở controller; service hoặc pipe
   chịu trách nhiệm.
+- **Mọi tham số đều phải có `description`.** Tham số path phải khai báo
+  `@ApiParam({ name, description })` — NestJS chỉ sinh ra
+  `{ name, in: "path" }` trần từ `@Param('id')`, không có gì để đọc. Tham số
+  header dùng `@ApiHeader`, tham số query trong DTO lấy `description` từ
+  `@ApiProperty`.
+
+```typescript
+  // Sai — Swagger hiện "id" mà không có gì để đọc.
+  @Get(':id')
+  findOne(@Param('id') id: string) { /* ... */ }
+
+  // Đúng.
+  @ApiParam({ name: 'id', description: 'Identifier of the opportunity.' })
+  @Get(':id')
+```
+
+### Mã trạng thái theo phương thức
+
+| Phương thức | Mã thành công | Decorator | Body |
+| --- | --- | --- | --- |
+| `GET` | 200 | `@ApiOkResponse` | không |
+| `POST` | 201 | `@ApiCreatedResponse` | DTO |
+| `POST` (job nền) | 202 | `@ApiAcceptedResponse` | DTO |
+| `PUT` | 200 | `@ApiOkResponse` | DTO đầy đủ |
+| `PATCH` | 200 | `@ApiOkResponse` | DTO `PartialType` |
+| `DELETE` | 200 | `@ApiOkResponse` | không |
+
+`PUT` thay thế toàn bộ bản ghi nên body là trạng thái mới đầy đủ. `PATCH`
+chỉ cập nhật một phần nên body là DTO `PartialType`. `DELETE` trả về bản ghi
+đã xoá để frontend không phải gọi thêm một lần. `POST` trả `202` chỉ khi
+việc còn chạy sau khi trả lời (export, đồng bộ, digest, embedding).
 
 ## 5. DTO và validation
 
@@ -164,13 +209,19 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateOpportunityDto {
-  @ApiProperty({ example: 'Nghiên cứu vật liệu mới cho pinh năng lượng' })
+  @ApiProperty({
+    description: 'Tiêu đề hiển thị của cơ hội nghiên cứu.',
+    example: 'Nghiên cứu vật liệu mới cho pinh năng lượng',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   title: string;
 
-  @ApiPropertyOptional({ example: 'Giảng viên cần cộng tác viên' })
+  @ApiPropertyOptional({
+    description: 'Mô tả dài hơn về cơ hội và người đang tìm đồng tác.',
+    example: 'Giảng viên cần cộng tác viên',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -182,13 +233,18 @@ Quy tắc:
 
 - `@ApiProperty` bắt buộc cho mọi trường. `@ApiPropertyOptional` cho trường
   optional. Không có decorator thì `whitelist` sẽ xoá trường đó khỏi payload.
+- **Mọi trường phải có `description`.** Đó là chỗ duy nhất ghi lại ý nghĩa
+  của một trường, và `apps/api` kiểm tra điều này tự động — xem §13.
 - Tên trường trong DTO dùng `camelCase`; mapping sang `snake_case` của
   PostgreSQL là việc của Prisma, không phải của DTO.
 - Validate ở DTO bằng `class-validator`. Không tự viết `if` trong service cho
   việc kiểm tra hình dạng dữ liệu.
 - `UpdateOpportunityDto` kế thừa `PartialType(CreateOpportunityDto)` từ
   `@nestjs/swagger`, để không lặp lại decorator.
-- Enum trong DTO dùng `enum` của Prisma, và khai báo `@ApiProperty({ enum: X })`.
+- Enum trong DTO dùng `enum` của Prisma, và khai báo
+  `@ApiProperty({ description, enum: X })`.
+- DTO query có trường số cần `@Type(() => Number)` từ `class-transformer`, để
+  schema Swagger và ép kiểu runtime thống nhất.
 
 Global `ValidationPipe` đã bật `whitelist` và `forbidNonWhitelisted`, nên
 payload có trường lạ sẽ trả `400` kèm danh sách trường không hợp lệ.
@@ -386,7 +442,13 @@ pnpm codegen                  # chạy cả hai
 
 - [ ] Endpoint có `@ApiTags`, `@ApiOperation` và `@Api*Response` kèm `type`.
 - [ ] **Mọi route đều có `@ApiOperation({ summary })` với `summary` không rỗng.**
-- [ ] DTO có `@ApiProperty`/`@ApiPropertyOptional` cho **mọi** trường.
+- [ ] Mã trạng thái thành công đúng theo phương thức (§4).
+- [ ] DTO có `@ApiProperty`/`@ApiPropertyOptional` cho **mọi** trường, kèm
+  `description`.
+- [ ] Tham số path có `@ApiParam` kèm `description`; tham số header có
+  `@ApiHeader` kèm `description`.
+- [ ] Response lỗi **không** khai báo `type` — server luôn gửi
+  `ApiErrorResponseDto`.
 - [ ] Controller không chứa truy vấn Prisma.
 - [ ] Controller trả payload thô — không tự dựng envelope.
 - [ ] Lỗi dùng exception của NestJS, không dùng `throw new Error`.
@@ -395,6 +457,38 @@ pnpm codegen                  # chạy cả hai
 - [ ] `pnpm --filter api build` chạy qua.
 - [ ] `pnpm --filter api test` chạy qua.
 - [ ] `pnpm --filter api openapi` đã chạy và `openapi.json` đã commit.
+- [ ] `pnpm --filter api openapi:check` chạy qua (CI cũng chạy bước này).
 - [ ] `pnpm --filter web orval` đã chạy nếu có thay đổi contract.
 - [ ] Kiểm tra `openapi.json`: response `2xx` trỏ tới `*Envelope`, và không
   có component tên `String`/`Number`/`Boolean` (primitive phải inline).
+
+## 13. Các quy tắc được kiểm tra tự động
+
+Các quy tắc trong tài liệu này được **kiểm tra bằng code**, không phải bằng
+mắt người review.
+
+`apps/api/src/common/openapi/openapi-rules.ts` chứa các quy tắc, và
+`apps/api/src/openapi-rules.spec.ts` dựng **document OpenAPI thật** rồi
+fail `pnpm --filter api test` khi có quy tắc bị vi phạm.
+
+| Quy tắc | Kiểm tra gì |
+| --- | --- |
+| `operation.summary` | Mọi route có `summary` khác rỗng |
+| `operation.responses` | Mọi route khai báo ít nhất một response |
+| `response.description` | Mọi response có `description` |
+| `errorResponse.schema` | Mọi response lỗi trỏ tới envelope lỗi chung |
+| `parameter.description` | Mọi tham số — path, header, query — có `description` |
+| `bodyProperty.description` | Mọi trường của request body có `description` |
+| `schemaProperty.description` | Mọi trường của DTO có `description` |
+| `component.name` | Không có component tên `String`/`Number`/`Boolean` |
+| `schema.reservedFields` | Không DTO nào dùng cả `success` và `data` |
+
+Message của lỗi nêu rõ quy tắc, vị trí và cách sửa, nên một lần test đỏ là
+đủ để biết cần thêm decorator nào:
+
+```powershell
+pnpm --filter api exec vitest run src/openapi-rules.spec.ts
+```
+
+Muốn đổi một quy tắc thì sửa ở `openapi-rules.ts` **và** thêm ca kiểm thử
+tương ứng vào `openapi-rules.spec.ts`.

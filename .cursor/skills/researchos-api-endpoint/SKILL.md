@@ -50,13 +50,15 @@ modules together; it holds no business logic.
 A DTO is the API contract, not a Prisma model. It must not expose internal
 fields such as `createdAt` or `internalNotes`.
 
-Every field needs **both** a Swagger decorator and a class-validator
-decorator. They do different jobs and neither substitutes for the other:
+Every field needs **three** decorators: a Swagger decorator, a class-validator
+decorator, and a `description`.
 
 - `@ApiProperty` puts the field in the OpenAPI spec, so the generated client
   types it.
 - A class-validator decorator (`@IsString()`, `@MaxLength()`) registers the
   field with class-validator.
+- The `description` says what the field means. It is the only place a reader
+  learns that `title` is a human-readable headline and not a slug.
 
 The global `ValidationPipe` runs with `whitelist: true` and
 `forbidNonWhitelisted: true`, and whitelist uses **class-validator metadata**,
@@ -70,13 +72,19 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateOpportunityDto {
-  @ApiProperty({ example: 'Nghiên cứu vật liệu mới cho pinh năng lượng' })
+  @ApiProperty({
+    description: 'Human-readable headline of the opportunity, shown in listings.',
+    example: 'Nghiên cứu vật liệu mới cho pinh năng lượng',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   title: string;
 
-  @ApiPropertyOptional({ example: 'Giảng viên cần cộng tác viên' })
+  @ApiPropertyOptional({
+    description: 'Longer explanation of the opportunity and who is looking for.',
+    example: 'Giảng viên cần cộng tác viên',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -84,15 +92,26 @@ export class CreateOpportunityDto {
 }
 ```
 
+The `description` is **mandatory**, not a nice-to-have. `apps/api` enforces
+it: `src/openapi-rules.spec.ts` builds the real OpenAPI document and fails
+the test run if any property of a request or response DTO has no
+`description`. See Step 9.
+
 - Use `PartialType(CreateOpportunityDto)` from `@nestjs/swagger` for update
   DTOs rather than repeating decorators.
 - Declare enums with `@ApiProperty({ enum: X })` and `@IsEnum(X)`.
 - Query parameters also go in a DTO (`@Query() dto: ListQueryDto`), not as
-  scattered `@Query('page') page?: string`.
+  scattered `@Query('page') page?: string`. A query DTO field carries its
+  `description` through `@ApiProperty` into the spec.
+- A query DTO with a numeric field needs `@Type(() => Number)` from
+  `class-transformer`. `enableImplicitConversion` is on in the global
+  `ValidationPipe`, but an explicit `@Type` is what makes the Swagger
+  schema and the runtime coercion agree.
 
 **Response DTOs** are different: they are only ever returned, never passed
 through the `ValidationPipe`, so they need `@ApiProperty` but no class-validator
-decorators. `HealthStatusDto` is the reference example.
+decorators. `HealthStatusDto` is the reference example. They still need a
+`description` on every property.
 
 ## Step 3 — Write the service
 
@@ -162,6 +181,8 @@ export class OpportunitiesController {
 
   @ApiOperation({ summary: 'Lấy chi tiết một cơ hội' })
   @ApiOkResponse({ description: 'Chi tiết cơ hội', type: OpportunityResponseDto })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy cơ hội' })
+  @ApiParam({ name: 'id', description: 'Identifier of the opportunity.' })
   @Get(':id')
   findOne(@Param('id') id: string): Promise<OpportunityResponseDto> {
     return this.opportunitiesService.findOne(id);
@@ -171,6 +192,84 @@ export class OpportunitiesController {
 
 - `@ApiTags` matches the module name, unaccented.
 - Do not coerce types in the controller; leave that to the pipe or the service.
+
+### Method to status code
+
+Each method has one expected success status. Do not mix them up.
+
+| Method | Success status | Response decorator | Request body |
+| --- | --- | --- | --- |
+| `GET` | 200 | `@ApiOkResponse` | none |
+| `POST` | 201 | `@ApiCreatedResponse` | DTO |
+| `POST` (long-running job) | 202 | `@ApiAcceptedResponse` | DTO |
+| `PUT` | 200 | `@ApiOkResponse` | full DTO |
+| `PATCH` | 200 | `@ApiOkResponse` | `PartialType` DTO |
+| `DELETE` | 200 | `@ApiOkResponse` | none |
+
+- **`PUT` replaces, `PATCH` updates.** A `PUT` body describes the complete
+  new state of the resource. A `PATCH` body describes only the fields that
+  change, so its DTO is built with `PartialType`. If the update is partial,
+  use `PATCH`; `PUT` with a partial body silently drops the omitted fields
+  in most clients' expectations.
+- **`DELETE` returns 200 with the deleted entity** in this codebase, not
+  `204`. Return the resource so the frontend can show what was removed.
+- **`POST` returns 202** only for work that finishes after the response —
+  an export, a sync, a digest, an embedding run. The response body carries
+  the id of the queued job and the frontend polls it. Ordinary creates
+  return 201.
+- A route that returns nothing useful can use `@HttpCode(204)` with
+  `@ApiNoContentResponse({ description })`, but the default of returning the
+  entity is preferred so the client does not need a second request.
+
+### Every parameter is documented
+
+A parameter in the OpenAPI spec is what a reader sees next to the input
+box, so it carries a `description`.
+
+| Parameter kind | How it is documented |
+| --- | --- |
+| Path | `@ApiParam({ name, description, example })` |
+| Header | `@ApiHeader({ name, description, required, example })` |
+| Query (in a DTO) | `@ApiProperty({ description })` on the DTO field |
+| Query (loose) | `@ApiQuery({ name, description, required, example })` |
+
+A **path parameter has no description unless you add `@ApiParam`**. NestJS
+generates the parameter from the `@Param('id')` decorator alone, and the
+result is a bare `{ "name": "id", "in": "path" }` entry with nothing to read.
+This is not a style preference — `apps/api` fails the test run if any
+parameter in the document lacks a description.
+
+```typescript
+// Right — the path parameter is described.
+@ApiParam({
+  name: 'id',
+  description: 'Identifier of the opportunity.',
+  example: 'a1b2c3',
+})
+@Get(':id')
+
+// Wrong — Swagger shows "id" with no explanation.
+@Get(':id')
+```
+
+Query parameters belong in a DTO, and a DTO field already carries a
+description through `@ApiProperty`. Use `@ApiQuery` only for a loose
+parameter that cannot be a DTO field, and give it a `description` too.
+
+### Authentication
+
+A route that requires a session says so in the spec, so the frontend knows
+before it calls:
+
+```typescript
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Not signed in.' })
+```
+
+Add `@ApiUnauthorizedResponse` to any route behind a guard, and
+`@ApiForbiddenResponse` to a route where a signed-in user can still be
+refused. A route that is deliberately public says so in a comment above the
+handler, per `docs/api-convention.md`.
 
 ### Mandatory: `@ApiOperation({ summary })` on every route
 
@@ -192,6 +291,24 @@ is mandatory — there is no exception, and no route is "too small to document".
 Every route also needs an `@Api*Response` with an explicit `type`. Missing
 annotations make Swagger describe the endpoint wrongly, and the generated
 client inherits the mistake.
+
+**Error responses must not declare a `type`.** The exception filter is
+global: the server answers *every* failure with `ApiErrorResponseDto`, no
+matter what the route says. An error response that declares its own body
+type describes a body the server never sends.
+
+```typescript
+// Right — the description labels the status code. The body is the shared
+// error envelope, which the OpenAPI transform attaches.
+@ApiNotFoundResponse({ description: 'Không tìm thấy cơ hội' })
+
+// Wrong — the server never sends this body.
+@ApiNotFoundResponse({ description: 'Không tìm thấy', type: ErrorDto })
+```
+
+This is not a style rule. `apps/api` fails the test run if an error
+response declares a schema other than the shared error envelope. The same
+applies to the success responses: they describe the **payload**.
 
 **Do not describe the envelope in the controller.** Annotate the *payload*
 type, exactly as you would without the envelope:
@@ -245,6 +362,10 @@ pnpm --filter api openapi     # writes apps/api/openapi.json
 pnpm --filter web orval       # writes apps/web/src/lib/api
 ```
 
+`pnpm --filter api openapi:check` verifies the committed `openapi.json`
+matches what the code generates, without writing it. CI runs it, so a stale
+spec cannot be committed.
+
 Do not delete a field that is already published. Backend and frontend deploy
 independently, so the client must stay backwards compatible with the older
 API. Mark a field deprecated first.
@@ -265,27 +386,74 @@ pnpm test
 
 All three must pass before the change is ready.
 
+## Step 9 — The OpenAPI rules are enforced
+
+The prose rules in this skill are checked by code, not by a reviewer.
+
+`apps/api/src/common/openapi/openapi-rules.ts` holds the rules, and
+`apps/api/src/openapi-rules.spec.ts` builds the **real** OpenAPI document
+and fails `pnpm --filter api test` when a rule is broken. The rules are:
+
+| Rule | What it checks |
+| --- | --- |
+| `operation.summary` | Every route has a non-empty `@ApiOperation` summary |
+| `operation.responses` | Every route declares at least one response |
+| `response.description` | Every response has a description |
+| `errorResponse.schema` | Every error response points at the shared error envelope |
+| `parameter.description` | Every parameter — path, header, query — has a description |
+| `bodyProperty.description` | Every request body property has a description |
+| `schemaProperty.description` | Every DTO property has a description |
+| `component.name` | No component is named `String`, `Number` or `Boolean` |
+| `schema.reservedFields` | No business DTO uses both `success` and `data` |
+
+The failure message names the rule, the location and the fix, so a red test
+tells you exactly which decorator to add:
+
+```text
+parameter.description @ GET /profiles/{id} -> path id: The parameter "id"
+has no description. Path and header parameters need an explicit @ApiParam or
+@ApiHeader; query parameters inherit theirs from the DTO's @ApiProperty.
+```
+
+Run it after touching a controller or a DTO:
+
+```powershell
+pnpm --filter api exec vitest run src/openapi-rules.spec.ts
+```
+
+If you change a rule, change it in `openapi-rules.ts` **and** add a case to
+`openapi-rules.spec.ts`. The rules are the contract; the prose above is
+only their documentation.
+
 ## Checklist
 
 - [ ] Module, controller, service, DTO under `src/modules/<domain>/`, generated with `--flat`
 - [ ] Local imports end in `.js`
-- [ ] Every request DTO field has `@ApiProperty`/`@ApiPropertyOptional` **and** a class-validator decorator
-- [ ] Response DTOs have `@ApiProperty` (no validator needed — they are never validated)
+- [ ] Every request DTO field has `@ApiProperty`/`@ApiPropertyOptional` **and** a class-validator decorator **and** a `description`
+- [ ] Every response DTO property has `@ApiProperty` with a `description` (no validator needed — they are never validated)
+- [ ] Every path parameter has `@ApiParam({ name, description })` — NestJS does not add it for you
+- [ ] Every header parameter has `@ApiHeader({ name, description })`
+- [ ] A numeric query DTO field has `@Type(() => Number)`
 - [ ] Controller has no Prisma query and no manual permission check
 - [ ] **Every route has `@ApiOperation({ summary })` with a non-empty summary** — no exceptions
+- [ ] The route uses the status code for its method (`GET` 200, `POST` 201, `POST` job 202, `PUT`/`PATCH`/`DELETE` 200)
 - [ ] Controller returns the **bare payload** — the envelope is applied by the interceptor, never built by hand
 - [ ] `@Api*Response` describes the **payload** type, not the envelope
+- [ ] **Error responses declare no `type`** — the server always sends the shared error envelope
+- [ ] A route behind a guard has `@ApiBearerAuth()` and `@ApiUnauthorizedResponse({ description })`
 - [ ] Errors throw NestJS exceptions, not `throw new Error`
 - [ ] Permission enforced in the backend
 - [ ] Multi-table writes use `$transaction`
 - [ ] If `message` is not empty, it carries a **code** (`camelCase`, e.g. `opportunityNotFound`), never prose — the FE resolves it against `messages.*.codes`
 - [ ] Every code the API can emit has an entry in `messages/vi.json` **and** `messages/en.json`
 - [ ] The FE falls back to a generic localized message when a code has no catalog entry — it never renders the raw code
-- [ ] Validation messages (`errors[].messages`) are codes too, not validator prose
+- [ ] Validation messages (`errors[].messages`) are codes too, not validator prose — the class-validator decorator carries the code in its `message` option
 - [ ] `openapi.json` regenerated and committed
+- [ ] `pnpm --filter api openapi:check` passes
 - [ ] `openapi.json` has no component named `String`/`Number`/`Boolean` (primitives stay inline)
 - [ ] Orval client regenerated; no hand-written file inside `src/lib/api/`
 - [ ] Frontend feature folder uses the same domain name
+- [ ] `pnpm --filter api exec vitest run src/openapi-rules.spec.ts` passes
 - [ ] `pnpm build`, `pnpm lint`, `pnpm test` pass
 
 ## Reference
