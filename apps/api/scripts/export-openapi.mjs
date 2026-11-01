@@ -1,7 +1,11 @@
 // Regenerates apps/api/openapi.json from the Nest modules without
 // starting a server. Run with: pnpm --filter api openapi
+//
+// Pass `--check` to verify the committed document is up to date without
+// writing it: it exits non-zero when the file on disk differs from what the
+// code generates. That keeps the committed spec honest.
 import 'reflect-metadata';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NestFactory } from '@nestjs/core';
@@ -15,10 +19,37 @@ import { createOpenApiDocument } from '../dist/openapi.js';
 process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@localhost:5432/researchos?schema=public';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outPath = resolve(here, '..', process.argv[2] ?? 'openapi.json');
+const args = process.argv.slice(2);
+const checkOnly = args.includes('--check');
+const positional = args.filter((arg) => !arg.startsWith('--'));
+const outPath = resolve(here, '..', positional[0] ?? 'openapi.json');
 
 const app = await NestFactory.create(AppModule, { logger: false });
 const document = createOpenApiDocument(app);
-writeFileSync(outPath, `${JSON.stringify(document, null, 2)}\n`);
 await app.close();
-console.log(`OpenAPI document written to ${outPath}`);
+
+const serialized = `${JSON.stringify(document, null, 2)}\n`;
+
+if (checkOnly) {
+  let current;
+
+  try {
+    current = readFileSync(outPath, 'utf8');
+  } catch {
+    console.error(`OpenAPI document is missing: ${outPath}`);
+    process.exit(1);
+  }
+
+  if (current !== serialized) {
+    console.error(
+      'The committed OpenAPI document is out of date.\n' +
+        'Run `pnpm --filter api openapi` and commit the result.',
+    );
+    process.exit(1);
+  }
+
+  console.log('OpenAPI document is up to date.');
+} else {
+  writeFileSync(outPath, serialized);
+  console.log(`OpenAPI document written to ${outPath}`);
+}

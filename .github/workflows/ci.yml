@@ -39,3 +39,5 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+      - name: Check the committed OpenAPI document is up to date
+        run: pnpm --filter api openapi:check

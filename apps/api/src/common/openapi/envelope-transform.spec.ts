@@ -1,9 +1,11 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import {
   applyEnvelopeTransform,
   ERROR_ENVELOPE_SCHEMA,
 } from './envelope-transform.js';
+import { HttpExceptionFilter } from '../filters/http-exception.filter.js';
 
 /**
  * A minimal document that mirrors the shape NestJS produces.
@@ -31,6 +33,46 @@ const jsonResponse = (schema: unknown) => ({
   description: 'ok',
   content: { 'application/json': { schema } },
 });
+
+/**
+ * Runs the real exception filter and returns the body it would send.
+ *
+ * The filter is what actually builds an error response, so its output —
+ * not a hand-written copy of the shape — is what the OpenAPI schema has to
+ * describe.
+ */
+async function captureErrorBody(
+  exception: Error = new NotFoundException('Opportunity not found'),
+): Promise<Record<string, unknown>> {
+  const filter = new HttpExceptionFilter();
+
+  let body: Record<string, unknown> = {};
+
+  const response = {
+    status() {
+      return this;
+    },
+    json(payload: Record<string, unknown>) {
+      body = payload;
+      return this;
+    },
+  };
+
+  const host = {
+    switchToHttp: () => ({
+      getResponse: () => response,
+      getRequest: () => ({ url: '/opportunities/abc' }),
+    }),
+  } as never;
+
+  filter.catch(exception, host);
+
+  // The filter is synchronous; await only to keep the helper's signature
+  // honest about being used with an async body.
+  await Promise.resolve();
+
+  return body;
+}
 
 describe('applyEnvelopeTransform', () => {
   it('wraps a named payload schema in an envelope', () => {
@@ -116,6 +158,32 @@ describe('applyEnvelopeTransform', () => {
     });
   });
 
+  it('overrides an error response that declares its own body', () => {
+    // The exception filter is global, so the server always answers a
+    // failure with the shared envelope. A route that declares another body
+    // describes something the server never sends, and the transform has to
+    // correct it — silently, because the runtime does not read the spec.
+    const doc = applyEnvelopeTransform(
+      documentWith({
+        '200': jsonResponse({ type: 'string' }),
+        '404': {
+          description: 'not found',
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/Special' } },
+          },
+        },
+      }),
+    );
+
+    const response = (
+      doc.paths['/health'] as any
+    ).get.responses['404'];
+
+    expect(response.content['application/json'].schema).toEqual({
+      $ref: `#/components/schemas/${ERROR_ENVELOPE_SCHEMA}`,
+    });
+  });
+
   it('registers the error envelope schema', () => {
     const doc = applyEnvelopeTransform(documentWith({}));
     const schemas = doc.components.schemas as Record<string, any>;
@@ -176,5 +244,87 @@ describe('applyEnvelopeTransform', () => {
 
     expect(schemas.HealthStatusDtoEnvelope).toBeDefined();
     expect(schemas.JobDtoEnvelope).toBeDefined();
+  });
+
+  it('describes the error envelope the way the filter sends it', () => {
+    const doc = applyEnvelopeTransform(documentWith({}));
+    const schemas = doc.components.schemas as Record<string, any>;
+    const errorSchema = schemas[ERROR_ENVELOPE_SCHEMA];
+
+    // These must match `HttpExceptionFilter` exactly. The filter builds the
+    // body by hand, so the transform's copy of the schema is the only place
+    // the spec learns what an error looks like.
+    expect(Object.keys(errorSchema.properties).sort()).toEqual([
+      'data',
+      'errors',
+      'message',
+      'path',
+      'statusCode',
+      'success',
+      'timestamp',
+    ]);
+
+    expect(errorSchema.required).toEqual([
+      'success',
+      'data',
+      'message',
+      'statusCode',
+      'path',
+      'timestamp',
+    ]);
+
+    // `success` is always literally false and `data` is always null.
+    expect(errorSchema.properties.success.enum).toEqual([false]);
+    expect(errorSchema.properties.data.nullable).toBe(true);
+    expect(errorSchema.properties.data.enum).toEqual([null]);
+
+    // The validation grouping the filter produces.
+    expect(errorSchema.properties.errors.items.required).toEqual([
+      'field',
+      'messages',
+    ]);
+  });
+
+  it('describes the same fields the exception filter sends', async () => {
+    const doc = applyEnvelopeTransform(documentWith({}));
+    const schemas = doc.components.schemas as Record<string, any>;
+    const described = Object.keys(schemas[ERROR_ENVELOPE_SCHEMA].properties);
+
+    // The filter builds the error body by hand. Its actual output is the
+    // source of truth, and the spec must describe the same set of fields —
+    // otherwise the generated client and the runtime disagree about what a
+    // failure carries.
+    //
+    // `errors` is the one field the filter sends only on a validation
+    // failure, so it is checked separately below.
+    const sent = Object.keys(await captureErrorBody());
+
+    expect(described.sort()).toEqual([...sent, 'errors'].sort());
+  });
+
+  it('describes the validation errors the filter sends on a bad request', async () => {
+    const doc = applyEnvelopeTransform(documentWith({}));
+    const schemas = doc.components.schemas as Record<string, any>;
+    const errorSchema = schemas[ERROR_ENVELOPE_SCHEMA];
+
+    const body = await captureErrorBody(
+      new BadRequestException({
+        statusCode: 400,
+        message: ['title must be a string', 'title should not be empty'],
+        error: 'Bad Request',
+      }),
+    );
+
+    // The filter groups the validation messages by field, and the schema
+    // has to describe that grouped shape.
+    expect(body.errors).toEqual([
+      { field: 'title', messages: ['must be a string', 'should not be empty'] },
+    ]);
+
+    expect(errorSchema.properties.errors.type).toBe('array');
+    expect(errorSchema.properties.errors.items.required).toEqual([
+      'field',
+      'messages',
+    ]);
   });
 });

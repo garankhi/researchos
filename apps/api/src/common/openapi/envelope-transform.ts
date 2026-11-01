@@ -131,16 +131,16 @@ function wrapSuccessResponse(
 /**
  * Points an error response at the shared error envelope.
  *
- * A response that already declares its own schema is left alone, so an
- * endpoint can still describe a specialised error body.
+ * The exception filter is global: the server answers *every* failure with
+ * `ApiErrorResponseDto`, whatever the route declares. An error response
+ * that declares its own body type would describe a body the server never
+ * sends, so the transform overwrites it.
+ *
+ * Overwriting rather than leaving it alone is deliberate. Leaving it alone
+ * would let the spec and the runtime disagree, and the disagreement is
+ * silent — the generated client would carry a type the server never sends.
  */
 function pointErrorResponseAtEnvelope(response: JsonSchema): void {
-  const content = response.content?.['application/json'];
-
-  if (content?.schema) {
-    return;
-  }
-
   response.content = {
     'application/json': {
       schema: { $ref: `#/components/schemas/${ERROR_ENVELOPE_SCHEMA}` },
