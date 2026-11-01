@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import {
+  ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -21,7 +22,12 @@ export class DemoController {
   constructor(private readonly demoService: DemoService) {}
 
   @ApiOperation({ summary: 'Returns the greeting after a configurable delay' })
-  @ApiQuery({ name: 'delay', required: false, example: 2000 })
+  @ApiQuery({
+    name: 'delay',
+    required: false,
+    description: 'Milliseconds to wait before answering. Capped at 30000.',
+    example: 2000,
+  })
   @ApiOkResponse({ description: 'Greeting message', type: String })
   @Get('slow')
   async getSlow(@Query('delay') delay?: string): Promise<string> {
@@ -33,6 +39,7 @@ export class DemoController {
   @ApiOperation({
     summary: 'Always fails with a 500 to exercise the error state',
   })
+  @ApiInternalServerErrorResponse({ description: 'The request always fails.' })
   @Get('fail')
   getFail(): never {
     throw new Error('Intentional demo failure');
