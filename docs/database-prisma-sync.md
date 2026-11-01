@@ -1,12 +1,133 @@
 # Đồng bộ schema nghiệp vụ vào Prisma
 
-Hiện `packages/database/prisma/schema.prisma` có `AuditLog` và một số enum;
-migration `20261031000000_init` đã tạo phần này. Bản nghiệp vụ đầy đủ nằm
-trong `docs/database/ResearchOS.sql`, gồm SQL export từ DBML và bổ sung
-PostgreSQL. Hai phần chưa được đồng bộ. Tài liệu này mô tả bước tiếp theo,
-không có nghĩa schema nghiệp vụ đã được áp dụng.
+Cập nhật 02/11/2026: database local đã áp dụng thành công cả
+`20261031000000_init` và `20261101185146_domain_schema`. `schema.prisma`
+đã có model nghiệp vụ sau introspection. Không cần init hay deploy lại.
 
-## Quy trình phù hợp với repo
+Prisma 7.10.1 sinh sai hai back-relation khi `db pull`; bản schema hiện tại
+đã sửa và validate thành công. Xem phần lưu ý P1012 bên dưới trước khi
+introspect lại.
+
+Đã tạo migration **`20261101185146_domain_schema`** bằng Prisma CLI:
+
+```powershell
+pnpm --filter @researchos/database exec prisma migrate dev --create-only --name domain_schema
+```
+
+CLI tự đặt timestamp trong tên thư mục. `--create-only` tạo file, chưa áp
+dụng migration mới. File SQL trống do CLI sinh ra sau đó được điền bằng bản
+sao nguyên vẹn của `docs/database/ResearchOS.sql`, gồm bảng, enum, index,
+CHECK, view, function và trigger. Đây là custom SQL migration; Prisma không
+tự sinh đầy đủ các phần PostgreSQL này chỉ từ model.
+
+## Trạng thái lúc mới tạo file (trước khi deploy)
+
+- Database ứng dụng vẫn chỉ có **một**: `researchos` ở `localhost:55432`.
+- `20261031000000_init` giữ nguyên; migration domain mới **chưa áp dụng**.
+- Đã chạy toàn bộ SQL mới trong một transaction rồi thay `COMMIT` cuối
+  bằng `ROLLBACK` để kiểm tra. Sau kiểm tra vẫn chỉ có `audit_logs` và
+  `_prisma_migrations`, lịch sử migration vẫn chỉ có init.
+- Chưa chạy các smoke/concurrency test nghiệp vụ; các script đó yêu cầu
+  database thử nghiệm riêng. Không khẳng định đã kiểm thử toàn bộ policy.
+- `schema.prisma` chưa có model nghiệp vụ. Cần introspect sau khi áp dụng.
+
+Prisma `migrate dev` có thể tự tạo rồi xóa một shadow database để kiểm tra
+lịch sử. Đó là chi tiết của CLI, không phải database ứng dụng thứ hai mà
+bạn cần giữ hoặc vận hành. `migrate deploy` bên dưới không cần shadow DB.
+
+## Các bước deploy và introspect cho máy mới
+
+Chạy từ root repo. Phần này ghi lại thứ tự thiết lập. Database local hiện
+đã hoàn tất deploy; chỉ cần validate/generate/status để kiểm tra, không
+cần chạy lại toàn bộ các bước.
+
+### 1. Khởi động Docker và xem trạng thái
+
+```powershell
+pnpm infra:up
+pnpm db:status
+```
+
+Lúc này `db:status` sẽ báo `20261101185146_domain_schema` chưa được áp dụng
+và có thể trả exit code 1. Đây là trạng thái chờ áp dụng, không phải init lỗi.
+
+### 2. Thêm các bảng nghiệp vụ vào database hiện có
+
+Nếu database đã có dữ liệu cần giữ, backup trước. Sau khi review SQL, chạy:
+
+```powershell
+pnpm db:migrate:deploy
+```
+
+**Đây là lệnh thực sự thay đổi database.** Prisma chạy migration domain
+chưa áp dụng; không chạy lại init. SQL đã kiểm tra không tạo lại hoặc xóa
+`audit_logs`. Không tự chạy `ResearchOS.sql` lần nữa bằng psql.
+
+### 3. Đồng bộ model Prisma và sinh client
+
+Ngay sau khi deploy migration thành công, chạy theo thứ tự:
+
+```powershell
+pnpm --filter @researchos/database exec prisma db pull
+```
+
+Review/sửa hai back-relation theo phần P1012 bên dưới rồi mới chạy:
+
+```powershell
+pnpm --filter @researchos/database db:validate
+pnpm db:generate
+pnpm db:status
+```
+
+`db pull` đọc các bảng vừa có và cập nhật `schema.prisma`; không sửa dữ
+liệu trong PostgreSQL. `db:generate` tạo client TypeScript. `db:status`
+cuối cùng phải báo database up to date. Review và commit `schema.prisma`
+cùng migration trước khi chia sẻ thay đổi cho người khác.
+
+**Không dùng `pnpm db:migrate` để áp dụng migration này hoặc tạo migration
+kế tiếp trước khi hoàn tất `db pull` và validate.** Nếu schema Prisma chưa
+có model nghiệp vụ mà đem làm đích của `migrate dev`, Prisma có thể đề nghị
+xóa các bảng vừa thêm. Không chạy `db:reset` hoặc `db push` cho bước này.
+
+Có thể mở `pnpm db:studio` để xem các bảng sau khi hoàn tất. Các cảnh báo
+introspection về trigger/CHECK/index đặc thù cần được review; những phần
+đó vẫn nằm trong PostgreSQL và SQL migration.
+
+## Prisma 7.10.1: sửa P1012 sau db pull
+
+Introspection hiện sinh lại hai field dưới đây thành kiểu optional đơn
+(`?`). Cần giữ chúng là danh sách (`[]`) trong schema đã review:
+
+| Model | Field back-relation | Kiểu đúng |
+| --- | --- | --- |
+| `output_revisions` | `research_outputs_research_outputs_id_current_release_idTooutput_revisions` | `research_outputs[]` |
+| `research_outputs` | `output_revisions_output_revisions_output_idToresearch_outputs` | `output_revisions[]` |
+
+Field đầu tránh lỗi validator yêu cầu UNIQUE chính xác cho cặp
+`[id, current_release_id]`. FK ghép hiện có vẫn đảm bảo revision thuộc đúng
+công trình; PK `research_outputs.id` vẫn giới hạn phía tham chiếu. Không
+thêm `@@unique([id, current_release_id])` chỉ để làm validator im lặng.
+
+Field thứ hai giữ đúng một công trình có nhiều revision. Unique index
+`uq_output_editable_draft` chỉ giới hạn **một bản nháp chưa release**, không
+giới hạn tổng số revision đã release. Giữ nguyên index và SQL migration.
+
+Không cần chạy lại `db pull` để sửa lỗi này: bản schema trong repo đã được
+sửa. Khi thật sự cần introspect lần sau, ưu tiên `prisma db pull --print`
+để review trước khi ghi đè schema, kiểm tra lại hai field rồi validate và
+generate. `pnpm test` của package database đã bao gồm `prisma validate` để
+CI bắt lỗi P1012 này trước khi merge.
+
+Có thể kiểm tra chỉ đọc xem model có đòi thay đổi SQL không:
+
+```powershell
+pnpm --filter @researchos/database exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+```
+
+Sau bản sửa hiện tại, kết quả là `-- This is an empty migration.`. Lệnh
+diff không áp dụng SQL hoặc tạo migration mới.
+
+## Quy trình tổng quát cho lần đồng bộ tiếp theo
 
 1. **Chốt bản SQL nghiệp vụ.** Kiểm tra file sinh ra từ DBML cùng
    `postgres-features.sql`. Giữ trigger, function, view, CHECK và index đặc

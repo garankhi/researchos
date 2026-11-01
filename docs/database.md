@@ -1,6 +1,6 @@
 # Database và Prisma
 
-Ngày cập nhật: 31/10/2026.
+Ngày cập nhật: 02/11/2026.
 
 Prisma 7.10.1 đã được cài đặt trong `packages/database`. Package này giữ
 schema, migration và client dùng chung cho cả `apps/api` và `apps/worker`.
@@ -89,12 +89,12 @@ Kết quả mong đợi là `"status":"ok"`. Nếu là `"degraded"`, xem mục "
 Docker và volume riêng, dùng credentials riêng. Chưa cần tách tài khoản
 migration hoặc tự chỉnh connection pool cho local.
 
-Migration đầu tiên chỉ tạo enum và `audit_logs` đúng với `schema.prisma`
-hiện tại. Bản SQL nghiệp vụ trong `docs/database/ResearchOS.sql` chưa được
-đưa vào Prisma/migration; Compose không tự import bản SQL đó. Việc đồng bộ
-schema nghiệp vụ là bước riêng, không được chạy cả hai cách khởi tạo lên
-cùng database.
-Quy trình cụ thể: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
+Migration init tạo enum và `audit_logs`; migration domain
+`20261101185146_domain_schema` tạo schema nghiệp vụ. Cả hai đã được áp dụng
+ở local. Model Prisma đã introspect và sửa back-relation do Prisma 7.10.1
+sinh sai. Khi introspect lại cần review, validate rồi generate trước khi
+tạo migration tiếp theo. Compose không tự import SQL. Chi tiết và lưu ý
+P1012: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
 
 Nếu vẫn muốn dùng PostgreSQL cài trực tiếp trên máy, script
 `packages/database/scripts/setup-database.ps1` vẫn dùng được; cập nhật
@@ -311,16 +311,18 @@ Ba ràng buộc ở tầng database:
 Bảng `audit_logs` đã có sẵn. Mọi thay đổi có ý nghĩa nên ghi một dòng vào
 đó với `actorId`, `action`, `entity`, `entityId` và `payload`.
 
-### 5.6 Còn để trống có chủ đích
+### 5.6 Schema nghiệp vụ và thay đổi tiếp theo
 
-Hiện schema **chưa có bảng nghiệp vụ**. Các mâu thuẫn SRS liệt kê ở
-`architecture.md` ("Những điểm SRS cần chốt") chưa được giải quyết. Đặt bảng
-lúc này sẽ khóa những quyết định sai vào schema.
+Schema nghiệp vụ đã có trong migration domain và được introspect vào
+`schema.prisma`. Các quyết định phạm vi chưa chốt trong `architecture.md`
+vẫn cần được giải quyết riêng khi triển khai tính năng.
 
-Khi một nhóm nghiệp vụ được chốt, thêm model vào `schema.prisma` và chạy:
+Chỉ khi cần thay đổi cấu trúc bảng tiếp theo, sửa model, validate và review
+SQL migration. Không chạy migrate chỉ để sinh client hoặc khởi động app:
 
 ```powershell
-pnpm db:migrate
+pnpm --filter @researchos/database db:validate
+pnpm --filter @researchos/database exec prisma migrate dev --create-only --name ten_thay_doi
 ```
 
 ### 5.7 Search index

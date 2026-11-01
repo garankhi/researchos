@@ -1,33 +1,992 @@
-// ResearchOS data model.
-//
-// Ownership rules for this file:
-// - Every table lives in the `public` schema. No schema-per-tenant.
-// - Enums are declared next to the models that use them, not in a shared dump.
-// - Three independent axes are tracked separately, per docs/architecture.md:
-//   `validationStatus`, `visibility` and `publicationStatus`. Never collapse
-//   them into one `status` field.
-// - Every record that can be user-entered, imported or AI-inferred keeps its
-//   provenance: `sourceKind`, `sourceRef` and `verificationStatus`.
-// - Timestamps are stored in UTC. `createdAt`/`updatedAt` are mandatory.
-//
-// The schema is intentionally empty of domain tables at this stage: the SRS
-// contradictions listed in docs/architecture.md ("Những điểm SRS cần chốt")
-// are not resolved yet, so locking in tables now would encode wrong decisions.
-// Run `prisma migrate dev --create-only` to capture the first real migration
-// once a domain area is confirmed.
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// ---------------------------------------------------------------------------
-// Shared building blocks
-// ---------------------------------------------------------------------------
+/// Generic audit trail. Every domain table that records a meaningful change
+/// references an entry here so that provenance is queryable.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @map("actor_id")
+  action    String   @db.VarChar(64)
+  entity    String   @db.VarChar(64)
+  entityId  String   @map("entity_id")
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model achievement_posts {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String             @db.Uuid
+  group_id          String?            @db.Uuid
+  project_id        String?            @db.Uuid
+  output_id         String?            @db.Uuid
+  title             String             @db.VarChar(255)
+  post_type         post_type          @default(GENERAL_NEWS)
+  content           String
+  award_issuer      String?            @db.VarChar(255)
+  award_year        Int?
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  research_groups   research_groups?   @relation(fields: [group_id], references: [id], onUpdate: NoAction)
+  research_outputs  research_outputs?  @relation(fields: [output_id], references: [id], onUpdate: NoAction)
+  research_projects research_projects? @relation(fields: [project_id], references: [id], onUpdate: NoAction)
+  users             users              @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model digest_deliveries {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String          @db.Uuid
+  period_start        DateTime        @db.Timestamptz(6)
+  period_end          DateTime        @db.Timestamptz(6)
+  status              delivery_status @default(PENDING)
+  attempts            Int             @default(0)
+  next_attempt_at     DateTime        @default(now()) @db.Timestamptz(6)
+  locked_until        DateTime?       @db.Timestamptz(6)
+  provider_message_id String?
+  last_error          String?
+  sent_at             DateTime?       @db.Timestamptz(6)
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  users               users           @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  digest_items        digest_items[]
+
+  @@unique([user_id, period_start, period_end], map: "digest_deliveries_user_id_period_start_period_end_idx")
+  @@index([locked_until], map: "idx_digest_lease", where: raw("(status = 'PROCESSING'::delivery_status)"))
+  @@index([next_attempt_at], map: "idx_digest_ready", where: raw("(status = ANY (ARRAY['PENDING'::delivery_status, 'FAILED'::delivery_status]))"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model digest_items {
+  delivery_id       String              @db.Uuid
+  subject_type      digest_subject_type
+  subject_id        String              @db.Uuid
+  event_id          String              @db.Uuid
+  matched_reasons   Json                @default("[]")
+  content_snapshot  Json
+  digest_deliveries digest_deliveries   @relation(fields: [delivery_id], references: [id], onUpdate: NoAction)
+  research_updates  research_updates    @relation(fields: [event_id], references: [id], onUpdate: NoAction)
+
+  @@id([delivery_id, subject_type, subject_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model digest_preferences {
+  user_id    String   @id @db.Uuid
+  enabled    Boolean  @default(false)
+  timezone   String   @default("Asia/Ho_Chi_Minh") @db.VarChar(100)
+  language   String   @default("vi") @db.VarChar(10)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model field_provenance {
+  entity_type String               @db.VarChar(64)
+  entity_id   String               @db.Uuid
+  field_name  String               @db.VarChar(64)
+  source      data_provenance_type
+  source_ref  String
+  synced_at   DateTime?            @db.Timestamptz(6)
+  verified_at DateTime?            @db.Timestamptz(6)
+  is_locked   Boolean              @default(false)
+  created_at  DateTime             @default(now()) @db.Timestamptz(6)
+
+  @@id([entity_type, entity_id, field_name, source_ref])
+  @@index([entity_type, entity_id], map: "idx_field_provenance_entity")
+  @@index([source], map: "idx_field_provenance_source")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model group_directions {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id          String              @db.Uuid
+  topic_id          String?             @db.Uuid
+  title             String              @db.VarChar(255)
+  description       String?
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  research_groups   research_groups     @relation(fields: [group_id], references: [id], onUpdate: NoAction)
+  research_topics   research_topics?    @relation(fields: [topic_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_projects research_projects[]
+
+  @@unique([id, group_id], map: "group_directions_id_group_id_idx")
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model group_members {
+  group_id        String            @db.Uuid
+  user_id         String            @db.Uuid
+  role            group_member_role @default(COLLABORATOR)
+  joined_at       DateTime          @default(now()) @db.Timestamptz(6)
+  research_groups research_groups   @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users             @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@id([group_id, user_id])
+  @@index([user_id, group_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model group_output_links {
+  output_id                                                                             String              @db.Uuid
+  group_id                                                                              String              @db.Uuid
+  requested_revision_id                                                                 String              @db.Uuid
+  requested_by                                                                          String              @db.Uuid
+  requested_at                                                                          DateTime            @default(now()) @db.Timestamptz(6)
+  status                                                                                group_output_status @default(PENDING)
+  decided_by                                                                            String?             @db.Uuid
+  decided_at                                                                            DateTime?           @db.Timestamptz(6)
+  decision_note                                                                         String?
+  accepted_revision_id                                                                  String?             @db.Uuid
+  accepted_by                                                                           String?             @db.Uuid
+  accepted_at                                                                           DateTime?           @db.Timestamptz(6)
+  removed_by                                                                            String?             @db.Uuid
+  removed_at                                                                            DateTime?           @db.Timestamptz(6)
+  users_group_output_links_accepted_byTousers                                           users?              @relation("group_output_links_accepted_byTousers", fields: [accepted_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_group_output_links_decided_byTousers                                            users?              @relation("group_output_links_decided_byTousers", fields: [decided_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_groups                                                                       research_groups     @relation(fields: [group_id], references: [id], onUpdate: NoAction)
+  output_revisions_group_output_links_output_id_accepted_revision_idTooutput_revisions  output_revisions?   @relation("group_output_links_output_id_accepted_revision_idTooutput_revisions", fields: [output_id, accepted_revision_id], references: [output_id, id], onUpdate: NoAction)
+  research_outputs                                                                      research_outputs    @relation(fields: [output_id], references: [id], onUpdate: NoAction)
+  output_revisions_group_output_links_output_id_requested_revision_idTooutput_revisions output_revisions    @relation("group_output_links_output_id_requested_revision_idTooutput_revisions", fields: [output_id, requested_revision_id], references: [output_id, id], onUpdate: NoAction)
+  users_group_output_links_removed_byTousers                                            users?              @relation("group_output_links_removed_byTousers", fields: [removed_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_group_output_links_requested_byTousers                                          users               @relation("group_output_links_requested_byTousers", fields: [requested_by], references: [id], onUpdate: NoAction)
+
+  @@id([output_id, group_id])
+  @@index([group_id, status, requested_at])
+  @@index([group_id, accepted_revision_id], map: "idx_group_display", where: raw("(accepted_revision_id IS NOT NULL)"))
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model interest_circle_members {
+  circle_id        String           @db.Uuid
+  user_id          String           @db.Uuid
+  joined_at        DateTime         @default(now()) @db.Timestamptz(6)
+  interest_circles interest_circles @relation(fields: [circle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users            @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@id([circle_id, user_id])
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model interest_circles {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                    String                    @db.VarChar(255)
+  primary_topic_id        String                    @db.Uuid
+  initiator_id            String                    @db.Uuid
+  upgraded_to_group_id    String?                   @db.Uuid
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  interest_circle_members interest_circle_members[]
+  users                   users                     @relation(fields: [initiator_id], references: [id], onUpdate: NoAction)
+  research_topics         research_topics           @relation(fields: [primary_topic_id], references: [id], onUpdate: NoAction)
+  research_groups         research_groups?          @relation(fields: [upgraded_to_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model knowledge_graph_edges {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_entity_type   String                 @db.VarChar(50)
+  source_entity_id     String                 @db.Uuid
+  target_entity_type   String                 @db.VarChar(50)
+  target_entity_id     String                 @db.Uuid
+  relationship_type    edge_type
+  ai_confidence_score  Decimal?               @db.Decimal(3, 2)
+  validation_status    edge_validation_status @default(PENDING)
+  confirmed_by_user_id String?                @db.Uuid
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  users                users?                 @relation(fields: [confirmed_by_user_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type], map: "knowledge_graph_edges_source_entity_type_source_entity_id_t_idx")
+  @@index([source_entity_type, source_entity_id])
+  @@index([target_entity_type, target_entity_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model local_credentials {
+  user_id              String   @id @db.Uuid
+  password_hash        String
+  password_changed_at  DateTime @default(now()) @db.Timestamptz(6)
+  must_change_password Boolean  @default(true)
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+  users                users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model mentoring_records {
+  id                                             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mentor_id                                      String             @db.Uuid
+  student_user_id                                String?            @db.Uuid
+  project_id                                     String?            @db.Uuid
+  student_name                                   String             @db.VarChar(255)
+  student_id_code                                String?            @db.VarChar(50)
+  level                                          String             @db.VarChar(50)
+  thesis_title                                   String
+  academic_year                                  Int
+  rbl_origin_id                                  String?            @db.VarChar(100)
+  created_at                                     DateTime           @default(now()) @db.Timestamptz(6)
+  users_mentoring_records_mentor_idTousers       users              @relation("mentoring_records_mentor_idTousers", fields: [mentor_id], references: [id], onUpdate: NoAction)
+  research_projects                              research_projects? @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_mentoring_records_student_user_idTousers users?             @relation("mentoring_records_student_user_idTousers", fields: [student_user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model oidc_identities {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String          @db.Uuid
+  issuer        String
+  subject       String          @db.VarChar(255)
+  created_at    DateTime        @default(now()) @db.Timestamptz(6)
+  users         users           @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  user_sessions user_sessions[]
+
+  @@unique([id, user_id], map: "oidc_identities_id_user_id_idx")
+  @@unique([issuer, subject], map: "oidc_identities_issuer_subject_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model oidc_login_attempts {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  state_hash               String    @unique @db.Char(64)
+  nonce_hash               String    @db.Char(64)
+  browser_binding_hash     String    @db.Char(64)
+  issuer                   String
+  redirect_uri             String
+  pkce_verifier_ciphertext String
+  encryption_key_id        String    @db.VarChar(100)
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at               DateTime  @db.Timestamptz(6)
+  consumed_at              DateTime? @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model opportunity_applications {
+  id                                                 String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  opportunity_id                                     String                         @db.Uuid
+  applicant_id                                       String                         @db.Uuid
+  applicant_note                                     String
+  status                                             opportunity_application_status @default(PENDING)
+  response_note                                      String?
+  response_due_at                                    DateTime                       @db.Timestamptz(6)
+  responded_by                                       String?                        @db.Uuid
+  applied_at                                         DateTime                       @default(now()) @db.Timestamptz(6)
+  responded_at                                       DateTime?                      @db.Timestamptz(6)
+  withdrawn_at                                       DateTime?                      @db.Timestamptz(6)
+  users_opportunity_applications_applicant_idTousers users                          @relation("opportunity_applications_applicant_idTousers", fields: [applicant_id], references: [id], onUpdate: NoAction)
+  research_opportunities                             research_opportunities         @relation(fields: [opportunity_id], references: [id], onUpdate: NoAction)
+  users_opportunity_applications_responded_byTousers users?                         @relation("opportunity_applications_responded_byTousers", fields: [responded_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([opportunity_id, applicant_id], map: "uq_application_not_withdrawn", where: raw("(status <> 'WITHDRAWN'::opportunity_application_status)"))
+  @@index([response_due_at], map: "idx_application_due", where: raw("(status = 'PENDING'::opportunity_application_status)"))
+  @@index([applicant_id, applied_at])
+  @@index([opportunity_id, applicant_id, applied_at])
+  @@index([opportunity_id, status, applied_at])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model output_authors {
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id               String               @db.Uuid
+  user_id                 String?              @db.Uuid
+  author_name_string      String               @db.VarChar(255)
+  author_order            Int
+  is_corresponding_author Boolean              @default(false)
+  research_outputs        research_outputs     @relation(fields: [output_id], references: [id], onUpdate: NoAction)
+  users                   users?               @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  publication_claims      publication_claims[]
+
+  @@unique([id, output_id], map: "output_authors_id_output_id_idx")
+  @@unique([output_id, author_order], map: "output_authors_output_id_author_order_idx")
+  @@unique([output_id, user_id], map: "output_authors_output_id_user_id_idx")
+  @@index([user_id, output_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model output_external_ids {
+  output_id        String           @db.Uuid
+  source           String           @db.VarChar(50)
+  external_id      String           @db.VarChar(255)
+  last_synced_at   DateTime?        @db.Timestamptz(6)
+  research_outputs research_outputs @relation(fields: [output_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([source, external_id])
+  @@index([output_id, source])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model output_files {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id             String                  @db.Uuid
+  uploaded_by           String                  @db.Uuid
+  storage_key           String                  @unique
+  file_name             String
+  mime_type             String                  @db.VarChar(100)
+  size_bytes            BigInt
+  sha256                String                  @db.VarChar(64)
+  visibility            visibility_level        @default(PRIVATE)
+  access_group_id       String?                 @db.Uuid
+  is_available          Boolean                 @default(true)
+  uploaded_at           DateTime                @default(now()) @db.Timestamptz(6)
+  research_groups       research_groups?        @relation(fields: [access_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_outputs      research_outputs        @relation(fields: [output_id], references: [id], onUpdate: NoAction)
+  users                 users                   @relation(fields: [uploaded_by], references: [id], onUpdate: NoAction)
+  output_revision_files output_revision_files[]
+
+  @@unique([output_id, id], map: "output_files_output_id_id_idx")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model output_revision_files {
+  output_id        String           @db.Uuid
+  revision_id      String           @db.Uuid
+  file_id          String           @db.Uuid
+  output_files     output_files     @relation(fields: [output_id, file_id], references: [output_id, id], onUpdate: NoAction)
+  output_revisions output_revisions @relation(fields: [output_id, revision_id], references: [output_id, id], onUpdate: NoAction)
+
+  @@id([revision_id, file_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model output_revisions {
+  id                                                                                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id                                                                               String                  @unique(map: "uq_output_editable_draft", where: raw("(released_at IS NULL)")) @db.Uuid
+  revision_no                                                                             Int
+  title                                                                                   String                  @db.VarChar(500)
+  abstract                                                                                String?
+  venue                                                                                   String?                 @db.VarChar(255)
+  publisher                                                                               String?                 @db.VarChar(255)
+  publication_year                                                                        Int?
+  publication_status                                                                      publication_status      @default(UNPUBLISHED)
+  output_type                                                                             String                  @default("PAPER") @db.VarChar(50)
+  external_url                                                                            String?
+  authors_snapshot                                                                        Json                    @default("[]")
+  created_by                                                                              String                  @db.Uuid
+  released_by                                                                             String?                 @db.Uuid
+  released_at                                                                             DateTime?               @db.Timestamptz(6)
+  created_at                                                                              DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                                                              DateTime                @default(now()) @db.Timestamptz(6)
+  group_output_links_group_output_links_output_id_accepted_revision_idTooutput_revisions  group_output_links[]    @relation("group_output_links_output_id_accepted_revision_idTooutput_revisions")
+  group_output_links_group_output_links_output_id_requested_revision_idTooutput_revisions group_output_links[]    @relation("group_output_links_output_id_requested_revision_idTooutput_revisions")
+  output_revision_files                                                                   output_revision_files[]
+  users_output_revisions_created_byTousers                                                users                   @relation("output_revisions_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  research_outputs_output_revisions_output_idToresearch_outputs                           research_outputs        @relation("output_revisions_output_idToresearch_outputs", fields: [output_id], references: [id], onUpdate: NoAction)
+  users_output_revisions_released_byTousers                                               users?                  @relation("output_revisions_released_byTousers", fields: [released_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  output_topics                                                                           output_topics[]
+  /// List back-relation avoids requiring a redundant UNIQUE(id, current_release_id).
+  /// The composite FK and research_outputs.id PK still restrict it to the owning output.
+  research_outputs_research_outputs_id_current_release_idTooutput_revisions               research_outputs[]      @relation("research_outputs_id_current_release_idTooutput_revisions")
+  research_updates                                                                        research_updates[]
+  search_index                                                                            search_index[]
+
+  @@unique([output_id, id], map: "output_revisions_output_id_id_idx")
+  @@unique([output_id, revision_no], map: "output_revisions_output_id_revision_no_idx")
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "idx_revision_title_search", type: Gin, where: raw("(released_at IS NOT NULL)"))
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model output_topics {
+  output_id        String           @db.Uuid
+  revision_id      String           @db.Uuid
+  topic_id         String           @db.Uuid
+  added_by         String           @db.Uuid
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  users            users            @relation(fields: [added_by], references: [id], onUpdate: NoAction)
+  output_revisions output_revisions @relation(fields: [output_id, revision_id], references: [output_id, id], onUpdate: NoAction)
+  research_topics  research_topics  @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+
+  @@id([revision_id, topic_id])
+  @@index([topic_id, revision_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model project_members {
+  project_id        String             @db.Uuid
+  user_id           String             @db.Uuid
+  role              expected_role_type
+  joined_at         DateTime           @default(now()) @db.Timestamptz(6)
+  research_projects research_projects  @relation(fields: [project_id], references: [id], onUpdate: NoAction)
+  users             users              @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@id([project_id, user_id])
+  @@index([user_id, project_id])
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model project_milestones {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id        String             @db.Uuid
+  title             String             @db.VarChar(255)
+  due_date          DateTime           @db.Date
+  status            milestone_status   @default(ON_TRACK)
+  notes             String?
+  updated_at        DateTime           @default(now()) @db.Timestamptz(6)
+  research_projects research_projects  @relation(fields: [project_id], references: [id], onUpdate: NoAction)
+  research_records  research_records[]
+
+  @@unique([id, project_id], map: "project_milestones_id_project_id_idx")
+  @@index([project_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model publication_claims {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id        String           @db.Uuid
+  user_id          String           @db.Uuid
+  author_id        String?          @db.Uuid
+  status           claim_status     @default(SUGGESTED)
+  match_source     String           @db.VarChar(50)
+  reviewed_at      DateTime?        @db.Timestamptz(6)
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  output_authors   output_authors?  @relation(fields: [author_id, output_id], references: [id, output_id], onUpdate: NoAction)
+  research_outputs research_outputs @relation(fields: [output_id], references: [id], onUpdate: NoAction)
+  users            users            @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@unique([output_id, user_id], map: "publication_claims_output_id_user_id_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model record_lineage {
+  id                                                                      String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  successor_record_id                                                     String            @db.Uuid
+  predecessor_record_id                                                   String?           @db.Uuid
+  inheritance_type                                                        String            @db.VarChar(100)
+  rbl_origin_flag                                                         Boolean           @default(false)
+  created_at                                                              DateTime          @default(now()) @db.Timestamptz(6)
+  research_records_record_lineage_predecessor_record_idToresearch_records research_records? @relation("record_lineage_predecessor_record_idToresearch_records", fields: [predecessor_record_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_records_record_lineage_successor_record_idToresearch_records   research_records  @relation("record_lineage_successor_record_idToresearch_records", fields: [successor_record_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model research_fields {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  internal_code      String?              @unique @db.VarChar(50)
+  name               String               @db.VarChar(255)
+  name_vi            String?              @db.VarChar(255)
+  description        String?
+  source             taxonomy_source      @default(OPENALEX)
+  external_id        String?              @db.VarChar(255)
+  source_updated_at  DateTime?            @db.Timestamptz(6)
+  last_synced_at     DateTime?            @db.Timestamptz(6)
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  research_subfields research_subfields[]
+
+  @@unique([source, external_id], map: "research_fields_source_external_id_idx")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_groups {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String                   @unique @db.VarChar(50)
+  name                   String                   @db.VarChar(255)
+  lead_id                String                   @db.Uuid
+  description            String?
+  is_active              Boolean                  @default(true)
+  archived_at            DateTime?                @db.Timestamptz(6)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  achievement_posts      achievement_posts[]
+  group_directions       group_directions[]
+  group_members          group_members[]
+  group_output_links     group_output_links[]
+  interest_circles       interest_circles[]
+  output_files           output_files[]
+  users                  users                    @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
+  research_opportunities research_opportunities[]
+  research_outputs       research_outputs[]
+  research_projects      research_projects[]
+  research_records       research_records[]
+  research_seminars      research_seminars[]
+  research_updates       research_updates[]
+  resource_handovers     resource_handovers[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_interests {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String               @db.Uuid
+  topic_id        String               @db.Uuid
+  source_type     interest_source
+  status          interest_status      @default(SUGGESTED)
+  provenance_tag  data_provenance_type @default(HUMAN)
+  evidence_note   String?
+  declared_at     DateTime             @default(now()) @db.Timestamptz(6)
+  reviewed_at     DateTime?            @db.Timestamptz(6)
+  research_topics research_topics      @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  users           users                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, topic_id], map: "research_interests_user_id_topic_id_idx")
+  @@index([topic_id, user_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_opportunities {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id                 String?                    @db.Uuid
+  project_id               String?                    @db.Uuid
+  creator_id               String                     @db.Uuid
+  title                    String                     @db.VarChar(255)
+  opportunity_kind         opportunity_kind
+  target_audience          target_audience            @default(ANY_RESEARCHER)
+  expected_role            String?                    @db.VarChar(255)
+  required_expertise_tags  String[]
+  description              String?
+  response_sla_days        Int                        @default(5)
+  application_deadline     DateTime?                  @db.Timestamptz(6)
+  status                   opportunity_status         @default(DRAFT)
+  published_at             DateTime?                  @db.Timestamptz(6)
+  archived_at              DateTime?                  @db.Timestamptz(6)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  opportunity_applications opportunity_applications[]
+  users                    users                      @relation(fields: [creator_id], references: [id], onUpdate: NoAction)
+  research_groups          research_groups?           @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_projects        research_projects?         @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_updates         research_updates[]
+
+  @@index([group_id])
+  @@index([project_id])
+  @@index([status, application_deadline])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_outputs {
+  id                                                                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doi                                                                       String?               @unique @db.VarChar(255)
+  owner_id                                                                  String?               @db.Uuid
+  created_by                                                                String?               @db.Uuid
+  sharing_status                                                            output_sharing_status @default(DRAFT)
+  current_release_id                                                        String?               @db.Uuid
+  visibility                                                                visibility_level      @default(PRIVATE)
+  access_group_id                                                           String?               @db.Uuid
+  provenance_tag                                                            data_provenance_type  @default(PAPER)
+  import_state                                                              output_import_state   @default(NONE)
+  last_synced_at                                                            DateTime?             @db.Timestamptz(6)
+  first_shared_at                                                           DateTime?             @db.Timestamptz(6)
+  archived_at                                                               DateTime?             @db.Timestamptz(6)
+  created_at                                                                DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at                                                                DateTime              @default(now()) @db.Timestamptz(6)
+  achievement_posts                                                         achievement_posts[]
+  group_output_links                                                        group_output_links[]
+  output_authors                                                            output_authors[]
+  output_external_ids                                                       output_external_ids[]
+  output_files                                                              output_files[]
+  /// One editable draft is unique; historical released revisions are still a list.
+  output_revisions_output_revisions_output_idToresearch_outputs             output_revisions[]    @relation("output_revisions_output_idToresearch_outputs")
+  publication_claims                                                        publication_claims[]
+  research_groups                                                           research_groups?      @relation(fields: [access_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_research_outputs_created_byTousers                                  users?                @relation("research_outputs_created_byTousers", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  output_revisions_research_outputs_id_current_release_idTooutput_revisions output_revisions?     @relation("research_outputs_id_current_release_idTooutput_revisions", fields: [id, current_release_id], references: [output_id, id], onUpdate: NoAction)
+  users_research_outputs_owner_idTousers                                    users?                @relation("research_outputs_owner_idTousers", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_updates                                                          research_updates[]
+  resource_handovers                                                        resource_handovers[]
+
+  @@index([visibility, sharing_status], map: "idx_output_visibility_lookup", where: raw("(sharing_status = 'SHARED'::output_sharing_status)"))
+  @@index([owner_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_projects {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String?                  @unique @db.VarChar(100)
+  title                  String                   @db.VarChar(500)
+  project_type           project_type
+  group_id               String?                  @db.Uuid
+  direction_id           String?                  @db.Uuid
+  lead_id                String                   @db.Uuid
+  funding_source         String?                  @db.VarChar(255)
+  budget_amount          Decimal?                 @db.Decimal(15, 2)
+  start_date             DateTime?                @db.Date
+  end_date               DateTime?                @db.Date
+  status                 project_status           @default(PROPOSAL_DRAFT)
+  archived_at            DateTime?                @db.Timestamptz(6)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  achievement_posts      achievement_posts[]
+  mentoring_records      mentoring_records[]
+  project_members        project_members[]
+  project_milestones     project_milestones[]
+  research_opportunities research_opportunities[]
+  group_directions       group_directions?        @relation(fields: [direction_id, group_id], references: [id, group_id], onDelete: Restrict, onUpdate: NoAction)
+  research_groups        research_groups?         @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users                  users                    @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
+  research_records       research_records[]
+  research_updates       research_updates[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_records {
+  id                                                                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                                                                 String               @db.VarChar(500)
+  project_id                                                            String?              @db.Uuid
+  milestone_id                                                          String?              @db.Uuid
+  owner_id                                                              String               @db.Uuid
+  group_id                                                              String?              @db.Uuid
+  topic_id                                                              String?              @db.Uuid
+  problem_statement                                                     String?
+  research_questions                                                    String[]
+  claim                                                                 String?
+  evidence                                                              String?
+  methodology                                                           String?
+  finding                                                               String?
+  evidence_of_ai_use                                                    Boolean              @default(false)
+  ai_task_description                                                   String?
+  ai_contribution_summary                                               String?
+  human_decision_points                                                 String?
+  record_status                                                         record_status        @default(DRAFT)
+  visibility                                                            visibility_level     @default(PRIVATE)
+  pub_status                                                            publication_status   @default(UNPUBLISHED)
+  trace_id                                                              String?              @db.VarChar(100)
+  provenance_tag                                                        data_provenance_type @default(HUMAN)
+  created_at                                                            DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime             @default(now()) @db.Timestamptz(6)
+  record_lineage_record_lineage_predecessor_record_idToresearch_records record_lineage[]     @relation("record_lineage_predecessor_record_idToresearch_records")
+  record_lineage_record_lineage_successor_record_idToresearch_records   record_lineage[]     @relation("record_lineage_successor_record_idToresearch_records")
+  research_groups                                                       research_groups?     @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  project_milestones                                                    project_milestones?  @relation(fields: [milestone_id, project_id], references: [id, project_id], onDelete: Restrict, onUpdate: NoAction)
+  users                                                                 users                @relation(fields: [owner_id], references: [id], onUpdate: NoAction)
+  research_projects                                                     research_projects?   @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_topics                                                       research_topics?     @relation(fields: [topic_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([owner_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_seminars {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id          String?            @db.Uuid
+  organizer_id      String             @db.Uuid
+  title             String             @db.VarChar(255)
+  seminar_type      seminar_type
+  scheduled_at      DateTime           @db.Timestamptz(6)
+  published_at      DateTime?          @db.Timestamptz(6)
+  location_or_link  String
+  research_context  String?
+  follow_up_actions String?
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  research_groups   research_groups?   @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users             users              @relation(fields: [organizer_id], references: [id], onUpdate: NoAction)
+  research_updates  research_updates[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_subfields {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id          String            @db.Uuid
+  internal_code     String?           @unique @db.VarChar(50)
+  name              String            @db.VarChar(255)
+  name_vi           String?           @db.VarChar(255)
+  description       String?
+  source            taxonomy_source   @default(OPENALEX)
+  external_id       String?           @db.VarChar(255)
+  source_updated_at DateTime?         @db.Timestamptz(6)
+  last_synced_at    DateTime?         @db.Timestamptz(6)
+  is_active         Boolean           @default(true)
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime          @default(now()) @db.Timestamptz(6)
+  research_fields   research_fields   @relation(fields: [field_id], references: [id], onUpdate: NoAction)
+  research_topics   research_topics[]
+
+  @@unique([source, external_id], map: "research_subfields_source_external_id_idx")
+  @@index([field_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model research_topics {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subfield_id        String               @db.Uuid
+  name               String               @db.VarChar(255)
+  description        String?
+  source             taxonomy_source      @default(LOCAL)
+  external_id        String?              @db.VarChar(255)
+  source_updated_at  DateTime?            @db.Timestamptz(6)
+  created_by         String?              @db.Uuid
+  is_active          Boolean              @default(true)
+  last_synced_at     DateTime?            @db.Timestamptz(6)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  group_directions   group_directions[]
+  interest_circles   interest_circles[]
+  output_topics      output_topics[]
+  research_interests research_interests[]
+  research_records   research_records[]
+  users              users?               @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_subfields research_subfields   @relation(fields: [subfield_id], references: [id], onUpdate: NoAction)
+
+  @@unique([source, external_id], map: "research_topics_source_external_id_idx")
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "idx_topic_search", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model research_updates {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event_key              String                  @unique @db.VarChar(255)
+  event_type             research_update_type
+  actor_id               String                  @db.Uuid
+  output_id              String?                 @db.Uuid
+  revision_id            String?                 @db.Uuid
+  group_id               String?                 @db.Uuid
+  opportunity_id         String?                 @db.Uuid
+  seminar_id             String?                 @db.Uuid
+  project_id             String?                 @db.Uuid
+  occurred_at            DateTime                @default(now()) @db.Timestamptz(6)
+  digest_items           digest_items[]
+  users                  users                   @relation(fields: [actor_id], references: [id], onUpdate: NoAction)
+  research_groups        research_groups?        @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_opportunities research_opportunities? @relation(fields: [opportunity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_outputs       research_outputs?       @relation(fields: [output_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  output_revisions       output_revisions?       @relation(fields: [output_id, revision_id], references: [output_id, id], onDelete: Restrict, onUpdate: NoAction)
+  research_projects      research_projects?      @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_seminars      research_seminars?      @relation(fields: [seminar_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([occurred_at])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model researcher_profiles {
+  user_id                 String                   @id @db.Uuid
+  orcid_id                String?                  @unique @db.VarChar(19)
+  scopus_author_id        String?                  @db.VarChar(50)
+  google_scholar_url      String?
+  availability_status     availability_status_type @default(NOT_AVAILABLE)
+  bio                     String?
+  avatar_storage_key      String?
+  profile_confirmed_at    DateTime?                @db.Timestamptz(6)
+  papers_reviewed_at      DateTime?                @db.Timestamptz(6)
+  onboarding_completed_at DateTime?                @db.Timestamptz(6)
+  last_synced_at          DateTime?                @db.Timestamptz(6)
+  llkh_last_exported_at   DateTime?                @db.Timestamptz(6)
+  updated_at              DateTime                 @default(now()) @db.Timestamptz(6)
+  users                   users                    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model resource_handovers {
+  id                                               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id                                        String?           @db.Uuid
+  group_id                                         String?           @db.Uuid
+  previous_user_id                                 String            @db.Uuid
+  new_user_id                                      String            @db.Uuid
+  performed_by                                     String            @db.Uuid
+  basis                                            handover_basis
+  authorization_reference                          String
+  reason                                           String
+  performed_at                                     DateTime          @default(now()) @db.Timestamptz(6)
+  research_groups                                  research_groups?  @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_resource_handovers_new_user_idTousers      users             @relation("resource_handovers_new_user_idTousers", fields: [new_user_id], references: [id], onUpdate: NoAction)
+  research_outputs                                 research_outputs? @relation(fields: [output_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_resource_handovers_performed_byTousers     users             @relation("resource_handovers_performed_byTousers", fields: [performed_by], references: [id], onUpdate: NoAction)
+  users_resource_handovers_previous_user_idTousers users             @relation("resource_handovers_previous_user_idTousers", fields: [previous_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([group_id, performed_at], map: "idx_handover_group_history", where: raw("(group_id IS NOT NULL)"))
+  @@index([output_id, performed_at], map: "idx_handover_output_history", where: raw("(output_id IS NOT NULL)"))
+  @@index([performed_by, performed_at])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model search_index {
+  entity_type      search_entity_type
+  entity_id        String                  @db.Uuid
+  revision_id      String?                 @db.Uuid
+  owner_id         String?                 @db.Uuid
+  visibility       visibility_level
+  access_group_id  String?                 @db.Uuid
+  title            String
+  body             String?
+  authors_text     String?
+  doc              Unsupported("tsvector")
+  updated_at       DateTime                @default(now()) @db.Timestamptz(6)
+  users            users?                  @relation(fields: [owner_id], references: [id], onUpdate: NoAction)
+  output_revisions output_revisions?       @relation(fields: [revision_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([entity_type, entity_id])
+  @@index([doc], map: "idx_search_index_doc", type: Gin)
+  @@index([visibility, access_group_id], map: "idx_search_index_scope")
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "idx_search_index_title_trgm", type: Gin)
+  @@index([entity_type], map: "idx_search_index_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_follows {
+  follower_id String       @db.Uuid
+  entity_type entity_types
+  entity_id   String       @db.Uuid
+  followed_at DateTime     @default(now()) @db.Timestamptz(6)
+  users       users        @relation(fields: [follower_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([follower_id, entity_type, entity_id])
+  @@index([entity_type, entity_id, follower_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_role_assignments {
+  id                                            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                       String            @db.Uuid
+  role                                          access_role
+  grant_source                                  role_grant_source @default(MANUAL)
+  granted_by                                    String?           @db.Uuid
+  granted_at                                    DateTime          @default(now()) @db.Timestamptz(6)
+  revoked_by                                    String?           @db.Uuid
+  revoked_at                                    DateTime?         @db.Timestamptz(6)
+  reason                                        String?
+  users_user_role_assignments_granted_byTousers users?            @relation("user_role_assignments_granted_byTousers", fields: [granted_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_user_role_assignments_revoked_byTousers users?            @relation("user_role_assignments_revoked_byTousers", fields: [revoked_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_user_role_assignments_user_idTousers    users             @relation("user_role_assignments_user_idTousers", fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@unique([user_id, role], map: "uq_unrevoked_user_role", where: raw("(revoked_at IS NULL)"))
+  @@index([user_id, role])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_sessions {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String                @db.Uuid
+  auth_method        authentication_method
+  identity_id        String?               @db.Uuid
+  session_token_hash String                @unique @db.Char(64)
+  idp_sid            String?
+  authenticated_at   DateTime              @db.Timestamptz(6)
+  created_at         DateTime              @default(now()) @db.Timestamptz(6)
+  last_seen_at       DateTime              @default(now()) @db.Timestamptz(6)
+  expires_at         DateTime              @db.Timestamptz(6)
+  idle_expires_at    DateTime              @db.Timestamptz(6)
+  revoked_at         DateTime?             @db.Timestamptz(6)
+  revocation_reason  String?
+  oidc_identities    oidc_identities?      @relation(fields: [identity_id, user_id], references: [id, user_id], onUpdate: NoAction)
+  users              users                 @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_unrevoked_sessions_user", where: raw("(revoked_at IS NULL)"))
+  @@index([identity_id, idp_sid])
+  @@index([user_id, expires_at])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model users {
+  id                                                                    String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fptu_guid                                                             String?                    @unique @db.VarChar(100)
+  user_type                                                             user_type
+  email                                                                 String                     @db.VarChar(255)
+  full_name                                                             String                     @db.VarChar(255)
+  academic_title                                                        String?                    @db.VarChar(100)
+  academic_degree                                                       String?                    @db.VarChar(100)
+  department_unit                                                       String                     @db.VarChar(255)
+  is_active                                                             Boolean                    @default(true)
+  last_login_at                                                         DateTime?                  @db.Timestamptz(6)
+  created_at                                                            DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime                   @default(now()) @db.Timestamptz(6)
+  achievement_posts                                                     achievement_posts[]
+  digest_deliveries                                                     digest_deliveries[]
+  digest_preferences                                                    digest_preferences?
+  group_members                                                         group_members[]
+  group_output_links_group_output_links_accepted_byTousers              group_output_links[]       @relation("group_output_links_accepted_byTousers")
+  group_output_links_group_output_links_decided_byTousers               group_output_links[]       @relation("group_output_links_decided_byTousers")
+  group_output_links_group_output_links_removed_byTousers               group_output_links[]       @relation("group_output_links_removed_byTousers")
+  group_output_links_group_output_links_requested_byTousers             group_output_links[]       @relation("group_output_links_requested_byTousers")
+  interest_circle_members                                               interest_circle_members[]
+  interest_circles                                                      interest_circles[]
+  knowledge_graph_edges                                                 knowledge_graph_edges[]
+  local_credentials                                                     local_credentials?
+  mentoring_records_mentoring_records_mentor_idTousers                  mentoring_records[]        @relation("mentoring_records_mentor_idTousers")
+  mentoring_records_mentoring_records_student_user_idTousers            mentoring_records[]        @relation("mentoring_records_student_user_idTousers")
+  oidc_identities                                                       oidc_identities[]
+  opportunity_applications_opportunity_applications_applicant_idTousers opportunity_applications[] @relation("opportunity_applications_applicant_idTousers")
+  opportunity_applications_opportunity_applications_responded_byTousers opportunity_applications[] @relation("opportunity_applications_responded_byTousers")
+  output_authors                                                        output_authors[]
+  output_files                                                          output_files[]
+  output_revisions_output_revisions_created_byTousers                   output_revisions[]         @relation("output_revisions_created_byTousers")
+  output_revisions_output_revisions_released_byTousers                  output_revisions[]         @relation("output_revisions_released_byTousers")
+  output_topics                                                         output_topics[]
+  project_members                                                       project_members[]
+  publication_claims                                                    publication_claims[]
+  research_groups                                                       research_groups[]
+  research_interests                                                    research_interests[]
+  research_opportunities                                                research_opportunities[]
+  research_outputs_research_outputs_created_byTousers                   research_outputs[]         @relation("research_outputs_created_byTousers")
+  research_outputs_research_outputs_owner_idTousers                     research_outputs[]         @relation("research_outputs_owner_idTousers")
+  research_projects                                                     research_projects[]
+  research_records                                                      research_records[]
+  research_seminars                                                     research_seminars[]
+  research_topics                                                       research_topics[]
+  research_updates                                                      research_updates[]
+  researcher_profiles                                                   researcher_profiles?
+  resource_handovers_resource_handovers_new_user_idTousers              resource_handovers[]       @relation("resource_handovers_new_user_idTousers")
+  resource_handovers_resource_handovers_performed_byTousers             resource_handovers[]       @relation("resource_handovers_performed_byTousers")
+  resource_handovers_resource_handovers_previous_user_idTousers         resource_handovers[]       @relation("resource_handovers_previous_user_idTousers")
+  search_index                                                          search_index[]
+  user_follows                                                          user_follows[]
+  user_role_assignments_user_role_assignments_granted_byTousers         user_role_assignments[]    @relation("user_role_assignments_granted_byTousers")
+  user_role_assignments_user_role_assignments_revoked_byTousers         user_role_assignments[]    @relation("user_role_assignments_revoked_byTousers")
+  user_role_assignments_user_role_assignments_user_idTousers            user_role_assignments[]    @relation("user_role_assignments_user_idTousers")
+  user_sessions                                                         user_sessions[]
+}
 
 /// Where a piece of data came from. Self-declared data is not trusted by
 /// default; imported and AI-inferred rows are always reviewable.
@@ -63,19 +1022,249 @@ enum PublicationStatus {
   ARCHIVED
 }
 
-/// Generic audit trail. Every domain table that records a meaningful change
-/// references an entry here so that provenance is queryable.
-model AuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?  @map("actor_id")
-  action    String   @db.VarChar(64)
-  entity    String   @db.VarChar(64)
-  entityId  String   @map("entity_id")
-  payload   Json?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+enum access_role {
+  RESEARCHER
+  ADMIN
+}
 
-  @@index([entity, entityId])
-  @@index([actorId])
-  @@index([createdAt])
-  @@map("audit_logs")
+enum authentication_method {
+  LOCAL
+  OIDC
+}
+
+enum availability_status_type {
+  OPEN_FOR_COLLABORATION
+  SEEKING_GROUP
+  MENTORING_ONLY
+  LIMITED_AVAILABILITY
+  NOT_AVAILABLE
+}
+
+enum claim_status {
+  SUGGESTED
+  CONFIRMED
+  REJECTED
+}
+
+enum data_provenance_type {
+  PAPER
+  AI_TRACE
+  AI_INF
+  HUMAN
+  EXT
+  UNK
+}
+
+enum delivery_status {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum digest_subject_type {
+  OUTPUT
+  OPPORTUNITY
+  SEMINAR
+  PROJECT
+}
+
+enum edge_type {
+  CITES
+  RELATED_TO
+  ADDRESSES
+  ANSWERS
+  USES_METHOD
+  USES_DATASET
+  INHERITS_METHOD
+  INHERITS_DATA
+  EXTENDS
+}
+
+enum edge_validation_status {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum entity_types {
+  RESEARCHER
+  GROUP
+  PROJECT
+  TOPIC
+  OUTPUT
+}
+
+enum expected_role_type {
+  CO_PI
+  METHODOLOGY_LEAD
+  DOMAIN_EXPERT
+  DATA_ENGINEER
+  STUDENT_RESEARCHER
+  CO_AUTHOR
+  ADVISOR_CONSULTANT
+}
+
+enum group_member_role {
+  CORE_MEMBER
+  COLLABORATOR
+  STUDENT_MEMBER
+}
+
+enum group_output_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REMOVED
+}
+
+enum handover_basis {
+  HOLDER_CONSENT
+  INSTITUTIONAL_AUTHORIZATION
+}
+
+enum interest_source {
+  DECLARED
+  INFERRED
+}
+
+enum interest_status {
+  SUGGESTED
+  ACTIVE
+  REJECTED
+}
+
+enum milestone_status {
+  ON_TRACK
+  DELAYED
+  BLOCKED
+  COMPLETED
+}
+
+enum opportunity_application_status {
+  PENDING
+  INVITED_TO_DISCUSS
+  DECLINED
+  WITHDRAWN
+}
+
+enum opportunity_kind {
+  RESEARCH_COLLABORATION
+  PROJECT_FORMATION
+  DATA_METHOD_EXCHANGE
+  FUNDING_CALL
+}
+
+enum opportunity_status {
+  DRAFT
+  OPEN
+  FILLED
+  CLOSED
+  EXPIRED
+}
+
+enum output_import_state {
+  NONE
+  CANDIDATE
+  ACCEPTED
+  REJECTED
+  DISMISSED
+}
+
+enum output_sharing_status {
+  DRAFT
+  SHARED
+  ARCHIVED
+}
+
+enum post_type {
+  GENERAL_NEWS
+  PUBLICATION
+  AWARD
+  PROJECT_UPDATE
+}
+
+enum project_status {
+  PROPOSAL_DRAFT
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  PUBLISHED_DELIVERED
+  CANCELLED
+}
+
+enum project_type {
+  UNIVERSITY_GRANT
+  MINISTRY_GRANT
+  STATE_GRANT
+  INDUSTRY_LAB
+  INTERNATIONAL_JOINT
+  COLLABORATIVE_RESEARCH
+}
+
+enum publication_status {
+  UNPUBLISHED
+  PUBLISHED
+}
+
+enum record_status {
+  DRAFT
+  RESEARCHER_CONFIRMED
+  VALIDATED
+  ARCHIVED
+}
+
+enum research_update_type {
+  OUTPUT_SHARED
+  OUTPUT_REVISION_RELEASED
+  OUTPUT_LINKED_TO_GROUP
+  OPPORTUNITY_OPENED
+  SEMINAR_PUBLISHED
+  PROJECT_UPDATED
+}
+
+enum role_grant_source {
+  MANUAL
+  SYSTEM
+}
+
+enum search_entity_type {
+  OUTPUT
+  RESEARCHER
+  GROUP
+  OPPORTUNITY
+}
+
+enum seminar_type {
+  RESEARCH_SEMINAR
+  PAPER_SHARING
+  METHOD_SHARING
+  WORKSHOP
+  PROGRESS_SEMINAR
+  GROUP_MEETING
+}
+
+enum target_audience {
+  FACULTY
+  STUDENT
+  ANY_RESEARCHER
+}
+
+enum taxonomy_source {
+  LOCAL
+  OPENALEX
+}
+
+enum user_type {
+  FACULTY
+  STUDENT
+  STAFF
+}
+
+enum visibility_level {
+  PRIVATE
+  RESEARCH_GROUP
+  FPTU_COMMUNITY
 }
