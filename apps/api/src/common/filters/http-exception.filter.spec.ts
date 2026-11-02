@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CodedHttpException } from '../errors/error-codes.js';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
 /**
@@ -45,10 +46,33 @@ describe('HttpExceptionFilter', () => {
 
     expect(body.success).toBe(false);
     expect(body.data).toBeNull();
-    expect(body.message).toBe('Opportunity not found');
     expect(body.statusCode).toBe(404);
     expect(body.path).toBe('/opportunities/abc');
     expect(body.timestamp).toEqual(expect.any(String));
+  });
+
+  it('sends the generic code for the status, not the exception message', () => {
+    const exception = new NotFoundException('Opportunity not found');
+    const { host, json } = hostFor(exception);
+
+    filter.catch(exception, host);
+
+    // The message is a code, not prose. The wording lives in the frontend's
+    // message catalog, so the server never sends English to a user.
+    expect(json.mock.calls[0][0].message).toBe('not_found');
+  });
+
+  it('sends the domain code when the exception carries one', () => {
+    const exception = new CodedHttpException(
+      'opportunity_not_found',
+      HttpStatus.NOT_FOUND,
+    );
+    const { host, json } = hostFor(exception);
+
+    filter.catch(exception, host);
+
+    expect(json.mock.calls[0][0].message).toBe('opportunity_not_found');
+    expect(json.mock.calls[0][0].statusCode).toBe(404);
   });
 
   it('returns 500 for a non-http exception', () => {
@@ -58,7 +82,7 @@ describe('HttpExceptionFilter', () => {
     filter.catch(exception, host);
 
     expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
-    expect(json.mock.calls[0][0].message).toBe('boom');
+    expect(json.mock.calls[0][0].message).toBe('server_error');
   });
 
   it('does not include the stack in the response', () => {
@@ -71,9 +95,11 @@ describe('HttpExceptionFilter', () => {
   });
 
   it('groups validation messages by field', () => {
+    // The global ValidationPipe runs in the `grouped` error format, so the
+    // exception's `message` is a record keyed by the property path.
     const exception = new BadRequestException({
       statusCode: 400,
-      message: ['title must be a string', 'title should not be empty'],
+      message: { title: ['title_required', 'title_invalid'] },
       error: 'Bad Request',
     });
 
@@ -83,11 +109,28 @@ describe('HttpExceptionFilter', () => {
 
     const body = json.mock.calls[0][0];
 
+    expect(body.message).toBe('validation_failed');
     expect(body.errors).toEqual([
       {
         field: 'title',
-        messages: ['must be a string', 'should not be empty'],
+        messages: ['title_required', 'title_invalid'],
       },
+    ]);
+  });
+
+  it('keeps a nested field path intact', () => {
+    const exception = new BadRequestException({
+      statusCode: 400,
+      message: { 'items.0.name': ['name_required'] },
+      error: 'Bad Request',
+    });
+
+    const { host, json } = hostFor(exception);
+
+    filter.catch(exception, host);
+
+    expect(json.mock.calls[0][0].errors).toEqual([
+      { field: 'items.0.name', messages: ['name_required'] },
     ]);
   });
 
@@ -110,6 +153,9 @@ describe('HttpExceptionFilter', () => {
 
     filter.catch(exception, host);
 
-    expect(json.mock.calls[0][0].message).toBe('first problem; second problem');
+    // A flat array is not the grouped shape, so there are no field errors —
+    // but the message is still a code.
+    expect(json.mock.calls[0][0].message).toBe('validation_failed');
+    expect(json.mock.calls[0][0].errors).toBeUndefined();
   });
 });

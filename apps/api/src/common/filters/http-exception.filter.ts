@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { CodedHttpException, codeForStatus } from '../errors/error-codes.js';
 
 /**
  * The error body returned for every failed request.
@@ -18,6 +19,14 @@ import type { Request, Response } from 'express';
 export interface ErrorResponseBody {
   success: false;
   data: null;
+  /**
+   * The error code, e.g. `opportunity_not_found`.
+   *
+   * A code, not a sentence: the wording lives in the frontend's message
+   * catalog, so the server never sends English to a user. The frontend
+   * reads it through `apiErrorCode()` and resolves it with
+   * `resolveErrorCode()`.
+   */
   message: string;
   statusCode: number;
   path: string;
@@ -53,7 +62,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const body: ErrorResponseBody = {
       success: false,
       data: null,
-      message: this.resolveMessage(exception),
+      message: this.resolveCode(exception, status),
       statusCode: status,
       path: request.url,
       timestamp: new Date().toISOString(),
@@ -74,39 +83,32 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json(body);
   }
 
-  private resolveMessage(exception: unknown): string {
-    if (exception instanceof HttpException) {
-      const payload = exception.getResponse();
-
-      if (typeof payload === 'string') {
-        return payload;
-      }
-
-      const message = (payload as { message?: unknown }).message;
-
-      if (typeof message === 'string') {
-        return message;
-      }
-
-      if (Array.isArray(message)) {
-        return message.join('; ');
-      }
+  /**
+   * Resolves the code that describes this failure.
+   *
+   * A `CodedHttpException` carries its own code — that is the domain code
+   * a module raises when it knows more than the status does. Everything
+   * else falls back to the generic code for the status, so `message` is
+   * always a code the frontend catalog can resolve.
+   */
+  private resolveCode(exception: unknown, status: number): string {
+    if (exception instanceof CodedHttpException) {
+      return exception.code;
     }
 
-    if (exception instanceof Error) {
-      return exception.message;
-    }
-
-    return 'Internal server error';
+    return codeForStatus(status);
   }
 
   /**
    * Extracts field-level validation errors from a `BadRequestException`.
    *
-   * NestJS's validation pipe rejects with a response shaped like
-   * `{ statusCode, message: string[], error }`. Splitting the messages back
-   * out by field gives the frontend something it can render next to the
-   * offending input.
+   * The global `ValidationPipe` runs in the `grouped` error format, so the
+   * exception's `message` is a `Record<string, string[]>` keyed by the
+   * property path — `title`, `items.0.name`, ... — with each message being
+   * the code the validator decorator carried.
+   *
+   * Nest groups the messages by field, so the frontend can render each one
+   * next to the input that caused it.
    */
   private resolveFieldErrors(
     exception: unknown,
@@ -123,35 +125,32 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const message = (payload as { message?: unknown }).message;
 
-    if (!Array.isArray(message)) {
+    if (!message || typeof message !== 'object' || Array.isArray(message)) {
       return undefined;
     }
 
-    const grouped = new Map<string, string[]>();
+    const grouped: Array<{ field: string; messages: string[] }> = [];
 
-    for (const entry of message) {
-      if (typeof entry !== 'string') {
+    for (const [field, messages] of Object.entries(message)) {
+      if (!Array.isArray(messages)) {
         continue;
       }
 
-      // NestJS formats validation messages as "field must be a string".
-      // The field name is the first word sequence before the constraint.
-      const match = /^(\S+)\s+(.*)$/.exec(entry);
-      const field = match?.[1] ?? 'body';
-      const detail = match?.[2] ?? entry;
+      const codes = messages.filter(
+        (entry): entry is string => typeof entry === 'string',
+      );
 
-      const bucket = grouped.get(field) ?? [];
-      bucket.push(detail);
-      grouped.set(field, bucket);
+      if (codes.length === 0) {
+        continue;
+      }
+
+      grouped.push({ field, messages: codes });
     }
 
-    if (grouped.size === 0) {
+    if (grouped.length === 0) {
       return undefined;
     }
 
-    return [...grouped.entries()].map(([field, messages]) => ({
-      field,
-      messages,
-    }));
+    return grouped;
   }
 }

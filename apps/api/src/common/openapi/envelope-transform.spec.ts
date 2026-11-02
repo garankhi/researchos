@@ -310,7 +310,7 @@ describe('applyEnvelopeTransform', () => {
     const body = await captureErrorBody(
       new BadRequestException({
         statusCode: 400,
-        message: ['title must be a string', 'title should not be empty'],
+        message: { title: ['title_required', 'title_invalid'] },
         error: 'Bad Request',
       }),
     );
@@ -318,7 +318,7 @@ describe('applyEnvelopeTransform', () => {
     // The filter groups the validation messages by field, and the schema
     // has to describe that grouped shape.
     expect(body.errors).toEqual([
-      { field: 'title', messages: ['must be a string', 'should not be empty'] },
+      { field: 'title', messages: ['title_required', 'title_invalid'] },
     ]);
 
     expect(errorSchema.properties.errors.type).toBe('array');

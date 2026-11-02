@@ -19,12 +19,19 @@ async function bootstrap() {
   // `forbidNonWhitelisted` turns that into an explicit error instead of
   // silently dropping data. `transform` lets DTOs coerce query and body
   // values into their declared types.
+  //
+  // `errorFormat: 'grouped'` makes the pipe report validation failures as
+  // `{ field: [messages] }` instead of a flat array of sentences. The field
+  // path is the property's own path (`items.0.name`), and each message is
+  // the code the validator decorator carried — both survive untouched, which
+  // is what the exception filter needs to build the `errors` array.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      errorFormat: 'grouped',
     }),
   );
 

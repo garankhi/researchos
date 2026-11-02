@@ -181,7 +181,8 @@
             ]
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "The error code, e.g. `opportunity_not_found`."
           },
           "statusCode": {
             "type": "number"
