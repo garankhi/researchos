@@ -127,6 +127,34 @@ pnpm --filter @researchos/database exec prisma migrate diff --from-config-dataso
 Sau bản sửa hiện tại, kết quả là `-- This is an empty migration.`. Lệnh
 diff không áp dụng SQL hoặc tạo migration mới.
 
+## Kiểm tra tự động: `pnpm db:drift`
+
+Lệnh trên so sánh schema.prisma với database đang chạy, nên nó chỉ phát
+hiện được lệch khi database đã được dựng từ SQL mới nhất. `pnpm db:drift`
+làm đúng việc đó một cách tự động và lặp lại được:
+
+1. Tạo database tạm `researchos_drift` trên cùng server với database dev.
+2. Áp dụng migration init (chứa `audit_logs` và bốn enum nền) rồi áp dụng
+   `docs/database/ResearchOS.sql`.
+3. So sánh database tạm với `schema.prisma` bằng `prisma migrate diff`.
+4. Xoá database tạm.
+
+Kết quả `-- This is an empty migration.` nghĩa là không có lệch. Nếu có,
+lệnh in ra phần diff và thoát với mã lỗi. Lệnh chỉ đọc với database dev:
+không ghi, không migrate, không xoá dữ liệu.
+
+Chạy ở máy dev:
+
+```powershell
+pnpm db:drift
+```
+
+CI chạy lệnh này trong job `db-drift` với một PostgreSQL service, nên một
+thay đổi sửa SQL mà quên introspect lại sẽ bị chặn trước khi merge.
+
+Khi cần đồng bộ lại, dùng `prisma db pull --print` như bước 4 ở trên; lệnh
+drift chỉ báo lệch, không tự sửa `schema.prisma`.
+
 ## Quy trình tổng quát cho lần đồng bộ tiếp theo
 
 1. **Chốt bản SQL nghiệp vụ.** Kiểm tra file sinh ra từ DBML cùng

@@ -110,6 +110,7 @@ Chạy từ root:
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ khi dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:status` | Trạng thái migration |
+| `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp với SQL nguồn |
 | `pnpm db:studio` | Prisma Studio để xem và sửa dữ liệu |
 
 `pnpm db:migrate` tương đương `prisma migrate dev`: nó tạo file migration mới
@@ -117,6 +118,12 @@ khi schema đổi và áp dụng các migration chưa chạy. **Chỉ dùng ở 
 
 `pnpm db:migrate:deploy` tương đương `prisma migrate deploy`: chỉ áp dụng
 migration đã tồn tại, không sinh file mới. Dùng ở CI và production.
+
+`pnpm db:drift` dựng một database tạm từ `docs/database/ResearchOS.sql`,
+so sánh với `schema.prisma` đã commit, rồi xoá database tạm. Lệnh chỉ đọc,
+không đụng vào database dev. Nếu SQL nguồn đã đổi mà `schema.prisma` chưa
+được introspect lại, lệnh báo lỗi và in ra phần diff cần sửa. Chi tiết quy
+trình đồng bộ: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
 
 ## 5. Quy tắc schema
 

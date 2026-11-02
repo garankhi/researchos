@@ -68,6 +68,10 @@
       "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
+    "db:drift": {
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
     "db:studio": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["DATABASE_URL"],

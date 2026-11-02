@@ -29,6 +29,7 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
+    "db:drift": "node scripts/drift-check.mjs",
     "format": "prisma format",
     "build": "tsc -p tsconfig.build.json",
     "prebuild": "pnpm run db:generate",
