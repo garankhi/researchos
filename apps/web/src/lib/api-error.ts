@@ -19,10 +19,14 @@ export type ApiErrorBody = ApiErrorResponseDto;
  * Both `message` and `errors[].messages` carry codes, not sentences, so
  * the frontend can resolve them against the message catalog. See the
  * `researchos-localization` skill.
- */export type ErrorCode = string;
+ */
+export type ErrorCode = string;
 
 /**
- * Extracts the error code from a failed API request.
+ * Reads the top-level error code out of a failed request.
+ *
+ * `message` carries the code for the whole failure
+ * (`opportunity_not_found`, `validation_failed`, ...).
  *
  * The backend returns the error envelope, and axios rejects with the whole
  * response body intact — the mutator only unwraps successful responses. So
@@ -35,39 +39,7 @@ export type ApiErrorBody = ApiErrorResponseDto;
  *
  * This value is a *code*, not display text. Resolve it with
  * `resolveErrorCode()` from `@/utils/error-messages` before showing it to
- * a user — this raw value is a fallback source, not a message.
- *
- * Prefer `apiErrorCode()` when the caller only needs the code; this
- * helper exists for the call sites that want the server's value either
- * way, and as the fallback when the response carries no code at all.
- */
-export function apiErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const body = error.response?.data as ApiErrorBody | undefined;
-
-    if (body?.message) {
-      return body.message;
-    }
-
-    if (error.message) {
-      return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  // Not a literal: the caller resolves this through the catalog, and a
-  // hardcoded string here would be one language forever.
-  return 'unknown_error';
-}
-
-/**
- * Reads the top-level error code out of a failed request.
- *
- * `message` carries the code for the whole failure
- * (`opportunity_not_found`, `validation_failed`, ...).
+ * a user — a raw code must never reach the screen.
  */
 export function apiErrorCode(error: unknown): ErrorCode | undefined {
   if (!axios.isAxiosError(error)) {

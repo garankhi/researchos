@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { CodedHttpException, codeForStatus } from '../errors/error-codes.js';
+import { codeForStatus } from '../errors/error-codes.js';
 
 /**
  * The error body returned for every failed request.
@@ -86,17 +86,64 @@ export class HttpExceptionFilter implements ExceptionFilter {
   /**
    * Resolves the code that describes this failure.
    *
-   * A `CodedHttpException` carries its own code — that is the domain code
-   * a module raises when it knows more than the status does. Everything
-   * else falls back to the generic code for the status, so `message` is
-   * always a code the frontend catalog can resolve.
+   * An exception that carries a code — a `CodedHttpException`, or any
+   * `HttpException` whose message is a code — names the failure itself.
+   * That is the domain code a module raises when it knows more than the
+   * status does.
+   *
+   * Everything else falls back to the generic code for the status, so
+   * `message` is always a code the frontend catalog can resolve.
+   *
+   * The code is read from the exception's `message`, which is where Nest
+   * puts the response body's `message`. Reading it from there rather than
+   * from a separate property means the two can never disagree.
    */
   private resolveCode(exception: unknown, status: number): string {
-    if (exception instanceof CodedHttpException) {
-      return exception.code;
+    const message = this.exceptionMessage(exception);
+
+    if (message && this.looksLikeCode(message)) {
+      return message;
     }
 
     return codeForStatus(status);
+  }
+
+  /**
+   * The exception's own message, if it has one.
+   */
+  private exceptionMessage(exception: unknown): string | undefined {
+    if (!(exception instanceof HttpException)) {
+      return undefined;
+    }
+
+    const payload = exception.getResponse();
+
+    if (typeof payload === 'string') {
+      return payload;
+    }
+
+    const message = (payload as { message?: unknown }).message;
+
+    if (typeof message === 'string') {
+      return message;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * True when a message looks like an error code rather than prose.
+   *
+   * A code is `snake_case`: lower-case letters, digits and underscores.
+   * Nest's built-in exceptions carry sentences (`"Opportunity not found"`),
+   * and a sentence must not become the code — the frontend would try to
+   * resolve it as a catalog key and fail.
+   *
+   * The check is deliberately narrow. A message that is not a code falls
+   * back to the generic code for the status.
+   */
+  private looksLikeCode(message: string): boolean {
+    return /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/.test(message);
   }
 
   /**

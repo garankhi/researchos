@@ -64,14 +64,17 @@
       "rate_limited": "Too many requests. Please slow down and try again shortly.",
       "not_implemented": "This action is not available yet.",
       "service_unavailable": "The service is temporarily unavailable. Please try again shortly.",
-      "title_required": "Title is required.",
-      "title_invalid": "Title must be a string.",
-      "title_too_long": "Title must not exceed 200 characters.",
-      "email_required": "Email is required.",
-      "email_invalid": "Email is invalid.",
-      "status_invalid": "The status is invalid.",
-      "email_already_registered": "This email is already registered.",
-      "status_required": "Status is required."
+      "fields": {
+        "title_required": "Title is required.",
+        "title_invalid": "Title must be a string.",
+        "title_too_long": "Title must not exceed 200 characters.",
+        "email_required": "Email is required.",
+        "email_invalid": "Email is invalid.",
+        "status_invalid": "The status is invalid.",
+        "email_already_registered": "This email is already registered.",
+        "status_required": "Status is required."
+      },
+      "domain": {}
     }
   },
   "notFound": {
