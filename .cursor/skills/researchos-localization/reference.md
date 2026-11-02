@@ -31,6 +31,14 @@ apps/web/src/messages/
 
 ### `errors.codes` — the backend error codes
 
+The namespace has three tiers, and each tier has one owner:
+
+| Tier | Path | Owner |
+| --- | --- | --- |
+| Generic | `errors.codes.*` | The backend — the HTTP status set, fixed |
+| Field | `errors.codes.fields.*` | The forms — one per field constraint |
+| Domain | `errors.codes.domain.*` | Each module — one per domain code |
+
 ```json
 {
   "errors": {
@@ -42,16 +50,26 @@ apps/web/src/messages/
       "not_found": "Không tìm thấy tài nguyên.",
       "forbidden": "Bạn không có quyền truy cập tài nguyên này.",
       "unauthorized": "Bạn cần đăng nhập để tiếp tục.",
-      "opportunity_not_found": "Không tìm thấy cơ hội nghiên cứu."
+      "fields": {
+        "title_required": "Tiêu đề là bắt buộc.",
+        "email_invalid": "Email không hợp lệ."
+      },
+      "domain": {
+        "opportunity_not_found": "Không tìm thấy cơ hội nghiên cứu."
+      }
     }
   }
 }
 ```
 
+`resolveErrorCode()` looks a code up in every tier, so a caller that does
+not know where a code came from still resolves it.
+
 ### Generic codes
 
 Every backend failure has a status-derived fallback, so the frontend always
-has a key to resolve.
+has a key to resolve. The set is **fixed** — it lives in
+`apps/api/src/common/errors/error-codes.ts`.
 
 | HTTP status | Code |
 | --- | --- |
@@ -66,9 +84,31 @@ has a key to resolve.
 | 501 | `not_implemented` |
 | 503 | `service_unavailable` |
 
+A spec (`apps/api/src/common/errors/error-codes.spec.ts`) checks that every
+generic code has an entry in **both** locales, so a missing one fails the
+test run instead of degrading silently.
+
+### Field codes
+
+One per field constraint, qualified by the field it belongs to. Shared
+between the backend's validation decorators and the frontend's zod schemas,
+so `title_required` means the same thing wherever it came from.
+
+| Code | Raised when |
+| --- | --- |
+| `title_required` | The title is empty |
+| `title_invalid` | The title is not a string |
+| `title_too_long` | The title is over 200 characters |
+| `email_required` | The email is empty |
+| `email_invalid` | The email is not an address |
+| `status_invalid` | The status is not one of the allowed values |
+| `status_required` | The status is empty |
+| `email_already_registered` | The email is taken |
+
 ### Domain codes
 
-Specific to what failed. Naming: `<noun>_<reason>`.
+Specific to what failed. Naming: `<noun>_<reason>`. Each module defines
+its own, and adds the catalog entries in both locales in the same change.
 
 | Code | Raised when |
 | --- | --- |
@@ -81,12 +121,14 @@ Specific to what failed. Naming: `<noun>_<reason>`.
 
 ## Backend error codes
 
-> **Status: the backend has not switched yet.** The backend currently sends
-> plain English text in `message` and validator prose in
-> `errors[].messages`. The shape below is the **target** — the backend must
-> move to it. The frontend is already wired against it
-> (`apiErrorCode()` and `resolveErrorCode()` exist), so today every code
-> resolves to a localized fallback rather than to the server's English.
+> **Status: the backend sends codes.** The exception filter puts a code in
+> `message`, and the global `ValidationPipe` runs in the `grouped` error
+> format, so `errors[].messages` carries one code per constraint. A code
+> with no catalog entry resolves to a localized fallback rather than to a
+> raw identifier.
+>
+> The **domain** codes below are not implemented yet: each module defines
+> the codes it can emit and adds the catalog entries in the same change.
 
 The backend sends the code in the error envelope's `message` field.
 
@@ -145,9 +187,19 @@ for "title is required" lives in the catalog, not in the DTO.
 ### Adding a code
 
 1. Backend — throw with the code, or put it in the validator's `message`.
-2. `src/messages/vi.json` — add it under `errors.codes`.
-3. `src/messages/en.json` — add it under `errors.codes`.
+2. `src/messages/vi.json` — add it under the tier it belongs to:
+   `errors.codes.domain` for a domain code, `errors.codes.fields` for a
+   validation constraint.
+3. `src/messages/en.json` — the same key.
 4. Frontend — nothing. The lookup is by key.
+
+A **generic** code needs no catalog edit: the backend owns that set, and
+`error-codes.spec.ts` checks both locales have every entry.
+
+A **domain** code is not checked by that spec — it is defined per module,
+so the module's own spec is where it belongs. Until the entry exists,
+`resolveErrorCode()` falls back to a localized message and logs the gap in
+development.
 
 ## Translation templates
 
@@ -235,7 +287,7 @@ t.rich('terms.body', {
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { apiErrorCode, apiErrorMessage } from '@/lib/api-error';
+import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 
 export function useApiError() {
@@ -253,8 +305,9 @@ export function useApiError() {
 ```
 
 A code with no catalog entry falls back to `t('unknown')` — a localized
-string — rather than to the server's raw value. The backend does not send
-codes yet, so today the fallback is always what the user sees.
+string — rather than to the server's raw value. In development the gap is
+logged, so a missing entry is visible instead of silently degrading to a
+wrong-but-plausible message.
 
 ### Dates and numbers
 

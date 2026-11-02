@@ -16,58 +16,30 @@ export type ApiErrorBody = ApiErrorResponseDto;
 /**
  * A machine-readable backend error identifier, e.g. `opportunity_not_found`.
  *
- * In the target contract both `message` and `errors[].messages` carry
- * codes, not sentences, so the frontend can resolve them against the
- * message catalog. The backend does not fully implement this yet — today
- * `message` holds English prose and the validation pipe reports validator
- * prose — so these helpers return whatever the server sent and the caller
- * resolves it with a fallback. See the `researchos-localization` skill.
+ * Both `message` and `errors[].messages` carry codes, not sentences, so
+ * the frontend can resolve them against the message catalog. See the
+ * `researchos-localization` skill.
  */
 export type ErrorCode = string;
-
-/**
- * Extracts a human readable message from a failed API request.
- *
- * The backend returns the error envelope, and axios rejects with the whole
- * response body intact — the mutator only unwraps successful responses. So
- * the server's message lives at `error.response.data.message`.
- *
- * Without this helper a component would have to reach into the axios error
- * shape itself, and `String(error)` would render
- * "AxiosError: Request failed with status code 500" instead of the message
- * the server actually sent.
- *
- * In the target contract this value is a *code*, not a sentence. Resolve it
- * with `resolveErrorCode()` from `@/utils/error-messages` before showing it
- * to a user — this raw value is a fallback source, not display text.
- */
-export function apiErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const body = error.response?.data as ApiErrorBody | undefined;
-
-    if (body?.message) {
-      return body.message;
-    }
-
-    if (error.message) {
-      return error.message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  // Not a literal: the caller resolves this through the catalog, and a
-  // hardcoded string here would be one language forever.
-  return 'unknown_error';
-}
 
 /**
  * Reads the top-level error code out of a failed request.
  *
  * `message` carries the code for the whole failure
  * (`opportunity_not_found`, `validation_failed`, ...).
+ *
+ * The backend returns the error envelope, and axios rejects with the whole
+ * response body intact — the mutator only unwraps successful responses. So
+ * the server's code lives at `error.response.data.message`.
+ *
+ * Without this helper a component would have to reach into the axios error
+ * shape itself, and `String(error)` would render
+ * "AxiosError: Request failed with status code 500" instead of the code
+ * the server actually sent.
+ *
+ * This value is a *code*, not display text. Resolve it with
+ * `resolveErrorCode()` from `@/utils/error-messages` before showing it to
+ * a user — a raw code must never reach the screen.
  */
 export function apiErrorCode(error: unknown): ErrorCode | undefined {
   if (!axios.isAxiosError(error)) {

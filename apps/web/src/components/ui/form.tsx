@@ -123,7 +123,9 @@ export function FormTextField<
           label={label}
           error={Boolean(error)}
           helperText={
-            message ? resolveErrorCode(t, message, t('unknown')) : helperText
+            message
+              ? resolveErrorCode(t, message, t('unknown'), 'field')
+              : helperText
           }
           inputRef={field.ref}
         />
@@ -177,7 +179,9 @@ export function FormSelect<
           label={label}
           error={Boolean(error)}
           helperText={
-            message ? resolveErrorCode(t, message, t('unknown')) : helperText
+            message
+              ? resolveErrorCode(t, message, t('unknown'), 'field')
+              : helperText
           }
         >
           {children}

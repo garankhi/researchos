@@ -46,25 +46,16 @@ message catalog, so a user never sees the server's English. See the
 `researchos-localization` skill for the naming convention and the
 resolution helper.
 
-> **The backend does not implement this yet.** It sends prose in both
-> places today — the exception filter copies the exception's own message,
-> and the validation pipe reports validator prose. The shape above is the
-> **target** contract. What is on the wire right now is:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "Opportunity not found",
-  "statusCode": 404,
-  "path": "/opportunities/abc",
-  "timestamp": "2026-10-29T01:30:00.000Z",
-  "errors": [{ "field": "title", "messages": ["must be a string"] }]
-}
-```
-
-That gap is tracked in the `researchos-localization` skill under "The
-current gap".
+> **The backend sends codes in both places.** The exception filter puts a
+> machine-readable code in `message` — a `CodedHttpException`'s domain
+> code, or the generic code for the HTTP status — and the global
+> `ValidationPipe` runs in the `grouped` error format, so
+> `errors[].messages` carries one code per constraint.
+>
+> A code with no catalog entry degrades to a localized fallback on the
+> frontend, so a catalog that has not caught up with a new code never
+> shows a raw identifier. See "The current gap" in the
+> `researchos-localization` skill.
 
 **Changing either shape is a breaking change for every screen.** Backend and
 frontend deploy independently.
@@ -188,14 +179,27 @@ Use the helpers in `apps/web/src/lib/api-error.ts` rather than reaching into
 the axios shape by hand:
 
 ```typescript
-import { apiErrorMessage } from '@/lib/api-error';
+import { apiErrorCode } from '@/lib/api-error';
+import { resolveErrorCode } from '@/utils/error-messages';
 
-<ErrorState title="Không tải được" message={apiErrorMessage(error)} />
+const t = useTranslations('errors');
+
+<ErrorState
+  title="Không tải được"
+  message={resolveErrorCode(t, apiErrorCode(error), t('unknown'))}
+/>
 ```
 
 `String(error)` is wrong — it renders
-`"AxiosError: Request failed with status code 500"` instead of the message
+`"AxiosError: Request failed with status code 500"` instead of the code
 the server actually sent.
+
+So is rendering the code directly. `message` carries a **code**
+(`opportunity_not_found`), and the wording lives in the frontend's message
+catalog. `resolveErrorCode()` looks the code up and falls back to a
+localized string when the catalog has no entry, so a raw `snake_case`
+identifier never reaches the screen. See the `researchos-localization`
+skill for the catalog's structure.
 
 ## Reserved names
 
@@ -215,8 +219,9 @@ when you change the contract:
 | Spec | Covers |
 | --- | --- |
 | `common/interceptors/api-response.interceptor.spec.ts` | Success wrapping, null payload, no double-wrapping |
-| `common/filters/http-exception.filter.spec.ts` | Error envelope, validation grouping, no stack leak |
+| `common/filters/http-exception.filter.spec.ts` | Error envelope, the code in `message`, validation grouping, no stack leak |
 | `common/openapi/envelope-transform.spec.ts` | Idempotency, inline primitives, error responses, schema/filter agreement |
+| `common/errors/error-codes.spec.ts` | Every generic code has an entry in both locale catalogs |
 | `src/openapi-rules.spec.ts` | The document satisfies every rule in `openapi-rules.ts` |
 
 ## Checklist
@@ -229,7 +234,7 @@ when you change the contract:
 - [ ] The transform stays idempotent
 - [ ] The transform's error schema still matches what the filter sends
 - [ ] The frontend does not unwrap by hand and does not read `query.data.data`
-- [ ] Error messages are read through `apiErrorMessage()`, never `String(error)`
+- [ ] Error messages are read through `apiErrorCode()` and resolved with `resolveErrorCode()`, never `String(error)` and never a raw code
 - [ ] No business DTO uses the field names `success` or `data`
 
 ## Reference

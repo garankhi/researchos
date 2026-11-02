@@ -61,14 +61,20 @@
       "forbidden": "Bạn không có quyền thực hiện thao tác này.",
       "unauthorized": "Bạn cần đăng nhập để tiếp tục.",
       "conflict": "Dữ liệu đã tồn tại.",
-      "title_required": "Tiêu đề là bắt buộc.",
-      "title_invalid": "Tiêu đề phải là chuỗi ký tự.",
-      "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
-      "email_required": "Email là bắt buộc.",
-      "email_invalid": "Email không hợp lệ.",
-      "status_invalid": "Trạng thái không hợp lệ.",
-      "email_already_registered": "Email này đã được đăng ký.",
-      "status_required": "Trạng thái là bắt buộc."
+      "rate_limited": "Có quá nhiều yêu cầu. Vui lòng giảm tần suất và thử lại sau.",
+      "not_implemented": "Tính năng này chưa được hỗ trợ.",
+      "service_unavailable": "Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.",
+      "fields": {
+        "title_required": "Tiêu đề là bắt buộc.",
+        "title_invalid": "Tiêu đề phải là chuỗi ký tự.",
+        "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
+        "email_required": "Email là bắt buộc.",
+        "email_invalid": "Email không hợp lệ.",
+        "status_invalid": "Trạng thái không hợp lệ.",
+        "email_already_registered": "Email này đã được đăng ký.",
+        "status_required": "Trạng thái là bắt buộc."
+      },
+      "domain": {}
     }
   },
   "notFound": {

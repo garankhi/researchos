@@ -257,12 +257,30 @@ Mọi lỗi đi qua `HttpExceptionFilter` và có cùng một hình dạng:
 {
   "success": false,
   "data": null,
-  "message": "Opportunity not found",
+  "message": "opportunity_not_found",
   "statusCode": 404,
   "path": "/opportunities/abc",
   "timestamp": "2026-10-29T01:30:00.000Z"
 }
 ```
+
+`message` mang **mã lỗi** (`snake_case`), không phải câu tiếng Anh. Frontend
+resolve mã này trong catalog `errors.codes`, nên server không bao giờ gửi tiếng
+Anh cho người dùng — xem skill `researchos-localization`.
+
+Mỗi mã là một *contract*: đổi tên một mã sẽ phá vỡ mọi bản dịch tham chiếu
+tới nó. Thêm mã mới thay vì tái sử dụng mã cũ.
+
+Catalog `errors.codes` chia làm ba tầng, mỗi tầng có một chủ sở hữu:
+
+| Tầng | Đường dẫn trong catalog | Chủ sở hữu | Mọc theo |
+| --- | --- | --- | --- |
+| Generic | `errors.codes.*` | Backend | Tập HTTP status — **cố định** |
+| Field | `errors.codes.fields.*` | Form / DTO | Các ràng buộc validation |
+| Domain | `errors.codes.domain.*` | Từng module | Mã cụ thể của module đó |
+
+Nhờ tách vậy, một module không thể vô tình ghi đè một mã generic, và luôn
+rõ một mã mới thuộc tầng nào.
 
 Trong service, dùng exception của NestJS — không trả lỗi bằng `throw new Error`:
 
@@ -274,25 +292,48 @@ Trong service, dùng exception của NestJS — không trả lỗi bằng `throw
 | Chưa đăng nhập | `UnauthorizedException` |
 | Xung đột với dữ liệu đã có | `ConflictException` |
 
+Khi trạng thái HTTP không nói đủ — `404` chỉ nói "không có", không nói *cái
+gì* không có — ném `CodedHttpException` để kèm mã cụ thể của module:
+
+```typescript
+throw new CodedHttpException('opportunity_not_found', HttpStatus.NOT_FOUND);
+```
+
+Mỗi module tự định nghĩa mã của riêng nó và thêm entry tương ứng vào
+`errors.codes.domain` của cả hai locale trong cùng một thay đổi. Mã chung theo
+HTTP status nằm sẵn trong `src/common/errors/error-codes.ts` — tập mã này cố
+định và không mọc theo module.
+
+**Các mã generic được kiểm tra tự động.** Spec
+`src/common/errors/error-codes.spec.ts` đọc cả hai catalog từ đĩa và fail khi
+một mã generic mà backend có thể phát ra lại thiếu trong locale nào đó. Nhờ
+vậy một entry bị quên sẽ fail `pnpm --filter api test` thay vì lặng lẽ rơi về
+một thông báo chung chung. Mã **domain** không nằm trong spec này — mỗi module
+tự chịu trách nhiệm cho mã của mình.
+
 Lỗi trả về **không chứa chi tiết nội bộ** (stack, SQL, tên bảng). Chi tiết
 đi vào log.
 
 Lỗi validation có thêm mảng `errors`, gom theo từng field để form hiển thị
-đúng chỗ:
+đúng chỗ. `message` trong mỗi entry cũng là mã lỗi:
 
 ```json
 {
   "success": false,
   "data": null,
-  "message": "title must be a string; title should not be empty",
+  "message": "validation_failed",
   "statusCode": 400,
   "path": "/opportunities",
   "timestamp": "2026-10-29T01:30:00.000Z",
   "errors": [
-    { "field": "title", "messages": ["must be a string", "should not be empty"] }
+    { "field": "title", "messages": ["title_required", "title_invalid"] }
   ]
 }
 ```
+
+`ValidationPipe` chạy với `errorFormat: 'grouped'`, nên `field` là đường dẫn
+thật của property (`items.0.name`) và mỗi message là mã do decorator
+class-validator mang theo.
 
 ## 6b. Envelope của response thành công
 
@@ -352,9 +393,13 @@ bộ code frontend cũ tiếp tục chạy mà không cần sửa một dòng n�
 
 Lỗi thì **không** đi qua mutator: axios reject với body thô, nên
 `error.response.data` vẫn là envelope lỗi đầy đủ. Dùng helper
-`apiErrorMessage(error)` trong `src/lib/api-error.ts` để lấy message, đừng
-dùng `String(error)` — nó ra `"AxiosError: Request failed with status code
-500"`.
+`apiErrorCode(error)` trong `src/lib/api-error.ts` để lấy mã lỗi, đừng dùng
+`String(error)` — nó ra `"AxiosError: Request failed with status code 500"`.
+
+Giá trị `apiErrorCode()` trả về là **mã**, không phải câu hiển thị. Resolve nó
+bằng `resolveErrorCode(t, code, t('unknown'))` trước khi render — nếu không,
+người dùng sẽ đọc `opportunity_not_found` thay vì một câu thông báo. Xem skill
+`researchos-localization`.
 
 > `success` và `data` là tên dành riêng cho envelope. Một DTO nghiệp vụ có
 > đúng hai field đó sẽ bị bóc nhầm một lớp.
@@ -438,6 +483,52 @@ pnpm codegen                  # chạy cả hai
   test, không dùng database dev.
 - `pnpm --filter api test`
 
+## 11b. Phân trang
+
+Mọi endpoint trả danh sách dùng chung một contract:
+
+**Query** — `PaginationQueryDto` trong `src/common/dto/pagination.dto.ts`:
+
+| Trường | Mặc định | Ràng buộc | Ý nghĩa |
+| --- | --- | --- | --- |
+| `page` | `1` | `@Min(1)` | Số trang, bắt đầu từ 1 |
+| `limit` | `20` | `@Min(1)`, `@Max(100)` | Số bản ghi một trang |
+| `sort` | — | `@IsString()` | Khóa sắp xếp, `-createdAt` là giảm dần |
+
+Controller nhận query bằng `@Query() query: PaginationQueryDto`, **không**
+rải `@Query('page')` rời rạc — một DTO query mang `description` của nó vào
+spec và được `ValidationPipe` ép kiểu kiểm tra một chỗ.
+
+**Response** — payload gồm `items` và `meta`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [{ "id": "abc", "title": "..." }],
+    "meta": {
+      "page": 1,
+      "limit": 20,
+      "total": 137,
+      "totalPages": 7,
+      "hasNextPage": true,
+      "hasPreviousPage": false
+    }
+  },
+  "message": ""
+}
+```
+
+`meta` nằm **bên trong** payload, cạnh `items`, chứ không nằm cạnh envelope.
+Lý do: mutator của Orval chỉ giữ lại `data` khi unwrap, nên một field `meta`
+ở tầng envelope sẽ bị rơi mất trước khi tới màn hình.
+
+Dùng `buildPaginationMeta(query, count, total)` để dựng `meta` — đừng tự
+tính `totalPages`.
+
+Frontend dùng `usePagination()` trong `apps/web/src/utils/pagination.ts` để có
+một cách phân trang giống nhau cho mọi danh sách.
+
 ## 12. Checklist trước khi mở Pull Request
 
 - [ ] Endpoint có `@ApiTags`, `@ApiOperation` và `@Api*Response` kèm `type`.
@@ -452,6 +543,10 @@ pnpm codegen                  # chạy cả hai
 - [ ] Controller không chứa truy vấn Prisma.
 - [ ] Controller trả payload thô — không tự dựng envelope.
 - [ ] Lỗi dùng exception của NestJS, không dùng `throw new Error`.
+- [ ] Mã lỗi mới đã có entry trong **cả hai** locale, ở đúng tầng của nó:
+  `errors.codes` (generic), `errors.codes.fields` (validation) hoặc
+  `errors.codes.domain` (mã của module).
+- [ ] Endpoint trả danh sách dùng `PaginationQueryDto` và `buildPaginationMeta()`.
 - [ ] Phân quyền đã được kiểm tra ở backend.
 - [ ] Ghi nhiều bảng dùng `$transaction`.
 - [ ] `pnpm --filter api build` chạy qua.

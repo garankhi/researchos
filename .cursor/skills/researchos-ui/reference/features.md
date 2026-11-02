@@ -167,17 +167,24 @@ export interface Profile {
 
 ### `hooks/use-profiles.ts` — list
 
+A list endpoint is paginated: the payload is `{ items, meta }`, and the
+query is `{ page, limit, sort }`. `usePagination()` in
+`src/utils/pagination.ts` owns the page state and returns the query to
+send, so every list screen paginates the same way.
+
 ```typescript
 'use client';
 
 import { useProfilesControllerFindAll } from '@/lib/api';
+import { usePagination } from '@/utils/pagination';
 import type { Profile } from '../types';
 
 export function useProfiles() {
-  const query = useProfilesControllerFindAll();
+  const pagination = usePagination({ limit: 20 });
+  const query = useProfilesControllerFindAll(pagination.query);
 
   const data: Profile[] | undefined = query.data
-    ? query.data.map((item) => ({
+    ? query.data.items.map((item) => ({
         id: item.id,
         displayName: item.displayName,
         createdAt: item.createdAt,
@@ -187,12 +194,25 @@ export function useProfiles() {
   return {
     ...query,
     data,
+    /** The pagination metadata of the current page. */
+    meta: query.data?.meta,
+    /** The page state and the moves a page control needs. */
+    pagination,
     isLoaded: query.isSuccess,
     isFetching: query.isFetching,
     isFailed: query.isError,
   };
 }
 ```
+
+The metadata sits **inside** the payload, next to `items`, not beside the
+envelope. The Orval mutator unwraps the envelope down to `data` and keeps
+nothing else, so a `meta` field at the envelope level would be dropped
+before it reached the screen.
+
+`pagination.nextPage(meta)` and `pagination.previousPage(meta)` take the
+current page's metadata, so a page control cannot walk past the last page
+even if it is clicked twice.
 
 ### `hooks/use-profile.ts` — detail
 

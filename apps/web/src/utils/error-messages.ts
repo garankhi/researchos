@@ -7,15 +7,65 @@ import type { ErrorCode } from '@/lib/api-error';
  * not throw — so guarding on it is what stops `t()` from rendering a raw
  * key.
  *
- * The signature is deliberately loose: the key is a plain `string` because
- * it is built at runtime from a code, and the values parameter is left out
- * so a real translator from `useTranslations` or `getTranslations` stays
- * assignable to it.
+ * `has` is **required**, not optional. Every real translator has it, so
+ * making it optional would only create a second, subtler behavior that a
+ * caller has to reason about. With it required, the resolution is one
+ * path: look the key up, and fall back when it is not there.
+ *
+ * The key is a plain `string` because it is built at runtime from a code,
+ * and the values parameter is left out so a real translator from
+ * `useTranslations` or `getTranslations` stays assignable to it.
  */
 export type ErrorTranslator = {
   (key: string): string;
-  has?: (key: string) => boolean;
+  has: (key: string) => boolean;
 };
+
+/**
+ * Where a code lives in the `errors.codes` namespace.
+ *
+ * The catalog has three tiers, and each tier has one owner:
+ *
+ * | Tier | Owner | Grows with |
+ * | --- | --- | --- |
+ * | `codes.*` | The backend | The HTTP status set — fixed |
+ * | `codes.fields.*` | The forms | The fields that can fail validation |
+ * | `codes.domain.*` | Each module | That module's domain codes |
+ *
+ * Splitting them means a module can never shadow a generic code by
+ * accident, and it makes it obvious where a new entry belongs.
+ */
+export type CodeKind = 'generic' | 'field' | 'domain';
+
+/**
+ * The catalog path for each tier.
+ *
+ * The tier is called `field` in code and `fields` in the catalog. The
+ * mapping lives here so the two names cannot drift, and so every lookup
+ * goes through one place.
+ */
+const TIER_PATH: Record<CodeKind, string> = {
+  generic: '',
+  field: 'fields',
+  domain: 'domain',
+};
+
+/**
+ * The catalog key for a code in one tier.
+ *
+ * The generic tier sits at the top level of `errors.codes`; the other two
+ * are nested under it.
+ */
+export function codeKey(code: ErrorCode, kind: CodeKind = 'generic'): string {
+  const tier = TIER_PATH[kind];
+
+  return tier ? `codes.${tier}.${code}` : `codes.${code}`;
+}
+
+/**
+ * The kinds a code is looked up in, in order.
+ */
+const LOOKUP_ORDER: CodeKind[] = ['generic', 'field', 'domain'];
 
 /**
  * Resolves a backend error code against the `errors.codes` namespace of the
@@ -29,31 +79,59 @@ export type ErrorTranslator = {
  * the component already owns — never to a blank error and never to a raw
  * `snake_case` string on screen.
  *
- * The backend does not implement codes yet, so a value that is still prose
- * also falls back. That is deliberate: showing English prose to a
- * Vietnamese user is worse than showing the component's own localized
- * fallback.
+ * A missing entry is a **bug in the catalog**, not a normal state: the
+ * backend can emit a code the frontend does not have. In development the
+ * gap is logged, so it is visible instead of silently degrading to a
+ * wrong-but-plausible message.
  */
 export function resolveErrorCode(
   t: ErrorTranslator,
   code: ErrorCode | undefined,
   fallback: string,
+  kind: CodeKind = 'generic',
 ): string {
   if (!code) {
     return fallback;
   }
 
-  const key = `codes.${code}`;
+  // The kind is a hint, not a guarantee: a code the caller thinks is a
+  // field code may still live in another tier. Every tier is tried, so the
+  // code resolves wherever it actually is.
+  const kinds =
+    kind === 'generic'
+      ? LOOKUP_ORDER
+      : [kind, ...LOOKUP_ORDER.filter((k) => k !== kind)];
 
-  if (t.has && !t.has(key)) {
-    return fallback;
+  for (const candidate of kinds) {
+    const key = codeKey(code, candidate);
+
+    if (t.has(key)) {
+      return t(key);
+    }
   }
 
-  try {
-    return t(key);
-  } catch {
-    return fallback;
+  warnMissingCode(code);
+
+  return fallback;
+}
+
+/**
+ * Logs a code that has no catalog entry.
+ *
+ * Only in development. In production the fallback is the right thing to
+ * show, and a warning in the console would be noise for every user who
+ * hits a code the catalog has not caught up with.
+ */
+function warnMissingCode(code: ErrorCode): void {
+  if (process.env.NODE_ENV === 'production') {
+    return;
   }
+
+  console.warn(
+    `[i18n] The error code "${code}" has no entry in the message catalog ` +
+      `(looked in ${LOOKUP_ORDER.join(', ')}). Add it to errors.codes in ` +
+      `every locale.`,
+  );
 }
 
 /**
@@ -63,6 +141,11 @@ export function resolveErrorCode(
  * Several constraints can fail on the same field, so each field's codes
  * are resolved and joined. The result is keyed by field name, ready to be
  * rendered next to the input that caused it.
+ *
+ * The keys are the **backend's** field paths (`title`, `items.0.name`).
+ * They are not automatically the form's field names — a form decides which
+ * server field maps to which input, because only the form knows how its
+ * fields are named.
  */
 export function resolveFieldErrorCodes(
   t: ErrorTranslator,
@@ -77,7 +160,7 @@ export function resolveFieldErrorCodes(
 
   for (const [field, fieldCodes] of Object.entries(codes)) {
     resolved[field] = fieldCodes
-      .map((code) => resolveErrorCode(t, code, fallback))
+      .map((code) => resolveErrorCode(t, code, fallback, 'field'))
       .join(', ');
   }
 

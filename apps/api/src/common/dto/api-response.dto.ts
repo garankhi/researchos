@@ -63,8 +63,11 @@ export class ApiErrorResponseDto {
   data: null;
 
   @ApiProperty({
-    description: 'Human readable description of what went wrong.',
-    example: 'Opportunity not found',
+    description:
+      'The error code, e.g. `opportunity_not_found`. A machine-readable ' +
+      'identifier, not a sentence — the frontend resolves it against its ' +
+      'message catalog, so the wording lives in the catalog, not here.',
+    example: 'opportunity_not_found',
   })
   message: string;
 
@@ -88,7 +91,9 @@ export class ApiErrorResponseDto {
 
   @ApiPropertyOptional({
     description:
-      'Field-level validation errors. Present when the request body or query failed validation.',
+      'Field-level validation errors. Present when the request body or query ' +
+      'failed validation. Each message is the code the validator decorator ' +
+      'carried, e.g. `title_required`.',
     type: 'array',
     items: { type: 'object' },
   })
