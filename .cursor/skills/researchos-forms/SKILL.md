@@ -88,7 +88,7 @@ The error message is a **code**, not a sentence. Rendering it raw puts
 helperText={formState.errors.title?.message}
 
 // Right
-helperText={resolveErrorCode(t, formState.errors.title?.message, t('unknown'))}
+helperText={resolveErrorCode(t, formState.errors.title?.message, t('unknown'), 'field')}
 ```
 
 ## The shape of a form
@@ -228,7 +228,8 @@ Two sources, one resolution path.
 ### From the schema
 
 The zod message is the code. `resolveErrorCode()` turns it into a
-sentence.
+sentence. Validation codes live in the **field** tier of the catalog
+(`errors.codes.fields.*`), so pass `'field'` as the kind.
 
 ### From the server
 
@@ -303,7 +304,7 @@ The submit button uses MUI v9's built-in `loading` prop, bound to
 ## Checklist
 
 - [ ] The schema lives in the feature, and its messages are **codes**
-- [ ] Every code the schema can produce has an entry in `messages/vi.json` **and** `messages/en.json` under `errors.codes`
+- [ ] Every code the schema can produce has an entry in `messages/vi.json` **and** `messages/en.json` under `errors.codes.fields`
 - [ ] `useForm` is called with a `zodResolver` and explicit `defaultValues`
 - [ ] The `<form>` has `onSubmit={handleSubmit(...)}`
 - [ ] Every control is registered or controlled — no unbound input

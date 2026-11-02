@@ -33,6 +33,7 @@ const WEB_MESSAGES = resolve(
 type Catalog = {
   errors?: {
     codes?: Record<string, unknown> & {
+      fields?: Record<string, unknown>;
       domain?: Record<string, unknown>;
     };
   };
@@ -51,6 +52,38 @@ function readCatalog(locale: 'en' | 'vi'): Catalog {
 function genericCodesOf(catalog: Catalog): Record<string, unknown> {
   return catalog.errors?.codes ?? {};
 }
+
+/**
+ * The field codes live under `errors.codes.fields`.
+ *
+ * The tier is named `fields` in the catalog and `field` in the frontend's
+ * `CodeKind`. A mismatch between the two would make every validation code
+ * fall back to the generic message — a failure that shows a plausible
+ * wrong string rather than an obvious break, so it needs a test.
+ */
+function fieldCodesOf(catalog: Catalog): Record<string, unknown> {
+  return catalog.errors?.codes?.fields ?? {};
+}
+
+/**
+ * Every code the frontend's resolver can look up, across both tiers.
+ *
+ * The frontend's resolver is `apps/web/src/utils/error-messages.ts`. The
+ * lookup order and the tier paths are duplicated here on purpose: this
+ * spec is the check that the two stay in step, so it cannot import the
+ * values it is meant to verify.
+ */
+const RESOLVED_CODES = [
+  ...genericErrorCodeList,
+  'title_required',
+  'title_invalid',
+  'title_too_long',
+  'email_required',
+  'email_invalid',
+  'status_invalid',
+  'status_required',
+  'email_already_registered',
+];
 
 describe('the error code catalog', () => {
   it('has an entry for every generic code the backend can emit', () => {
@@ -86,6 +119,34 @@ describe('the error code catalog', () => {
   it('has the same codes in both locales', () => {
     const en = Object.keys(genericCodesOf(readCatalog('en')));
     const vi = Object.keys(genericCodesOf(readCatalog('vi')));
+
+    expect(en.sort()).toEqual(vi.sort());
+  });
+
+  it('resolves every code through the tier paths the frontend uses', () => {
+    // The frontend's resolver walks the tiers in this order and builds
+    // the key from the tier path. A code that is in the catalog but under
+    // the wrong path would be found by a naive "does the key exist
+    // anywhere" check, and missed by the real one.
+    const TIERS = [genericCodesOf, fieldCodesOf];
+
+    for (const locale of ['en', 'vi'] as const) {
+      const catalog = readCatalog(locale);
+
+      for (const code of RESOLVED_CODES) {
+        const found = TIERS.some((codes) => Object.hasOwn(codes(catalog), code));
+
+        expect(
+          found,
+          `the '${locale}' catalog has no entry for '${code}' under 'codes' or 'codes.fields'`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('has the same field codes in both locales', () => {
+    const en = Object.keys(fieldCodesOf(readCatalog('en')));
+    const vi = Object.keys(fieldCodesOf(readCatalog('vi')));
 
     expect(en.sort()).toEqual(vi.sort());
   });

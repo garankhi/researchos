@@ -250,22 +250,19 @@ export const axiosInstance = <T>(
 ```typescript
 export type ApiErrorBody = ApiErrorResponseDto;
 
-export function apiErrorMessage(error: unknown): string;
 export function apiErrorCode(error: unknown): string | undefined;
 export function apiFieldErrors(error: unknown): ApiErrorBody['errors'];
 export function apiFieldErrorCodes(error: unknown): Record<string, string[]> | undefined;
 export function apiStatusCode(error: unknown): number | undefined;
 ```
 
-`apiErrorMessage` reads `error.response.data.message` first, falls back to
-`error.message`, then to `unknown_error`. `apiFieldErrors` returns the
-per-field validation messages.
+`apiErrorCode` reads `error.response.data.message` — the code for the whole
+failure. `apiFieldErrors` returns the per-field validation messages, and
+`apiFieldErrorCodes` is the same data grouped by field as codes.
 
-`apiErrorCode` and `apiFieldErrorCodes` are the code-shaped views of the
-same envelope — the top-level code, and the per-field codes grouped by
-field. They exist because the target contract sends codes, and the frontend
-resolves them against the message catalog. See the `researchos-localization`
-skill.
+There is deliberately **no** `apiErrorMessage`. It used to duplicate
+`apiErrorCode` and return the same value under a name that invited a call
+site to render a raw code as display text.
 
 `ApiErrorBody` is a type-only alias of the generated `ApiErrorResponseDto`,
 imported from `@/lib/api/models`. The eslint rule allows type-only imports

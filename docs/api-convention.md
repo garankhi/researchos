@@ -271,6 +271,17 @@ Anh cho người dùng — xem skill `researchos-localization`.
 Mỗi mã là một *contract*: đổi tên một mã sẽ phá vỡ mọi bản dịch tham chiếu
 tới nó. Thêm mã mới thay vì tái sử dụng mã cũ.
 
+Catalog `errors.codes` chia làm ba tầng, mỗi tầng có một chủ sở hữu:
+
+| Tầng | Đường dẫn trong catalog | Chủ sở hữu | Mọc theo |
+| --- | --- | --- | --- |
+| Generic | `errors.codes.*` | Backend | Tập HTTP status — **cố định** |
+| Field | `errors.codes.fields.*` | Form / DTO | Các ràng buộc validation |
+| Domain | `errors.codes.domain.*` | Từng module | Mã cụ thể của module đó |
+
+Nhờ tách vậy, một module không thể vô tình ghi đè một mã generic, và luôn
+rõ một mã mới thuộc tầng nào.
+
 Trong service, dùng exception của NestJS — không trả lỗi bằng `throw new Error`:
 
 | Tình huống | Exception |
@@ -288,9 +299,17 @@ gì* không có — ném `CodedHttpException` để kèm mã cụ thể của mo
 throw new CodedHttpException('opportunity_not_found', HttpStatus.NOT_FOUND);
 ```
 
-Mỗi module tự định nghĩa mã của riêng nó và thêm entry tương ứng vào catalog
-`errors.codes` của cả hai locale trong cùng một thay đổi. Mã chung theo HTTP
-status nằm sẵn trong `src/common/errors/error-codes.ts`.
+Mỗi module tự định nghĩa mã của riêng nó và thêm entry tương ứng vào
+`errors.codes.domain` của cả hai locale trong cùng một thay đổi. Mã chung theo
+HTTP status nằm sẵn trong `src/common/errors/error-codes.ts` — tập mã này cố
+định và không mọc theo module.
+
+**Các mã generic được kiểm tra tự động.** Spec
+`src/common/errors/error-codes.spec.ts` đọc cả hai catalog từ đĩa và fail khi
+một mã generic mà backend có thể phát ra lại thiếu trong locale nào đó. Nhờ
+vậy một entry bị quên sẽ fail `pnpm --filter api test` thay vì lặng lẽ rơi về
+một thông báo chung chung. Mã **domain** không nằm trong spec này — mỗi module
+tự chịu trách nhiệm cho mã của mình.
 
 Lỗi trả về **không chứa chi tiết nội bộ** (stack, SQL, tên bảng). Chi tiết
 đi vào log.
@@ -374,9 +393,13 @@ bộ code frontend cũ tiếp tục chạy mà không cần sửa một dòng n�
 
 Lỗi thì **không** đi qua mutator: axios reject với body thô, nên
 `error.response.data` vẫn là envelope lỗi đầy đủ. Dùng helper
-`apiErrorMessage(error)` trong `src/lib/api-error.ts` để lấy message, đừng
-dùng `String(error)` — nó ra `"AxiosError: Request failed with status code
-500"`.
+`apiErrorCode(error)` trong `src/lib/api-error.ts` để lấy mã lỗi, đừng dùng
+`String(error)` — nó ra `"AxiosError: Request failed with status code 500"`.
+
+Giá trị `apiErrorCode()` trả về là **mã**, không phải câu hiển thị. Resolve nó
+bằng `resolveErrorCode(t, code, t('unknown'))` trước khi render — nếu không,
+người dùng sẽ đọc `opportunity_not_found` thay vì một câu thông báo. Xem skill
+`researchos-localization`.
 
 > `success` và `data` là tên dành riêng cho envelope. Một DTO nghiệp vụ có
 > đúng hai field đó sẽ bị bóc nhầm một lớp.
@@ -520,7 +543,9 @@ một cách phân trang giống nhau cho mọi danh sách.
 - [ ] Controller không chứa truy vấn Prisma.
 - [ ] Controller trả payload thô — không tự dựng envelope.
 - [ ] Lỗi dùng exception của NestJS, không dùng `throw new Error`.
-- [ ] Mã lỗi mới đã có entry trong `errors.codes` của **cả hai** locale.
+- [ ] Mã lỗi mới đã có entry trong **cả hai** locale, ở đúng tầng của nó:
+  `errors.codes` (generic), `errors.codes.fields` (validation) hoặc
+  `errors.codes.domain` (mã của module).
 - [ ] Endpoint trả danh sách dùng `PaginationQueryDto` và `buildPaginationMeta()`.
 - [ ] Phân quyền đã được kiểm tra ở backend.
 - [ ] Ghi nhiều bảng dùng `$transaction`.

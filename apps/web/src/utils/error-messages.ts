@@ -38,10 +38,28 @@ export type ErrorTranslator = {
 export type CodeKind = 'generic' | 'field' | 'domain';
 
 /**
+ * The catalog path for each tier.
+ *
+ * The tier is called `field` in code and `fields` in the catalog. The
+ * mapping lives here so the two names cannot drift, and so every lookup
+ * goes through one place.
+ */
+const TIER_PATH: Record<CodeKind, string> = {
+  generic: '',
+  field: 'fields',
+  domain: 'domain',
+};
+
+/**
  * The catalog key for a code in one tier.
+ *
+ * The generic tier sits at the top level of `errors.codes`; the other two
+ * are nested under it.
  */
 export function codeKey(code: ErrorCode, kind: CodeKind = 'generic'): string {
-  return kind === 'generic' ? `codes.${code}` : `codes.${kind}.${code}`;
+  const tier = TIER_PATH[kind];
+
+  return tier ? `codes.${tier}.${code}` : `codes.${code}`;
 }
 
 /**

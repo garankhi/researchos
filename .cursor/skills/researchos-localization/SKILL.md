@@ -242,7 +242,7 @@ up in its catalog and renders the user's language.
 
 ```json
 // The catalog holds the translation.
-{ "errors": { "codes": { "opportunity_not_found": "Không tìm thấy cơ hội" } } }
+{ "errors": { "codes": { "domain": { "opportunity_not_found": "Không tìm thấy cơ hội" } } } }
 ```
 
 So the frontend never shows an English error to a Vietnamese user, and
@@ -254,6 +254,49 @@ adding a language does not require a backend deploy.
 > A code with no catalog entry falls back to a localized message, so a
 > catalog that has not caught up with a new code never shows a raw
 > identifier. See "The current gap" below for what still needs doing.
+
+### The catalog has three tiers, and each tier has one owner
+
+The codes live under `errors.codes`, split so that nothing can collide:
+
+| Tier | Path | Owner | Grows with |
+| --- | --- | --- | --- |
+| Generic | `errors.codes.*` | The backend | The HTTP status set — **fixed** |
+| Field | `errors.codes.fields.*` | The forms | The fields that can fail validation |
+| Domain | `errors.codes.domain.*` | Each module | That module's domain codes |
+
+The split is not cosmetic. Without it, a module adding `not_found` as a
+domain code would silently replace the generic one, and there would be no
+way to tell which tier a code belongs to.
+
+```json
+{
+  "errors": {
+    "codes": {
+      "not_found": "Không tìm thấy dữ liệu.",
+      "fields": {
+        "title_required": "Tiêu đề là bắt buộc."
+      },
+      "domain": {
+        "opportunity_not_found": "Không tìm thấy cơ hội nghiên cứu."
+      }
+    }
+  }
+}
+```
+
+`resolveErrorCode()` looks a code up in every tier, so a caller that does
+not know where a code came from still resolves it. `resolveFieldErrorCodes()`
+prefers the field tier, because that is where validation codes live.
+
+**The generic codes are checked.** A spec in
+`apps/api/src/common/errors/error-codes.spec.ts` reads both catalogs from
+disk and fails when the backend can emit a generic code that a locale does
+not have. A missing entry is a bug in the catalog, and it is caught by
+`pnpm --filter api test` rather than by a user reporting a vague error.
+
+A missing **domain** code is not caught by that spec — domain codes are
+defined per module, so a module's own spec is where they belong.
 
 ### Why the code lives in `message`
 
@@ -300,6 +343,11 @@ throw — so the guard is what stops `t()` from rendering a raw key. A missing
 translation degrades to a localized fallback, never to a blank error and
 never to a raw `snake_case` string.
 
+`has` is **required** on the translator type, so there is exactly one
+resolution path. A code with no catalog entry is also logged in
+development, so a missing entry is visible rather than silently degrading
+to a wrong-but-plausible message.
+
 The same pattern applies per field:
 
 ```typescript
@@ -317,6 +365,11 @@ const messages = resolveFieldErrorCodes(
 ))}
 ```
 
+The keys are the **backend's** field paths (`title`, `items.0.name`). They
+are not automatically the form's field names — a form decides which server
+field maps to which input, because only the form knows how its fields are
+named.
+
 ### The current gap
 
 What is true today, and what has to change:
@@ -325,31 +378,36 @@ What is true today, and what has to change:
 | --- | --- | --- |
 | `message` on the wire | A `snake_case` code | Done |
 | `errors[].messages` on the wire | A `snake_case` code per constraint | Done |
-| `api-error.ts` helpers | `apiErrorMessage`, `apiErrorCode`, `apiFieldErrors`, `apiFieldErrorCodes`, `apiStatusCode` | Done |
+| `api-error.ts` helpers | `apiErrorCode`, `apiFieldErrors`, `apiFieldErrorCodes`, `apiStatusCode` | Done |
 | `utils/error-messages.ts` | `resolveErrorCode`, `resolveFieldErrorCodes` | Done |
-| Catalog | `errors.codes` has the generic codes | One entry per code the API can emit — the domain codes arrive with their module |
+| Catalog | `errors.codes` (generic), `errors.codes.fields`, `errors.codes.domain` | One entry per code the API can emit — the domain codes arrive with their module |
 | Frontend resolution | Wired | The same calls resolve to the catalog |
+| Generic code coverage | Checked by `error-codes.spec.ts` | A backend code with no catalog entry fails the test run |
 
 The backend side is done:
 
-- The exception filter emits a code in `message`: a `CodedHttpException`
-  carries its own domain code, and everything else falls back to the
+- The exception filter emits a code in `message`: an exception whose
+  message is a code keeps it, and everything else falls back to the
   generic code for the HTTP status (`codeForStatus()` in
   `src/common/errors/error-codes.ts`).
 - The global `ValidationPipe` runs with `errorFormat: 'grouped'`, so a
   field's real property path survives and each message keeps the code its
   class-validator decorator carried.
+- A spec checks that every generic code the backend can emit has an entry
+  in **both** locales, so a missing entry fails `pnpm --filter api test`.
 
 What still has to happen, per module:
 
 - Each module defines the codes it can emit and adds one catalog entry per
-  code, in **both** locales, in the same change that introduces the code.
-  A module raises a domain code with `CodedHttpException`.
+  code under `errors.codes.domain`, in **both** locales, in the same
+  change that introduces the code. A module raises a domain code with
+  `CodedHttpException`.
 
 Until a module's codes are in the catalog, the frontend renders the
 localized fallback: `resolveErrorCode()` degrades to a localized message
 when the code has no catalog entry, never to a blank error and never to a
-raw `snake_case` string.
+raw `snake_case` string. In development the gap is logged, so it is
+visible rather than silent.
 
 ### Validation errors
 
@@ -370,7 +428,7 @@ wording is a code resolved against the catalog.
 
 A client-side form produces the same kind of code. The zod schema's
 message is the code, and it resolves through the same `errors.codes`
-namespace:
+namespace — the **field** tier:
 
 ```typescript
 const schema = z.object({
@@ -379,8 +437,8 @@ const schema = z.object({
 ```
 
 So `title_required` means the same thing whether the failure came from the
-schema or from the server — one catalog entry covers both. The form
-conventions are in the `researchos-forms` skill.
+schema or from the server — one catalog entry under `errors.codes.fields`
+covers both. The form conventions are in the `researchos-forms` skill.
 
 ## The language toggle
 
@@ -482,14 +540,14 @@ Check in a browser too:
 | A user-facing literal in a component | The string stays in one language forever |
 | Copying an example from the `researchos-ui` skill verbatim | That skill shows the *channel*; the wording comes from this skill's catalog |
 | A `<` or `>` in a message | ICU rich-text tag — the build fails with `UNCLOSED_TAG`. Wrap it: `'<html>'` |
-| Looking a validation message up in the catalog | Validation messages are not codes yet; there is no key for them |
+| Looking a validation message up in the catalog | Validation codes live under `errors.codes.fields`, not at the top level |
 | Adding a key to only one catalog | The typecheck fails, or the other locale renders the raw key |
 | `next/link` instead of `components/ui/link` | The link drops the locale prefix |
 | `usePathname` from `next/navigation` | Returns the prefixed path, so the link double-prefixes |
 | `redirect` from `next/navigation` | Redirects to the unprefixed path; the proxy redirects again |
 | `toLocaleString()` with no locale argument | Uses the browser locale, not the app locale |
 | Concatenating translated fragments | Wrong word order in every language but one |
-| Showing `apiErrorMessage(error)` directly | The user sees the server's English text |
+| Showing a raw error code to the user | The user reads `title_invalid` instead of a sentence — always resolve it with `resolveErrorCode()` |
 | Renaming an existing error code | Every translation referencing it breaks |
 | Adding `middleware.ts` | Deprecated in Next 16; use `src/proxy.ts` |
 | A `page.tsx` outside `app/[locale]/` | The route is not localized and the proxy redirects it |

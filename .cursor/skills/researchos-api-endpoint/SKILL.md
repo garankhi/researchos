@@ -163,14 +163,27 @@ throw new NotFoundException('Không tìm thấy cơ hội');
 | `opportunity_not_found` | Domain-specific: the opportunity does not exist |
 
 Every code the API can emit has an entry in `apps/web/src/messages/vi.json`
-**and** `messages/en.json`, under `errors.codes`. A code is a contract:
-renaming one breaks every translation that references it — add a new code
-instead of repurposing an old one.
+**and** `messages/en.json`, under the tier it belongs to. A code is a
+contract: renaming one breaks every translation that references it — add a
+new code instead of repurposing an old one.
+
+| Tier | Catalog path | Owner |
+| --- | --- | --- |
+| Generic | `errors.codes.*` | The backend — the HTTP status set, fixed |
+| Field | `errors.codes.fields.*` | The DTO's validation constraints |
+| Domain | `errors.codes.domain.*` | The module |
+
+The generic codes are checked by a spec
+(`apps/api/src/common/errors/error-codes.spec.ts`) that fails the test run
+when a locale is missing one. A domain code is the module's own
+responsibility — add the entries in both locales in the same change that
+introduces the code.
 
 > **The backend sends codes.** The global exception filter puts a code in
-> the envelope's `message`: a `CodedHttpException`'s domain code, or the
-> generic code for the HTTP status. See "The current gap" in the
-> `researchos-localization` skill for what a module still has to add.
+> the envelope's `message`: an exception whose message is a code keeps it,
+> and everything else falls back to the generic code for the HTTP status.
+> See "The current gap" in the `researchos-localization` skill for what a
+> module still has to add.
 
 Validation messages follow the same rule. class-validator lets each
 decorator carry its own `message`, and that message is what the validation

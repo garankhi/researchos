@@ -17,7 +17,8 @@
  *   locales in the same change.
  *
  * The frontend catalog mirrors this split: `errors.codes.*` holds the
- * generic codes, `errors.codes.domain.*` holds the domain ones.
+ * generic codes, `errors.codes.fields.*` the validation constraints and
+ * `errors.codes.domain.*` the domain ones.
  */
 
 import { HttpException, HttpStatus } from '@nestjs/common';
@@ -63,7 +64,9 @@ export const genericErrorCodeList: string[] = [
  * always has a key to look up.
  */
 export function codeForStatus(status: number): string {
-  return genericErrorCodes[status as HttpStatus] ?? 'server_error';
+  const code = (genericErrorCodes as Record<number, string | undefined>)[status];
+
+  return code ?? 'server_error';
 }
 
 /**

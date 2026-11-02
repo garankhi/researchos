@@ -18,13 +18,13 @@ The frontend never unwraps it by hand — the Orval mutator
 ```
 
 Errors are *not* unwrapped: a failed request rejects in axios, so
-`error.response.data` is still the full error envelope. Read the message
-through `apiErrorMessage(error)` from `src/lib/api-error.ts`, never
+`error.response.data` is still the full error envelope. Read the code
+through `apiErrorCode(error)` from `src/lib/api-error.ts`, never
 `String(error)`.
 
-> `apiErrorMessage()` returns the raw value the server sent — which in the
-> target contract is a **code**, not a sentence. Resolve it against the
-> catalog before rendering. See "Error codes" below.
+> `apiErrorCode()` returns the raw value the server sent — which is a
+> **code**, not a sentence. Resolve it against the catalog before
+> rendering. See "Error codes" below.
 
 Full details: the `researchos-contract` skill.
 
@@ -85,11 +85,18 @@ that is not in the catalog instead of throwing. A code with no entry
 degrades to the fallback — a localized string the component owns — never
 to a blank error and never to a raw `snake_case` string on screen.
 
+The catalog has three tiers, and a code is looked up in each of them:
+`errors.codes.*` (the backend's generic codes), `errors.codes.fields.*`
+(validation constraints) and `errors.codes.domain.*` (each module's own
+codes). A caller that does not know which tier a code came from still
+resolves it.
+
 > **The backend sends codes.** It puts a machine-readable code in `message`
 > and one code per constraint in `errors[].messages`. A code with no
 > catalog entry still degrades to the fallback — the intended behaviour,
 > not a bug: a raw `snake_case` identifier for a Vietnamese user is worse
-> than the component's own localized fallback.
+> than the component's own localized fallback. In development the gap is
+> logged, so a missing entry is visible rather than silent.
 
 Field-level rendering:
 
