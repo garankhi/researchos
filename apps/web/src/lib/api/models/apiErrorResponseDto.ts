@@ -10,6 +10,7 @@ import type { ApiErrorResponseDtoErrorsItem } from './apiErrorResponseDtoErrorsI
 export interface ApiErrorResponseDto {
   success: false;
   data: null;
+  /** The error code, e.g. `opportunity_not_found`. */
   message: string;
   statusCode: number;
   path: string;

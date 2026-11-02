@@ -85,12 +85,11 @@ that is not in the catalog instead of throwing. A code with no entry
 degrades to the fallback — a localized string the component owns — never
 to a blank error and never to a raw `snake_case` string on screen.
 
-> **The backend does not send codes yet.** It sends English prose in
-> `message` and validator prose in `errors[].messages`, so today every
-> code resolves to the fallback. That is the intended behaviour, not a bug:
-> an English sentence for a Vietnamese user is worse than the component's
-> own localized fallback. When the backend switches to codes, the same
-> calls start resolving — no frontend change needed.
+> **The backend sends codes.** It puts a machine-readable code in `message`
+> and one code per constraint in `errors[].messages`. A code with no
+> catalog entry still degrades to the fallback — the intended behaviour,
+> not a bug: a raw `snake_case` identifier for a Vietnamese user is worse
+> than the component's own localized fallback.
 
 Field-level rendering:
 

@@ -29,10 +29,9 @@ export type ErrorTranslator = {
  * the component already owns — never to a blank error and never to a raw
  * `snake_case` string on screen.
  *
- * The backend does not implement codes yet, so a value that is still prose
- * also falls back. That is deliberate: showing English prose to a
- * Vietnamese user is worse than showing the component's own localized
- * fallback.
+ * The backend sends codes, so a code with no catalog entry means the
+ * catalog has not caught up with a newly added code — not that the server
+ * sent prose. Either way the fallback is what renders.
  */
 export function resolveErrorCode(
   t: ErrorTranslator,

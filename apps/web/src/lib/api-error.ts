@@ -16,30 +16,30 @@ export type ApiErrorBody = ApiErrorResponseDto;
 /**
  * A machine-readable backend error identifier, e.g. `opportunity_not_found`.
  *
- * In the target contract both `message` and `errors[].messages` carry
- * codes, not sentences, so the frontend can resolve them against the
- * message catalog. The backend does not fully implement this yet — today
- * `message` holds English prose and the validation pipe reports validator
- * prose — so these helpers return whatever the server sent and the caller
- * resolves it with a fallback. See the `researchos-localization` skill.
- */
-export type ErrorCode = string;
+ * Both `message` and `errors[].messages` carry codes, not sentences, so
+ * the frontend can resolve them against the message catalog. See the
+ * `researchos-localization` skill.
+ */export type ErrorCode = string;
 
 /**
- * Extracts a human readable message from a failed API request.
+ * Extracts the error code from a failed API request.
  *
  * The backend returns the error envelope, and axios rejects with the whole
  * response body intact — the mutator only unwraps successful responses. So
- * the server's message lives at `error.response.data.message`.
+ * the server's code lives at `error.response.data.message`.
  *
  * Without this helper a component would have to reach into the axios error
  * shape itself, and `String(error)` would render
- * "AxiosError: Request failed with status code 500" instead of the message
+ * "AxiosError: Request failed with status code 500" instead of the code
  * the server actually sent.
  *
- * In the target contract this value is a *code*, not a sentence. Resolve it
- * with `resolveErrorCode()` from `@/utils/error-messages` before showing it
- * to a user — this raw value is a fallback source, not display text.
+ * This value is a *code*, not display text. Resolve it with
+ * `resolveErrorCode()` from `@/utils/error-messages` before showing it to
+ * a user — this raw value is a fallback source, not a message.
+ *
+ * Prefer `apiErrorCode()` when the caller only needs the code; this
+ * helper exists for the call sites that want the server's value either
+ * way, and as the fallback when the response carries no code at all.
  */
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {

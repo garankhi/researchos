@@ -167,13 +167,10 @@ Every code the API can emit has an entry in `apps/web/src/messages/vi.json`
 renaming one breaks every translation that references it — add a new code
 instead of repurposing an old one.
 
-> **The backend does not implement this yet.** The global exception filter
-> still copies the exception's own message into the envelope, so what
-> reaches the wire today is prose. The rules above describe the **target**
-> contract — write new endpoints against them, and treat the current
-> behaviour as the gap to close. See "The current gap" in the
-> `researchos-localization` skill for the full picture of what has to change
-> in the filter, the validation pipe, and the frontend helpers.
+> **The backend sends codes.** The global exception filter puts a code in
+> the envelope's `message`: a `CodedHttpException`'s domain code, or the
+> generic code for the HTTP status. See "The current gap" in the
+> `researchos-localization` skill for what a module still has to add.
 
 Validation messages follow the same rule. class-validator lets each
 decorator carry its own `message`, and that message is what the validation

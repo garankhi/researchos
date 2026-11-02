@@ -81,12 +81,14 @@ Specific to what failed. Naming: `<noun>_<reason>`.
 
 ## Backend error codes
 
-> **Status: the backend has not switched yet.** The backend currently sends
-> plain English text in `message` and validator prose in
-> `errors[].messages`. The shape below is the **target** — the backend must
-> move to it. The frontend is already wired against it
-> (`apiErrorCode()` and `resolveErrorCode()` exist), so today every code
-> resolves to a localized fallback rather than to the server's English.
+> **Status: the backend sends codes.** The exception filter puts a code in
+> `message`, and the global `ValidationPipe` runs in the `grouped` error
+> format, so `errors[].messages` carries one code per constraint. A code
+> with no catalog entry resolves to a localized fallback rather than to a
+> raw identifier.
+>
+> The **domain** codes below are not implemented yet: each module defines
+> the codes it can emit and adds the catalog entries in the same change.
 
 The backend sends the code in the error envelope's `message` field.
 

@@ -46,25 +46,16 @@ message catalog, so a user never sees the server's English. See the
 `researchos-localization` skill for the naming convention and the
 resolution helper.
 
-> **The backend does not implement this yet.** It sends prose in both
-> places today — the exception filter copies the exception's own message,
-> and the validation pipe reports validator prose. The shape above is the
-> **target** contract. What is on the wire right now is:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "Opportunity not found",
-  "statusCode": 404,
-  "path": "/opportunities/abc",
-  "timestamp": "2026-10-29T01:30:00.000Z",
-  "errors": [{ "field": "title", "messages": ["must be a string"] }]
-}
-```
-
-That gap is tracked in the `researchos-localization` skill under "The
-current gap".
+> **The backend sends codes in both places.** The exception filter puts a
+> machine-readable code in `message` — a `CodedHttpException`'s domain
+> code, or the generic code for the HTTP status — and the global
+> `ValidationPipe` runs in the `grouped` error format, so
+> `errors[].messages` carries one code per constraint.
+>
+> A code with no catalog entry degrades to a localized fallback on the
+> frontend, so a catalog that has not caught up with a new code never
+> shows a raw identifier. See "The current gap" in the
+> `researchos-localization` skill.
 
 **Changing either shape is a breaking change for every screen.** Backend and
 frontend deploy independently.
