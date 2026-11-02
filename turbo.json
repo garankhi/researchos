@@ -72,6 +72,24 @@
       "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
+    "db:setup": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
+    "db:seed": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
+    "db:seed:online": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
+    "db:taxonomy:export": {
+      "cache": false
+    },
     "db:studio": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["DATABASE_URL"],

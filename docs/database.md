@@ -33,7 +33,15 @@ packages/database/
     index.ts             Public surface của package
     generated/           Client do Prisma sinh ra, KHÔNG commit
   scripts/
+    setup.mjs            Dựng database: tạo DB, áp migration, seed taxonomy
     setup-database.ps1   Tạo database và chạy migration
+    seed.mjs             Seed taxonomy từ snapshot có sẵn + tài khoản dev
+    seed-online.mjs      Seed taxonomy bằng cách tải từ OpenAlex + tài khoản dev
+    dev-users.mjs        Module tạo tài khoản development, dùng chung cho 2 seed
+    export-taxonomy.mjs  Làm mới snapshot taxonomy
+    drift-check.mjs      Kiểm tra schema khớp với SQL nguồn
+    data/
+      openalex-taxonomy.json   Snapshot taxonomy, phải commit
 ```
 
 ## 2. Yêu cầu
@@ -106,12 +114,33 @@ Chạy từ root:
 
 | Lệnh | Tác dụng |
 | --- | --- |
+| `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
+| `pnpm db:setup` | Dựng database từ đầu: tạo database, áp migration, seed taxonomy |
 | `pnpm db:generate` | Sinh lại client từ `schema.prisma` |
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ khi dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:status` | Trạng thái migration |
 | `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp với SQL nguồn |
+| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
+| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
 | `pnpm db:studio` | Prisma Studio để xem và sửa dữ liệu |
+
+`pnpm db:setup` là lệnh onboarding cho phần database: nó tạo database nếu chưa
+có, áp dụng migration và nhập taxonomy từ snapshot đã commit trong repo, kèm
+tài khoản development cho local login. Lệnh
+**không cần mạng và không cần OpenAlex API key**, nên máy mới dựng được database
+chỉ với `pnpm infra:up` rồi `pnpm db:setup`.
+
+Lệnh `pnpm setup` ở root làm nhiều hơn thế: nó gọi `pnpm db:setup` cùng với
+việc tạo `.env`, cài dependency, bật Docker, build và sinh client API. Xem
+[README](../README.md).
+
+`pnpm db:seed` đọc taxonomy từ snapshot
+(`packages/database/scripts/data/openalex-taxonomy.json`), nên chạy nhanh và
+offline. `pnpm db:seed:online` tải trực tiếp từ OpenAlex, cần mạng và mất
+khoảng 90 giây. Cả hai dùng chung phần ghi vào database, nên cho ra cùng kết
+quả, và cả hai cũng tạo tài khoản development.
+Chi tiết: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
 
 `pnpm db:migrate` tương đương `prisma migrate dev`: nó tạo file migration mới
 khi schema đổi và áp dụng các migration chưa chạy. **Chỉ dùng ở máy dev.**

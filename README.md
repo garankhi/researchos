@@ -14,6 +14,8 @@ packages/
   config/      Cách tìm và nạp file .env dùng chung
   database/    Prisma schema, migration, client dùng chung API/worker
   queue/       Cấu hình Redis và hợp đồng job dùng chung API/worker
+scripts/
+  setup.mjs    Lệnh `pnpm setup` thiết lập toàn bộ máy local
 docs/
   architecture.md    Kiến trúc tổng thể
   api-convention.md  Quy ước tạo API
@@ -24,16 +26,25 @@ docs/
 
 ## Chạy lần đầu
 
+Cần Node.js 24 và pnpm 12.15.0. Mở Docker Desktop trước khi chạy.
+
+Lệnh này làm hết phần thiết lập trên một máy mới: tạo `.env`, cài dependency,
+bật PostgreSQL/Redis bằng Docker, dựng database (migration + seed), build và
+sinh client API cho web.
+
 ```powershell
-Copy-Item .env.example .env
-pnpm install --frozen-lockfile
-pnpm infra:up
-pnpm db:migrate:deploy
+pnpm setup
 ```
 
-Mở Docker Desktop trước khi chạy. Cấu hình mẫu dùng một database `researchos`
+Cấu hình mẫu dùng một database `researchos`
 ở `localhost:55432` và Redis ở `localhost:6379`, chỉ cho phép kết nối từ máy
 local. Không cần cài PostgreSQL hoặc Redis trực tiếp trên máy.
+
+Lệnh chạy được nhiều lần, từng bước bị bỏ qua nếu đã xong. Muốn bỏ qua bước
+nào thì đặt biến tương ứng trước khi chạy: `SETUP_SKIP_INSTALL=1` hoặc
+`SETUP_SKIP_INFRA=1`.
+
+Sau khi setup xong, mở app:
 
 ```powershell
 pnpm dev
@@ -50,10 +61,28 @@ Worker chạy BullMQ bằng application context, không mở HTTP port. Chạy
 sẽ có Docker, biến môi trường và volume riêng; không dùng lại dữ liệu local.
 Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
 
+## Tài khoản development
+
+Các tài khoản cho local login (FPTU SSO chưa có tài liệu) được `pnpm setup`
+tạo luôn. Chúng dùng chung một mật khẩu đã biết, nên chỉ có ý nghĩa ở máy
+local:
+
+| Email | `user_type` | Quyền |
+| --- | --- | --- |
+| `admin@researchos.local` | `STAFF` | `ADMIN` + `RESEARCHER` |
+| `faculty@researchos.local` | `FACULTY` | researcher qua luật nền, không có dòng grant |
+| `student@researchos.local` | `STUDENT` | `RESEARCHER` |
+| `guest@researchos.local` | `STAFF` | không có quyền |
+
+Mật khẩu của cả bốn tài khoản là `ResearchOS!Dev2026`. Seed tài khoản chạy
+luôn cùng taxonomy, nên `pnpm db:seed` và `pnpm db:seed:online` luôn tạo tài
+khoản.
+
 ## Lệnh thường dùng
 
 | Lệnh | Tác dụng |
 | --- | --- |
+| `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
 | `pnpm infra:up` | Chạy PostgreSQL/Redis và chờ healthcheck |
 | `pnpm infra:down` | Dừng hạ tầng local, giữ dữ liệu |
 | `pnpm infra:status` | Xem trạng thái PostgreSQL/Redis |
@@ -66,6 +95,9 @@ Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
 | `pnpm test:queue` | Test API → Redis → worker thật, tự khởi động worker thử |
 | `pnpm queue:probe` | Gửi một job kiểm tra đến worker đang chạy |
 | `pnpm codegen` | Sinh OpenAPI rồi client Orval cho web |
+| `pnpm db:setup` | Dựng database: tạo database, áp migration, seed taxonomy |
+| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
+| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ ở máy dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:studio` | Prisma Studio |

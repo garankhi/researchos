@@ -30,6 +30,10 @@
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:drift": "node scripts/drift-check.mjs",
+    "db:setup": "node scripts/setup.mjs",
+    "db:seed": "pnpm run build && node scripts/seed.mjs",
+    "db:seed:online": "pnpm run build && node scripts/seed-online.mjs",
+    "db:taxonomy:export": "node scripts/export-taxonomy.mjs",
     "format": "prisma format",
     "build": "tsc -p tsconfig.build.json",
     "prebuild": "pnpm run db:generate",
@@ -38,6 +42,7 @@
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
+    "@node-rs/argon2": "^2.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "pg": "8.23.1",
