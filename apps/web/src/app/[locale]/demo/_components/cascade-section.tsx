@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Box, Chip, Stack, Typography } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 
 /**
@@ -19,6 +20,7 @@ import { DemoNote, DemoRow, DemoSection } from './demo-ui';
  * values are also compared as resolved pixels.
  */
 export function CascadeSection() {
+  const t = useTranslations('demo');
   const boxRef = useRef<HTMLDivElement>(null);
   const referenceRef = useRef<HTMLDivElement>(null);
   const [computed, setComputed] = useState<string>('');
@@ -66,8 +68,8 @@ export function CascadeSection() {
   return (
     <DemoSection
       id="cascade"
-      title="Tailwind x MUI cascade"
-      description="Utility class của Tailwind phải thắng style mặc định của MUI, không cần !important."
+      title={t('sections.cascade.title')}
+      description={t('sections.cascade.description')}
     >
       <Stack spacing={2}>
         <Box
@@ -81,11 +83,9 @@ export function CascadeSection() {
           }}
         >
           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Tailwind bg-amber-500 vs MUI backgroundColor
+            {t('cascade.heading')}
           </Typography>
-          <Typography variant="body2">
-            MUI đặt backgroundColor là primary.main; Tailwind đặt bg-amber-500.
-          </Typography>
+          <Typography variant="body2">{t('cascade.body')}</Typography>
         </Box>
 
         {/* Reference: Tailwind's own token, so the check tracks the version. */}
@@ -99,29 +99,25 @@ export function CascadeSection() {
           }}
         />
 
-        <DemoRow label="Computed background">
+        <DemoRow label={t('labels.computedBackground')}>
           <Chip
-            label={computed || '(đang đọc…)'}
+            label={computed || t('theme.htmlClassEmpty')}
             size="small"
             variant="outlined"
           />
           <Chip
-            label={`Tham chiếu: ${reference || '(đang đọc…)'}`}
+            label={t('labels.reference', { value: reference || t('theme.htmlClassEmpty') })}
             size="small"
             variant="outlined"
           />
           <Chip
-            label={matches ? 'Tailwind thắng' : 'Chưa khớp'}
+            label={matches ? t('labels.tailwindWins') : t('labels.notMatching')}
             size="small"
             color={matches ? 'success' : 'warning'}
           />
         </DemoRow>
 
-        <DemoNote>
-          Nếu kết quả là “Chưa khớp”, layer `mui` đang nằm trên `utilities` —
-          kiểm tra lại `@layer` trong globals.css và `enableCssLayer` trong
-          layout.tsx.
-        </DemoNote>
+        <DemoNote>{t('notes.cascade')}</DemoNote>
       </Stack>
     </DemoSection>
   );

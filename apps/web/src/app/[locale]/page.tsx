@@ -1,9 +1,12 @@
 import { Suspense } from 'react';
+import { getTranslations } from 'next-intl/server';
 import { ApiStatus } from './_components/api-status';
 
-export default function Home() {
+export default async function Home() {
+  const t = await getTranslations('home');
+
   return (
-    <Suspense fallback={<p>Loading API status…</p>}>
+    <Suspense fallback={<p>{t('loadingStatus')}</p>}>
       <ApiStatus />
     </Suspense>
   );

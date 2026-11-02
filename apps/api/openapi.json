@@ -9,6 +9,7 @@
             "name": "delay",
             "required": false,
             "in": "query",
+            "description": "Milliseconds to wait before answering. Capped at 30000.",
             "schema": {
               "example": 2000,
               "type": "string"
@@ -38,8 +39,15 @@
         "operationId": "DemoController_getFail",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": ""
+          "500": {
+            "description": "The request always fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Always fails with a 500 to exercise the error state",
@@ -135,7 +143,8 @@
           },
           "service": {
             "type": "string",
-            "example": "researchos-api"
+            "example": "researchos-api",
+            "description": "Name of the service that answered the probe."
           },
           "uptimeSeconds": {
             "type": "number",
@@ -144,7 +153,8 @@
           },
           "timestamp": {
             "type": "string",
-            "example": "2026-10-29T01:30:00.000Z"
+            "example": "2026-10-29T01:30:00.000Z",
+            "description": "ISO timestamp of when the probe answered."
           }
         },
         "required": [

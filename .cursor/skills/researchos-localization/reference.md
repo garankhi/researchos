@@ -81,10 +81,12 @@ Specific to what failed. Naming: `<noun>_<reason>`.
 
 ## Backend error codes
 
-> **Status: not implemented yet.** The backend currently sends plain English
-> text in `message`, and `src/lib/api-error.ts` has no `apiErrorCode`
-> helper. The shape below is the target. Until it lands, `message` holds
-> English prose and the frontend shows it as-is.
+> **Status: the backend has not switched yet.** The backend currently sends
+> plain English text in `message` and validator prose in
+> `errors[].messages`. The shape below is the **target** — the backend must
+> move to it. The frontend is already wired against it
+> (`apiErrorCode()` and `resolveErrorCode()` exist), so today every code
+> resolves to a localized fallback rather than to the server's English.
 
 The backend sends the code in the error envelope's `message` field.
 
@@ -99,11 +101,42 @@ The backend sends the code in the error envelope's `message` field.
 }
 ```
 
+### Field-level validation codes
+
+`errors[].messages` carries codes too, one per constraint, qualified by the
+field:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "validation_failed",
+  "statusCode": 400,
+  "path": "/profiles",
+  "timestamp": "2026-10-29T01:30:00.000Z",
+  "errors": [{ "field": "title", "messages": ["title_invalid", "title_required"] }]
+}
+```
+
+The backend produces these by putting the code in each class-validator
+decorator's `message` option:
+
+```typescript
+@IsString({ message: 'title_invalid' })
+@IsNotEmpty({ message: 'title_required' })
+title: string;
+```
+
+The frontend resolves each code the same way as `message`, so the wording
+for "title is required" lives in the catalog, not in the DTO.
+
 ### Naming rules
 
 - `snake_case`, lowercase.
 - Namespaced by what failed, not by what to do: `opportunity_not_found`,
   not `show_404`.
+- Field-level codes are qualified by their field: `title_required`,
+  `email_invalid`.
 - Never the HTTP status as the whole code: `not_found` alone is too vague
   to be useful in a UI.
 - Stable. A code is a contract between the backend and every translation
@@ -111,7 +144,7 @@ The backend sends the code in the error envelope's `message` field.
 
 ### Adding a code
 
-1. Backend — throw with the code.
+1. Backend — throw with the code, or put it in the validator's `message`.
 2. `src/messages/vi.json` — add it under `errors.codes`.
 3. `src/messages/en.json` — add it under `errors.codes`.
 4. Frontend — nothing. The lookup is by key.
@@ -195,32 +228,33 @@ t.rich('terms.body', {
 
 ### Resolving a backend error code
 
-> Requires `apiErrorCode()` from `src/lib/api-error.ts`, which does not
-> exist yet — see the note above.
+`apiErrorCode()` and `resolveErrorCode()` live in `src/lib/api-error.ts` and
+`src/utils/error-messages.ts`.
 
 ```typescript
 'use client';
 
 import { useTranslations } from 'next-intl';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api-error';
+import { resolveErrorCode } from '@/utils/error-messages';
 
 export function useApiError() {
   const t = useTranslations('errors');
 
   function resolve(error: unknown): { title: string; message: string } {
-    const code = apiErrorCode(error);
-    const fallback = apiErrorMessage(error);
+    // The catalog holds the wording. The server's value is only a fallback.
+    const message = resolveErrorCode(t, apiErrorCode(error), t('unknown'));
 
-    if (code && t.has(`codes.${code}`)) {
-      return { title: t(`codes.${code}`), message: fallback };
-    }
-
-    return { title: t('title'), message: fallback };
+    return { title: t('title'), message };
   }
 
   return { resolve };
 }
 ```
+
+A code with no catalog entry falls back to `t('unknown')` — a localized
+string — rather than to the server's raw value. The backend does not send
+codes yet, so today the fallback is always what the user sees.
 
 ### Dates and numbers
 

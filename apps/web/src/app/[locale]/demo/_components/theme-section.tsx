@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { Box, Button, Chip, Stack, Switch, Typography } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 
@@ -56,6 +57,7 @@ function useHydrated(): boolean {
  * text and trip a hydration mismatch.
  */
 export function ThemeSection() {
+  const t = useTranslations('demo');
   const { resolvedTheme, theme, setTheme } = useTheme();
   const htmlClass = useHtmlClass();
   const hydrated = useHydrated();
@@ -63,35 +65,35 @@ export function ThemeSection() {
   return (
     <DemoSection
       id="theme"
-      title="Theme & dark mode"
-      description="Kiểm tra next-themes và MUI dùng cùng một color scheme."
+      title={t('sections.theme.title')}
+      description={t('sections.theme.description')}
     >
       <Stack spacing={2}>
-        <DemoRow label="Chủ đề">
+        <DemoRow label={t('labels.themeSwitcher')}>
           <Button
             size="small"
             variant="contained"
             onClick={() => setTheme('light')}
           >
-            Sáng
+            {t('labels.light')}
           </Button>
           <Button
             size="small"
             variant="contained"
             onClick={() => setTheme('dark')}
           >
-            Tối
+            {t('labels.dark')}
           </Button>
           <Button
             size="small"
             variant="outlined"
             onClick={() => setTheme('system')}
           >
-            Theo hệ thống
+            {t('labels.system')}
           </Button>
         </DemoRow>
 
-        <DemoRow label="System preference">
+        <DemoRow label={t('labels.systemPreference')}>
           <Switch
             checked={
               hydrated ? theme === 'system' || theme === undefined : false
@@ -100,31 +102,33 @@ export function ThemeSection() {
             color="primary"
           />
           <Typography variant="body2" color="text.secondary">
-            Bật để theo hệ thống
+            {t('labels.followSystem')}
           </Typography>
         </DemoRow>
 
         <Box>
-          <DemoRow label="Trạng thái">
+          <DemoRow label={t('labels.state')}>
             <Chip
-              label={`<html> class: "${htmlClass || '(trống)'}"}`}
+              label={t('theme.htmlClass', {
+                value: htmlClass || t('theme.htmlClassEmpty'),
+              })}
               size="small"
               variant="outlined"
             />
             <Chip
               label={
                 hydrated
-                  ? `next-themes: ${resolvedTheme ?? 'chưa gán'}`
-                  : 'next-themes: (đang mount)'
+                  ? t('theme.nextThemesResolved', {
+                      value: resolvedTheme ?? t('theme.nextThemesUnresolved'),
+                    })
+                  : t('theme.nextThemesMounting')
               }
               size="small"
               variant="outlined"
             />
           </DemoRow>
           <DemoNote>
-            {hydrated
-              ? 'Nếu class trên <html> không khớp với next-themes thì bridge trong theme-provider.tsx đã hỏng.'
-              : 'Đang chờ mount để đọc trạng thái phía client.'}
+            {hydrated ? t('notes.themeBridge') : t('notes.themeHydrating')}
           </DemoNote>
         </Box>
       </Stack>

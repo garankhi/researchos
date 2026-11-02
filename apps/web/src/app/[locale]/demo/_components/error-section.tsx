@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import ErrorBoundary from '@/components/ui/error-boundary';
 import { ErrorState } from '@/components/ui/feedback';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
@@ -21,25 +22,30 @@ import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 function Boom({
   armedRef,
   version,
+  message,
+  healthyMessage,
 }: {
   armedRef: React.RefObject<boolean>;
   version: number;
+  message: string;
+  healthyMessage: string;
 }) {
   useEffect(() => {
     if (armedRef.current) {
       armedRef.current = false;
-      throw new Error('Lỗi cố ý từ component demo');
+      throw new Error(message);
     }
-  }, [armedRef, version]);
+  }, [armedRef, version, message]);
 
   return (
     <Typography variant="body2" color="success.main">
-      Component đang hoạt động bình thường.
+      {healthyMessage}
     </Typography>
   );
 }
 
 export function ErrorSection() {
+  const t = useTranslations('demo');
   const armedRef = useRef(false);
   const [version, setVersion] = useState(0);
 
@@ -51,49 +57,49 @@ export function ErrorSection() {
   return (
     <DemoSection
       id="error"
-      title="Error states"
-      description="Mỗi lỗi phải nói rõ lỗi gì và luôn có đường đi tiếp."
+      title={t('sections.error.title')}
+      description={t('sections.error.description')}
     >
       <Stack spacing={3}>
         <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            ErrorState dùng chung (có nút thử lại)
+            {t('errorSection.sharedState')}
           </Typography>
           <ErrorState
-            title="Không tải được dữ liệu"
-            message="Mô tả cụ thể: máy chủ từ chối kết nối sau 3 lần thử."
+            title={t('errorSection.sharedState')}
+            message={t('notes.errorBoundary')}
             onRetry={() => undefined}
           />
         </Box>
 
         <Box>
-          <DemoRow label="Component boundary">
+          <DemoRow label={t('labels.componentBoundary')}>
             <Button
               size="small"
               variant="contained"
               color="error"
               onClick={arm}
             >
-              Ném lỗi
+              {t('actions.throwError')}
             </Button>
           </DemoRow>
 
           <Box sx={{ mt: 1.5 }}>
-            <ErrorBoundary title="Lỗi ở cấp component">
-              <Boom armedRef={armedRef} version={version} />
+            <ErrorBoundary title={t('errorSection.sharedState')}>
+              <Boom
+                armedRef={armedRef}
+                version={version}
+                message={t('errorSection.intentional')}
+                healthyMessage={t('errorSection.healthy')}
+              />
             </ErrorBoundary>
           </Box>
-          <DemoNote>
-            Ném lỗi một lần; nút “Thử lại” trong boundary gọi `retry()` và
-            component hoạt động trở lại. Boundary dùng `catchError` từ
-            `next/error`: `redirect()` và `notFound()` vẫn đi xuyên qua thay vì
-            bị nuốt thành lỗi chung.
-          </DemoNote>
+          <DemoNote>{t('notes.errorBoundary')}</DemoNote>
         </Box>
 
         <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Lỗi cấp route (app/error.tsx) — dùng nút bên dưới
+            {t('errorSection.routeLevel')}
           </Typography>
           <Button
             size="small"
@@ -102,7 +108,7 @@ export function ErrorSection() {
             component="a"
             href="/demo/crash"
           >
-            Mở route lỗi cấp route
+            {t('actions.openRouteError')}
           </Button>
         </Box>
       </Stack>

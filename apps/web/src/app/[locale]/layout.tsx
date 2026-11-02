@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter';
 import { AppThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import '../globals.css';
 import Header from '@/components/ui/header';
 import { NextIntlClientProvider } from 'next-intl';
@@ -69,8 +70,13 @@ export default async function RootLayout({
                   },
                 }}
               >
-                <Header />
-                {children}
+                {/* The snackbar sits inside the i18n provider so a message
+                    can be translated at the point it is shown, and inside
+                    the MUI provider so `Snackbar` can anchor to the theme. */}
+                <SnackbarProvider>
+                  <Header />
+                  {children}
+                </SnackbarProvider>
               </NextIntlClientProvider>
             </QueryProvider>
           </AppThemeProvider>

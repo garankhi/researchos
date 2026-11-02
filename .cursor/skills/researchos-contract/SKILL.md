@@ -30,6 +30,31 @@ A failed response:
 {
   "success": false,
   "data": null,
+  "message": "opportunity_not_found",
+  "statusCode": 404,
+  "path": "/opportunities/abc",
+  "timestamp": "2026-10-29T01:30:00.000Z",
+  "errors": [{ "field": "title", "messages": ["title_required"] }]
+}
+```
+
+`errors` is present only on a validation failure. `message` is one code for
+the whole failure; `errors[].messages` holds one code per field constraint.
+
+**Both are codes, not prose.** The frontend resolves them against its
+message catalog, so a user never sees the server's English. See the
+`researchos-localization` skill for the naming convention and the
+resolution helper.
+
+> **The backend does not implement this yet.** It sends prose in both
+> places today — the exception filter copies the exception's own message,
+> and the validation pipe reports validator prose. The shape above is the
+> **target** contract. What is on the wire right now is:
+
+```json
+{
+  "success": false,
+  "data": null,
   "message": "Opportunity not found",
   "statusCode": 404,
   "path": "/opportunities/abc",
@@ -38,8 +63,8 @@ A failed response:
 }
 ```
 
-`errors` is present only on a validation failure. `message` is a string, or
-several validation messages joined with `; `.
+That gap is tracked in the `researchos-localization` skill under "The
+current gap".
 
 **Changing either shape is a breaking change for every screen.** Backend and
 frontend deploy independently.
@@ -71,6 +96,31 @@ return toOpportunityResponse(record);
 return { success: true, data: record, message: '' };
 ```
 
+### The error schema is written twice, and the transform's copy wins
+
+`common/dto/api-response.dto.ts` declares `ApiErrorResponseDto` with the
+Swagger decorators, but the class is **not registered** with Swagger — the
+transform writes the `ApiErrorResponseDto` component by hand instead. The
+DTO class is documentation and the source of the frontend's type; the
+transform's hand-written schema is what lands in `openapi.json`.
+
+That is a drift risk, so it is guarded:
+`common/openapi/envelope-transform.spec.ts` runs the real exception filter
+and asserts that the schema describes exactly the fields the filter sends.
+
+Note the two shapes differ slightly on purpose:
+
+| | `ApiErrorResponseDto` (the DTO class) | The transform's schema |
+| --- | --- | --- |
+| `success` | `boolean` with `example: false` | `boolean`, `enum: [false]` |
+| `data` | `nullable: true, enum: [null]` | `nullable: true, enum: [null]` |
+| `errors` | `items: { type: 'object' }` | full item shape with `field` and `messages` |
+
+The DTO class renders `data` as `type: number` — Swagger infers a type from
+the `null` literal — which is why the transform writes its own copy instead
+of reusing the class. Do not "simplify" the transform to reuse the DTO: the
+`nullable`/`enum` form is the one Orval accepts.
+
 ## Why the OpenAPI document is rewritten
 
 Swagger only knows the payload a controller declares. Without a transform,
@@ -92,7 +142,29 @@ Three rules the transform follows, each of which has caused a real bug:
   named `String`, `Number` or `Boolean` after regenerating.
 - **The error envelope's `data` is `nullable`, not `type: "null"`.** OpenAPI
   3.0 has no `null` type, and `type: "null"` makes Orval's spec validation
-  fail.
+  fail. This one is verified: running Orval against a spec that uses
+  `type: "null"` fails with
+
+  ```text
+  OpenAPI spec validation failed:
+  "must be equal to one of the allowed values: array, boolean, integer, number, object, string"
+  ```
+
+### Every error response points at the shared envelope
+
+The exception filter is global: the server answers **every** failure with
+`ApiErrorResponseDto`, whatever the route declares. The transform therefore
+*overwrites* the schema of every `4xx`/`5xx` response instead of leaving a
+route-declared one alone.
+
+That matters because the two would otherwise disagree silently. A route that
+declares `@ApiNotFoundResponse({ type: SomeDto })` would put `SomeDto` in the
+spec, the server would still send `ApiErrorResponseDto`, and the generated
+client would carry a type that never arrives on the wire.
+
+The `researchos-api-endpoint` skill forbids declaring a `type` on an error
+response, and `apps/api/src/openapi-rules.spec.ts` fails the test run when
+one does.
 
 ## How the frontend unwraps it
 
@@ -116,7 +188,7 @@ Use the helpers in `apps/web/src/lib/api-error.ts` rather than reaching into
 the axios shape by hand:
 
 ```typescript
-import { apiErrorMessage, apiFieldErrors } from '@/lib/api-error';
+import { apiErrorMessage } from '@/lib/api-error';
 
 <ErrorState title="Không tải được" message={apiErrorMessage(error)} />
 ```
@@ -131,6 +203,10 @@ the server actually sent.
 happens to have both fields would be unwrapped one level too far by the
 frontend mutator's `isEnvelope` check. Prefix or rename such fields.
 
+This is enforced, not just documented: the `schema.reservedFields` rule in
+`apps/api/src/common/openapi/openapi-rules.ts` fails the test run when a
+DTO declares both fields.
+
 ## Tests
 
 The envelope pieces have their own specs, and they are the ones to extend
@@ -140,15 +216,18 @@ when you change the contract:
 | --- | --- |
 | `common/interceptors/api-response.interceptor.spec.ts` | Success wrapping, null payload, no double-wrapping |
 | `common/filters/http-exception.filter.spec.ts` | Error envelope, validation grouping, no stack leak |
-| `common/openapi/envelope-transform.spec.ts` | Idempotency, inline primitives, error responses |
+| `common/openapi/envelope-transform.spec.ts` | Idempotency, inline primitives, error responses, schema/filter agreement |
+| `src/openapi-rules.spec.ts` | The document satisfies every rule in `openapi-rules.ts` |
 
 ## Checklist
 
 - [ ] The controller returns the **bare payload** — the interceptor applies the envelope
 - [ ] `@Api*Response` describes the **payload** type, not the envelope
+- [ ] **Error responses declare no `type`** — the filter always sends the shared error envelope, and the transform overwrites the schema
 - [ ] The error envelope's `data` stays `nullable`, not `type: "null"`
 - [ ] `openapi.json` has no component named `String`/`Number`/`Boolean`
 - [ ] The transform stays idempotent
+- [ ] The transform's error schema still matches what the filter sends
 - [ ] The frontend does not unwrap by hand and does not read `query.data.data`
 - [ ] Error messages are read through `apiErrorMessage()`, never `String(error)`
 - [ ] No business DTO uses the field names `success` or `data`

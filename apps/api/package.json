@@ -17,6 +17,7 @@
     "start:prod": "node dist/main",
     "lint": "oxlint --type-aware src/ test/",
     "openapi": "nest build && node scripts/export-openapi.mjs",
+    "openapi:check": "nest build && node scripts/export-openapi.mjs --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",

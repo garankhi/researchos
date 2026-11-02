@@ -7,5 +7,8 @@
  */
 
 export type DemoControllerGetSlowParams = {
+  /**
+   * Milliseconds to wait before answering. Capped at 30000.
+   */
   delay?: string;
 };

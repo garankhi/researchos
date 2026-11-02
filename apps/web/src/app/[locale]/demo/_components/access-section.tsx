@@ -1,6 +1,7 @@
 'use client';
 
 import { Box, Button, Stack, Typography } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
 
 /**
@@ -11,11 +12,13 @@ import { DemoNote, DemoRow, DemoSection } from './demo-ui';
  * gets a dedicated route under `/demo/access/*`.
  */
 export function AccessSection() {
+  const t = useTranslations('demo');
+
   return (
     <DemoSection
       id="access"
-      title="Access boundaries (404 / 401 / 403)"
-      description="Các route riêng gọi notFound(), unauthorized() và forbidden() trong lúc server render."
+      title={t('sections.access.title')}
+      description={t('sections.access.description')}
     >
       <Stack spacing={2}>
         <DemoRow label="notFound()">
@@ -25,7 +28,7 @@ export function AccessSection() {
             component="a"
             href="/demo/access/not-found"
           >
-            Mở trang 404
+            {t('actions.openRouteError')}
           </Button>
         </DemoRow>
 
@@ -36,7 +39,7 @@ export function AccessSection() {
             component="a"
             href="/demo/access/unauthorized"
           >
-            Mở trang 401
+            {t('actions.openRouteError')}
           </Button>
         </DemoRow>
 
@@ -47,13 +50,13 @@ export function AccessSection() {
             component="a"
             href="/demo/access/forbidden"
           >
-            Mở trang 403
+            {t('actions.openRouteError')}
           </Button>
         </DemoRow>
 
         <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Route lỗi cấp segment
+            {t('labels.segmentError')}
           </Typography>
           <Stack direction="row" spacing={1}>
             <Button
@@ -75,10 +78,7 @@ export function AccessSection() {
           </Stack>
         </Box>
 
-        <DemoNote>
-          `forbidden()` và `unauthorized()` cần `experimental.authInterrupts:
-          true` trong next.config.ts — thiếu thì Next sẽ báo lỗi build.
-        </DemoNote>
+        <DemoNote>{t('notes.authInterrupts')}</DemoNote>
       </Stack>
     </DemoSection>
   );

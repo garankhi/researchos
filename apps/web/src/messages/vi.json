@@ -39,7 +39,8 @@
   },
   "home": {
     "apiStatus": "Trạng thái API",
-    "apiResponse": "API trả về: {status} ({service})"
+    "apiResponse": "API trả về: {status} ({service})",
+    "loadingStatus": "Đang tải trạng thái API…"
   },
   "errors": {
     "title": "Đã xảy ra lỗi khi tải trang",
@@ -49,14 +50,30 @@
     "unknown": "Đã xảy ra lỗi không xác định.",
     "componentTitle": "Lỗi ở cấp component",
     "apiUnreachableTitle": "Không kết nối được API",
-    "apiUnreachableDescription": "Hãy chắc chắn API đang chạy tại cổng 4000, rồi thử lại.",
+    "apiUnreachableDescription": "Hãy chắc chắn apps/api đang chạy tại cổng 4000, rồi thử lại.",
     "loadFailedTitle": "Không tải được dữ liệu",
     "loadFailedDescription": "Mô tả cụ thể: máy chủ từ chối kết nối sau 3 lần thử.",
-    "requestFailedTitle": "Tải thất bại"
+    "requestFailedTitle": "Tải thất bại",
+    "codes": {
+      "server_error": "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.",
+      "validation_failed": "Dữ liệu gửi lên không hợp lệ.",
+      "not_found": "Không tìm thấy dữ liệu.",
+      "forbidden": "Bạn không có quyền thực hiện thao tác này.",
+      "unauthorized": "Bạn cần đăng nhập để tiếp tục.",
+      "conflict": "Dữ liệu đã tồn tại.",
+      "title_required": "Tiêu đề là bắt buộc.",
+      "title_invalid": "Tiêu đề phải là chuỗi ký tự.",
+      "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
+      "email_required": "Email là bắt buộc.",
+      "email_invalid": "Email không hợp lệ.",
+      "status_invalid": "Trạng thái không hợp lệ.",
+      "email_already_registered": "Email này đã được đăng ký.",
+      "status_required": "Trạng thái là bắt buộc."
+    }
   },
   "notFound": {
     "title": "Không tìm thấy trang",
-    "description": "Trang bạn tìm không tồn tại, đã bị xóa hoặc đã được chuyển sang địa chỉ khác."
+    "description": "Trang bạn đang tìm không tồn tại, đã bị xóa hoặc đã được chuyển sang địa chỉ khác."
   },
   "unauthorized": {
     "title": "Cần đăng nhập",
@@ -69,7 +86,7 @@
   },
   "demo": {
     "title": "Demo & kiểm thử",
-    "description": "Trang này tập hợp các quy ước của frontend: MUI, Tailwind, dark mode, loading, error, truy cập và API client. Dùng để kiểm tra nhanh sau mỗi thay đổi.",
+    "description": "Trang này tập hợp các quy ước của frontend: MUI, Tailwind, dark mode, loading, error, form, truy cập và API client. Dùng để kiểm tra nhanh sau mỗi thay đổi.",
     "sections": {
       "mui": {
         "title": "MUI components",
@@ -101,6 +118,10 @@
       },
       "suspense": {
         "title": "Suspense fallback"
+      },
+      "forms": {
+        "title": "Biểu mẫu",
+        "description": "zod schema, react-hook-form và MUI form components — toàn bộ convention của form."
       }
     },
     "actions": {
@@ -128,6 +149,7 @@
       "chips": "Chips",
       "inputs": "Inputs",
       "typography": "Typography",
+      "text": "Text",
       "computedBackground": "Computed background",
       "reference": "Tham chiếu: {value}",
       "tailwindWins": "Tailwind thắng",
@@ -146,7 +168,7 @@
       "cancelOnNavigate": "Bấm rồi điều hướng đi nơi khác trước khi response về: request sẽ bị huỷ và component không báo lỗi.",
       "noRetry": "Endpoint này dùng `retry: false` để lỗi hiện ra ngay. Mặc định TanStack Query retry 3 lần với backoff luỹ thừa.",
       "cascade": "Nếu kết quả là “Chưa khớp”, layer `mui` đang nằm trên `utilities` — kiểm tra lại `@layer` trong globals.css và `enableCssLayer` trong layout.tsx.",
-      "themeBridge": "Nếu class trên <html> không khớp với next-themes thì bridge trong theme-provider.tsx đã hỏng.",
+      "themeBridge": "Nếu class trên '<html>' không khớp với next-themes thì bridge trong theme-provider.tsx đã hỏng.",
       "themeHydrating": "Đang chờ mount — không thể đọc trạng thái phía client.",
       "errorBoundary": "Ném lỗi một lần; nút “Thử lại” trong boundary gọi `retry()` và component hoạt động trở lại. Boundary dùng `catchError` từ `next/error`: `redirect()` và `notFound()` vẫn đi xuyên qua thay vì bị nuốt thành lỗi chung.",
       "authInterrupts": "`forbidden()` và `unauthorized()` cần `experimental.authInterrupts: true` trong next.config.ts — thiếu thì Next sẽ báo lỗi build.",
@@ -154,6 +176,9 @@
       "muiSystemProps": "MUI v9 bỏ các system props (gap, flex, py, px, alignItems) khỏi prop surface trực tiếp — chúng phải đi qua `sx`, nếu không sẽ lọt ra DOM dưới dạng HTML attribute không hợp lệ."
     },
     "typography": {
+      "heading1": "Heading 1",
+      "heading5": "Heading 5",
+      "subtitle1": "Subtitle 1",
       "body1": "Body 1 — dòng chữ chuẩn để dùng.",
       "body2": "Body 2 — phụ, dành cho mô tả.",
       "caption": "Caption — chú thích nhỏ."
@@ -167,6 +192,8 @@
     },
     "loading": {
       "toggle": "Ẩn/hiện",
+      "show": "Hiện lại",
+      "hide": "Ẩn đi",
       "rectangularCircular": "Rectangular + circular",
       "multipleLines": "Nhiều dòng",
       "listItem": "List item",
@@ -175,6 +202,49 @@
       "emptyTitle": "Chưa có kết quả",
       "emptyMessage": "Bộ lọc hiện tại không khớp mục nào.",
       "clearFilters": "Xóa bộ lọc"
+    },
+    "mui": {
+      "contained": "Contained",
+      "outlined": "Outlined",
+      "text": "Text",
+      "error": "Error",
+      "disabled": "Disabled",
+      "chipDefault": "Default",
+      "chipSuccess": "Success",
+      "chipWarning": "Warning",
+      "chipDeletable": "Deletable",
+      "inputText": "Text",
+      "inputDisabled": "Disabled"
+    },
+    "cascade": {
+      "heading": "Tailwind bg-amber-500 vs MUI backgroundColor",
+      "body": "MUI đặt backgroundColor là primary.main; Tailwind đặt bg-amber-500."
+    },
+    "theme": {
+      "htmlClass": "'<html>' class: \"{value}\"",
+      "htmlClassEmpty": "(trống)",
+      "nextThemesResolved": "next-themes: {value}",
+      "nextThemesUnresolved": "chưa gán",
+      "nextThemesMounting": "next-themes: (đang mount)"
+    },
+    "errorSection": {
+      "sharedState": "ErrorState dùng chung (có nút thử lại)",
+      "healthy": "Component đang hoạt động bình thường.",
+      "intentional": "Lỗi cố ý từ component demo",
+      "routeLevel": "Lỗi cấp route (app/error.tsx) — dùng nút bên dưới"
+    },
+    "forms": {
+      "titleLabel": "Tiêu đề",
+      "emailLabel": "Email",
+      "statusLabel": "Trạng thái",
+      "statusDraft": "Bản nháp",
+      "statusActive": "Đang hoạt động",
+      "subscribeLabel": "Nhận thông báo",
+      "hint": "Gửi form rỗng để xem lỗi validation hiển thị bên dưới mỗi trường.",
+      "actions": "Hành động",
+      "submit": "Gửi",
+      "reset": "Đặt lại",
+      "note": "Thông báo lỗi là mã (ví dụ {unknown}) được tra cứu trong catalog, không phải câu tiếng Anh."
     }
   }
 }
