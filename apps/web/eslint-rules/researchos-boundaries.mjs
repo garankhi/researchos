@@ -1,10 +1,10 @@
 /**
  * ESLint rules that enforce the ResearchOS frontend boundaries.
  *
- * These three rules used to be prose in the `researchos-ui` skill and in
- * `apps/web/src/features/README.md`. Prose does not fail a build, so a
- * reviewer was the only thing standing between the codebase and a
- * cross-feature import or a domain entity leaking into a shared primitive.
+ * These three rules used to be prose in the `researchos-ui` skill. Prose
+ * does not fail a build, so a reviewer was the only thing standing between
+ * the codebase and a cross-feature import or a domain entity leaking into a
+ * shared primitive.
  *
  * Each rule here mirrors one documented convention:
  *

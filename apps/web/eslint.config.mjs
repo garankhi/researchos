@@ -60,9 +60,9 @@ const eslintConfig = defineConfig([
     // The ResearchOS boundary rules.
     //
     // These three conventions used to live only in the `researchos-ui`
-    // skill and in `src/features/README.md`. Prose does not fail a build,
-    // so a cross-feature import or a domain entity in a shared primitive
-    // would only be caught in review. The rules live in
+    // skill. Prose does not fail a build, so a cross-feature import or a
+    // domain entity in a shared primitive would only be caught in review.
+    // The rules live in
     // `eslint-rules/researchos-boundaries.mjs` because two of them need the
     // filesystem — the backend module list is read from disk, not
     // hardcoded.
