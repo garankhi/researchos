@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "infra:status": "docker compose ps",
@@ -23,6 +24,10 @@
     "db:migrate:deploy": "turbo run db:migrate:deploy",
     "db:status": "turbo run db:status",
     "db:drift": "turbo run db:drift",
+    "db:setup": "turbo run db:setup",
+    "db:seed": "turbo run db:seed",
+    "db:seed:online": "turbo run db:seed:online",
+    "db:taxonomy:export": "turbo run db:taxonomy:export",
     "db:studio": "turbo run db:studio",
     "format": "turbo run format"
   },

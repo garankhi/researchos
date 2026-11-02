@@ -29,6 +29,14 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    // The command that `prisma db seed` runs. The seed script imports the
+    // compiled Prisma client from `dist/`, so the package has to be built
+    // before it runs; `db:seed` in package.json does that.
+    //
+    // This is the offline seed, which reads the committed snapshot. The
+    // online variant, which fetches the taxonomy from OpenAlex, is
+    // `db:seed:online`.
+    seed: 'node scripts/seed.mjs',
   },
   datasource: {
     url: process.env.DATABASE_URL ?? '',

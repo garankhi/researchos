@@ -155,6 +155,113 @@ thay đổi sửa SQL mà quên introspect lại sẽ bị chặn trước khi m
 Khi cần đồng bộ lại, dùng `prisma db pull --print` như bước 4 ở trên; lệnh
 drift chỉ báo lệch, không tự sửa `schema.prisma`.
 
+## Dựng database mới: `pnpm db:setup`
+
+Đây là lệnh onboarding. Nó tạo database nếu chưa có, áp dụng migration rồi
+seed taxonomy từ snapshot có sẵn trong repo — **không cần mạng, không cần
+OpenAlex API key**.
+
+```powershell
+pnpm infra:up       # bật PostgreSQL và Redis
+pnpm db:setup
+```
+
+Lệnh chạy theo thứ tự:
+
+1. Tạo database nếu chưa tồn tại (đối với PostgreSQL không do Compose quản
+   lý; Compose tự tạo qua `POSTGRES_DB`).
+2. `prisma migrate deploy` — áp dụng migration.
+3. `pnpm db:seed` — nhập taxonomy từ snapshot, và tạo tài khoản development.
+
+```powershell
+pnpm db:setup
+```
+
+## Dữ liệu tham chiếu: `pnpm db:seed`
+
+Lệnh này nhập taxonomy OpenAlex vào `research_fields`, `research_subfields`
+và `research_topics`, đồng thời tạo tài khoản development.
+
+```powershell
+pnpm db:seed
+```
+
+Lệnh đọc từ **snapshot có sẵn** trong repo
+(`packages/database/scripts/data/openalex-taxonomy.json`), nên chạy nhanh và
+không cần mạng.
+
+Cả ba cấp dùng `source = 'OPENALEX'` và `external_id` là canonical URL của
+OpenAlex. Taxonomy được **nhập một lần, không đồng bộ định kỳ** — topic do
+người dùng đề xuất mới là thứ đi qua hàng đợi duyệt, topic nhập từ nguồn
+không cần duyệt.
+
+Mỗi lần chạy là idempotent: ghi bằng upsert trên `(source, external_id)`,
+nên chạy lại cho ra cùng các dòng với cùng id nội bộ. Lệnh tự build package
+trước, vì seed dùng Prisma client đã biên dịch trong `dist/` (Prisma 7 sinh
+client dạng TypeScript, Node không chạy được trực tiếp).
+
+Cùng cơ chế đó, `prisma db seed` cũng chạy được vì `prisma.config.ts` khai
+báo `migrations.seed`.
+
+### Nguồn trực tiếp từ OpenAlex: `pnpm db:seed:online`
+
+Bản seed tải taxonomy từ API OpenAlex thay vì đọc snapshot:
+
+```powershell
+pnpm db:seed:online
+```
+
+Cần mạng, mất khoảng 90 giây, và dùng chung hạn mức ngày của request không
+có API key. Chỉ dùng khi muốn nạp lại taxonomy từ nguồn.
+
+Hai bản seed dùng chung phần ghi vào database, nên kết quả giống hệt nhau.
+
+### Làm mới snapshot: `pnpm db:taxonomy:export`
+
+Lệnh này tải taxonomy từ OpenAlex và ghi lại file snapshot, theo thứ tự ổn
+định nên diff nhỏ:
+
+```powershell
+pnpm db:taxonomy:export
+```
+
+Snapshot được commit vào repo. Cập nhật nó bằng tay, kèm code đã đổi, chứ
+không phải tự động mỗi lần seed.
+
+### Tài khoản development
+
+Tài khoản development cho local login (FPTU SSO chưa có tài liệu) được tạo
+cùng lúc với taxonomy, bởi cả `pnpm db:seed` và `pnpm db:seed:online`:
+
+```powershell
+pnpm db:seed
+```
+
+Bốn tài khoản, phủ đúng các vai trò cần phát triển:
+
+| Email | `user_type` | Quyền |
+| --- | --- | --- |
+| `admin@researchos.local` | `STAFF` | `ADMIN` + `RESEARCHER` |
+| `faculty@researchos.local` | `FACULTY` | researcher qua luật nền, không có dòng grant |
+| `student@researchos.local` | `STUDENT` | `RESEARCHER` |
+| `guest@researchos.local` | `STAFF` | không có quyền |
+
+`FACULTY` là researcher nhờ luật nền trong `effective_user_access`, nên không
+cần dòng `user_role_assignments` nào. Các grant khác dùng
+`grant_source = 'SYSTEM'` với `granted_by = NULL`, đúng theo check
+`ck_grant_source_actor`.
+
+Mật khẩu của cả bốn tài khoản là `ResearchOS!Dev2026`, hash bằng Argon2id.
+PHC string lưu kèm thuật toán và tham số
+(`$argon2id$v=19$m=...,t=...,p=...`), nên backend đọc được thông số để verify.
+
+Tài khoản này dùng chung một mật khẩu đã biết, nên chỉ có ý nghĩa ở máy
+local. `user_sessions` **không** được seed. Session phải do endpoint login cấp,
+vì chỉ endpoint đó biết token thô, còn database chỉ lưu hash của nó.
+
+Phần seed tài khoản cũng idempotent: tài khoản đã có thì giữ nguyên id và các
+grant, chỉ làm mới credential để mật khẩu mới có hiệu lực ngay.
+
 ## Quy trình tổng quát cho lần đồng bộ tiếp theo
 
 1. **Chốt bản SQL nghiệp vụ.** Kiểm tra file sinh ra từ DBML cùng
