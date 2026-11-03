@@ -201,7 +201,10 @@ Each row links to the section that shows the how.
 
 - [ ] `pnpm --filter api exec vitest run src/openapi-rules.spec.ts` passes
       → [openapi-rules.md](reference/openapi-rules.md#the-rules-are-enforced-by-code)
-- [ ] `pnpm build`, `pnpm lint`, `pnpm test` pass
+- [ ] `pnpm build`, `pnpm lint`, `pnpm format:check`, `pnpm test` pass
+      → [tooling.md](reference/tooling.md#commands)
+- [ ] `pnpm test:e2e` passes — only when the change touches the
+      API ↔ Redis ↔ worker path
       → [tooling.md](reference/tooling.md#commands)
 
 ## Verifying
@@ -209,10 +212,10 @@ Each row links to the section that shows the how.
 ```powershell
 pnpm --filter api openapi:check
 pnpm --filter api test
-pnpm build && pnpm lint && pnpm test
+pnpm build && pnpm lint && pnpm format:check && pnpm test
 ```
 
-All three must pass before the change is ready.
+All of them must pass before the change is ready.
 
 The OpenAPI rules are enforced by code, not by a reviewer — a red test names
 the rule, the location and the fix. Run the rules spec after touching a

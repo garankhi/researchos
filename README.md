@@ -175,12 +175,22 @@ trước rồi client sinh từ spec đó.
 ### 5. Kiểm tra trước khi commit
 
 ```powershell
-pnpm codegen && pnpm build && pnpm lint && pnpm test
+pnpm codegen && pnpm build && pnpm lint && pnpm format:check && pnpm test
 ```
 
 Đây đúng là những bước CI chạy, nên chạy đúng thứ tự này thì không có gì
 là bất ngờ khi mở PR. Nếu đổi DTO mà quên `pnpm codegen`, bước `build` ở
 trên vẫn pass — CI sẽ fail, nhưng muộn hơn là ở đây.
+
+`pnpm format:check` chỉ *báo* file chưa đúng format (không sửa). Muốn tự
+sửa thì chạy `pnpm format`.
+
+Nếu bạn đụng tới phần API ↔ Redis ↔ worker, chạy thêm bộ e2e — CI cũng
+chạy nó, trong một job riêng có Postgres và Redis:
+
+```powershell
+pnpm test:e2e
+```
 
 ### 6. Commit
 
@@ -220,8 +230,16 @@ key, flow label, base branch và lệnh verify.
 Base branch `dev` là điểm dễ sai nhất — merge vào `main` sẽ bỏ qua toàn bộ
 quy trình review của nhánh phát triển.
 
-CI chạy trên mỗi PR: codegen, kiểm tra artifact generated, lint, test, build,
-và schema drift. Đợi CI xanh rồi mới merge.
+CI chạy trên mỗi PR: codegen, kiểm tra artifact generated, lint, format check,
+test, build, và schema drift. Đợi CI xanh rồi mới merge.
+
+CI chia làm ba job:
+
+| Job | Chạy gì | Cần service |
+| --- | --- | --- |
+| `checks` | codegen, drift check, lint, format check, test, build, skill links | không |
+| `e2e` | bộ e2e API ↔ Redis ↔ worker | Postgres, Redis |
+| `schema-drift` | datamodel đã commit có khớp schema nguồn | Postgres |
 
 ### 8. Sau khi merge
 

@@ -21,7 +21,15 @@ pnpm --filter api openapi:check
 pnpm --filter api test
 pnpm --filter api lint
 pnpm --filter api build
-pnpm build && pnpm lint && pnpm test
+pnpm build && pnpm lint && pnpm format:check && pnpm test
+```
+
+The e2e suites live in `apps/api/test/` and are excluded from the default
+`pnpm test` run — they need a database and a Redis. Run them when the change
+touches the API ↔ Redis ↔ worker path:
+
+```powershell
+pnpm test:e2e
 ```
 
 ## Regenerate the contract
