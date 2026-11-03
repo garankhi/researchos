@@ -5,6 +5,8 @@ import { SESSION_RESOLVER } from '../../common/auth/session-resolver.js';
 import { RoleGuard } from '../../common/guards/role.guard.js';
 import { SessionGuard } from '../../common/guards/session.guard.js';
 import { AccessService } from './access.service.js';
+import { AuthController } from './auth.controller.js';
+import { AuthService } from './auth.service.js';
 import { SessionService } from './session.service.js';
 
 /**
@@ -41,8 +43,10 @@ import { SessionService } from './session.service.js';
  * two sources of truth for the session rules.
  */
 @Module({
+  controllers: [AuthController],
   providers: [
     AccessService,
+    AuthService,
     SessionService,
 
     // The resolver the guards ask. It is the session service itself, so

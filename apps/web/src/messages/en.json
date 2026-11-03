@@ -38,9 +38,23 @@
     "current": "Current language"
   },
   "home": {
+    "title": "ResearchOS",
     "apiStatus": "API status",
     "apiResponse": "API returned: {status} ({service})",
     "loadingStatus": "Loading API status…"
+  },
+  "identity": {
+    "title": "Sign in",
+    "subtitle": "Use your institutional email account to access ResearchOS.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "signedIn": "Signed in successfully.",
+    "signedOut": "You are not signed in.",
+    "signedOutToast": "Signed out.",
+    "signInAction": "Sign in",
+    "signOut": "Sign out",
+    "welcome": "Welcome, {name}."
   },
   "errors": {
     "title": "An error occurred while loading the page",
@@ -70,11 +84,17 @@
         "title_too_long": "Title must not exceed 200 characters.",
         "email_required": "Email is required.",
         "email_invalid": "Email is invalid.",
+        "email_too_long": "Email must not exceed 255 characters.",
+        "password_required": "Password is required.",
+        "password_too_long": "Password must not exceed 1024 characters.",
         "status_invalid": "The status is invalid.",
         "email_already_registered": "This email is already registered.",
         "status_required": "Status is required."
       },
       "domain": {
+        "invalid_credentials": "The email or password is incorrect.",
+        "account_inactive": "This account has been deactivated. Please contact an administrator.",
+        "must_change_password": "You need to change your password before continuing.",
         "opportunity_not_found": "The opportunity was not found."
       }
     }

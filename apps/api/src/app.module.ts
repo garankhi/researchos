@@ -35,13 +35,13 @@ import { JobsModule } from './modules/jobs/jobs.module.js';
     }),
     PrismaModule,
 
-    // The rate limiter. The session guard is registered globally, so a
-    // brute-force run against a protected route is bounded by the
-    // platform rather than by each route remembering to ask for it.
+    // The rate limiter. A login without one is an open credential-stuffing
+    // target, so the limit is part of the platform's contract rather than
+    // a per-route decoration.
     //
     // The default is deliberately loose — it is a backstop against a
-    // runaway client, not a quota. A route that needs a tighter bound
-    // tightens it further with `@Throttle`.
+    // runaway client, not a quota. The login route tightens it further
+    // with `@Throttle`.
     ThrottlerModule.forRoot([
       {
         name: 'default',

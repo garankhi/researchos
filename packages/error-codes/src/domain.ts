@@ -64,6 +64,11 @@ export type DomainCodeMap = Record<string, Record<string, string>>;
  * exists to prevent.
  */
 export const domainErrorCodes = {
+  identity: {
+    invalidCredentials: 'invalid_credentials',
+    accountInactive: 'account_inactive',
+    mustChangePassword: 'must_change_password',
+  },
   opportunities: {
     notFound: 'opportunity_not_found',
   },
