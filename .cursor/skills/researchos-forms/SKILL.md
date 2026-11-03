@@ -131,8 +131,7 @@ server. See the `researchos-localization` skill.
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Button } from '@mui/material';
-import { FormTextField } from '@/components/ui/form';
+import { FormSubmitButton, FormTextField } from '@/components/ui/form';
 import { profileFormSchema } from '../schemas/profile-form.schema';
 import type { ProfileFormValues } from '../schemas/profile-form.schema';
 
@@ -143,18 +142,18 @@ export function ProfileForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: { title: '', email: '', status: 'draft', subscribe: false },
   });
 
+  const mutation = useCreateProfile();
+
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <FormTextField name="title" label={t('title')} error={Boolean(errors.title)} />
-      <Button type="submit" loading={isSubmitting}>
-        {t('save')}
-      </Button>
+      <FormSubmitButton mutation={mutation} label={t('save')} />
     </form>
   );
 }
@@ -162,16 +161,17 @@ export function ProfileForm() {
 
 ## The shared primitives
 
-`components/ui/form.tsx` holds `FormTextField`, `FormSelect` and
-`FormCheckbox`. Use them instead of hand-rolling the wiring — each one
-registers the control, reflects the error state onto the MUI control, and
-resolves the error message through the catalog.
+`components/ui/form.tsx` holds `FormTextField`, `FormSelect`,
+`FormCheckbox` and `FormSubmitButton`. Use them instead of hand-rolling the
+wiring — each one registers the control, reflects the error state onto the
+MUI control, and resolves the error message through the catalog.
 
-| Primitive | Use for | Wiring |
+   | Primitive | Use for | Wiring |
 | --- | --- | --- |
 | `FormTextField` | A text input | `register` |
 | `FormSelect` | A dropdown | `Controller` |
 | `FormCheckbox` | A toggle | `Controller` |
+| `FormSubmitButton` | The submit button | the mutation's `isPending` |
 
 They read the form from `useFormContext()`, so the form component must
 wrap its children in `<FormProvider>`.
@@ -294,12 +294,28 @@ Three outcomes, three behaviours:
 | Server returns `400` | Map the field errors onto the inputs; keep the user on the page |
 | Server returns `5xx` | Show an `ErrorState` with a retry |
 
-The submit button uses MUI v9's built-in `loading` prop, bound to
-`isSubmitting` — not `isPending`, which is a query flag.
+The submit button uses `FormSubmitButton`, which is bound to the
+**mutation's** `isPending`.
 
 ```tsx
-<Button type="submit" loading={isSubmitting}>{t('save')}</Button>
+<FormSubmitButton mutation={mutation} label={t('save')} />
 ```
+
+### Why the mutation's flag and not the form's
+
+react-hook-form's `isSubmitting` is true from the moment the submit handler
+starts until its promise settles. A form that validates and then fires a
+mutation spends that time in two phases — and the request the user cares
+about is the second one. Bound to `isSubmitting`, the spinner appears
+during client-side validation and can stop before the server has answered.
+
+The mutation's `isPending` covers exactly the window that matters: the
+request is in flight. MUI v9's `loading` prop renders the spinner and
+disables the button, so a double submit is impossible while it runs.
+
+A **query's** `isPending` is never the right flag: it means "no data yet",
+and for a query with `enabled: false` it stays `true` forever, so the
+button would be permanently disabled.
 
 ## Checklist
 
@@ -313,7 +329,7 @@ The submit button uses MUI v9's built-in `loading` prop, bound to
 - [ ] Field errors are resolved with `resolveErrorCode()`, never rendered raw
 - [ ] Server-side field errors are mapped onto the inputs with `setError`
 - [ ] A `400` is caught, not thrown
-- [ ] The submit button uses `loading={isSubmitting}`
+- [ ] The submit button is `FormSubmitButton`, bound to the mutation's `isPending`
 - [ ] Success shows a snackbar; failure shows an inline error
 
 ## Reference

@@ -69,7 +69,7 @@ not know where a code came from still resolves it.
 
 Every backend failure has a status-derived fallback, so the frontend always
 has a key to resolve. The set is **fixed** — it lives in
-`apps/api/src/common/errors/error-codes.ts`.
+`packages/error-codes`, the package both sides import.
 
 | HTTP status | Code |
 | --- | --- |
@@ -84,7 +84,7 @@ has a key to resolve. The set is **fixed** — it lives in
 | 501 | `not_implemented` |
 | 503 | `service_unavailable` |
 
-A spec (`apps/api/src/common/errors/error-codes.spec.ts`) checks that every
+A spec (`apps/web/src/utils/error-codes.spec.ts`) checks that every
 generic code has an entry in **both** locales, so a missing one fails the
 test run instead of degrading silently.
 

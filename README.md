@@ -92,6 +92,8 @@ khoản.
 | `pnpm build` | Build toàn workspace |
 | `pnpm lint` | Lint toàn workspace |
 | `pnpm test` | Test toàn workspace |
+| `pnpm --filter web test` | Test riêng frontend (vitest) |
+| `pnpm --filter api test` | Test riêng backend |
 | `pnpm test:queue` | Test API → Redis → worker thật, tự khởi động worker thử |
 | `pnpm queue:probe` | Gửi một job kiểm tra đến worker đang chạy |
 | `pnpm codegen` | Sinh OpenAPI rồi client Orval cho web |

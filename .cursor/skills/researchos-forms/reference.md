@@ -26,9 +26,14 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Alert, Box, Button, Stack } from '@mui/material';
+import { Alert, Box, Stack } from '@mui/material';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
-import { FormTextField, FormSelect, FormCheckbox } from '@/components/ui/form';
+import {
+  FormTextField,
+  FormSelect,
+  FormCheckbox,
+  FormSubmitButton,
+} from '@/components/ui/form';
 import { apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveFieldErrorCodes } from '@/utils/error-messages';
 import { useCreateProfile } from '../hooks/use-create-profile';
@@ -47,7 +52,7 @@ export function ProfileForm() {
     control,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
@@ -114,9 +119,7 @@ export function ProfileForm() {
 
         <FormCheckbox name="subscribe" label={t('subscribe')} />
 
-        <Button type="submit" loading={isSubmitting}>
-          {t('save')}
-        </Button>
+        <FormSubmitButton mutation={mutation} label={t('save')} />
       </Stack>
     </Box>
   );

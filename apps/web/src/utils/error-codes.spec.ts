@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { genericErrorCodeList } from './error-codes.js';
+import { genericErrorCodeList } from '@researchos/error-codes';
 
 /**
  * The generic error codes must exist in the frontend's message catalog.
@@ -15,20 +15,17 @@ import { genericErrorCodeList } from './error-codes.js';
  * This spec closes that gap. It reads the real catalogs from disk and
  * fails when a generic code has no entry in either locale.
  *
+ * It lives here, in the web app, rather than in the API: the thing being
+ * checked is the *frontend's* catalog, so the frontend's test runner is
+ * its natural home. The code list itself comes from
+ * `@researchos/error-codes`, so the API and this spec read the same list
+ * and neither package reaches into the other's folder.
+ *
  * The domain codes are not checked here: they are defined per module, and
  * a module's own spec is where its codes belong.
  */
 
-const WEB_MESSAGES = resolve(
-  import.meta.dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'web',
-  'src',
-  'messages',
-);
+const MESSAGES = resolve(import.meta.dirname, '..', 'messages');
 
 type Catalog = {
   errors?: {
@@ -40,7 +37,7 @@ type Catalog = {
 };
 
 function readCatalog(locale: 'en' | 'vi'): Catalog {
-  const path = resolve(WEB_MESSAGES, `${locale}.json`);
+  const path = resolve(MESSAGES, `${locale}.json`);
 
   return JSON.parse(readFileSync(path, 'utf8')) as Catalog;
 }
@@ -134,7 +131,9 @@ describe('the error code catalog', () => {
       const catalog = readCatalog(locale);
 
       for (const code of RESOLVED_CODES) {
-        const found = TIERS.some((codes) => Object.hasOwn(codes(catalog), code));
+        const found = TIERS.some((codes) =>
+          Object.hasOwn(codes(catalog), code),
+        );
 
         expect(
           found,

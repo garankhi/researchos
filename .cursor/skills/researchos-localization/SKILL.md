@@ -290,10 +290,10 @@ not know where a code came from still resolves it. `resolveFieldErrorCodes()`
 prefers the field tier, because that is where validation codes live.
 
 **The generic codes are checked.** A spec in
-`apps/api/src/common/errors/error-codes.spec.ts` reads both catalogs from
+`apps/web/src/utils/error-codes.spec.ts` reads both catalogs from
 disk and fails when the backend can emit a generic code that a locale does
 not have. A missing entry is a bug in the catalog, and it is caught by
-`pnpm --filter api test` rather than by a user reporting a vague error.
+`pnpm --filter web test` rather than by a user reporting a vague error.
 
 A missing **domain** code is not caught by that spec — domain codes are
 defined per module, so a module's own spec is where they belong.
@@ -389,12 +389,12 @@ The backend side is done:
 - The exception filter emits a code in `message`: an exception whose
   message is a code keeps it, and everything else falls back to the
   generic code for the HTTP status (`codeForStatus()` in
-  `src/common/errors/error-codes.ts`).
+  `@researchos/error-codes`).
 - The global `ValidationPipe` runs with `errorFormat: 'grouped'`, so a
   field's real property path survives and each message keeps the code its
   class-validator decorator carried.
 - A spec checks that every generic code the backend can emit has an entry
-  in **both** locales, so a missing entry fails `pnpm --filter api test`.
+  in **both** locales, so a missing entry fails `pnpm --filter web test`.
 
 What still has to happen, per module:
 

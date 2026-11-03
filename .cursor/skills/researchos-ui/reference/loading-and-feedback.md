@@ -101,6 +101,10 @@ import { Button, CircularProgress, IconButton } from '@mui/material';
 `loading` implies `disabled`, so a double submit is impossible while the
 mutation is in flight.
 
+In a **form**, the submit button uses the `FormSubmitButton` primitive,
+which takes the mutation and binds `loading` to its `isPending` for you.
+See `researchos-forms`.
+
 ```typescript
 // Wrong — query.isPending can be true forever on a disabled query.
 <Button loading={query.isPending}>Lưu</Button>
@@ -138,6 +142,7 @@ rather than hand-rolling an equivalent.
 | `FormTextField` | A text input bound to react-hook-form — see `researchos-forms` |
 | `FormSelect` | A dropdown bound to react-hook-form — see `researchos-forms` |
 | `FormCheckbox` | A toggle bound to react-hook-form — see `researchos-forms` |
+| `FormSubmitButton` | The submit button, bound to the mutation's `isPending` — see `researchos-forms` |
 
 ## Mutation feedback
 

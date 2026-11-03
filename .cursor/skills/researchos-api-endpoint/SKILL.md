@@ -174,7 +174,7 @@ new code instead of repurposing an old one.
 | Domain | `errors.codes.domain.*` | The module |
 
 The generic codes are checked by a spec
-(`apps/api/src/common/errors/error-codes.spec.ts`) that fails the test run
+(`apps/web/src/utils/error-codes.spec.ts`) that fails the test run
 when a locale is missing one. A domain code is the module's own
 responsibility — add the entries in both locales in the same change that
 introduces the code.

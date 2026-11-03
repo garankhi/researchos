@@ -1,5 +1,5 @@
 /**
- * The error codes the API can emit.
+ * The API's error-code primitives.
  *
  * A code is a machine-readable identifier, never an English sentence. The
  * frontend resolves it against the `errors.codes` namespace of the message
@@ -9,65 +9,21 @@
  * Two kinds of code exist, and they live in two different places:
  *
  * - A **generic code**, derived from the HTTP status (`not_found`,
- *   `validation_failed`). The set is fixed here — it is a platform
- *   contract, and it does not grow.
+ *   `validation_failed`). The set is fixed in `@researchos/error-codes` —
+ *   it is a platform contract, and it does not grow.
  * - A **domain code**, specific to what failed (`opportunity_not_found`).
  *   A module raises one when it knows better than the status. Each module
  *   defines its own codes and adds the matching catalog entries in both
  *   locales in the same change.
  *
- * The frontend catalog mirrors this split: `errors.codes.*` holds the
- * generic codes, `errors.codes.fields.*` the validation constraints and
- * `errors.codes.domain.*` the domain ones.
+ * The generic codes live in their own package, without a NestJS
+ * dependency, so that the web app's catalog check can read the same list
+ * the API emits.
  */
 
 import { HttpException, HttpStatus } from '@nestjs/common';
 
-/**
- * The generic code for each HTTP status.
- *
- * The frontend catalog has an entry for each of these, so a failure that
- * carries no more specific code still resolves to a localized message
- * instead of falling back to a raw identifier.
- *
- * `genericErrorCodes` exposes the same set to the test that checks the
- * catalog against it — the two must never drift.
- */
-export const genericErrorCodes = {
-  [HttpStatus.BAD_REQUEST]: 'validation_failed',
-  [HttpStatus.UNAUTHORIZED]: 'unauthorized',
-  [HttpStatus.FORBIDDEN]: 'forbidden',
-  [HttpStatus.NOT_FOUND]: 'not_found',
-  [HttpStatus.CONFLICT]: 'conflict',
-  [HttpStatus.UNPROCESSABLE_ENTITY]: 'validation_failed',
-  [HttpStatus.TOO_MANY_REQUESTS]: 'rate_limited',
-  [HttpStatus.NOT_IMPLEMENTED]: 'not_implemented',
-  [HttpStatus.SERVICE_UNAVAILABLE]: 'service_unavailable',
-  [HttpStatus.INTERNAL_SERVER_ERROR]: 'server_error',
-} as const satisfies Partial<Record<HttpStatus, string>>;
-
-/**
- * The distinct generic codes, in the order they are listed above.
- *
- * Two statuses can share a code (`400` and `422` are both
- * `validation_failed`), so this is the set of *distinct* codes — which is
- * what the catalog has to cover.
- */
-export const genericErrorCodeList: string[] = [
-  ...new Set(Object.values(genericErrorCodes)),
-];
-
-/**
- * The code for a failure that has no more specific code.
- *
- * The mapping is total: every status resolves to a code, so the frontend
- * always has a key to look up.
- */
-export function codeForStatus(status: number): string {
-  const code = (genericErrorCodes as Record<number, string | undefined>)[status];
-
-  return code ?? 'server_error';
-}
+export { codeForStatus, genericErrorCodeList, genericErrorCodes } from '@researchos/error-codes';
 
 /**
  * An HTTP failure that carries a specific error code.
