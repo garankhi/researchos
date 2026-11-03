@@ -289,14 +289,28 @@ way to tell which tier a code belongs to.
 not know where a code came from still resolves it. `resolveFieldErrorCodes()`
 prefers the field tier, because that is where validation codes live.
 
-**The generic codes are checked.** A spec in
+**All three tiers are checked.** A spec in
 `apps/web/src/utils/error-codes.spec.ts` reads both catalogs from
-disk and fails when the backend can emit a generic code that a locale does
-not have. A missing entry is a bug in the catalog, and it is caught by
-`pnpm --filter web test` rather than by a user reporting a vague error.
+disk and fails when the backend can emit a code that a locale does not
+have — generic, field or domain. A missing entry is a bug in the catalog,
+and it is caught by `pnpm --filter web test` rather than by a user
+reporting a vague error.
 
-A missing **domain** code is not caught by that spec — domain codes are
-defined per module, so a module's own spec is where they belong.
+**A domain code is registered before it is used.** The domain tier used to
+be the one gap: the codes were each module's own responsibility, and
+nothing checked them. They live in a registry now —
+`packages/error-codes/src/domain.ts` — which the spec reads and the API
+raises from, so the three places a code touches are tied together:
+
+| # | Where | What |
+| --- | --- | --- |
+| 1 | `packages/error-codes/src/domain.ts` | The module's entry in `domainErrorCodes` |
+| 2 | `apps/web/src/messages/en.json` | Under `errors.codes.domain` |
+| 3 | `apps/web/src/messages/vi.json` | Under `errors.codes.domain` |
+
+Because the API raises a domain code by reading it off the registry, a
+code the registry does not list is a **compile error** — so a domain code
+cannot reach the wire without a catalog entry being required too.
 
 ### Why the code lives in `message`
 
@@ -382,7 +396,8 @@ What is true today, and what has to change:
 | `utils/error-messages.ts` | `resolveErrorCode`, `resolveFieldErrorCodes` | Done |
 | Catalog | `errors.codes` (generic), `errors.codes.fields`, `errors.codes.domain` | One entry per code the API can emit — the domain codes arrive with their module |
 | Frontend resolution | Wired | The same calls resolve to the catalog |
-| Generic code coverage | Checked by `error-codes.spec.ts` | A backend code with no catalog entry fails the test run |
+| Code coverage | Checked by `error-codes.spec.ts` | A code with no catalog entry fails the test run — generic, field and domain alike |
+| Domain code registry | `packages/error-codes/src/domain.ts` | A module registers its codes there and raises them from it |
 
 The backend side is done:
 
@@ -393,15 +408,20 @@ The backend side is done:
 - The global `ValidationPipe` runs with `errorFormat: 'grouped'`, so a
   field's real property path survives and each message keeps the code its
   class-validator decorator carried.
-- A spec checks that every generic code the backend can emit has an entry
-  in **both** locales, so a missing entry fails `pnpm --filter web test`.
+- A spec checks that every code the backend can emit has an entry in
+  **both** locales, so a missing entry fails `pnpm --filter web test`.
 
 What still has to happen, per module:
 
-- Each module defines the codes it can emit and adds one catalog entry per
-  code under `errors.codes.domain`, in **both** locales, in the same
-  change that introduces the code. A module raises a domain code with
-  `CodedHttpException`.
+- Each module registers the codes it can emit in
+  `packages/error-codes/src/domain.ts`, adds one catalog entry per code
+  under `errors.codes.domain` in **both** locales, and raises the code
+  with `CodedHttpException` reading it off the registry — all in the same
+  change.
+
+The registry is what makes that change safe: a module that raises a code
+it never registered does not compile, and a registered code with no
+catalog entry fails the test run.
 
 Until a module's codes are in the catalog, the frontend renders the
 localized fallback: `resolveErrorCode()` degrades to a localized message

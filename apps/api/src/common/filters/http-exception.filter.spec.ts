@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodedHttpException } from '../errors/error-codes.js';
+import { CodedHttpException, domainErrorCodes } from '../errors/error-codes.js';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
 /**
@@ -64,7 +64,7 @@ describe('HttpExceptionFilter', () => {
 
   it('sends the domain code when the exception carries one', () => {
     const exception = new CodedHttpException(
-      'opportunity_not_found',
+      domainErrorCodes.opportunities.notFound,
       HttpStatus.NOT_FOUND,
     );
     const { host, json } = hostFor(exception);

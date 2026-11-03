@@ -1,5 +1,5 @@
 /**
- * The generic error codes the ResearchOS API can emit.
+ * The error codes the ResearchOS API and web app share.
  *
  * A code is a machine-readable identifier, never an English sentence. The
  * frontend resolves it against the `errors.codes` namespace of the message
@@ -9,8 +9,8 @@
  * Two kinds of code exist, and they live in two different places:
  *
  * - A **generic code**, derived from the HTTP status (`not_found`,
- *   `validation_failed`). The set is fixed here — it is a platform
- *   contract, and it does not grow.
+ *   `validation_failed`). The set is fixed — it is a platform contract, and
+ *   it does not grow.
  * - A **domain code**, specific to what failed (`opportunity_not_found`).
  *   A module raises one when it knows better than the status. Each module
  *   defines its own codes and adds the matching catalog entries in both
@@ -22,15 +22,25 @@
  *
  * ## Why this lives in a package
  *
- * The generic codes are a contract between the two sides of the wire: the
- * API emits them, the web app resolves them against its catalog. Keeping
- * the list in one place lets both sides import it, so the list cannot drift
- * and neither package has to reach into the other's folder.
+ * The codes are a contract between the two sides of the wire: the API
+ * emits them, the web app resolves them against its catalog. Keeping the
+ * lists in one place lets both sides import them, so the lists cannot
+ * drift and neither package has to reach into the other's folder.
  *
  * This module deliberately has **no dependency on NestJS**. The API maps
  * HTTP statuses onto these codes, but the mapping itself is plain data, and
  * the web app has no reason to pull a server framework in to read it.
+ *
+ * The domain codes live in `domain.ts`, for the same reason: the API
+ * raises them and the web app's catalog is checked against them.
  */
+
+export {
+  domainErrorCodeList,
+  domainErrorCodes,
+  isDomainErrorCode,
+} from './domain.js';
+export type { DomainCodeMap, DomainErrorCode } from './domain.js';
 
 /**
  * The generic code for each HTTP status.

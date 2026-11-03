@@ -166,6 +166,10 @@ Each row links to the section that shows the how.
       **and** `messages/en.json` under the tier it belongs to —
       `errors.codes`, `errors.codes.fields` or `errors.codes.domain`
       → [researchos-localization](../researchos-localization/SKILL.md)
+- [ ] A **domain** code the screen renders is registered in
+      `packages/error-codes/src/domain.ts` — the catalog check reads that
+      registry, so an unregistered code fails `pnpm --filter web test`
+      → [researchos-localization](../researchos-localization/SKILL.md)
 - [ ] `pnpm build`, `pnpm lint`, `pnpm test` pass
       → [tooling.md](reference/tooling.md#commands)
 - [ ] The change was checked in a browser, not just in the build — a passing

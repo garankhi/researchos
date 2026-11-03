@@ -16,14 +16,22 @@
  *   defines its own codes and adds the matching catalog entries in both
  *   locales in the same change.
  *
- * The generic codes live in their own package, without a NestJS
- * dependency, so that the web app's catalog check can read the same list
- * the API emits.
+ * The generic and domain codes live in their own package, without a
+ * NestJS dependency, so that the web app's catalog check can read the
+ * same lists the API emits.
  */
 
 import { HttpException, HttpStatus } from '@nestjs/common';
+import type { DomainErrorCode } from '@researchos/error-codes';
 
-export { codeForStatus, genericErrorCodeList, genericErrorCodes } from '@researchos/error-codes';
+export {
+  codeForStatus,
+  domainErrorCodeList,
+  domainErrorCodes,
+  genericErrorCodeList,
+  genericErrorCodes,
+} from '@researchos/error-codes';
+export type { DomainCodeMap } from '@researchos/error-codes';
 
 /**
  * An HTTP failure that carries a specific error code.
@@ -43,13 +51,26 @@ export { codeForStatus, genericErrorCodeList, genericErrorCodes } from '@researc
  * A code is a contract: renaming one breaks every translation that
  * references it. Add a new code instead of repurposing an old one.
  *
+ * ## Why the code is typed
+ *
+ * The `code` parameter accepts only the codes registered in
+ * `@researchos/error-codes`. That is what makes the registry the single
+ * place a domain code lives: a module cannot raise a code the registry
+ * does not list, because that is a compile error.
+ *
+ * And because the registry is what the frontend's catalog check reads, a
+ * code cannot be raised without a catalog entry being required too.
+ *
  * ```typescript
- * throw new CodedHttpException('opportunity_not_found', HttpStatus.NOT_FOUND);
+ * throw new CodedHttpException(
+ *   domainErrorCodes.opportunities.notFound,
+ *   HttpStatus.NOT_FOUND,
+ * );
  * ```
  */
 export class CodedHttpException extends HttpException {
   constructor(
-    readonly code: string,
+    readonly code: DomainErrorCode,
     status: HttpStatus,
   ) {
     super({ message: code, statusCode: status }, status);

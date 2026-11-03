@@ -88,6 +88,25 @@ A spec (`apps/web/src/utils/error-codes.spec.ts`) checks that every
 generic code has an entry in **both** locales, so a missing one fails the
 test run instead of degrading silently.
 
+### Domain codes
+
+One per specific failure a module can report — `opportunity_not_found`
+says more than `not_found`. They live in a registry,
+`packages/error-codes/src/domain.ts`, keyed by the module that owns them:
+
+```typescript
+export const domainErrorCodes = {
+  opportunities: {
+    notFound: 'opportunity_not_found',
+  },
+} as const satisfies DomainCodeMap;
+```
+
+The registry is the single source of truth: the frontend's catalog check
+reads it, and the API raises the codes from it. That is what makes an
+unregistered code impossible — `CodedHttpException` accepts only the
+registry's codes, so a string literal is a compile error.
+
 ### Field codes
 
 One per field constraint, qualified by the field it belongs to. Shared
@@ -186,20 +205,40 @@ for "title is required" lives in the catalog, not in the DTO.
 
 ### Adding a code
 
-1. Backend — throw with the code, or put it in the validator's `message`.
-2. `src/messages/vi.json` — add it under the tier it belongs to:
-   `errors.codes.domain` for a domain code, `errors.codes.fields` for a
-   validation constraint.
+**A domain code** touches three places, and all three change together:
+
+1. `packages/error-codes/src/domain.ts` — register it under the module's
+   own key:
+
+   ```typescript
+   export const domainErrorCodes = {
+     opportunities: {
+       notFound: 'opportunity_not_found',
+     },
+   } as const satisfies DomainCodeMap;
+   ```
+
+2. `src/messages/vi.json` — add it under `errors.codes.domain`.
 3. `src/messages/en.json` — the same key.
-4. Frontend — nothing. The lookup is by key.
+4. Backend — raise it by reading the code off the registry:
+
+   ```typescript
+   throw new CodedHttpException(
+     domainErrorCodes.opportunities.notFound,
+     HttpStatus.NOT_FOUND,
+   );
+   ```
+
+5. Frontend — nothing. The lookup is by key.
 
 A **generic** code needs no catalog edit: the backend owns that set, and
 `error-codes.spec.ts` checks both locales have every entry.
 
-A **domain** code is not checked by that spec — it is defined per module,
-so the module's own spec is where it belongs. Until the entry exists,
-`resolveErrorCode()` falls back to a localized message and logs the gap in
-development.
+A **domain** code is checked by that spec too — the registry is the list
+it compares against. A registered code with no entry in either locale
+fails the test run, and a code that is not registered cannot be raised
+at all: `CodedHttpException` accepts only the registry's codes, so
+passing a string literal is a compile error.
 
 ## Translation templates
 
