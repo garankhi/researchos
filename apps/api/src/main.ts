@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor.js';
@@ -12,7 +13,15 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.WEB_ORIGIN?.split(',') ?? true,
+    // The session rides an opaque cookie, so the browser has to be allowed
+    // to send it cross-origin. Without this the cookie never reaches the
+    // API and every request is signed out.
+    credentials: true,
   });
+
+  // The session guard reads the session cookie from `request.cookies`, so
+  // the cookie header has to be parsed into it.
+  app.use(cookieParser());
 
   // Global validation. `whitelist` strips properties that have no matching
   // DTO decorator, so a client cannot smuggle extra fields into a payload;

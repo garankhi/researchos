@@ -1,10 +1,12 @@
 import { resolve } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { resolveEnvFilePaths } from '@researchos/config';
 import { PrismaModule } from '@researchos/database';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { IdentityModule } from './modules/identity/identity.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
 
 /**
@@ -32,8 +34,25 @@ import { JobsModule } from './modules/jobs/jobs.module.js';
       ),
     }),
     PrismaModule,
+
+    // The rate limiter. The session guard is registered globally, so a
+    // brute-force run against a protected route is bounded by the
+    // platform rather than by each route remembering to ask for it.
+    //
+    // The default is deliberately loose — it is a backstop against a
+    // runaway client, not a quota. A route that needs a tighter bound
+    // tightens it further with `@Throttle`.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
+
     DemoModule,
     HealthModule,
+    IdentityModule,
     JobsModule,
   ],
 })
