@@ -57,3 +57,8 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+      # The skills are read by an agent, not by a person, so a broken link
+      # is not obvious to anyone. It is cheap to catch here: the check
+      # resolves every relative link and anchor in `.cursor/skills/`.
+      - name: Check the skill links
+        run: node scripts/check-skill-links.mjs
