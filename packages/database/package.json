@@ -35,6 +35,7 @@
     "db:seed:online": "pnpm run build && node scripts/seed-online.mjs",
     "db:taxonomy:export": "node scripts/export-taxonomy.mjs",
     "format": "prisma format",
+    "format:check": "prisma format && git diff --exit-code prisma/schema.prisma",
     "build": "tsc -p tsconfig.build.json",
     "prebuild": "pnpm run db:generate",
     "lint": "oxlint --type-aware src/",

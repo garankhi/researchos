@@ -17,6 +17,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:queue": "turbo run test:queue --filter=api",
+    "test:e2e": "turbo run test:e2e --filter=api",
     "queue:probe": "turbo run queue:probe --filter=api",
     "codegen": "turbo run codegen",
     "db:generate": "turbo run db:generate",
@@ -30,7 +31,8 @@
     "db:taxonomy:export": "turbo run db:taxonomy:export",
     "db:studio": "turbo run db:studio",
     "jira:commit-report": "node scripts/jira-commit-report.mjs",
-    "format": "turbo run format"
+    "format": "turbo run format",
+    "format:check": "turbo run format:check"
   },
   "keywords": [],
   "author": "",
