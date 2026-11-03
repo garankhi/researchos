@@ -101,9 +101,169 @@ khoản.
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ ở máy dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:studio` | Prisma Studio |
+| `pnpm jira:commit-report` | Sinh nội dung comment Jira từ commit trong range |
+
+## Quy trình làm một feature
+
+Từ lúc bắt đầu đến lúc có PR. Mỗi bước có một mục đích riêng — đừng bỏ
+bước nào chỉ vì "chạy được rồi".
+
+### 1. Lấy code mới nhất
+
+```powershell
+git checkout dev
+git pull
+```
+
+`dev` là nhánh mọi thay đổi được merge vào. Không commit thẳng lên `dev`.
+
+### 2. Tạo branch theo ticket
+
+```powershell
+git checkout -b feat/RES-<n>-<slug>
+```
+
+`<n>` là số ticket, `<slug>` mô tả ngắn thay đổi. Ví dụ
+`feat/RES-29-web-test-kit`.
+
+Mỗi ticket một branch, một commit. Không trộn hai ticket vào một branch.
+
+### 3. Viết code
+
+Chạy app trong terminal riêng:
+
+```powershell
+pnpm dev
+```
+
+Đọc [docs/api-convention.md](./docs/api-convention.md) trước khi tạo endpoint
+và [docs/database.md](./docs/database.md) trước khi đổi schema. Các skill
+trong `.cursor/skills/` mô tả quy ước của từng phần: `researchos-api-endpoint`
+cho endpoint, `researchos-ui` và `researchos-forms` cho frontend,
+`researchos-contract` cho envelope, `researchos-localization` cho i18n.
+
+### 4. Chạy `pnpm codegen` — **bắt buộc nếu đổi DTO**
+
+```powershell
+pnpm codegen
+```
+
+Lệnh này sinh `apps/api/openapi.json`, rồi sinh client Orval ở
+`apps/web/src/lib/api/` từ spec đó. Cả hai file đều được commit vào repo.
+
+> **Đổi DTO mà không chạy `pnpm codegen` là frontend dùng type cũ.**
+> `pnpm build` **không** sinh lại client. Đã kiểm chứng: thêm một field vào
+> `HealthStatusDto`, chạy `pnpm build` — `openapi.json` và client Orval
+> không đổi, field mới không có trong type của frontend. Chạy
+> `pnpm codegen` thì mới có. Frontend lúc đó vẫn build được nhưng đang gọi
+> API với type không khớp server.
+>
+> **Không cần build thủ công.** `pnpm codegen` tự build API: task `api#openapi`
+> chạy `nest build` rồi mới xuất spec. Lệnh này đủ để cập nhật cả spec lẫn
+> client.
+>
+> Lưu ý: `ApiErrorResponseDto` là envelope lỗi và được viết cứng trong
+> `apps/api/src/common/openapi/envelope-transform.ts`, nên thêm field vào đó
+> sẽ **không** xuất hiện trong spec. Field của envelope lỗi phải sửa ở
+> transform, không sửa ở DTO.
+
+`pnpm codegen` chạy `api#openapi` rồi `web#orval`, nên spec luôn được sinh
+trước rồi client sinh từ spec đó.
+
+### 5. Kiểm tra trước khi commit
+
+```powershell
+pnpm codegen && pnpm build && pnpm lint && pnpm test
+```
+
+Đây đúng là những bước CI chạy, nên chạy đúng thứ tự này thì không có gì
+là bất ngờ khi mở PR. Nếu đổi DTO mà quên `pnpm codegen`, bước `build` ở
+trên vẫn pass — CI sẽ fail, nhưng muộn hơn là ở đây.
+
+### 6. Commit
+
+```powershell
+git add -A
+git commit -m "feat(web): <mô tả ngắn> RES-<n>"
+```
+
+Quy ước commit: `<type>(<scope>): <mô tả> RES-<n>`.
+
+| Type | Dùng khi |
+| --- | --- |
+| `feat` | Thêm tính năng |
+| `fix` | Sửa lỗi |
+| `refactor` | Đổi cấu trúc, không đổi hành vi |
+| `docs` | Chỉ tài liệu |
+| `ci` | Workflow, script, tooling |
+| `chore` | Việc bảo trì khác |
+
+Scope là phần bị ảnh hưởng: `web`, `api`, `database`, `worker`, `queue`, `skills`.
+Một thay đổi có thể có nhiều scope: `feat(api,web): ...`.
+
+> **Một ticket, một commit.** Nếu một feature cần nhiều commit, tách theo
+> mốc review được, nhưng mỗi commit phải build được và không được vỡ.
+> PR dùng squash merge, nên commit trên branch là bản ghi review; commit
+> trên `dev` là một dòng duy nhất.
+
+### 7. Mở PR
+
+```powershell
+git push -u origin feat/RES-<n>-<slug>
+```
+
+Rồi mở PR vào **`dev`**, không phải `main`. Template PR sẽ điền sẵn: ticket
+key, flow label, base branch và lệnh verify.
+
+Base branch `dev` là điểm dễ sai nhất — merge vào `main` sẽ bỏ qua toàn bộ
+quy trình review của nhánh phát triển.
+
+CI chạy trên mỗi PR: codegen, kiểm tra artifact generated, lint, test, build,
+và schema drift. Đợi CI xanh rồi mới merge.
+
+### 8. Sau khi merge
+
+```powershell
+git checkout dev
+git pull
+git branch -d feat/RES-<n>-<slug>
+```
+
+Sinh nội dung comment để post lên Jira:
+
+```powershell
+pnpm jira:commit-report
+```
+
+Lệnh này đọc commit trong `origin/dev..HEAD` và in sẵn phần comment — nó không
+tự gọi Jira. Copy vào Jira, hoặc dùng làm nguồn cho comment.
+
+### Mở rộng: đổi schema database
+
+Thêm hai bước nữa, trước bước 5:
+
+```powershell
+pnpm db:generate
+pnpm db:migrate
+```
+
+`db:generate` cập nhật Prisma client, `db:migrate` tạo và áp migration (chỉ ở
+máy dev).
+
+> **Nguồn sự thật là file SQL, không phải Prisma.** Schema nghiệp vụ nằm ở
+> `docs/database/ResearchOS.sql`; `packages/database/prisma/schema.prisma` là
+> một bản *copy* được dùng để sinh client. Sửa schema thì sửa SQL, rồi
+> introspect lại datamodel — không sửa datamodel rồi migration, vì hai bên
+> sẽ lệch nhau. CI có job `schema-drift` dựng lại database từ SQL rồi so với
+> datamodel đã commit, nên quên bước này sẽ fail ở CI.
+>
+> Xem [docs/database-prisma-sync.md](./docs/database-prisma-sync.md) cho quy
+> trình đầy đủ, kể cả hai lỗi back-relation mà Prisma 7 sinh sai khi
+> introspect.
 
 ## Tài liệu
 
 Đọc [docs/architecture.md](./docs/architecture.md) trước khi thay đổi kiến trúc,
-[docs/api-convention.md](./docs/api-convention.md) trước khi tạo endpoint, và
-[docs/database.md](./docs/database.md) trước khi đổi schema.
+[docs/api-convention.md](./docs/api-convention.md) trước khi tạo endpoint,
+[docs/database.md](./docs/database.md) trước khi đổi schema, và
+[docs/github.md](./docs/github.md) trước khi đổi workflow hoặc ruleset.
