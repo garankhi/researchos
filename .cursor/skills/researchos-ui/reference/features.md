@@ -269,6 +269,6 @@ live in the `researchos-forms` skill, and eslint enforces them in
 | `researchosForms/select-requires-controller` | `<TextField select>` using `register()` instead of `Controller` |
 | `researchosForms/form-error-must-be-resolved` | An error message rendered raw instead of resolved through the catalog |
 
-Reusable controls: `FormTextField`, `FormSelect`, `FormCheckbox` in
-`src/components/ui/form.tsx` — they bind into the form and resolve the error
-message themselves.
+Reusable controls: `FormTextField`, `FormSelect`, `FormCheckbox` and
+`FormSubmitButton` in `src/components/ui/form.tsx` — they bind into the form
+and resolve the error message themselves.

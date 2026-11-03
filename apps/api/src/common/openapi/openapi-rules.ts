@@ -83,7 +83,9 @@ function isGeneratedSchema(name: string): boolean {
  * Returns the violations in the order they were found. An empty array means
  * the document satisfies every rule.
  */
-export function checkOpenApiDocument(document: OpenAPIObject): OpenApiViolation[] {
+export function checkOpenApiDocument(
+  document: OpenAPIObject,
+): OpenApiViolation[] {
   const violations: OpenApiViolation[] = [];
   const doc = document as unknown as JsonSchema;
   const schemas: JsonSchema = doc.components?.schemas ?? {};
@@ -352,7 +354,9 @@ function checkReservedFieldNames(
   }
 
   const properties = Object.keys(schema.properties ?? {});
-  const used = RESERVED_FIELD_NAMES.filter((field) => properties.includes(field));
+  const used = RESERVED_FIELD_NAMES.filter((field) =>
+    properties.includes(field),
+  );
 
   if (used.length === RESERVED_FIELD_NAMES.length) {
     violations.push({

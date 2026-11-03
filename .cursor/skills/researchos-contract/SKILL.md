@@ -221,8 +221,16 @@ when you change the contract:
 | `common/interceptors/api-response.interceptor.spec.ts` | Success wrapping, null payload, no double-wrapping |
 | `common/filters/http-exception.filter.spec.ts` | Error envelope, the code in `message`, validation grouping, no stack leak |
 | `common/openapi/envelope-transform.spec.ts` | Idempotency, inline primitives, error responses, schema/filter agreement |
-| `common/errors/error-codes.spec.ts` | Every generic code has an entry in both locale catalogs |
 | `src/openapi-rules.spec.ts` | The document satisfies every rule in `openapi-rules.ts` |
+
+The frontend side of the contract has its own specs, in `apps/web`:
+
+| Spec | Covers |
+| --- | --- |
+| `src/lib/axios-instance.spec.ts` | The envelope is unwrapped one level; `query.data` is the payload |
+| `src/lib/api-error.spec.ts` | The error helpers read the code, the field errors and the status |
+| `src/utils/error-messages.spec.ts` | A code resolves against the catalog, and never renders raw |
+| `src/utils/error-codes.spec.ts` | Every generic code has an entry in both locale catalogs |
 
 ## Checklist
 

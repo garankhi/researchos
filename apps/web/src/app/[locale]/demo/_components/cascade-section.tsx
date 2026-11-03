@@ -106,7 +106,9 @@ export function CascadeSection() {
             variant="outlined"
           />
           <Chip
-            label={t('labels.reference', { value: reference || t('theme.htmlClassEmpty') })}
+            label={t('labels.reference', {
+              value: reference || t('theme.htmlClassEmpty'),
+            })}
             size="small"
             variant="outlined"
           />

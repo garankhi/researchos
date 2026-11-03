@@ -74,7 +74,9 @@
         "email_already_registered": "This email is already registered.",
         "status_required": "Status is required."
       },
-      "domain": {}
+      "domain": {
+        "opportunity_not_found": "The opportunity was not found."
+      }
     }
   },
   "notFound": {

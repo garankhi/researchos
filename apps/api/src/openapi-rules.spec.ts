@@ -33,7 +33,8 @@ describe('OpenAPI document rules', () => {
 
     // The message lists every violation at once, so a failing run tells the
     // author exactly which routes and fields need fixing.
-    expect(violations.map((v) => `${v.rule} @ ${v.location}: ${v.message}`))
-      .toEqual([]);
+    expect(
+      violations.map((v) => `${v.rule} @ ${v.location}: ${v.message}`),
+    ).toEqual([]);
   });
 });

@@ -78,6 +78,7 @@ researchos/
   packages/
     config/               Cách tìm và nạp file .env dùng chung
     database/             Prisma schema, migration, client dùng chung API/worker
+    error-codes/          Mã lỗi generic dùng chung API/web
     contracts/            API contracts/client; không đưa ORM entities ra frontend
     backend-core/         Nghiệp vụ backend dùng chung cho API/worker nếu cần
   docs/
@@ -119,6 +120,10 @@ apps/web/src/
     axios-instance.ts       Mutator cho Orval; phải nằm ngoài api/
   theme/                    Cấu hình theme MUI
 ~~~
+
+Test của frontend nằm cạnh file nó test, đặt tên `*.spec.ts`:
+`apps/web/vitest.config.mts` chạy chúng bằng vitest. Chạy riêng web:
+`pnpm --filter web test`.
 
 Quy tắc giữ khi tổ chức frontend:
 

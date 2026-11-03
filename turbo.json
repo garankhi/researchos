@@ -24,6 +24,11 @@
       "cache": false,
       "passThroughEnv": ["DATABASE_URL", "REDIS_URL"]
     },
+    "test:e2e": {
+      "dependsOn": ["build", "worker#build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL"]
+    },
     "queue:probe": {
       "dependsOn": ["build"],
       "cache": false,
@@ -97,6 +102,10 @@
       "persistent": true
     },
     "format": {
+      "cache": false
+    },
+    "format:check": {
+      "dependsOn": ["^build"],
       "cache": false
     }
   }

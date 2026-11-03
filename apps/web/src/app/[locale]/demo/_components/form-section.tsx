@@ -3,11 +3,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
+import { useMutation } from '@tanstack/react-query';
 import { Alert, Box, Button, MenuItem, Stack } from '@mui/material';
 import { z } from 'zod';
 import {
   FormCheckbox,
   FormSelect,
+  FormSubmitButton,
   FormTextField,
 } from '@/components/ui/form';
 import { DemoNote, DemoRow, DemoSection } from './demo-ui';
@@ -20,8 +22,14 @@ import { DemoNote, DemoRow, DemoSection } from './demo-ui';
  * the state, the shared MUI form primitives for the controls, and the
  * message catalog for every label and error.
  *
+ * The submit button uses `FormSubmitButton`, which is bound to the
+ * **mutation's** `isPending` — not the form's `isSubmitting`. The form
+ * validates locally and then fires a mutation, and the two are separate
+ * windows: the spinner must track the request, not the validation.
+ *
  * It is deliberately local — it does not call the API — so the validation
- * behaviour can be observed without a backend running.
+ * behaviour can be observed without a backend running. The mutation
+ * simulates a request so the pending state is observable too.
  */
 
 const formSchema = z.object({
@@ -33,6 +41,16 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+/**
+ * A stand-in for a real request, so the pending state is observable
+ * without a backend running.
+ */
+function submitDemoForm(values: FormValues): Promise<FormValues> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(values), 1200);
+  });
+}
+
 export function FormSection() {
   const t = useTranslations('demo');
   const tError = useTranslations('errors');
@@ -40,7 +58,7 @@ export function FormSection() {
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,10 +69,12 @@ export function FormSection() {
     },
   });
 
+  const mutation = useMutation({ mutationFn: submitDemoForm });
+
   const onSubmit = handleSubmit((values) => {
     // A real form would call the mutation here. The demo shows the
     // validation behaviour, which is the part that is easy to get wrong.
-    window.alert(JSON.stringify(values, null, 2));
+    mutation.mutate(values);
   });
 
   return (
@@ -99,9 +119,7 @@ export function FormSection() {
           <Alert severity="info">{t('forms.hint')}</Alert>
 
           <DemoRow label={t('forms.actions')}>
-            <Button type="submit" loading={isSubmitting}>
-              {t('forms.submit')}
-            </Button>
+            <FormSubmitButton mutation={mutation} label={t('forms.submit')} />
             <Button type="button" variant="outlined" disabled={!isDirty}>
               {t('forms.reset')}
             </Button>

@@ -33,7 +33,8 @@ export class ApiResponseDto<T = unknown> {
   data: T;
 
   @ApiProperty({
-    description: 'Human readable message. Empty on success unless the endpoint sets one.',
+    description:
+      'Human readable message. Empty on success unless the endpoint sets one.',
     example: '',
   })
   message: string;

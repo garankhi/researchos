@@ -9,6 +9,8 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import type { FormControlLabelProps } from '@mui/material/FormControlLabel';
+import Button from '@mui/material/Button';
+import type { ButtonProps } from '@mui/material/Button';
 import { resolveErrorCode } from '@/utils/error-messages';
 
 /**
@@ -240,5 +242,61 @@ export function FormCheckbox<
         </FormControl>
       )}
     />
+  );
+}
+
+/**
+ * The submit button of a form.
+ *
+ * It is bound to the **mutation's** `isPending`, never the form's
+ * `isSubmitting` and never a query's `isPending`.
+ *
+ * ## Why the form's own state is not enough
+ *
+ * react-hook-form's `isSubmitting` is true from the moment the submit
+ * handler starts until the handler's promise settles. A form that validates
+ * and then fires a mutation spends that time in two phases — and the
+ * request the user actually cares about is the second one. Binding the
+ * button to `isSubmitting` therefore shows the spinner during client-side
+ * validation, and it can stop showing it before the server has answered.
+ *
+ * The mutation's `isPending` covers exactly the window that matters: the
+ * request is in flight.
+ *
+ * ## Why never a query's `isPending`
+ *
+ * `isPending` on a query means "no data yet". For a query with
+ * `enabled: false` that stays `true` forever, so a button bound to it
+ * would be permanently disabled. A mutation that has not fired is not
+ * pending, so its flag is the correct signal.
+ *
+ * MUI v9's `loading` prop renders a spinner and disables the button, so a
+ * double submit is impossible while the request is in flight.
+ *
+ * ```tsx
+ * const mutation = useCreateProfile();
+ *
+ * <FormSubmitButton mutation={mutation} label={t('save')} />
+ * ```
+ */
+export function FormSubmitButton({
+  mutation,
+  label,
+  ...buttonProps
+}: {
+  /**
+   * The mutation whose request the button reflects.
+   *
+   * Only `isPending` is read — the primitive does not care what the
+   * mutation does with the data.
+   */
+  mutation: { isPending: boolean };
+  /** The button label. Always a translated string. */
+  label: React.ReactNode;
+} & Omit<ButtonProps, 'loading' | 'type'>) {
+  return (
+    <Button type="submit" loading={mutation.isPending} {...buttonProps}>
+      {label}
+    </Button>
   );
 }

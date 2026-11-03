@@ -98,7 +98,7 @@ Each row links to the section that shows the how.
       *enabled* query
       → [data-and-errors.md](reference/data-and-errors.md#query-state-cheat-sheet)
 - [ ] A detail query guards the request with `enabled: Boolean(id)`
-      → [features.md](reference/features.md#hooksuse-profilets-detail)
+      → [features.md](reference/features.md#hooksuse-profilets--detail)
 - [ ] Errors are read through `apiErrorCode()`, never `String(error)`
       → [data-and-errors.md](reference/data-and-errors.md#the-response-envelope-in-one-line)
 - [ ] Backend error text is resolved with `resolveErrorCode()` /
@@ -132,7 +132,7 @@ Each row links to the section that shows the how.
       → [routing.md](reference/routing.md#error-states)
 - [ ] `error.tsx` uses `retry`, narrows `error` from `unknown`, and is not
       exported as `Error`
-      → [routing.md](reference/routing.md#segment-appsegmenterrortsx)
+      → [routing.md](reference/routing.md#segment--appsegmenterrortsx)
 - [ ] `notFound()` / `unauthorized()` / `forbidden()` are called from a
       dedicated route, never from a click handler
       → [routing.md](reference/routing.md#access-boundaries)
@@ -165,6 +165,10 @@ Each row links to the section that shows the how.
 - [ ] Every code the API can emit has an entry in `messages/vi.json`
       **and** `messages/en.json` under the tier it belongs to —
       `errors.codes`, `errors.codes.fields` or `errors.codes.domain`
+      → [researchos-localization](../researchos-localization/SKILL.md)
+- [ ] A **domain** code the screen renders is registered in
+      `packages/error-codes/src/domain.ts` — the catalog check reads that
+      registry, so an unregistered code fails `pnpm --filter web test`
       → [researchos-localization](../researchos-localization/SKILL.md)
 - [ ] `pnpm build`, `pnpm lint`, `pnpm test` pass
       → [tooling.md](reference/tooling.md#commands)

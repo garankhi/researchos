@@ -68,7 +68,9 @@ export function MuiSection() {
           </Typography>
           <Typography variant="h1">{t('typography.heading1')}</Typography>
           <Typography variant="h5">{t('typography.heading5')}</Typography>
-          <Typography variant="subtitle1">{t('typography.subtitle1')}</Typography>
+          <Typography variant="subtitle1">
+            {t('typography.subtitle1')}
+          </Typography>
           <Typography variant="body1">{t('typography.body1')}</Typography>
           <Typography variant="body2" color="text.secondary">
             {t('typography.body2')}

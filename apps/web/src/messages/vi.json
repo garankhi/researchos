@@ -74,7 +74,9 @@
         "email_already_registered": "Email này đã được đăng ký.",
         "status_required": "Trạng thái là bắt buộc."
       },
-      "domain": {}
+      "domain": {
+        "opportunity_not_found": "Không tìm thấy cơ hội."
+      }
     }
   },
   "notFound": {
