@@ -28,8 +28,12 @@ const settingKeys = ['profile', 'account', 'dashboard', 'logout'] as const;
 
 function ResponsiveAppBar() {
   const t = useTranslations('nav');
-  const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
-  const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
+  const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(
+    null,
+  );
+  const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(
+    null,
+  );
 
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElNav(event.currentTarget);
@@ -95,7 +99,9 @@ function ResponsiveAppBar() {
             >
               {pageKeys.map((page) => (
                 <MenuItem key={page} onClick={handleCloseNavMenu}>
-                  <Typography sx={{ textAlign: 'center' }}>{t(page)}</Typography>
+                  <Typography sx={{ textAlign: 'center' }}>
+                    {t(page)}
+                  </Typography>
                 </MenuItem>
               ))}
             </Menu>
@@ -127,7 +133,9 @@ function ResponsiveAppBar() {
               </Button>
             ))}
           </Box>
-          <Box sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}
+          >
             <SearchBar />
             <LanguageToggle />
             <ThemeToggle />
@@ -154,7 +162,9 @@ function ResponsiveAppBar() {
             >
               {settingKeys.map((setting) => (
                 <MenuItem key={setting} onClick={handleCloseUserMenu}>
-                  <Typography sx={{ textAlign: 'center' }}>{t(setting)}</Typography>
+                  <Typography sx={{ textAlign: 'center' }}>
+                    {t(setting)}
+                  </Typography>
                 </MenuItem>
               ))}
             </Menu>

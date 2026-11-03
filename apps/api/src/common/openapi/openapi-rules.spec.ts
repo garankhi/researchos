@@ -167,7 +167,9 @@ describe('checkOpenApiDocument', () => {
               '200': { description: 'ok' },
               '404': {
                 description: 'Not found',
-                content: { 'application/json': { schema: { $ref: ERROR_REF } } },
+                content: {
+                  'application/json': { schema: { $ref: ERROR_REF } },
+                },
               },
             },
           }),
@@ -184,7 +186,12 @@ describe('checkOpenApiDocument', () => {
         '/profiles/{id}': {
           get: operation({
             parameters: [
-              { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+              {
+                name: 'id',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
             ],
           }),
         },
@@ -314,7 +321,12 @@ describe('checkOpenApiDocument', () => {
         get: operation({
           summary: undefined,
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
           ],
         }),
       },

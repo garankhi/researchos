@@ -47,7 +47,10 @@ export default function GlobalError({
             'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
         }}
       >
-        <NextIntlClientProvider locale={routing.defaultLocale} messages={messages}>
+        <NextIntlClientProvider
+          locale={routing.defaultLocale}
+          messages={messages}
+        >
           <GlobalErrorCopy onRetry={() => retry()} />
         </NextIntlClientProvider>
       </body>

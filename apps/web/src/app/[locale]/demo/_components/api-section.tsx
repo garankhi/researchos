@@ -66,9 +66,7 @@ export function ApiSection() {
               disabled={health.isFetching}
               onClick={() => void health.refetch()}
             >
-              {health.isFetching
-                ? tCommon('loading')
-                : t('actions.callAgain')}
+              {health.isFetching ? tCommon('loading') : t('actions.callAgain')}
             </Button>
             <Button
               size="small"
@@ -137,7 +135,11 @@ export function ApiSection() {
             ) : slow.isError ? (
               <ErrorState
                 title={tErrors('requestFailedTitle')}
-                message={resolveErrorCode(tErrors, apiErrorCode(slow.error), tErrors('unknown'))}
+                message={resolveErrorCode(
+                  tErrors,
+                  apiErrorCode(slow.error),
+                  tErrors('unknown'),
+                )}
                 onRetry={() => void slow.refetch()}
               />
             ) : slow.isSuccess ? (
@@ -179,7 +181,11 @@ export function ApiSection() {
             ) : failing.isError ? (
               <ErrorState
                 title={t('states.expectedFailure')}
-                message={resolveErrorCode(tErrors, apiErrorCode(failing.error), tErrors('unknown'))}
+                message={resolveErrorCode(
+                  tErrors,
+                  apiErrorCode(failing.error),
+                  tErrors('unknown'),
+                )}
                 onRetry={() => void failing.refetch()}
               />
             ) : failing.isSuccess ? (
@@ -216,7 +222,11 @@ export function ApiSection() {
             ) : unstable.isError ? (
               <ErrorState
                 title={t('states.randomFailure')}
-                message={resolveErrorCode(tErrors, apiErrorCode(unstable.error), tErrors('unknown'))}
+                message={resolveErrorCode(
+                  tErrors,
+                  apiErrorCode(unstable.error),
+                  tErrors('unknown'),
+                )}
                 onRetry={() => void unstable.refetch()}
               />
             ) : unstable.isSuccess ? (

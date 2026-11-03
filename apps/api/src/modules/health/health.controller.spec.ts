@@ -18,13 +18,12 @@ class PrismaServiceStub {
   }
 }
 
-function createController(prisma: PrismaServiceStub): Promise<HealthController> {
+function createController(
+  prisma: PrismaServiceStub,
+): Promise<HealthController> {
   return Test.createTestingModule({
     controllers: [HealthController],
-    providers: [
-      HealthService,
-      { provide: PrismaService, useValue: prisma },
-    ],
+    providers: [HealthService, { provide: PrismaService, useValue: prisma }],
   })
     .compile()
     .then((app) => app.get<HealthController>(HealthController));
@@ -58,7 +57,9 @@ describe('HealthController', () => {
     });
 
     it('should report degraded when the database is unreachable', async () => {
-      const healthController = await createController(new PrismaServiceStub(true));
+      const healthController = await createController(
+        new PrismaServiceStub(true),
+      );
 
       const result = await healthController.checkReadiness();
 

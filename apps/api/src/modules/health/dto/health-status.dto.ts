@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class HealthStatusDto {
-  @ApiProperty({ example: 'ok', description: 'ok when healthy, degraded when a dependency is unreachable' })
+  @ApiProperty({
+    example: 'ok',
+    description: 'ok when healthy, degraded when a dependency is unreachable',
+  })
   status: string;
 
   @ApiProperty({

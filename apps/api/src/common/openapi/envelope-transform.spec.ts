@@ -102,9 +102,7 @@ describe('applyEnvelopeTransform', () => {
       }),
     );
 
-    const response = (
-      doc.paths['/health'] as any
-    ).get.responses['200'];
+    const response = (doc.paths['/health'] as any).get.responses['200'];
 
     expect(response.content['application/json'].schema).toEqual({
       $ref: '#/components/schemas/HealthStatusDtoEnvelope',
@@ -134,9 +132,7 @@ describe('applyEnvelopeTransform', () => {
       documentWith({ '200': { description: 'no content' } }),
     );
 
-    const response = (
-      doc.paths['/health'] as any
-    ).get.responses['200'];
+    const response = (doc.paths['/health'] as any).get.responses['200'];
 
     expect(response.content).toBeUndefined();
   });
@@ -149,9 +145,7 @@ describe('applyEnvelopeTransform', () => {
       }),
     );
 
-    const response = (
-      doc.paths['/health'] as any
-    ).get.responses['500'];
+    const response = (doc.paths['/health'] as any).get.responses['500'];
 
     expect(response.content['application/json'].schema).toEqual({
       $ref: `#/components/schemas/${ERROR_ENVELOPE_SCHEMA}`,
@@ -169,15 +163,15 @@ describe('applyEnvelopeTransform', () => {
         '404': {
           description: 'not found',
           content: {
-            'application/json': { schema: { $ref: '#/components/schemas/Special' } },
+            'application/json': {
+              schema: { $ref: '#/components/schemas/Special' },
+            },
           },
         },
       }),
     );
 
-    const response = (
-      doc.paths['/health'] as any
-    ).get.responses['404'];
+    const response = (doc.paths['/health'] as any).get.responses['404'];
 
     expect(response.content['application/json'].schema).toEqual({
       $ref: `#/components/schemas/${ERROR_ENVELOPE_SCHEMA}`,

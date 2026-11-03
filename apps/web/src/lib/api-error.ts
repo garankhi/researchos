@@ -57,9 +57,7 @@ export function apiErrorCode(error: unknown): ErrorCode | undefined {
  * The backend groups validation messages by field so a form can show each
  * message next to the input that caused it.
  */
-export function apiFieldErrors(
-  error: unknown,
-): ApiErrorBody['errors'] {
+export function apiFieldErrors(error: unknown): ApiErrorBody['errors'] {
   if (!axios.isAxiosError(error)) {
     return undefined;
   }

@@ -187,7 +187,10 @@ function errorEnvelopeSchema(): JsonSchema {
       // OpenAPI 3.0 has no `null` type. `nullable` plus a single-null enum
       // is the idiomatic way to describe a field that is always null.
       data: { nullable: true, enum: [null] },
-      message: { type: 'string', description: 'The error code, e.g. `opportunity_not_found`.' },
+      message: {
+        type: 'string',
+        description: 'The error code, e.g. `opportunity_not_found`.',
+      },
       statusCode: { type: 'number' },
       path: { type: 'string' },
       timestamp: { type: 'string' },

@@ -170,9 +170,7 @@ export function usePagination({
  * Returns `undefined` when the payload is not paginated, so a caller can
  * tell "no results" from "no metadata".
  */
-export function paginationMetaOf(
-  payload: unknown,
-): PaginationMeta | undefined {
+export function paginationMetaOf(payload: unknown): PaginationMeta | undefined {
   if (typeof payload !== 'object' || payload === null) {
     return undefined;
   }

@@ -11,7 +11,11 @@ import { HttpExceptionFilter } from './http-exception.filter.js';
 /**
  * Minimal stand-ins for the express request and response objects.
  */
-function hostFor(exception: unknown, url = '/opportunities/abc', method = 'GET') {
+function hostFor(
+  exception: unknown,
+  url = '/opportunities/abc',
+  method = 'GET',
+) {
   const json = vi.fn();
   const status = vi.fn(() => ({ json }));
 
