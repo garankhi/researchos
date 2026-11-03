@@ -53,6 +53,11 @@ jobs:
         run: git diff --exit-code apps/api/openapi.json apps/web/src/lib/api
       - name: Lint
         run: pnpm lint
+      # Prettier only rewrites files; nothing checked that the tree was
+      # already formatted, so the drift accumulated unnoticed. `--check`
+      # fails instead of writing, which is what a CI step needs.
+      - name: Check the formatting
+        run: pnpm format:check
       - name: Test
         run: pnpm test
       - name: Build
@@ -62,3 +67,62 @@ jobs:
       # resolves every relative link and anchor in `.cursor/skills/`.
       - name: Check the skill links
         run: node scripts/check-skill-links.mjs
+
+  # The end-to-end suites need a database and a Redis, so they cannot live
+  # in the `checks` job above — that one stays fast and hermetic on purpose.
+  #
+  # They are also the only tests that exercise the API → Redis → worker
+  # pipeline, which is the part of the system no unit test reaches. A
+  # regression there is invisible to `pnpm test`, so it has to run somewhere.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: researchos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d researchos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:8.2.11-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/researchos?schema=public
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.15.0
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # The queue e2e drives a standalone worker against the same Redis, so
+      # the worker has to be built first. The task does that itself.
+      - name: Apply the migrations
+        run: pnpm db:migrate:deploy
+      - name: Run the end-to-end suites
+        run: pnpm test:e2e
