@@ -1,0 +1,63 @@
+# The database drift check.
+#
+# It lives in its own workflow rather than as a job in `ci.yml` because it
+# needs a Postgres service, and the `checks` job deliberately has no
+# database dependency — that job stays fast and hermetic.
+#
+# A separate file also gives the check its own trigger list, so what it
+# runs on is stated rather than inherited from another workflow's
+# `on:` block.
+name: Schema drift
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-drift-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db-drift:
+    name: schema drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: researchos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d researchos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/researchos?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.15.0
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check the committed datamodel matches the schema source
+        run: pnpm db:drift
