@@ -4,13 +4,16 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { Alert, Box, Stack } from '@mui/material';
 import { FormSubmitButton, FormTextField } from '@/components/ui/form';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
+import { useRouter } from '@/i18n/navigation';
 import { useLogin } from '../hooks/use-login';
 import { loginFormSchema } from '../schemas/login-form.schema';
+import { resolveReturnTo } from '../utils/return-to';
 import type { LoginFormValues } from '../schemas/login-form.schema';
 
 /**
@@ -35,11 +38,20 @@ import type { LoginFormValues } from '../schemas/login-form.schema';
  * The submit button is bound to the **mutation's** `isPending` through
  * `FormSubmitButton`, so the spinner tracks the request rather than the
  * client-side validation.
+ *
+ * ## Where the user lands afterwards
+ *
+ * A protected screen sends the visitor here with a `returnTo` parameter
+ * naming the page they wanted, and the login sends them back there. With
+ * no parameter, the home page is the destination. The value comes from the
+ * URL, so it is sanitized before it is used — see `utils/return-to.ts`.
  */
 export function LoginForm() {
   const t = useTranslations('identity');
   const tError = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [serverMessage, setServerMessage] = useState<string | null>(null);
 
@@ -73,6 +85,10 @@ export function LoginForm() {
           autoHideDuration: null,
         });
       }
+
+      // The redirect comes **after** the account is known, so the header
+      // renders the right name on the page the user lands on.
+      router.replace(resolveReturnTo(searchParams));
     } catch (error) {
       const codes = apiFieldErrorCodes(error);
 

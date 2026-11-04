@@ -52,6 +52,7 @@
     "signedIn": "Signed in successfully.",
     "signedOut": "You are not signed in.",
     "signedOutToast": "Signed out.",
+    "signOutFailed": "Could not sign you out. Please try again.",
     "signInAction": "Sign in",
     "signOut": "Sign out",
     "welcome": "Welcome, {name}."

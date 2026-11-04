@@ -1,6 +1,8 @@
+import { Suspense } from 'react';
 import { Box, Container, Paper, Stack, Typography } from '@mui/material';
 import { getTranslations } from 'next-intl/server';
 import { LoginForm } from '@/features/identity';
+import { LoadingSkeleton } from '@/components/ui/feedback';
 
 /**
  * The login screen.
@@ -10,6 +12,11 @@ import { LoginForm } from '@/features/identity';
  *
  * The page is deliberately plain — a card with the form in it. The form
  * reports its own failures inline, next to the input that caused them.
+ *
+ * The form reads the `returnTo` query parameter, and reading search
+ * params is a request-time value. Under `cacheComponents` that needs a
+ * Suspense boundary, or the whole page would be pushed out of the static
+ * shell — so the form sits behind one and the shell keeps the card.
  */
 export default async function LoginPage() {
   const t = await getTranslations('identity');
@@ -27,7 +34,9 @@ export default async function LoginPage() {
         </Box>
 
         <Paper sx={{ p: 4, width: '100%' }}>
-          <LoginForm />
+          <Suspense fallback={<LoadingSkeleton variant="rectangular" height={120} />}>
+            <LoginForm />
+          </Suspense>
         </Paper>
       </Stack>
     </Container>

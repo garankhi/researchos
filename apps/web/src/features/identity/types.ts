@@ -1,4 +1,8 @@
-import type { MeDto } from '@/lib/api/models';
+import type {
+  MeDto,
+  MeDtoRolesItem,
+  MeDtoUserType,
+} from '@/lib/api/models';
 
 /**
  * Domain types for the identity feature.
@@ -14,6 +18,14 @@ import type { MeDto } from '@/lib/api/models';
  * The roles are the **live** roles the backend read for this request — not
  * a snapshot of what the session was created with — so a revoked grant
  * takes effect on the next call.
+ *
+ * The two enum-shaped fields keep the **generated** unions rather than
+ * widening them to `string`. `MeDtoUserType` and `MeDtoRolesItem` are
+ * literal unions Orval derives from the OpenAPI enum, so the domain type
+ * can reuse them directly: a `userType` of `'PRINCIPAL'` is a type error
+ * here, exactly as it is in the generated model. Widening them to `string`
+ * would throw that away and make every `switch` on a role fall through to
+ * a `default` branch that hides the mistake.
  */
 export interface CurrentUser {
   /** The account's id. */
@@ -23,7 +35,7 @@ export interface CurrentUser {
   /** The account's display name. */
   fullName: string;
   /** The kind of account — `FACULTY`, `STUDENT` or `STAFF`. */
-  userType: string;
+  userType: MeDtoUserType;
   /** The department or unit the account belongs to. */
   departmentUnit: string;
   /** The academic title, when the account has one. */
@@ -31,7 +43,7 @@ export interface CurrentUser {
   /** The academic degree, when the account has one. */
   academicDegree: string | null;
   /** The roles the account currently holds. */
-  roles: string[];
+  roles: MeDtoRolesItem[];
   /** Whether the account finished the onboarding. */
   onboardingCompleted: boolean;
   /** Whether the account confirmed its profile. */

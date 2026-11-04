@@ -52,6 +52,7 @@
     "signedIn": "Đăng nhập thành công.",
     "signedOut": "Bạn chưa đăng nhập.",
     "signedOutToast": "Đã đăng xuất.",
+    "signOutFailed": "Không thể đăng xuất. Vui lòng thử lại.",
     "signInAction": "Đăng nhập",
     "signOut": "Đăng xuất",
     "welcome": "Chào mừng, {name}."

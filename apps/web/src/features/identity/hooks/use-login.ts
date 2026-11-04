@@ -3,6 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthControllerLogin, getAuthControllerMeQueryKey } from '@/lib/api';
 import { toCurrentUser } from '../types';
+import { useSessionStore } from '../store/session-store';
 import type { CurrentUser, LoginCredentials } from '../types';
 
 /**
@@ -30,14 +31,23 @@ import type { CurrentUser, LoginCredentials } from '../types';
  * The **generated** payload is what goes into the cache, because that is
  * what `useMe` reads and maps. The domain type is a read model, not
  * something the query cache holds.
+ *
+ * ## Why the store is written too
+ *
+ * The query cache is empty on a hard reload, so a component that reads it
+ * renders "signed out" first. The session store is written as soon as the
+ * login response arrives, so the header and the account menu already know
+ * the name and the roles when the redirect lands.
  */
 export function useLogin() {
   const queryClient = useQueryClient();
+  const setUser = useSessionStore((state) => state.setUser);
 
   const mutation = useAuthControllerLogin({
     mutation: {
       onSuccess: (payload) => {
         queryClient.setQueryData(getAuthControllerMeQueryKey(), payload);
+        setUser(toCurrentUser(payload));
       },
     },
   });

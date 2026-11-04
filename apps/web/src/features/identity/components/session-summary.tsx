@@ -6,15 +6,15 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { useLogout } from '../hooks/use-logout';
-import { useMe } from '../hooks/use-me';
+import { useSession } from '../hooks/use-session';
 
 /**
  * The signed-in landing state.
  *
  * It answers one question — "who am I right now?" — and it answers it from
  * the session, not from what the login form remembered. The session is the
- * only source of truth: a session that expired in another tab shows up here
- * as signed out, because `GET /me` says so.
+ * only source of truth: a session that expired in another tab shows up
+ * here as signed out, because `GET /me` says so.
  *
  * The three states are explicit, never raw query flags:
  *
@@ -30,11 +30,10 @@ export function SessionSummary() {
   const tError = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
 
-  const { data, isLoaded, isFetching, isFailed, isSignedOut, refetch } =
-    useMe();
+  const { user, isFetching, isFailed, isSignedOut } = useSession();
   const logout = useLogout();
 
-  if (isFetching && !isLoaded) {
+  if (isFetching && !user) {
     return <LoadingSkeleton variant="text" width={260} />;
   }
 
@@ -43,12 +42,11 @@ export function SessionSummary() {
       <ErrorState
         title={tError('loadFailedTitle')}
         message={tError('loadFailedDescription')}
-        onRetry={() => void refetch()}
       />
     );
   }
 
-  if (isSignedOut || !data) {
+  if (isSignedOut || !user) {
     return (
       <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
         <Typography variant="body2" color="text.secondary">
@@ -62,24 +60,31 @@ export function SessionSummary() {
   }
 
   const handleLogout = () => {
-    logout.mutate(undefined, {
-      onSuccess: () => {
+    // `mutateAsync` rather than `mutate` with a per-call `onSuccess`: a
+    // per-call callback only runs while the observer still has listeners,
+    // and clearing the session store can unmount this component. See
+    // the note in `useLogout`.
+    logout
+      .mutateAsync(undefined)
+      .then(() => {
         showSnackbar({ severity: 'success', message: t('signedOutToast') });
-      },
-    });
+      })
+      .catch(() => {
+        showSnackbar({ severity: 'error', message: t('signOutFailed') });
+      });
   };
 
   return (
     <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
       <Typography variant="h6" component="p" sx={{ fontWeight: 600 }}>
-        {t('welcome', { name: data.fullName })}
+        {t('welcome', { name: user.fullName })}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        {data.email}
+        {user.email}
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        {data.roles.map((role) => (
+        {user.roles.map((role) => (
           <Chip key={role} label={role} size="small" />
         ))}
       </Box>
