@@ -6,6 +6,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { DemoService } from './demo.service.js';
 
 /**
@@ -15,8 +16,12 @@ import { DemoService } from './demo.service.js';
  * - `/demo/slow` delays its response so the loading state is observable.
  * - `/demo/fail` returns a 5xx so the error state is observable.
  * - `/demo/unstable` alternates between success and failure.
+ *
+ * They are public: a demo endpoint that demanded a session would not be a
+ * demo endpoint.
  */
 @ApiTags('demo')
+@Public()
 @Controller('demo')
 export class DemoController {
   constructor(private readonly demoService: DemoService) {}
