@@ -8,9 +8,7 @@ import Typography from '@mui/material/Typography';
 import Menu from '@mui/material/Menu';
 import MenuIcon from '@mui/icons-material/Menu';
 import Container from '@mui/material/Container';
-import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import SearchBar from '@/components/ui/search-bar';
@@ -24,30 +22,31 @@ import { useTranslations } from 'next-intl';
  * the message catalog, so it changes with the locale.
  */
 const pageKeys = ['products', 'pricing', 'blog'] as const;
-const settingKeys = ['profile', 'account', 'dashboard', 'logout'] as const;
 
-function ResponsiveAppBar() {
+/**
+ * The application header.
+ *
+ * It is a shared primitive, so it knows nothing about a domain. The
+ * account area — the avatar, the account menu and the sign-out — belongs
+ * to the identity feature, so the header receives it as `accountSlot`
+ * rather than importing it.
+ *
+ * The direction of the dependency is the point: the feature knows about
+ * the header's slot, not the other way round. A shared primitive that
+ * imported a feature would be the lowest layer depending on the highest.
+ */
+function ResponsiveAppBar({ accountSlot }: { accountSlot?: React.ReactNode }) {
   const t = useTranslations('nav');
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(
-    null,
-  );
-  const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(
     null,
   );
 
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElNav(event.currentTarget);
   };
-  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElUser(event.currentTarget);
-  };
 
   const handleCloseNavMenu = () => {
     setAnchorElNav(null);
-  };
-
-  const handleCloseUserMenu = () => {
-    setAnchorElUser(null);
   };
 
   return (
@@ -73,7 +72,7 @@ function ResponsiveAppBar() {
           <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
             <IconButton
               size="large"
-              aria-label={t('accountOfCurrentUser')}
+              aria-label={t('openMenu')}
               aria-controls="menu-appbar"
               aria-haspopup="true"
               onClick={handleOpenNavMenu}
@@ -139,35 +138,7 @@ function ResponsiveAppBar() {
             <SearchBar />
             <LanguageToggle />
             <ThemeToggle />
-            <Tooltip title={t('openSettings')}>
-              <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                <Avatar alt="Remy Sharp" src="/static/images/avatar/2.jpg" />
-              </IconButton>
-            </Tooltip>
-            <Menu
-              sx={{ mt: '45px' }}
-              id="menu-appbar"
-              anchorEl={anchorElUser}
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorElUser)}
-              onClose={handleCloseUserMenu}
-            >
-              {settingKeys.map((setting) => (
-                <MenuItem key={setting} onClick={handleCloseUserMenu}>
-                  <Typography sx={{ textAlign: 'center' }}>
-                    {t(setting)}
-                  </Typography>
-                </MenuItem>
-              ))}
-            </Menu>
+            {accountSlot}
           </Box>
         </Toolbar>
       </Container>

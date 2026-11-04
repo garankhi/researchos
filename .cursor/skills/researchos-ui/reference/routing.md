@@ -174,6 +174,16 @@ export default function NotFoundPage() {
 `forbidden()` and `unauthorized()` need `experimental.authInterrupts: true` in
 `next.config.ts`. Without it the build fails.
 
+The two interrupts mirror the backend's guards, one for one:
+
+| Backend | Answer | Frontend |
+| --- | --- | --- |
+| `SessionGuard` → `401` | There is no valid session | `unauthorized()` |
+| `RoleGuard` → `403` | Signed in, but not allowed | `forbidden()` |
+
+The backend decides which one applies — the route only renders the
+boundary. See the `researchos-api-endpoint` skill for the guards.
+
 ## Next.js route conventions
 
 | File | Scope | Purpose |

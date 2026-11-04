@@ -121,6 +121,117 @@
           "health"
         ]
       }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The signed-in user payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential was rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Signs in with a local credential and issues a session cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The session was revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no session to revoke.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revokes the session behind the current cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The current user payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Returns the current user payload",
+        "tags": [
+          "auth"
+        ]
+      }
     }
   },
   "info": {
@@ -162,6 +273,127 @@
           "service",
           "uptimeSeconds",
           "timestamp"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The account's email address. It is normalized before the lookup, so the case and the surrounding spaces do not matter.",
+            "example": "faculty@researchos.local"
+          },
+          "password": {
+            "type": "string",
+            "description": "The account's password.",
+            "example": "ResearchOS!Dev2026"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "MeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The account's id.",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "email": {
+            "type": "string",
+            "description": "The account's email address, normalized.",
+            "example": "faculty@researchos.local"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The account's display name.",
+            "example": "Dev Faculty"
+          },
+          "userType": {
+            "type": "string",
+            "description": "The kind of account.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "The department or unit the account belongs to.",
+            "example": "FPTU"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "The account's academic title, when it has one.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "The account's academic degree, when it has one.",
+            "example": "TS",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "description": "The roles the account currently holds. `RESEARCHER` and `ADMIN` are the two roles; a faculty account is a researcher through the baseline rule, without an explicit grant.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESEARCHER",
+                "ADMIN"
+              ]
+            },
+            "example": [
+              "RESEARCHER"
+            ]
+          },
+          "onboardingCompleted": {
+            "type": "boolean",
+            "description": "Whether the account finished the onboarding. A missing profile row means false — it never creates one.",
+            "example": true
+          },
+          "profileConfirmed": {
+            "type": "boolean",
+            "description": "Whether the account confirmed its profile. A missing profile row means false.",
+            "example": true
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "Whether the account must change its password before it can use the rest of the API.",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "userType",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "roles",
+          "onboardingCompleted",
+          "profileConfirmed",
+          "mustChangePassword"
+        ]
+      },
+      "LogoutDto": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean",
+            "description": "Whether a session was revoked.",
+            "example": true
+          }
+        },
+        "required": [
+          "revoked"
         ]
       },
       "ApiErrorResponseDto": {
@@ -284,6 +516,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/HealthStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "MeDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/MeDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "LogoutDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/LogoutDto"
           },
           "message": {
             "type": "string",

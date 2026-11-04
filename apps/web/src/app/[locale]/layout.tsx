@@ -6,6 +6,7 @@ import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import '../globals.css';
 import Header from '@/components/ui/header';
+import { AccountSlot } from '@/features/identity';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
@@ -74,7 +75,12 @@ export default async function RootLayout({
                     can be translated at the point it is shown, and inside
                     the MUI provider so `Snackbar` can anchor to the theme. */}
                 <SnackbarProvider>
-                  <Header />
+                  {/* The header is a shared primitive and knows nothing
+                      about a domain, so the account area is passed in as a
+                      slot. The dependency runs the other way: the identity
+                      feature knows about the header's slot, not the
+                      reverse. */}
+                  <Header accountSlot={<AccountSlot />} />
                   {children}
                 </SnackbarProvider>
               </NextIntlClientProvider>

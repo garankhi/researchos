@@ -2,6 +2,12 @@ import Axios, { type AxiosRequestConfig } from 'axios';
 
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000',
+  // The session rides an opaque cookie, so the browser has to be allowed to
+  // send it. Without this the cookie never reaches the API and every
+  // request is signed out. The API answers with
+  // `Access-Control-Allow-Credentials`, so the pair is what makes the
+  // session work across the two origins.
+  withCredentials: true,
 });
 
 /**

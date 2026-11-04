@@ -195,6 +195,30 @@ describe('SessionService', () => {
       expect(sql).toContain('expires_at >');
       expect(sql).toContain('idle_expires_at >');
     });
+
+    it('takes every timestamp from the database, not from the application', async () => {
+      // The row's `created_at` was written by the database, and the check
+      // `ck_session_times` requires `last_seen_at >= created_at`. The two
+      // timestamps have to come from the same clock, so the refresh reads
+      // the database clock rather than the application clock.
+      await service.refresh('session-1');
+
+      const sql = lastQueryText(prisma.$executeRaw);
+
+      expect(sql).toContain('clock_timestamp()');
+      expect(lastQueryValues(prisma.$executeRaw)).not.toContain(
+        expect.any(Date),
+      );
+    });
+
+    it('derives the sliding window from the database clock', async () => {
+      await service.refresh('session-1');
+
+      expect(lastQueryText(prisma.$executeRaw)).toContain(
+        "interval '1 second'",
+      );
+      expect(lastQueryValues(prisma.$executeRaw)).toContain(1_800);
+    });
   });
 
   describe('effectiveRoles', () => {

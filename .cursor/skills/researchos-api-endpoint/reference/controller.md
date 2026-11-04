@@ -212,6 +212,20 @@ Add `@ApiUnauthorizedResponse` to any route behind a guard, and
 refused. A route that is deliberately public says so in a comment above the
 handler, per `docs/api-convention.md`.
 
+```typescript
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Not signed in.' })
+@ApiForbiddenResponse({ description: 'The caller does not hold the required role.' })
+@Roles('ADMIN')
+@Get('users')
+listUsers(): UsersDto { ... }
+```
+
+The session guard is **global**, so a route does not carry
+`@UseGuards(SessionGuard)` — it is protected by default, and a public route
+opts out with `@Public()`. The guards, the decorators and the decision a new
+route has to make: [auth-and-guards.md](auth-and-guards.md).
+
 ## The controller returns the payload
 
 The controller returns the **bare payload**. The envelope is applied by the

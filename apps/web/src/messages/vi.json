@@ -38,9 +38,24 @@
     "current": "Ngôn ngữ hiện tại"
   },
   "home": {
+    "title": "ResearchOS",
     "apiStatus": "Trạng thái API",
     "apiResponse": "API trả về: {status} ({service})",
     "loadingStatus": "Đang tải trạng thái API…"
+  },
+  "identity": {
+    "title": "Đăng nhập",
+    "subtitle": "Dùng tài khoản email của trường để truy cập ResearchOS.",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "submit": "Đăng nhập",
+    "signedIn": "Đăng nhập thành công.",
+    "signedOut": "Bạn chưa đăng nhập.",
+    "signedOutToast": "Đã đăng xuất.",
+    "signOutFailed": "Không thể đăng xuất. Vui lòng thử lại.",
+    "signInAction": "Đăng nhập",
+    "signOut": "Đăng xuất",
+    "welcome": "Chào mừng, {name}."
   },
   "errors": {
     "title": "Đã xảy ra lỗi khi tải trang",
@@ -70,11 +85,17 @@
         "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
         "email_required": "Email là bắt buộc.",
         "email_invalid": "Email không hợp lệ.",
+        "email_too_long": "Email không được vượt quá 255 ký tự.",
+        "password_required": "Mật khẩu là bắt buộc.",
+        "password_too_long": "Mật khẩu không được vượt quá 1024 ký tự.",
         "status_invalid": "Trạng thái không hợp lệ.",
         "email_already_registered": "Email này đã được đăng ký.",
         "status_required": "Trạng thái là bắt buộc."
       },
       "domain": {
+        "invalid_credentials": "Email hoặc mật khẩu không đúng.",
+        "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
+        "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",
         "opportunity_not_found": "Không tìm thấy cơ hội."
       }
     }

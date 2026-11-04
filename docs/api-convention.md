@@ -450,6 +450,32 @@ nguyên. Không có ngoại lệ.
 - Khi endpoint yêu cầu đăng nhập, dùng guard; khi endpoint công khai, ghi rõ
   bằng comment trong controller.
 
+### Session guard và role guard
+
+Hai guard chạy global, theo thứ tự:
+
+| Guard | Câu hỏi | Trả lời | Mã |
+| --- | --- | --- | --- |
+| `SessionGuard` | Còn phiên hợp lệ không? | `401 Unauthorized` | `unauthorized` |
+| `RoleGuard` | Người gọi có đủ role không? | `403 Forbidden` | `forbidden` |
+
+- **Mọi route được bảo vệ sẵn.** Guard session đăng ký global, nên route
+  không cần `@UseGuards(SessionGuard)`. Route công khai opt out bằng
+  `@Public()` — đây là ngoại lệ hẹp, không phải mặc định.
+- Role của route khai báo bằng `@Roles('ADMIN')`. Guard yêu cầu **tất cả**
+  role được liệt kê, không phải "một trong".
+- Role được đọc **trực tiếp** ở mỗi request, không chụp lại trong session:
+  thu hồi quyền có hiệu lực ở request kế tiếp, không cần đăng nhập lại.
+- `@CurrentUserId()` trả về `string`, không phải `string | undefined`: guard
+  session đã từ chối request không có phiên trước đó.
+- Kiểm tra quyền theo bản ghi cụ thể nằm ở **service** của module, không
+  nằm ở controller và không nằm ở guard trong `common/`.
+- Cookie phiên là token **opaque** (`httpOnly`, `secure`, `sameSite: 'lax'`);
+  database chỉ lưu hash SHA-256 của nó.
+
+Chi tiết: skill `researchos-api-endpoint`
+([`.cursor/skills/researchos-api-endpoint/SKILL.md`](../.cursor/skills/researchos-api-endpoint/SKILL.md)).
+
 ## 9. Transaction, idempotency và job nền
 
 - Ghi nhiều bảng liên quan: dùng `$transaction`.

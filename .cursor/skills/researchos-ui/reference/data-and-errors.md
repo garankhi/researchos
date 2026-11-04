@@ -59,6 +59,12 @@ The feature hook should hide these behind explicit names, as
 `features/health/hooks/use-api-health.ts` does with `isHealthy`, `isFetching`
 and `isFailed`.
 
+These flags describe the **query cache**. The app also has a Zustand store
+for client state — a value the API does not own, or one that has to be
+readable synchronously on the first render. The two do not overlap: if a
+value came from the API, it belongs in the cache. See
+[client-state.md](client-state.md).
+
 ## Error codes
 
 The backend sends **codes**, not sentences: `message` carries one code for

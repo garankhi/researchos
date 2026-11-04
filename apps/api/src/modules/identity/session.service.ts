@@ -116,21 +116,43 @@ export class SessionService implements SessionResolver {
    *
    * A session that has already expired is not touched — the `WHERE` clause
    * excludes it, so a late refresh cannot resurrect a dead session.
+   *
+   * Every timestamp here comes from the **database** clock, not from the
+   * application. The row's own `created_at` was written by the database,
+   * and the check `ck_session_times` requires `last_seen_at >=
+   * created_at` — a comparison between two timestamps that have to come
+   * from the same clock. The expiry comparisons (`expires_at > now`,
+   * `idle_expires_at > now`) have the same requirement, and `now()` is the
+   * transaction time, which is the right reference for a statement that
+   * reads and writes one row.
    */
   async refresh(sessionId: string): Promise<void> {
-    const now = new Date();
-    const idleUntil = new Date(now.getTime() + this.idleTtlMs);
-
     await this.prisma.$executeRaw`
       UPDATE user_sessions
       SET
-        last_seen_at = ${now},
-        idle_expires_at = LEAST(${idleUntil}, expires_at)
+        last_seen_at = clock_timestamp(),
+        idle_expires_at = LEAST(
+          clock_timestamp() + ${this.idleTtlSeconds()} * interval '1 second',
+          expires_at
+        )
       WHERE id = ${sessionId}
         AND revoked_at IS NULL
-        AND expires_at > ${now}
-        AND idle_expires_at > ${now}
+        AND expires_at > now()
+        AND idle_expires_at > now()
     `;
+  }
+
+  /**
+   * The idle window, in whole seconds.
+   *
+   * The sliding expiry is anchored to the same clock as the row's
+   * timestamps, so the number travels as a plain count of seconds and the
+   * database does the arithmetic. A number is also the only thing a
+   * parameterised query can carry — a SQL expression would be sent as a
+   * string literal.
+   */
+  private idleTtlSeconds(): number {
+    return Math.floor(this.idleTtlMs / 1000);
   }
 
   /**

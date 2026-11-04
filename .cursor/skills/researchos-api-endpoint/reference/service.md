@@ -28,6 +28,16 @@ Permission checks that depend on the specific record (does this user see
 *this* row?) are business logic and belong in the service. Cross-cutting
 guards live in `src/common/guards/` and must not name any entity.
 
+| Question | Where it is answered |
+| --- | --- |
+| Is there a valid session? | `SessionGuard` → `401` |
+| Does the caller hold the required role? | `RoleGuard` → `403` |
+| May this caller see *this record*? | **this service** → `403` |
+
+The service reads the caller's id from `@CurrentUserId()` in the controller
+and decides what the caller may do with the record. See
+[auth-and-guards.md](auth-and-guards.md).
+
 ### Multi-table write
 
 ```typescript
