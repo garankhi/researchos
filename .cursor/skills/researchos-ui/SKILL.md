@@ -1,6 +1,6 @@
 ---
 name: researchos-ui
-description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, or when the user mentions loading states, error states, React Query, Orval, MUI, dark mode, responsive design, breakpoints, or Next.js route conventions.
+description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, Zustand client state, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, when deciding between the query cache and a Zustand store, or when the user mentions loading states, error states, React Query, Zustand, Orval, MUI, dark mode, responsive design, breakpoints, or Next.js route conventions.
 ---
 
 # ResearchOS UI
@@ -21,6 +21,7 @@ looks wrong or when `query.data` has the wrong type.
 | --- | --- |
 | The wire format — envelope, error shape, codes | `researchos-contract` |
 | How to build a screen, folder boundaries, state, feedback | **this skill** |
+| Server state (TanStack Query) and client state (Zustand) | **this skill** |
 | Forms — react-hook-form, zod, MUI form controls | `researchos-forms` |
 | Wording — the message catalog, locale routing | `researchos-localization` |
 | Adding or changing an endpoint, codegen | `researchos-api-endpoint` |
@@ -30,7 +31,7 @@ owns the words it carries.
 
 ## Non-negotiables
 
-Six rules account for most of the mistakes in this codebase. Each one is
+Eight rules account for most of the mistakes in this codebase. Each one is
 counter-intuitive enough to be worth stating once, up front.
 
 1. **`query.data` is already the payload — never `query.data.data`.** The
@@ -65,6 +66,18 @@ counter-intuitive enough to be worth stating once, up front.
 6. **Every user-facing string comes from the message catalog** via `t()`.
    *Why:* the app has two locales; a literal is one language forever.
    → [loading-and-feedback.md](reference/loading-and-feedback.md#mutation-feedback)
+
+7. **Server state lives in TanStack Query. Client state lives in Zustand.**
+   *Why:* a store that mirrors an API response is a second source of truth
+   for the same fact, and the two drift apart.
+   → [client-state.md](reference/client-state.md#the-split)
+
+8. **A mutation that unmounts its caller must not rely on `mutate(vars,
+   { onSuccess })`.** A per-call callback is dropped when the observer has
+   no listeners left — and clearing a Zustand store unmounts the component
+   that owns it. Use `mutateAsync().then()`.
+   *Why:* the redirect silently never happens.
+   → [client-state.md](reference/client-state.md#clearing-a-store-from-a-mutation--the-unmount-trap)
 
 ## Checklist
 
@@ -104,6 +117,27 @@ Each row links to the section that shows the how.
 - [ ] Backend error text is resolved with `resolveErrorCode()` /
       `resolveFieldErrorCodes()` — the server's raw value is never rendered
       → [data-and-errors.md](reference/data-and-errors.md#error-codes)
+
+### Client state
+
+- [ ] A value that came from the API stays in the query cache — it is not
+      copied into a Zustand store
+      → [client-state.md](reference/client-state.md#the-split)
+- [ ] A store lives in `features/<domain>/store/`; other features read it
+      through the feature's hook, never by importing the store directly
+      → [client-state.md](reference/client-state.md#where-a-store-lives)
+- [ ] The store carries an explicit "known yet?" flag, not a bare nullable
+      → [client-state.md](reference/client-state.md#the-shape-of-a-store)
+- [ ] The store is written from the domain hook, never directly from a
+      component
+      → [client-state.md](reference/client-state.md#the-rules)
+- [ ] Selectors pick a single field, never the whole state object
+      → [client-state.md](reference/client-state.md#the-rules)
+- [ ] A session store is **not** persisted
+      → [client-state.md](reference/client-state.md#the-rules)
+- [ ] A mutation whose cleanup clears the store does the cleanup in
+      `onSettled` and the redirect/toast in the caller's `mutateAsync().then()`
+      → [client-state.md](reference/client-state.md#clearing-a-store-from-a-mutation--the-unmount-trap)
 
 ### Loading
 
@@ -204,6 +238,7 @@ Read the file you need; do not read them all.
 | --- | --- |
 | [reference/features.md](reference/features.md) | Folder boundaries, the five rules, transport → domain → UI, the feature folder and its templates, form rules |
 | [reference/data-and-errors.md](reference/data-and-errors.md) | The response envelope, query flags and the `isPending` trap, error codes and field errors |
+| [reference/client-state.md](reference/client-state.md) | TanStack Query vs Zustand, where a store lives, the store rules, clearing a store from a mutation |
 | [reference/loading-and-feedback.md](reference/loading-and-feedback.md) | Skeletons, mutation indicators, shared primitives, the snackbar provider, mutation feedback |
 | [reference/mui-and-responsive.md](reference/mui-and-responsive.md) | MUI v9 props, links, the Tailwind/MUI cascade, breakpoints, overflow, dark mode |
 | [reference/routing.md](reference/routing.md) | Error states at each level, route templates, access boundaries, Next.js file conventions, Suspense |

@@ -287,6 +287,29 @@ const mutation = useCreateProfile({
 Do not derive the success message from a `useEffect` on `mutation.isSuccess`
 — it fires twice under React Strict Mode.
 
+### When the callback must survive an unmount
+
+A hook-level `onSuccess` / `onError` runs whenever the mutation was
+triggered. A **per-call** callback — the second argument of `mutate()` —
+runs only if the observer still has listeners when the mutation settles.
+
+That matters when the mutation's cleanup unmounts the caller: clearing a
+Zustand store that holds the account removes the account menu, which
+unsubscribes the observer, and the per-call callback is silently dropped. A
+redirect placed there never happens.
+
+```typescript
+// Wrong — the redirect never runs, because clearUser() unmounts the caller.
+logout.mutate(undefined, { onSuccess: () => router.replace('/') });
+
+// Right — the promise continuation is not owned by the component.
+logout
+  .mutateAsync(undefined)
+  .then(() => router.replace('/'));
+```
+
+Full explanation: [client-state.md](client-state.md#clearing-a-store-from-a-mutation--the-unmount-trap).
+
 ### The snackbar provider
 
 Do not hand-roll a `Snackbar`. The app already has one:

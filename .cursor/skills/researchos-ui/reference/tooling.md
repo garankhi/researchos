@@ -177,6 +177,11 @@ config's `packageJson` is not set.
 | Feature importing another feature's files | Coupling; call the other feature's hook instead. Blocked by `researchos/no-cross-feature-imports` |
 | `components/ui/` naming a domain entity | Breaks the shared-primitive boundary. Blocked by `researchos/no-domain-entities-in-ui` |
 | A feature folder with no matching backend module | The screen cannot be traced back to its API. Blocked by `researchos/feature-name-matches-backend-module` |
+| Copying an API response into a Zustand store | Two sources of truth for one fact; they drift. Keep server data in the query cache |
+| A persisted Zustand store holding a session | The header claims a signed-in user for a session that expired while the browser was closed |
+| `mutate(vars, { onSuccess })` where the cleanup clears a Zustand store | The per-call callback is dropped when the observer has no listeners — the redirect silently never happens. Use `mutateAsync().then()` |
+| `useSomeStore()` with no selector | Every consumer re-renders on every write |
+| Clearing the store but leaving the query cache | The screen reads a stale session back out of the cache |
 | A user-facing string literal in a component | The string stays in one language forever. Use `t('…')` |
 | Looking a validation message up in the catalog | Validation messages are not codes yet — there is no key for them |
 | MUI system props passed directly | Invalid HTML attributes leak onto the DOM |

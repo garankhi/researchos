@@ -115,6 +115,7 @@ apps/web/src/
       types.ts              Kiểu dữ liệu UI dùng
       hooks/                Hook gọi API và chuẩn hoá trạng thái
       components/           Component riêng của nghiệp vụ
+      store/                Trạng thái phía client (Zustand): state không do API sở hữu
   lib/                      Hạ tầng, không có logic nghiệp vụ
     api/                    DO ORVAL SINH RA — không sửa tay
     axios-instance.ts       Mutator cho Orval; phải nằm ngoài api/
@@ -145,6 +146,14 @@ Quy tắc giữ khi tổ chức frontend:
   phân biệt `isPending` (chưa có data) với `isFetching` (đang có request).
   `isPending` với query `enabled: false` đúng mãi, là nguồn lỗi "spinner
   không bao giờ dừng" quen thuộc.
+- **Tách server state và client state.** Dữ liệu từ API thuộc về TanStack
+  Query (query cache). Zustand chỉ giữ trạng thái phía client mà API không
+  sở hữu, hoặc trạng thái cần đọc được đồng bộ ngay ở render đầu tiên (ví dụ
+  phiên đăng nhập mà header cần biết tức thì). Store nằm ở
+  `features/<nghiệp-vụ>/store/`, là module riêng của feature: feature khác đọc
+  qua hook của feature này, không import thẳng store. Store không persist
+  session: cookie phiên mới là nguồn sự thật, `GET /me` mới quyết định phiên
+  còn hiệu lực hay không.
 
 Chi tiết thư mục `features/` và quy tắc frontend: skill `researchos-ui`
 ([`.cursor/skills/researchos-ui/SKILL.md`](../.cursor/skills/researchos-ui/SKILL.md)).
