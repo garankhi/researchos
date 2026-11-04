@@ -34,7 +34,9 @@ export default async function LoginPage() {
         </Box>
 
         <Paper sx={{ p: 4, width: '100%' }}>
-          <Suspense fallback={<LoadingSkeleton variant="rectangular" height={120} />}>
+          <Suspense
+            fallback={<LoadingSkeleton variant="rectangular" height={120} />}
+          >
             <LoginForm />
           </Suspense>
         </Paper>

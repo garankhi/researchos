@@ -1,8 +1,4 @@
-import type {
-  MeDto,
-  MeDtoRolesItem,
-  MeDtoUserType,
-} from '@/lib/api/models';
+import type { MeDto, MeDtoRolesItem, MeDtoUserType } from '@/lib/api/models';
 
 /**
  * Domain types for the identity feature.
