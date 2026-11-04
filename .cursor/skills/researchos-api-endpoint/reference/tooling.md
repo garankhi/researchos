@@ -90,6 +90,8 @@ The specs worth knowing about:
 | `src/openapi-rules.spec.ts` | The document satisfies every rule in `openapi-rules.ts` |
 | `common/openapi/envelope-transform.spec.ts` | Idempotency, inline primitives, error responses, schema/filter agreement |
 | `common/filters/http-exception.filter.spec.ts` | The error envelope, the code in `message`, validation grouping, no stack leak |
+| `common/guards/session.guard.spec.ts` | A public route passes, a missing or unknown session is a `401`, the principal is attached |
+| `common/guards/role.guard.spec.ts` | Every listed role is required, and the roles are read live |
 
 The envelope specs are described in the `researchos-contract` skill.
 
@@ -112,6 +114,10 @@ The envelope specs are described in the `researchos-contract` skill.
 | A domain code passed to `CodedHttpException` as a string literal | A compile error — the code is not in the registry |
 | Prisma query inside a controller | Business logic leaks out of the service; hard to test |
 | Manual permission check in a controller | Easily bypassed and duplicated |
+| `@UseGuards(SessionGuard)` on a route | The session guard is global — a per-route guard duplicates the protection and implies the routes without one are unprotected |
+| A public route without `@Public()` | A `401` on a route that should be open |
+| A role check in the controller or in `common/guards/` | A controller check is bypassable; a guard check would need to know every domain entity |
+| Trusting `principal.roles` for a role check | The roles are a snapshot; a revoked grant would still pass until the next login |
 | Returning a raw Prisma entity | Leaks internal columns to the client |
 | Missing `.js` on a local import | ESM resolution fails at runtime, not at build time |
 | Deleting a published field | Breaks a frontend that has not been redeployed yet |

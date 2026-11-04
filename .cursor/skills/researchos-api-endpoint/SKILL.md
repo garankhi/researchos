@@ -1,6 +1,6 @@
 ---
 name: researchos-api-endpoint
-description: Creates and changes REST API endpoints in the ResearchOS NestJS backend — from DTO and service through Swagger annotations to the generated OpenAPI spec and the frontend Orval client. Use when adding or modifying an endpoint, controller, service, module, or DTO in apps/api, when a frontend screen needs a new API contract, or when the user mentions API routes, OpenAPI, Swagger, Orval codegen, DTO validation, or "new endpoint".
+description: Creates and changes REST API endpoints in the ResearchOS NestJS backend — from DTO and service through Swagger annotations to the generated OpenAPI spec and the frontend Orval client. Use when adding or modifying an endpoint, controller, service, module, or DTO in apps/api, when a frontend screen needs a new API contract, or when the user mentions API routes, OpenAPI, Swagger, Orval codegen, DTO validation, session guard, role guard, permissions, or "new endpoint".
 ---
 
 # ResearchOS API endpoint
@@ -23,6 +23,7 @@ the interceptor, the exception filter or the OpenAPI transform.
 | --- | --- |
 | The wire format — envelope, error shape, codes | `researchos-contract` |
 | Adding or changing an endpoint, codegen | **this skill** |
+| The session guard, the role guard, access control | **this skill** |
 | The wording — the message catalog, locale routing | `researchos-localization` |
 | Building a screen against the generated client | `researchos-ui` |
 | Forms — react-hook-form, zod, MUI form controls | `researchos-forms` |
@@ -32,7 +33,7 @@ the interceptor, the exception filter or the OpenAPI transform.
 
 ## Non-negotiables
 
-Six rules account for most of the mistakes in this codebase. Each one is
+Eight rules account for most of the mistakes in this codebase. Each one is
 counter-intuitive enough to be worth stating once, up front.
 
 1. **Every route has `@ApiOperation({ summary })` with a non-empty summary** —
@@ -69,6 +70,20 @@ counter-intuitive enough to be worth stating once, up front.
    *Why:* the tsconfig sets `module: nodenext` and the package is ESM, so the
    import fails at runtime, not at build time.
    → [module-and-dto.md](reference/module-and-dto.md#step-1--generate-the-module)
+
+7. **Every route is protected by default.** The session guard is global, so a
+   route opts out with `@Public()` — it is never protected with
+   `@UseGuards(SessionGuard)`.
+   *Why:* the guard is already applied everywhere; a per-route guard
+   duplicates it and implies the routes without one are unprotected.
+   → [auth-and-guards.md](reference/auth-and-guards.md#adding-a-new-route--the-decision)
+
+8. **Roles are checked by the role guard; records are checked by the
+   service.** A role check never goes in a controller, and a per-record check
+   never goes in `common/guards/`.
+   *Why:* a guard that could answer "may this caller see *this* row?" would
+   have to know every domain entity — the boundary `common/` must not cross.
+   → [auth-and-guards.md](reference/auth-and-guards.md#what-the-role-guard-is-not)
 
 ## Checklist
 
@@ -150,12 +165,36 @@ Each row links to the section that shows the how.
 - [ ] A route behind a guard has `@ApiBearerAuth()` and
       `@ApiUnauthorizedResponse({ description })`
       → [controller.md](reference/controller.md#authentication)
+- [ ] A route a signed-in caller can still be refused from also declares
+      `@ApiForbiddenResponse({ description })`
+      → [auth-and-guards.md](reference/auth-and-guards.md#swagger)
 - [ ] Every path parameter has `@ApiParam({ name, description })`
       → [controller.md](reference/controller.md#every-parameter-needs-a-description)
 - [ ] Every header parameter has `@ApiHeader({ name, description })`
       → [controller.md](reference/controller.md#every-parameter-needs-a-description)
 - [ ] No type coercion in the controller — the pipe or the service does it
       → [controller.md](reference/controller.md)
+
+### Auth and guards
+
+- [ ] The route is **not** protected with `@UseGuards(SessionGuard)` — the
+      session guard is global
+      → [auth-and-guards.md](reference/auth-and-guards.md#adding-a-new-route--the-decision)
+- [ ] A route open to everyone carries `@Public()`; every other route is
+      protected by default
+      → [auth-and-guards.md](reference/auth-and-guards.md#public)
+- [ ] A route that needs a role carries `@Roles(...)` — the guard requires
+      **every** listed role
+      → [auth-and-guards.md](reference/auth-and-guards.md#the-role-guard)
+- [ ] A handler that needs the caller's id takes
+      `@CurrentUserId() userId: string` — never `string | undefined`
+      → [auth-and-guards.md](reference/auth-and-guards.md#the-decorators)
+- [ ] A per-record permission check lives in the owning module's **service**
+      → [auth-and-guards.md](reference/auth-and-guards.md#what-the-role-guard-is-not)
+- [ ] The controller has no manual permission check
+      → [service.md](reference/service.md#service)
+- [ ] `common/` names no business entity
+      → [auth-and-guards.md](reference/auth-and-guards.md#the-shape-of-it)
 
 ### Error codes
 
@@ -229,6 +268,7 @@ Read the file you need; do not read them all.
 | --- | --- |
 | [reference/module-and-dto.md](reference/module-and-dto.md) | Generating a module, the DTO decorators, request vs response DTOs, numeric query fields |
 | [reference/service.md](reference/service.md) | Prisma access, transactions, the exception table, the payload-not-envelope rule |
+| [reference/auth-and-guards.md](reference/auth-and-guards.md) | The session guard, the role guard, the decorators, the session cookie, access control |
 | [reference/controller.md](reference/controller.md) | The controller template, method to status code, parameters, authentication, URL patterns, background work |
 | [reference/error-codes.md](reference/error-codes.md) | The three code tiers, the domain code registry, adding a code, validation codes |
 | [reference/openapi-rules.md](reference/openapi-rules.md) | The rules enforced by `openapi-rules.ts`, the shared error envelope, what a failure message looks like |
