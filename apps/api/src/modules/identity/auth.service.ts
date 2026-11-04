@@ -143,6 +143,21 @@ export class AuthService {
 
       // 4. `user_sessions` — the write comes last, and only after the
       //    credential has been accepted.
+      //
+      //    Every timestamp comes from **one** `CURRENT_TIMESTAMP` inside
+      //    the statement, and the expiries are derived from it with SQL
+      //    intervals. The column defaults cannot be used for the times
+      //    that matter: `created_at` and `last_seen_at` default to
+      //    `CURRENT_TIMESTAMP`, which in PostgreSQL is the **transaction**
+      //    start time — not the time of the statement. A login transaction
+      //    that takes a moment (the Argon2id verification is inside it) or
+      //    any drift between the app clock and the database clock then
+      //    makes `authenticated_at > created_at`, and the check
+      //    `ck_session_times` rejects the row.
+      //
+      //    Deriving everything from one database timestamp keeps the three
+      //    columns consistent with each other and removes the app clock
+      //    from the comparison entirely.
       await tx.$executeRaw`
         INSERT INTO user_sessions (
           id,
@@ -151,6 +166,8 @@ export class AuthService {
           identity_id,
           session_token_hash,
           authenticated_at,
+          created_at,
+          last_seen_at,
           expires_at,
           idle_expires_at
         )
@@ -160,9 +177,11 @@ export class AuthService {
           'LOCAL',
           NULL,
           ${hashSessionToken(token)},
-          ${new Date()},
-          ${this.expiresAt()},
-          ${this.idleExpiresAt()}
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP + ${this.absoluteTtlSeconds()} * interval '1 second',
+          CURRENT_TIMESTAMP + ${this.idleTtlSeconds()} * interval '1 second'
         )
       `;
 
@@ -186,13 +205,19 @@ export class AuthService {
    * Revoking an unknown or already revoked session is not an error: the
    * caller ends up signed out either way, and a logout that fails is a
    * confusing way to say "you are already signed out".
+   *
+   * The revocation time comes from the **database** clock
+   * (`clock_timestamp()`), not from the application. The check
+   * `ck_session_revocation` requires `revoked_at >= created_at`, and
+   * `created_at` was written by the database when the session was issued,
+   * so the two timestamps have to be compared in the same clock.
    */
   async logout(token: string): Promise<void> {
     const tokenHash = hashSessionToken(token);
 
     await this.prisma.$executeRaw`
       UPDATE user_sessions
-      SET revoked_at = ${new Date()}, revocation_reason = 'LOGOUT'
+      SET revoked_at = clock_timestamp(), revocation_reason = 'LOGOUT'
       WHERE session_token_hash = ${tokenHash}
         AND revoked_at IS NULL
     `;
@@ -311,18 +336,28 @@ export class AuthService {
     );
   }
 
-  /** The absolute expiry of a new session. */
-  private expiresAt(): Date {
+  /**
+   * The absolute lifetime, in whole seconds.
+   *
+   * The expiry is anchored to the same `CURRENT_TIMESTAMP` the row's own
+   * timestamps use, so the number travels as a plain count of seconds and
+   * the database does the arithmetic. A number is also the only thing a
+   * parameterised query can carry — a SQL expression would be sent as a
+   * string literal.
+   */
+  private absoluteTtlSeconds(): number {
     const { absoluteTtlMs } = resolveSessionTtls(this.config);
 
-    return new Date(Date.now() + absoluteTtlMs);
+    return Math.floor(absoluteTtlMs / 1000);
   }
 
-  /** The idle expiry of a new session. */
-  private idleExpiresAt(): Date {
+  /**
+   * The idle window, in whole seconds.
+   */
+  private idleTtlSeconds(): number {
     const { idleTtlMs } = resolveSessionTtls(this.config);
 
-    return new Date(Date.now() + idleTtlMs);
+    return Math.floor(idleTtlMs / 1000);
   }
 }
 /**

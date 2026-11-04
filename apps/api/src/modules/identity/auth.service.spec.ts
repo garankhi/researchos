@@ -51,6 +51,21 @@ function lastQueryValues(spy: ReturnType<typeof vi.fn>): unknown[] {
   return (call?.slice(1) ?? []) as unknown[];
 }
 
+/**
+ * The `INSERT INTO user_sessions` call of a mocked transaction.
+ *
+ * The insert is the one statement that writes the session row, so the
+ * tests that care about the shape of the row look it up by its SQL rather
+ * than by its position — the login runs several statements.
+ */
+function sessionInsertCall(spy: ReturnType<typeof vi.fn>): unknown[] {
+  const call = spy.mock.calls.find((candidate) =>
+    String((candidate[0] as unknown[]).join('?')).includes('INSERT INTO'),
+  );
+
+  return call ?? [];
+}
+
 describe('normalizeEmail', () => {
   it('trims and lowercases the address', () => {
     expect(normalizeEmail('  Faculty@ResearchOS.Local ')).toBe(
@@ -236,10 +251,8 @@ describe('AuthService', () => {
         password: 'correct',
       });
 
-      const insert = tx.$executeRaw.mock.calls.find((call) =>
-        String((call[0] as unknown[]).join('?')).includes('INSERT INTO'),
-      );
-      const values = (insert?.slice(1) ?? []) as unknown[];
+      const insert = sessionInsertCall(tx.$executeRaw);
+      const values = (insert.slice(1) ?? []) as unknown[];
 
       expect(values).not.toContain(result.token);
       expect(
@@ -272,6 +285,87 @@ describe('AuthService', () => {
 
       expect(lastQueryText(tx.$queryRaw)).toContain('FOR UPDATE');
     });
+
+    /**
+     * The timestamps of the session row are compared against each other by
+     * the check `ck_session_times` (`authenticated_at <= created_at AND
+     * last_seen_at >= created_at`), and `created_at` is written by the
+     * **database** as the transaction start time.
+     *
+     * So a login that takes any measurable time — the Argon2id
+     * verification happens inside the transaction — makes the app's clock
+     * read later than `created_at`, and the row is rejected. The fix is to
+     * let the database own all three timestamps, so they are always
+     * consistent with each other.
+     *
+     * These tests pin that: no timestamp comes from the application.
+     */
+    describe('the timestamps of the session row', () => {
+      it('takes every timestamp from the database, not from the application', async () => {
+        withValidCredential();
+        vi.mocked(verify).mockResolvedValue(true);
+
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            id: 'user-1',
+            email: 'faculty@researchos.local',
+            full_name: 'Dev Faculty',
+            user_type: 'FACULTY',
+            department_unit: 'FPTU',
+            academic_title: null,
+            academic_degree: null,
+          },
+        ]);
+
+        await service.login({
+          email: 'faculty@researchos.local',
+          password: 'correct',
+        });
+
+        const insert = sessionInsertCall(tx.$executeRaw);
+        const sql = String((insert[0] as unknown[]).join('?'));
+        const values = (insert.slice(1) ?? []) as unknown[];
+
+        // The three columns the check compares all read the database clock.
+        expect(sql.match(/CURRENT_TIMESTAMP/g)).toHaveLength(5);
+
+        // No timestamp travels as a parameter — that would be the
+        // application clock, which is exactly what the check rejects.
+        expect(values.some((value) => value instanceof Date)).toBe(false);
+      });
+
+      it('derives the expiries from the same database timestamp', async () => {
+        withValidCredential();
+        vi.mocked(verify).mockResolvedValue(true);
+
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            id: 'user-1',
+            email: 'faculty@researchos.local',
+            full_name: 'Dev Faculty',
+            user_type: 'FACULTY',
+            department_unit: 'FPTU',
+            academic_title: null,
+            academic_degree: null,
+          },
+        ]);
+
+        await service.login({
+          email: 'faculty@researchos.local',
+          password: 'correct',
+        });
+
+        const insert = sessionInsertCall(tx.$executeRaw);
+        const sql = String((insert[0] as unknown[]).join('?'));
+        const values = (insert.slice(1) ?? []) as unknown[];
+
+        // The expiries are the database timestamp plus a number of
+        // seconds, so they cannot drift away from `created_at`.
+        expect(sql).toContain("interval '1 second'");
+        expect(values).toContain(43_200);
+        expect(values).toContain(1_800);
+      });
+    });
   });
 
   describe('logout', () => {
@@ -285,6 +379,19 @@ describe('AuthService', () => {
 
     it('does not fail when there is no session to revoke', async () => {
       await expect(service.logout('unknown')).resolves.toBeUndefined();
+    });
+
+    it('stamps the revocation with the database clock', async () => {
+      // `created_at` was written by the database, and the check
+      // `ck_session_revocation` requires `revoked_at >= created_at`. The
+      // two timestamps have to come from the same clock, so the revocation
+      // is stamped in the database rather than from the application.
+      await service.logout('raw-token');
+
+      expect(lastQueryText(prisma.$executeRaw)).toContain('clock_timestamp()');
+      expect(lastQueryValues(prisma.$executeRaw)).not.toContain(
+        expect.any(Date),
+      );
     });
   });
 
