@@ -32,6 +32,7 @@
     "db:drift": "node scripts/drift-check.mjs",
     "db:setup": "node scripts/setup.mjs",
     "db:seed": "pnpm run build && node scripts/seed.mjs",
+    "db:seed:demo": "pnpm run build && node scripts/seed.mjs --demo",
     "db:seed:online": "pnpm run build && node scripts/seed-online.mjs",
     "db:taxonomy:export": "node scripts/export-taxonomy.mjs",
     "format": "prisma format",

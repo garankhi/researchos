@@ -35,9 +35,8 @@ packages/database/
   scripts/
     setup.mjs            Dựng database: tạo DB, áp migration, seed taxonomy
     setup-database.ps1   Tạo database và chạy migration
-    seed.mjs             Seed taxonomy từ snapshot có sẵn + tài khoản dev
-    seed-online.mjs      Seed taxonomy bằng cách tải từ OpenAlex + tài khoản dev
-    dev-users.mjs        Module tạo tài khoản development, dùng chung cho 2 seed
+    seed.mjs             Seed: taxonomy từ snapshot + tài khoản dev + dữ liệu demo
+    seed-online.mjs      Seed: taxonomy tải từ OpenAlex + tài khoản dev + dữ liệu demo
     export-taxonomy.mjs  Làm mới snapshot taxonomy
     drift-check.mjs      Kiểm tra schema khớp với SQL nguồn
     data/
@@ -121,8 +120,9 @@ Chạy từ root:
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:status` | Trạng thái migration |
 | `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp với SQL nguồn |
-| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
-| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
+| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, tạo tài khoản development, và ghi dữ liệu demo (profile, group, opportunity, publication) |
+| `pnpm db:seed:demo` | Chỉ ghi dữ liệu demo, bỏ qua taxonomy — dùng khi taxonomy đã có sẵn |
+| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, tạo tài khoản development, và ghi dữ liệu demo |
 | `pnpm db:studio` | Prisma Studio để xem và sửa dữ liệu |
 
 `pnpm db:setup` là lệnh onboarding cho phần database: nó tạo database nếu chưa
@@ -141,6 +141,35 @@ offline. `pnpm db:seed:online` tải trực tiếp từ OpenAlex, cần mạng v
 khoảng 90 giây. Cả hai dùng chung phần ghi vào database, nên cho ra cùng kết
 quả, và cả hai cũng tạo tài khoản development.
 Chi tiết: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
+
+Cả ba lệnh seed nằm trong **một file** (`packages/database/scripts/seed.mjs`).
+Việc tách taxonomy, tài khoản và dữ liệu demo ra ba file chỉ thêm rắc rối:
+dữ liệu demo trỏ tới topic taxonomy và tài khoản đã seed, nên thứ tự chạy
+luôn là bắt buộc. File này seed theo thứ tự này:
+
+1. Taxonomy (`research_fields` → `research_subfields` → `research_topics`).
+2. Tài khoản (`users`, `local_credentials`, `user_role_assignments`).
+3. Profile (`researcher_profiles`), group (`research_groups`, `group_members`),
+   hướng nghiên cứu (`group_directions`), sở thích (`research_interests`).
+4. Opportunity (`research_opportunities`) và publication
+   (`research_outputs`, `output_revisions`, `output_authors`, `output_topics`).
+
+`search_index` **không** được seed trực tiếp. Trigger `sync_search_index`
+tự đồng bộ từ các dòng nguồn, nên index có dữ liệu đúng ngay khi dữ liệu
+demo được ghi. Đây là điểm quan trọng: quyền xem của search index được lọc
+bằng SQL (`visible_search_index`), nên mock HTTP sẽ không bao giờ kiểm chứng
+được phần lọc quyền này.
+
+`pnpm db:seed:demo` bỏ qua bước 1 và chỉ ghi lại dữ liệu demo. Lệnh này
+nhanh hơn nhiều (dưới 1 giây so với khoảng 4 giây) và là fixture mà e2e
+suite dùng.
+
+Cả hai lệnh seed đều **idempotent**: chạy hai lần cho ra cùng số dòng, với
+cùng id. Mỗi bảng được ghi bằng `upsert` trên đúng danh tính mà schema định
+nghĩa cho bảng đó. Riêng `output_revisions` không dùng `upsert`, vì schema có
+partial unique index `uq_output_editable_draft` trên `(output_id) WHERE
+released_at IS NULL` và Prisma sẽ chọn index đó làm đích `ON CONFLICT` —
+PostgreSQL không dùng được partial index làm đích `ON CONFLICT`.
 
 `pnpm db:migrate` tương đương `prisma migrate dev`: nó tạo file migration mới
 khi schema đổi và áp dụng các migration chưa chạy. **Chỉ dùng ở máy dev.**

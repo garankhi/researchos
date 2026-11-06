@@ -180,7 +180,7 @@ pnpm db:setup
 ## Dữ liệu tham chiếu: `pnpm db:seed`
 
 Lệnh này nhập taxonomy OpenAlex vào `research_fields`, `research_subfields`
-và `research_topics`, đồng thời tạo tài khoản development.
+và `research_topics`, đồng thời tạo tài khoản development và dữ liệu demo.
 
 ```powershell
 pnpm db:seed
@@ -261,6 +261,42 @@ vì chỉ endpoint đó biết token thô, còn database chỉ lưu hash của n
 
 Phần seed tài khoản cũng idempotent: tài khoản đã có thì giữ nguyên id và các
 grant, chỉ làm mới credential để mật khẩu mới có hiệu lực ngay.
+
+### Dữ liệu demo: `pnpm db:seed:demo`
+
+Lệnh này ghi dữ liệu demo mà các màn hình Discovery, Group và Opportunity đọc:
+profile đã xác nhận, group đang hoạt động, opportunity đang mở và publication
+đã share.
+
+```powershell
+pnpm db:seed:demo
+```
+
+Lệnh bỏ qua bước nhập taxonomy, nên nó cần taxonomy đã có sẵn trong database.
+Đổi lại nó nhanh hơn nhiều (dưới 1 giây so với khoảng 4 giây cho
+`pnpm db:seed`), và là fixture mà e2e suite dùng.
+
+`search_index` **không** được seed trực tiếp. Trigger `sync_search_index`
+đồng bộ index từ các dòng nguồn, nên index có dữ liệu đúng ngay khi dữ liệu
+demo được ghi. Điểm này quan trọng: quyền xem của search index được lọc bằng
+SQL (`visible_search_index`), nên mock HTTP sẽ không bao giờ kiểm chứng được
+phần lọc quyền này.
+
+Thứ tự ghi dữ liệu demo bị các trigger và CHECK constraint ép buộc:
+
+| Bước | Bảng | Ràng buộc |
+| --- | --- | --- |
+| 1 | `researcher_profiles` | profile đã xác nhận thì mới được index |
+| 2 | `research_groups`, `group_members` | `guard_group_leader_eligibility` đòi lead là researcher đang hoạt động |
+| 3 | `group_directions`, `research_interests` | `guard_researcher_feature` đòi researcher; interest `DECLARED` không được ở trạng thái `SUGGESTED` |
+| 4 | `research_opportunities` | `normalize_opportunity` đòi tạo ở trạng thái `DRAFT` rồi mới publish; `ck_published_opportunity` đòi deadline tương lai |
+| 5 | `research_outputs`, `output_revisions`, `output_authors`, `output_topics` | `ck_shared_output` đòi revision đã release; topic phải gắn **trước** khi release, vì `guard_revision_attachment` đóng băng attachment của revision đã release |
+
+Riêng `output_revisions` không dùng `upsert`. Schema có partial unique index
+`uq_output_editable_draft` trên `(output_id) WHERE released_at IS NULL`, và
+Prisma sẽ chọn index đó làm đích `ON CONFLICT` — PostgreSQL không dùng được
+partial index làm đích `ON CONFLICT`, nên câu lệnh sẽ hỏng với `42P10`. Seed
+tìm revision theo `(output_id, revision_no)` rồi tạo hoặc cập nhật trực tiếp.
 
 ## Quy trình tổng quát cho lần đồng bộ tiếp theo
 
