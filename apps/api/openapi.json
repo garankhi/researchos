@@ -232,6 +232,237 @@
           "auth"
         ]
       }
+    },
+    "/jobs/probes": {
+      "post": {
+        "operationId": "JobsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProbeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Durably accepted; poll statusUrl.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid diagnostic parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires ADMIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key was already used with different input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submits an admin diagnostic job through the transactional outbox",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "operationId": "JobsController_find",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Logical job UUID returned on submission.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current durable status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid job UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job is missing or belongs to another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Returns the requesting user’s durable job status",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/jobs/{id}/retry": {
+      "post": {
+        "operationId": "JobsController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Failed logical job UUID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reprocessing accepted; poll statusUrl.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid job UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires ADMIN; ownership is still required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job is missing or belongs to another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Only failed jobs can be reprocessed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprocesses an owned failed job in a new bounded generation",
+        "tags": [
+          "jobs"
+        ]
+      }
     }
   },
   "info": {
@@ -394,6 +625,61 @@
         },
         "required": [
           "revoked"
+        ]
+      },
+      "CreateProbeDto": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Caller-generated UUID; repeated submissions by this owner reuse the job.",
+            "format": "uuid"
+          },
+          "failuresBeforeSuccess": {
+            "type": "number",
+            "description": "Diagnostic failures before success in generation zero; 3 exhausts the bounded retry policy.",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 0
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ]
+      },
+      "JobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Durable logical job identifier.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "PENDING includes queued, running and retrying work; terminal states are persisted in PostgreSQL.",
+            "enum": [
+              "PENDING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Execution attempts in the current generation.",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "statusUrl": {
+            "type": "string",
+            "description": "Owner-scoped URL to poll for this job."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "attempts",
+          "statusUrl"
         ]
       },
       "ApiErrorResponseDto": {
@@ -564,6 +850,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/LogoutDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "JobDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/JobDto"
           },
           "message": {
             "type": "string",

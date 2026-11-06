@@ -8,11 +8,15 @@
 
 export * from './apiErrorResponseDto';
 export * from './apiErrorResponseDtoErrorsItem';
+export * from './createProbeDto';
 export * from './demoControllerGetSlowEnvelope';
 export * from './demoControllerGetSlowParams';
 export * from './demoControllerGetUnstableEnvelope';
 export * from './healthStatusDto';
 export * from './healthStatusDtoEnvelope';
+export * from './jobDto';
+export * from './jobDtoEnvelope';
+export * from './jobDtoStatus';
 export * from './loginDto';
 export * from './logoutDto';
 export * from './logoutDtoEnvelope';

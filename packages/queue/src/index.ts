@@ -2,6 +2,22 @@ import type { QueueOptions } from 'bullmq';
 
 export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
+export const BACKGROUND_QUEUE = 'background-jobs';
+export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
+export const DURABLE_PROBE_JOB = 'diagnostic-probe';
+export const JOB_ATTEMPTS = 3;
+
+export interface BackgroundJobPayload {
+  jobId: string;
+  generation: number;
+}
+
+export function backgroundTransportId(
+  jobId: string,
+  generation: number,
+): string {
+  return `${jobId}-${generation}`;
+}
 
 export interface ProbePayload {
   requestId: string;
@@ -55,7 +71,7 @@ export function createQueueOptions(
       enableOfflineQueue: role === 'worker',
     },
     defaultJobOptions: {
-      attempts: 3,
+      attempts: JOB_ATTEMPTS,
       backoff: { type: 'exponential', delay: 500 },
       removeOnComplete: { age: 3600, count: 100 },
       removeOnFail: { age: 86400, count: 1000 },
