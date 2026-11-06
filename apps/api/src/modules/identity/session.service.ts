@@ -101,6 +101,9 @@ export class SessionService implements SessionResolver {
       userId: session.user_id,
       sessionId: session.id,
       authMethod: session.auth_method,
+      mustChangePassword:
+        session.auth_method === 'LOCAL' &&
+        session.must_change_password !== false,
       roles: await this.roleNamesFor(session.user_id),
       email: session.email,
       fullName: session.full_name,

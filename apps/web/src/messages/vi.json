@@ -87,6 +87,8 @@
         "email_invalid": "Email không hợp lệ.",
         "email_too_long": "Email không được vượt quá 255 ký tự.",
         "password_required": "Mật khẩu là bắt buộc.",
+        "password_invalid": "Mật khẩu phải là chuỗi ký tự.",
+        "new_password_too_short": "Mật khẩu mới phải có ít nhất 12 ký tự.",
         "id_uuid": "Cần cung cấp UUID hợp lệ.",
         "failures_before_success_integer": "Số lần lỗi chẩn đoán phải là số nguyên.",
         "failures_before_success_min": "Số lần lỗi chẩn đoán phải từ 0 trở lên.",
@@ -100,6 +102,7 @@
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",
         "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",
+        "password_unchanged": "Mật khẩu mới phải khác mật khẩu hiện tại.",
         "opportunity_not_found": "Không tìm thấy cơ hội."
       }
     }

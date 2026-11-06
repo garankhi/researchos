@@ -17,9 +17,10 @@ import { PrismaService } from '@researchos/database';
 
 vi.mock('@node-rs/argon2', () => ({
   verify: vi.fn(),
+  hash: vi.fn(),
 }));
 
-import { verify } from '@node-rs/argon2';
+import { verify, hash } from '@node-rs/argon2';
 
 /**
  * A stub of the transaction client the login runs in.
@@ -86,6 +87,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     vi.mocked(verify).mockReset();
+    vi.mocked(hash).mockReset();
 
     tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
@@ -126,6 +128,96 @@ describe('AuthService', () => {
         { password_hash: 'hash', must_change_password: false },
       ]);
   }
+
+  describe('changePassword', () => {
+    const dto = {
+      currentPassword: 'Temporary!Password',
+      newPassword: 'Replacement!Password2026',
+    };
+
+    function validChangeSession() {
+      withValidCredential();
+      tx.$queryRaw.mockResolvedValueOnce([
+        { id: 'session-1', auth_method: 'LOCAL' },
+      ]);
+      vi.mocked(verify).mockResolvedValue(true);
+      vi.mocked(hash).mockResolvedValue('replacement-hash');
+    }
+
+    it('verifies the current password and updates the hash/flag atomically', async () => {
+      validChangeSession();
+      await service.changePassword('user-1', 'session-1', dto);
+      expect(verify).toHaveBeenCalledWith('hash', dto.currentPassword);
+      expect(hash).toHaveBeenCalledWith(dto.newPassword);
+      expect(lastQueryText(tx.$executeRaw)).toContain(
+        'must_change_password = false',
+      );
+      expect(lastQueryValues(tx.$executeRaw)).toContain('replacement-hash');
+      expect(lastQueryValues(tx.$executeRaw)).not.toContain(dto.newPassword);
+      const selects = tx.$queryRaw.mock.calls.map((call) =>
+        (call[0] as string[]).join('?'),
+      );
+      expect(selects[0]).toContain('FROM users');
+      expect(selects[1]).toContain('FROM local_credentials');
+      expect(selects[2]).toContain('FROM user_sessions');
+      expect(selects.every((sql) => sql.includes('FOR UPDATE'))).toBe(true);
+      expect(selects[2]).toContain('clock_timestamp()');
+    });
+
+    it('does not change credentials when the current password is rejected', async () => {
+      validChangeSession();
+      vi.mocked(verify).mockResolvedValue(false);
+      await expect(
+        service.changePassword('user-1', 'session-1', dto),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+      expect(hash).not.toHaveBeenCalled();
+    });
+
+    it('rechecks session revocation/expiry inside the transaction', async () => {
+      withValidCredential();
+      tx.$queryRaw.mockResolvedValueOnce([]);
+      await expect(
+        service.changePassword('user-1', 'revoked-session', dto),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+      expect(verify).not.toHaveBeenCalled();
+    });
+
+    it('rejects OIDC sessions and leaves the LOCAL credential alone', async () => {
+      withValidCredential();
+      tx.$queryRaw.mockResolvedValueOnce([
+        { id: 'session-1', auth_method: 'OIDC' },
+      ]);
+      await expect(
+        service.changePassword('user-1', 'session-1', dto),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects reuse of the current password', async () => {
+      validChangeSession();
+      await expect(
+        service.changePassword('user-1', 'session-1', {
+          ...dto,
+          newPassword: dto.currentPassword,
+        }),
+      ).rejects.toMatchObject({ status: 400, code: 'password_unchanged' });
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects an OIDC-only account with 403 rather than invalidating its session', async () => {
+      tx.$queryRaw
+        .mockResolvedValueOnce([{ id: 'user-1', is_active: true }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'session-1', auth_method: 'OIDC' }]);
+      await expect(
+        service.changePassword('user-1', 'session-1', dto),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+      expect(verify).not.toHaveBeenCalled();
+    });
+  });
 
   describe('login', () => {
     it('rejects an unknown account with the generic invalid-credentials code', async () => {

@@ -68,6 +68,10 @@ export class JobsController {
     description: 'Logical job UUID returned on submission.',
   })
   @ApiOkResponse({ description: 'Current durable status.', type: JobDto })
+  @ApiForbiddenResponse({
+    description:
+      'The LOCAL session must change its password before accessing jobs.',
+  })
   @ApiBadRequestResponse({ description: 'Invalid job UUID.' })
   @ApiNotFoundResponse({
     description: 'Job is missing or belongs to another user.',

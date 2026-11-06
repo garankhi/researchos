@@ -87,8 +87,8 @@ export class MeDto {
 
   @ApiProperty({
     description:
-      'Whether the account must change its password before it can use the ' +
-      'rest of the API.',
+      'Whether this LOCAL session must change its password before normal protected access. ' +
+      'False for OIDC sessions; session inspection, logout and password change remain available.',
     example: false,
   })
   mustChangePassword: boolean;

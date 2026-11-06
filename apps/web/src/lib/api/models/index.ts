@@ -8,6 +8,9 @@
 
 export * from './apiErrorResponseDto';
 export * from './apiErrorResponseDtoErrorsItem';
+export * from './changePasswordDto';
+export * from './changePasswordResultDto';
+export * from './changePasswordResultDtoEnvelope';
 export * from './createProbeDto';
 export * from './demoControllerGetSlowEnvelope';
 export * from './demoControllerGetSlowParams';

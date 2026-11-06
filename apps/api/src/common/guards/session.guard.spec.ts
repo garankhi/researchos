@@ -7,6 +7,8 @@ import { SESSION_RESOLVER } from '../auth/session-resolver.js';
 import type { SessionResolver } from '../auth/session-resolver.js';
 import { SESSION_COOKIE_NAME } from '../auth/session-cookie.js';
 import type { AuthPrincipal } from '../auth/auth-principal.js';
+import { CodedHttpException, domainErrorCodes } from '../errors/error-codes.js';
+import { ALLOW_PASSWORD_CHANGE_PENDING_KEY } from '../decorators/allow-password-change-pending.decorator.js';
 
 /**
  * The session guard is the front door: everything that is not explicitly
@@ -20,6 +22,7 @@ const principal: AuthPrincipal = {
   userId: 'user-1',
   sessionId: 'session-1',
   authMethod: 'LOCAL',
+  mustChangePassword: false,
   roles: ['RESEARCHER'],
   email: 'faculty@researchos.local',
   fullName: 'Dev Faculty',
@@ -85,6 +88,38 @@ describe('SessionGuard', () => {
       UnauthorizedException,
     );
     expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it('blocks a password-change-pending admin before granting protected access', async () => {
+    resolve.mockResolvedValue({
+      ...principal,
+      roles: ['ADMIN'],
+      mustChangePassword: true,
+    });
+    const rejection = guard.canActivate(
+      contextWith({ [SESSION_COOKIE_NAME]: 'token' }),
+    );
+    await expect(rejection).rejects.toBeInstanceOf(CodedHttpException);
+    await expect(rejection).rejects.toMatchObject({
+      code: domainErrorCodes.identity.mustChangePassword,
+      status: 403,
+    });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('lets a restricted session reach an explicitly allowed authenticated handler', async () => {
+    resolve.mockResolvedValue({ ...principal, mustChangePassword: true });
+    Reflect.defineMetadata(ALLOW_PASSWORD_CHANGE_PENDING_KEY, true, handlerRef);
+    try {
+      await expect(
+        guard.canActivate(contextWith({ [SESSION_COOKIE_NAME]: 'token' })),
+      ).resolves.toBe(true);
+      await expect(guard.canActivate(contextWith({}))).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    } finally {
+      Reflect.deleteMetadata(ALLOW_PASSWORD_CHANGE_PENDING_KEY, handlerRef);
+    }
   });
 
   it('refuses a request whose cookie is empty', async () => {
