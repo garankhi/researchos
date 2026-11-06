@@ -72,6 +72,10 @@ export const domainErrorCodes = {
   opportunities: {
     notFound: 'opportunity_not_found',
   },
+  taxonomy: {
+    fieldNotFound: 'field_not_found',
+    topicNotFound: 'topic_not_found',
+  },
 } as const satisfies DomainCodeMap;
 
 /**

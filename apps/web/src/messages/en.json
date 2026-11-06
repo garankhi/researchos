@@ -96,7 +96,9 @@
         "invalid_credentials": "The email or password is incorrect.",
         "account_inactive": "This account has been deactivated. Please contact an administrator.",
         "must_change_password": "You need to change your password before continuing.",
-        "opportunity_not_found": "The opportunity was not found."
+        "opportunity_not_found": "The opportunity was not found.",
+        "field_not_found": "The requested research field was not found.",
+        "topic_not_found": "The requested research topic was not found."
       }
     }
   },
