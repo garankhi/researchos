@@ -1,13 +1,13 @@
 /**
  * The name of the cookie that carries the session token.
  *
- * The cookie is opaque: it holds a random token, never a JWT and never
- * any claim. Only the hash of that token is stored, so a database leak
- * does not hand out live sessions.
+ * The cookie is opaque: it holds a random token, never a JWT and never any
+ * claim. Only the hash of that token is stored, so a database leak does not
+ * hand out live sessions.
  *
- * The name lives in the shared leaf because it is part of the wire
- * contract between the browser and the API — the guard has to read the
- * same cookie the login route writes.
+ * The name lives in the shared leaf because it is part of the wire contract
+ * between the browser and the API — the guard has to read the same cookie
+ * the login route writes.
  */
 export const SESSION_COOKIE_NAME = 'researchos_session';
 

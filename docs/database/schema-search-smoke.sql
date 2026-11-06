@@ -212,7 +212,7 @@ END $$;
 
 -- Deleting a researcher profile of a retained user removes the search row.
 -- The account stays, but the profile's bio, title and document must not
--- stay publicly searchable.
+-- stay searchable by every authenticated, active FPTU account.
 DO $$
 DECLARE
  u uuid=gen_random_uuid(); o uuid; r uuid; n int;

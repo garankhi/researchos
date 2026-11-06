@@ -31,9 +31,8 @@ owns the words it carries.
 
 ## Non-negotiables
 
-Eight rules account for most of the mistakes in this codebase. Each one is
+Nine rules account for most of the mistakes in this codebase. Each one is
 counter-intuitive enough to be worth stating once, up front.
-
 1. **`query.data` is already the payload — never `query.data.data`.** The
    Orval mutator `src/lib/axios-instance.ts` unwraps one level.
    *Why:* a manual unwrap reads `undefined` and looks like a backend bug.
@@ -78,6 +77,20 @@ counter-intuitive enough to be worth stating once, up front.
    that owns it. Use `mutateAsync().then()`.
    *Why:* the redirect silently never happens.
    → [client-state.md](reference/client-state.md#clearing-a-store-from-a-mutation--the-unmount-trap)
+
+9. **The auth gate is in the `[locale]` layout — do not gate a route by
+   hand.** Every route is protected by default; a new one needs no work.
+   *Why:* a second gate, or a per-page check, is one more place to forget
+   and one more place to get the redirect wrong.
+   → [routing.md](reference/routing.md#the-auth-gate)
+
+10. **The gate renders its children; it never holds them back.** There is
+    no skeleton while the session check is pending — the check is a browser
+    request, so the server never gets an answer and would always ship the
+    skeleton, dropping the segment from the server shell.
+    *Why:* "Could not validate that a segment in your UI has instant
+    navigation. This segment was dropped from rendering."
+    → [routing.md](reference/routing.md#why-the-gate-never-holds-the-page-back)
 
 ## Checklist
 
@@ -170,6 +183,28 @@ Each row links to the section that shows the how.
 - [ ] `notFound()` / `unauthorized()` / `forbidden()` are called from a
       dedicated route, never from a click handler
       → [routing.md](reference/routing.md#access-boundaries)
+
+### Access
+
+- [ ] A new route needs **no** access work — the `[locale]` layout's
+      `AuthGate` already covers it
+      → [routing.md](reference/routing.md#the-auth-gate)
+- [ ] A route that must stay reachable without a session is added to
+      `PUBLIC_ROUTE_PREFIXES` in `features/identity/utils/auth-gate.ts` —
+      nowhere else
+      → [routing.md](reference/routing.md#the-two-public-routes)
+- [ ] The gate reads `useMe().isSignedOut` (a strict `401`), never
+      `useSession().isSignedOut`
+      → [routing.md](reference/routing.md#useme-not-usesession)
+- [ ] The redirect carries a sanitized `returnTo`, built with
+      `buildLoginHref()` — never a raw path
+      → [routing.md](reference/routing.md#the-auth-gate)
+- [ ] The gate **renders** its children and redirects on a `401` — it never
+      swaps them for a skeleton while the session check is pending
+      → [routing.md](reference/routing.md#why-the-gate-never-holds-the-page-back)
+- [ ] A page that shows **protected** data fetches it in a client-side
+      query, never in a server component
+      → [routing.md](reference/routing.md#why-the-gate-never-holds-the-page-back)
 
 ### UI
 

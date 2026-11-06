@@ -8,6 +8,7 @@
 
 export { AccountMenu } from './components/account-menu';
 export { AccountSlot } from './components/account-slot';
+export { AuthGate } from './components/auth-gate';
 export { LoginForm } from './components/login-form';
 export { SessionSummary } from './components/session-summary';
 export { useLogin } from './hooks/use-login';
@@ -18,6 +19,12 @@ export { useCurrentUser } from './hooks/use-session';
 export { loginFormSchema } from './schemas/login-form.schema';
 export type { LoginFormValues } from './schemas/login-form.schema';
 export { initialsOf } from './utils/initials';
+export {
+  PUBLIC_ROUTE_PREFIXES,
+  isPublicRoute,
+  resolveGateDecision,
+} from './utils/auth-gate';
+export type { GateDecision, GateState } from './utils/auth-gate';
 export {
   DEFAULT_RETURN_TO,
   RETURN_TO_PARAM,

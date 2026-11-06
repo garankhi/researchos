@@ -426,9 +426,9 @@ Ba điểm phải giữ:
 2. **Ba entity không có cột `visibility` thật.** `researcher_profiles`,
    `research_groups`, `research_opportunities` không có cột này — quyền phải
    **suy ra** từ trạng thái:
-   - researcher: profile đã xác nhận → công khai; chưa xác nhận → không index
-   - group: đang active → công khai
-   - opportunity: `OPEN` → công khai; có `group_id` → chỉ thành viên group đó
+   - researcher: profile đã xác nhận → hiển thị với mọi tài khoản FPTU đã đăng nhập và đang active; chưa xác nhận → không index
+   - group: đang active → hiển thị với mọi tài khoản FPTU đã đăng nhập và đang active
+   - opportunity: `OPEN` → hiển thị với mọi tài khoản FPTU đã đăng nhập và đang active; có `group_id` → chỉ thành viên group đó
 
 3. **Một bảng, một hàm lọc quyền.** Cả 4 loại dùng chung bộ ba giá trị
    visibility, nên `visible_search_index(actor)` áp cùng một quy tắc cho tất cả.
@@ -451,7 +451,7 @@ Ba điểm phải giữ:
   1. **`search_index` bám `current_release_id`, không bám revision ghim của
      group.** Một group có thể ghim revision cũ (`accepted_revision_id` khác
      `current_release_id`) — group vẫn hiện bản cũ trong `group_output_releases`,
-     còn Search hiện bản mới nhất. Đây là chủ ý: Search là bản đọc công khai
+     còn Search hiện bản mới nhất. Đây là chủ ý: Search là bản đọc dùng chung
      của công trình, còn group là bản trình bày riêng.
 
   2. **`search_index` và `released_output_versions` cùng nguồn.** Cùng một
@@ -491,7 +491,7 @@ ORDER BY rank DESC;
 | --- | --- |
 | `PRIVATE` | chỉ owner (`s.owner_id = actor`) |
 | `RESEARCH_GROUP` | thành viên của `access_group_id` |
-| `FPTU_COMMUNITY` | mọi người |
+| `FPTU_COMMUNITY` | mọi tài khoản FPTU đã đăng nhập và đang active |
 
 > **Điều kiện tài khoản active áp cho mọi nhánh.** `can_view_output` bắt buộc
 > actor phải là tài khoản active (`JOIN users u ON u.id=actor AND u.is_active`).
@@ -499,7 +499,7 @@ ORDER BY rank DESC;
 > trong hệ thống, hoặc đã bị vô hiệu hoá thì **không thấy dòng nào** — kể cả
 > dòng `FPTU_COMMUNITY`, và kể cả dòng `PRIVATE` của chính mình. Thiếu điều
 > kiện này là lỗ hổng: một tài khoản bị vô hiệu hoá vẫn tra được kết quả
-> công khai, và owner bị vô hiệu hoá vẫn thấy bài riêng của mình.
+> dùng chung, và owner bị vô hiệu hoá vẫn thấy bài riêng của mình.
 
 > **Vì sao cần nhánh `owner`:** một bài `SHARED` nhưng `visibility = 'PRIVATE'`
 > vẫn phải tìm được bởi chính chủ. `released_output_versions` cũng đưa bài đó

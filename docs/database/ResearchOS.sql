@@ -1595,8 +1595,9 @@ CREATE FUNCTION visible_group_output_releases(actor uuid,target_group uuid) RETU
  SELECT r.* FROM group_output_releases r WHERE r.group_id=target_group AND can_view_output(actor,r.output_id);
 $$;
 -- Search index permission filter. Mirrors can_view_output exactly: the owner
--- always sees the record, FPTU_COMMUNITY is visible to everyone, RESEARCH_GROUP
--- is visible to the members of access_group_id. The owner case matters - a
+-- always sees the record, FPTU_COMMUNITY is visible to every authenticated,
+-- active FPTU account, RESEARCH_GROUP is visible to the members of
+-- access_group_id. The owner case matters - a
 -- PRIVATE-visibility work stays findable by its owner in search.
 -- The four entity types carry the same visibility triple, so one filter covers
 -- all of them.
@@ -1797,10 +1798,12 @@ CREATE TRIGGER guard_digest_delivery BEFORE INSERT OR UPDATE ON digest_deliverie
 --   OUTPUT        indexed when the work is SHARED and the revision is the
 --                 current release. The owner is the researcher themselves.
 --   RESEARCHER    indexed when the group is active and not archived. A group
---                 is a public research unit, so visibility is FPTU_COMMUNITY.
+--                 is a research unit open to the whole university community,
+--                 so visibility is FPTU_COMMUNITY.
 --                 The owner is the group leader.
 --   OPPORTUNITY   indexed when status = 'OPEN' and not archived. Visibility is
---                 FPTU_COMMUNITY - an open call for collaboration is public.
+--                 FPTU_COMMUNITY - an open call for collaboration is visible
+--                 to every authenticated, active FPTU account.
 --                 The owner is the creator.
 --
 -- Drafts (accepted but not published), unconfirmed profiles, archived groups
@@ -1909,7 +1912,8 @@ BEGIN
     END IF;
     etype:='OPPORTUNITY'; eid:=NEW.id; eowner:=NEW.creator_id;
     -- A group-scoped opportunity is visible to that group's members only;
-    -- a personal one is public. The scope lives on the opportunity row.
+    -- a personal one is visible to every authenticated, active FPTU account.
+    -- The scope lives on the opportunity row.
     IF NEW.group_id IS NOT NULL THEN
       evis:='RESEARCH_GROUP'; egroup:=NEW.group_id;
     ELSE
@@ -1971,7 +1975,8 @@ CREATE TRIGGER sync_search_index_del AFTER DELETE ON research_opportunities FOR 
 -- Deleting the profile of a retained user also has to clean up the index.
 -- The delete trigger on users only fires when the account itself goes away;
 -- a researcher profile can be removed while the account stays, and the
--- profile's bio, title and search document would otherwise stay public.
+-- profile's bio, title and search document would otherwise stay visible to
+-- every authenticated, active FPTU account.
 CREATE FUNCTION sync_search_index_delete_profile() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   DELETE FROM search_index WHERE entity_type='RESEARCHER' AND entity_id=OLD.user_id;

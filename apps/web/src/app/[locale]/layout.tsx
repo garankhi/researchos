@@ -6,7 +6,7 @@ import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import '../globals.css';
 import Header from '@/components/ui/header';
-import { AccountSlot } from '@/features/identity';
+import { AccountSlot, AuthGate } from '@/features/identity';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
@@ -81,7 +81,11 @@ export default async function RootLayout({
                       feature knows about the header's slot, not the
                       reverse. */}
                   <Header accountSlot={<AccountSlot />} />
-                  {children}
+                  {/* The platform is for signed-in users only. The gate sits
+                      here, in the layout, so every route under `[locale]` is
+                      protected by default — a new page does not have to
+                      remember to protect itself. */}
+                  <AuthGate>{children}</AuthGate>
                 </SnackbarProvider>
               </NextIntlClientProvider>
             </QueryProvider>

@@ -140,6 +140,117 @@ The global boundary replaces the root layout, so it does not inherit the
 providers, the theme, or the `dark` class on `<html>`. Style it standalone
 rather than assuming the app shell is present.
 
+### The auth gate
+
+Every route in `app/[locale]/` sits behind a gate. An unauthenticated
+visitor is sent to the login screen instead of the page they asked for.
+
+```typescript
+// app/[locale]/layout.tsx
+<AuthGate>{children}</AuthGate>
+```
+
+| File | Role |
+| --- | --- |
+| `features/identity/utils/auth-gate.ts` | The **pure** rules — public routes, the decision. Testable without a browser or a session |
+| `features/identity/components/auth-gate.tsx` | The component that applies them |
+| `features/identity/utils/return-to.ts` | `buildLoginHref()` — the sanitized `returnTo` link |
+
+The gate is in **one** place — the `[locale]` layout — so a new route is
+protected by default rather than by remembering to protect it. Do not add
+a second gate, and do not gate a route by hand.
+
+#### The two public routes
+
+```typescript
+export const PUBLIC_ROUTE_PREFIXES = ['/login', '/'] as const;
+```
+
+- `/login` — the sign-in screen. Gating it would loop: the gate would
+  send the visitor to the login screen, which is where they already are.
+- `/` — the home screen. It is the landing page, and it answers the
+  "who am I?" question itself: a signed-out visitor sees a sign-in
+  button instead of being thrown away. Gating it would leave a visitor
+  who followed a shared link with nothing but a login form and no
+  explanation of what they were trying to reach.
+
+Note that `/` matches **only** the root: the match is on a path segment
+boundary, so `/` does not swallow `/demo`. A prefix matches itself and
+everything below it (`/login/…`), never a longer word that happens to
+start with the same letters — `/login` never matches `/logins`.
+
+The pathname the gate reads is the **locale-free** one (`/login`, not
+`/vi/login`), because the locale is a routing concern.
+
+#### The two decisions
+
+```typescript
+export type GateDecision = 'render' | 'redirect';
+```
+
+1. **A public route always renders.** The login screen must not be
+   redirected to itself, and the home screen must not bounce a visitor
+   away before it has shown them anything.
+2. **A signed-out visitor is redirected** to `/login?returnTo=…`.
+
+There is deliberately **no** "wait" decision, and there is no fourth case
+for "the API is down". A failed request is not the same as not being
+signed in, and redirecting to the login screen because the API is
+unreachable would send the visitor into a loop they cannot get out of.
+The page renders instead, and its own error state explains what went
+wrong.
+
+#### Why the gate never holds the page back
+
+An earlier version replaced the page with a skeleton until the session
+check came back. That cannot work here, and the reason only shows up
+under `cacheComponents`: **the session check never resolves on the
+server.** `GET /me` is a browser request — the server has no answer to
+give, so the server always rendered the "still checking" branch.
+
+Two things followed, and both were bad:
+
+- the server shipped a skeleton instead of the page, so the real content
+  only ever existed in the client payload — and Next.js dropped the
+  segment from the server shell entirely (`Route "/[locale]/demo": Could
+  not validate that a segment in your UI has instant navigation. This
+  segment was dropped from rendering.`);
+- every protected page cost a round trip before it could show anything,
+  which is the same round trip the header was already making.
+
+So the gate **renders the page and redirects the moment the answer says
+"no session"**. A signed-out visitor sees the page shell for a moment and
+is then sent to the login screen — which is what a redirect is.
+
+**The consequence for protected data:** because the server renders the
+page before it knows who is asking, a page must not fetch **protected**
+data on the server. That data belongs to a client-side query, where the
+browser sends the session cookie and the backend can answer `401` for a
+request it should refuse. A server component that reads a protected row
+would put that row in the HTML for everybody.
+
+#### `useMe`, not `useSession`
+
+`useSession().isSignedOut` means "there is no account **and** the check
+has finished", which is also true when the API is down. `useMe().isSignedOut`
+is the strict reading — **the API answered `401`** — so the gate only
+redirects when the backend really said "not signed in".
+
+#### Why it is client-side
+
+The session rides an opaque `httpOnly` cookie. The browser holds it and
+JavaScript cannot read it, so a server-side check is only possible when
+the web app and the API share one origin. They are separate origins in
+development (`localhost:3000` and `localhost:4000`) and sit behind a
+reverse proxy in production, and the deployment does not pin the cookie's
+`Domain` attribute. A proxy-level gate that reads the cookie would be a
+**redirect loop** in every topology where the cookie is scoped to the API
+host.
+
+The backend remains the authority. The gate does not decide who may read
+what; it only decides whether to show a screen to someone the backend
+would refuse to answer anyway.
+
 ### Access boundaries
 
 Each interrupt function gets a route that calls it during a server render.
