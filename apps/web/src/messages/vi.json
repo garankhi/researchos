@@ -104,7 +104,8 @@
         "email_already_registered": "Địa chỉ email này đã được sử dụng.",
         "cannot_grant_self_role": "Quản trị viên không thể tự cấp hoặc thay đổi vai trò của chính mình.",
         "role_already_granted": "Người dùng đã có vai trò này và đang có hiệu lực.",
-        "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi."
+        "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi.",
+        "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu."
       }
     }
   },

@@ -104,7 +104,8 @@
         "email_already_registered": "This email address is already in use.",
         "cannot_grant_self_role": "An administrator cannot grant or modify their own roles.",
         "role_already_granted": "The user already holds this active role.",
-        "role_not_granted": "The user does not hold this active role."
+        "role_not_granted": "The user does not hold this active role.",
+        "profile_not_found": "The requested researcher profile was not found."
       }
     }
   },
