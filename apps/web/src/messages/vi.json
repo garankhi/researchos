@@ -96,7 +96,9 @@
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",
         "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",
-        "opportunity_not_found": "Không tìm thấy cơ hội."
+        "opportunity_not_found": "Không tìm thấy cơ hội.",
+        "field_not_found": "Không tìm thấy lĩnh vực nghiên cứu yêu cầu.",
+        "topic_not_found": "Không tìm thấy chủ đề nghiên cứu yêu cầu."
       }
     }
   },

@@ -232,6 +232,306 @@
           "auth"
         ]
       }
+    },
+    "/taxonomy/tree": {
+      "get": {
+        "operationId": "TaxonomyController_getTree",
+        "parameters": [
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter the taxonomy tree by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter nodes by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cây phân cấp nghiên cứu hoàn chỉnh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerGetTreeEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy toàn bộ cây phân cấp nghiên cứu (Fields -> Subfields -> Topics)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/fields": {
+      "get": {
+        "operationId": "TaxonomyController_findAllFields",
+        "parameters": [
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter fields by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter fields by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách các lĩnh vực nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerFindAllFieldsEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liệt kê danh sách các lĩnh vực nghiên cứu cấp 1 (Fields)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/fields/{fieldId}/subfields": {
+      "get": {
+        "operationId": "TaxonomyController_findSubfieldsByFieldId",
+        "parameters": [
+          {
+            "name": "fieldId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research field (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter subfields by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter subfields by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách các phân ngành nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerFindSubfieldsByFieldIdEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy lĩnh vực nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liệt kê danh sách các phân ngành nghiên cứu (Subfields) theo lĩnh vực",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topics": {
+      "get": {
+        "operationId": "TaxonomyController_findAllTopics",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "subfieldId",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by parent subfield identifier (UUID).",
+            "schema": {
+              "example": "b0000000-0000-0000-0000-000000000001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string to match topic name (fuzzy / trigram search).",
+            "schema": {
+              "example": "Machine Learning",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách chủ đề nghiên cứu kèm metadata phân trang",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTopicsResponseDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tìm kiếm và phân trang danh sách các chủ đề nghiên cứu cấp 3 (Topics)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topics/{topicId}": {
+      "get": {
+        "operationId": "TaxonomyController_findOneTopic",
+        "parameters": [
+          {
+            "name": "topicId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the research topic (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chi tiết chủ đề nghiên cứu kèm cấp cha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicDetailResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy chủ đề nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy chi tiết một chủ đề nghiên cứu kèm thông tin cấp cha",
+        "tags": [
+          "taxonomy"
+        ]
+      }
     }
   },
   "info": {
@@ -394,6 +694,536 @@
         },
         "required": [
           "revoked"
+        ]
+      },
+      "TaxonomyTreeTopicDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "TaxonomyTreeSubfieldDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research subfield (UUID).",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "fieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research field.",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "object",
+            "description": "Stable internal code for the subfield.",
+            "example": "SUBFIELD-AI",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research subfield.",
+            "example": "Artificial Intelligence"
+          },
+          "nameVi": {
+            "type": "object",
+            "description": "Vietnamese translated name of the research subfield.",
+            "example": "Trí tuệ nhân tạo",
+            "nullable": true
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or scope of the research subfield.",
+            "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
+            "example": "https://openalex.org/subfields/1702",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this subfield is active and selectable in the system.",
+            "example": true
+          },
+          "topics": {
+            "description": "List of research topics belonging to this subfield.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeTopicDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "topics"
+        ]
+      },
+      "TaxonomyTreeFieldDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research field (UUID).",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "object",
+            "description": "Stable internal code for the field.",
+            "example": "FIELD-CS",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research field.",
+            "example": "Computer Science"
+          },
+          "nameVi": {
+            "type": "object",
+            "description": "Vietnamese translated name of the research field.",
+            "example": "Khoa học máy tính",
+            "nullable": true
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or scope of the research field.",
+            "example": "Study of computation, information, and automation.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
+            "example": "https://openalex.org/fields/17",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this field is active and selectable in the system.",
+            "example": true
+          },
+          "subfields": {
+            "description": "List of research subfields belonging to this field.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeSubfieldDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "subfields"
+        ]
+      },
+      "FieldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research field (UUID).",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "object",
+            "description": "Stable internal code for the field.",
+            "example": "FIELD-CS",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research field.",
+            "example": "Computer Science"
+          },
+          "nameVi": {
+            "type": "object",
+            "description": "Vietnamese translated name of the research field.",
+            "example": "Khoa học máy tính",
+            "nullable": true
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or scope of the research field.",
+            "example": "Study of computation, information, and automation.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
+            "example": "https://openalex.org/fields/17",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this field is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "SubfieldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research subfield (UUID).",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "fieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research field.",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "object",
+            "description": "Stable internal code for the subfield.",
+            "example": "SUBFIELD-AI",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research subfield.",
+            "example": "Artificial Intelligence"
+          },
+          "nameVi": {
+            "type": "object",
+            "description": "Vietnamese translated name of the research subfield.",
+            "example": "Trí tuệ nhân tạo",
+            "nullable": true
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or scope of the research subfield.",
+            "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
+            "example": "https://openalex.org/subfields/1702",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this subfield is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "TopicResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "The page that was returned, 1-based.",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "description": "How many records one page holds.",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records the query matched in total.",
+            "example": 137
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "How many pages the result is split into.",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a next page exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a previous page exists.",
+            "example": false
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNextPage",
+          "hasPreviousPage"
+        ]
+      },
+      "PaginatedTopicsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The research topics of this page.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "TopicDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "object",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "object",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          },
+          "subfield": {
+            "description": "The parent research subfield of this topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubfieldResponseDto"
+              }
+            ]
+          },
+          "field": {
+            "description": "The root research field of this topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "subfield",
+          "field"
         ]
       },
       "ApiErrorResponseDto": {
@@ -564,6 +1394,135 @@
           },
           "data": {
             "$ref": "#/components/schemas/LogoutDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerGetTreeEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeFieldDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerFindAllFieldsEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerFindSubfieldsByFieldIdEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubfieldResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedTopicsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedTopicsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicDetailResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicDetailResponseDto"
           },
           "message": {
             "type": "string",
