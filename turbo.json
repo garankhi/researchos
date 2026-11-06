@@ -82,6 +82,11 @@
       "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
+    "db:reset": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
     "db:seed": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["DATABASE_URL"],

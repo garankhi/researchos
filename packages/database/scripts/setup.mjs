@@ -14,78 +14,16 @@
 // The script is plain Node, so that it runs the same way on every machine.
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import {
+  parseDatabaseUrl,
+  resolveDatabaseUrl,
+} from './database-url.mjs';
 import { fail, log } from './openalex.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const workspaceRoot = resolve(packageRoot, '..', '..');
-
-/**
- * Reads the connection string the way the Prisma CLI reads it: the
- * package-local `.env` overrides the workspace root `.env`, and a real
- * environment variable is used only when no file provides a value.
- */
-function resolveDatabaseUrl() {
-  for (const path of [
-    resolve(packageRoot, '.env.local'),
-    resolve(packageRoot, '.env'),
-    resolve(workspaceRoot, '.env'),
-  ]) {
-    let contents;
-    try {
-      contents = readFileSync(path, 'utf8');
-    } catch {
-      continue;
-    }
-
-    const match = /^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?\s*$/m.exec(contents);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
-  }
-
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
-  }
-
-  return fail(
-    'DATABASE_URL is not set. Copy .env.example to .env and fill it in.',
-  );
-}
-
-/**
- * Parses a PostgreSQL connection string into its parts.
- *
- * The URL is parsed with the URL parser, which handles the userinfo, the
- * port and the database name. The password is percent-decoded, because it
- * may contain characters that are escaped in the URL.
- */
-function parseDatabaseUrl(url) {
-  const parsed = new URL(url);
-
-  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
-
-  if (!database) {
-    fail(`The connection string has no database name: ${url}`);
-  }
-
-  const [user, password] = (
-    parsed.username ? `${parsed.username}:${parsed.password}` : ''
-  )
-    .split(':')
-    .map((part) => decodeURIComponent(part));
-
-  return {
-    host: parsed.hostname,
-    port: parsed.port || '5432',
-    user: user || 'postgres',
-    password: password ?? '',
-    database,
-  };
-}
 
 /**
  * Runs a command and ends the run when it fails.

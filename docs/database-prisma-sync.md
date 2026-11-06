@@ -87,7 +87,8 @@ cùng migration trước khi chia sẻ thay đổi cho người khác.
 **Không dùng `pnpm db:migrate` để áp dụng migration này hoặc tạo migration
 kế tiếp trước khi hoàn tất `db pull` và validate.** Nếu schema Prisma chưa
 có model nghiệp vụ mà đem làm đích của `migrate dev`, Prisma có thể đề nghị
-xóa các bảng vừa thêm. Không chạy `db:reset` hoặc `db push` cho bước này.
+xóa các bảng vừa thêm. Không chạy `pnpm db:reset` hoặc `db push` cho bước này —
+`db:reset` xoá toàn bộ database, không chỉ các bảng vừa thêm.
 
 Có thể mở `pnpm db:studio` để xem các bảng sau khi hoàn tất. Các cảnh báo
 introspection về trigger/CHECK/index đặc thù cần được review; những phần
@@ -176,6 +177,23 @@ Lệnh chạy theo thứ tự:
 ```powershell
 pnpm db:setup
 ```
+
+## Dựng lại database: `pnpm db:reset`
+
+Khi database đã tồn tại nhưng cần dựng lại từ đầu — migration lệch, seed lỗi
+giữa chừng, hay chỉ muốn bắt đầu lại — dùng `pnpm db:reset`:
+
+```powershell
+pnpm db:reset
+```
+
+Lệnh **xoá sạch** database hiện tại rồi dựng lại: `DROP DATABASE` →
+`CREATE DATABASE` → `prisma migrate deploy` → `pnpm db:seed`. Bước seed là
+bản **offline** (đọc taxonomy từ snapshot có sẵn trong repo), nên lệnh không
+cần mạng và không cần OpenAlex API key.
+
+Khác với `db:setup`, lệnh này xoá mọi dữ liệu đang có trong database, kể cả
+dữ liệu mà seed không tạo ra. Chỉ dùng ở máy dev.
 
 ## Dữ liệu tham chiếu: `pnpm db:seed`
 

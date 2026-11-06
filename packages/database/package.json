@@ -26,7 +26,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
-    "db:reset": "prisma migrate reset",
+    "db:reset": "pnpm run build && node scripts/reset.mjs",
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:drift": "node scripts/drift-check.mjs",
