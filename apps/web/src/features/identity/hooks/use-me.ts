@@ -43,18 +43,12 @@ export function useMe() {
   const clearUser = useSessionStore((state) => state.clearUser);
   const markResolved = useSessionStore((state) => state.markResolved);
 
-  const data: CurrentUser | undefined = query.data
-    ? toCurrentUser(query.data)
-    : undefined;
+  const data: CurrentUser | undefined =
+    query.isSuccess && query.data ? toCurrentUser(query.data) : undefined;
 
   const isSignedOut = query.isError && apiStatusCode(query.error) === 401;
 
   useEffect(() => {
-    if (data) {
-      setUser(data);
-      return;
-    }
-
     // A `401` means the session is gone. Any other failure — the API is
     // down, the network dropped — says nothing about the session, so the
     // store keeps what it had rather than signing the user out because
@@ -65,10 +59,25 @@ export function useMe() {
       return;
     }
 
+    // Error results can retain old query.data. Only a successful response
+    // may establish an account, including after an earlier 401 cleared it.
+    if (query.isSuccess && query.data) {
+      setUser(toCurrentUser(query.data));
+      return;
+    }
+
     if (query.isError) {
       markResolved();
     }
-  }, [data, isSignedOut, query.isError, setUser, clearUser, markResolved]);
+  }, [
+    query.data,
+    query.isSuccess,
+    isSignedOut,
+    query.isError,
+    setUser,
+    clearUser,
+    markResolved,
+  ]);
 
   return {
     ...query,
