@@ -90,6 +90,30 @@ describe('SessionService', () => {
   });
 
   describe('resolve', () => {
+    it.each([
+      ['LOCAL', true, true],
+      ['LOCAL', false, false],
+      ['LOCAL', null, true],
+      ['OIDC', true, false],
+    ])(
+      'preserves the password gate for %s with credential flag %s',
+      async (method, flag, expected) => {
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            id: 'session-1',
+            user_id: 'user-1',
+            auth_method: method,
+            email: 'user@example.test',
+            full_name: 'Test User',
+            must_change_password: flag,
+          },
+        ]);
+        await expect(service.resolve('token')).resolves.toMatchObject({
+          mustChangePassword: expected,
+        });
+      },
+    );
+
     it('returns null for an unknown token', async () => {
       prisma.$queryRaw.mockResolvedValue([]);
 
@@ -124,6 +148,7 @@ describe('SessionService', () => {
         userId: 'user-1',
         sessionId: 'session-1',
         authMethod: 'LOCAL',
+        mustChangePassword: false,
         roles: ['RESEARCHER'],
         email: 'faculty@researchos.local',
         fullName: 'Dev Faculty',

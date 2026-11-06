@@ -12,6 +12,8 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
+  ApiBadRequestResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -23,24 +25,31 @@ import {
   SESSION_COOKIE_OPTIONS,
 } from '../../common/auth/session-cookie.js';
 import { Public } from '../../common/decorators/public.decorator.js';
-import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { CurrentPrincipal } from '../../common/decorators/current-principal.decorator.js';
+import { AllowPasswordChangePending } from '../../common/decorators/allow-password-change-pending.decorator.js';
+import type { AuthPrincipal } from '../../common/auth/auth-principal.js';
 import { AuthService } from './auth.service.js';
 import { resolveSessionTtls } from './session-ttl.js';
 import { LoginDto } from './dto/login.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
 import { MeDto } from './dto/me.dto.js';
+import {
+  ChangePasswordDto,
+  ChangePasswordResultDto,
+} from './dto/change-password.dto.js';
 
 /**
  * The session endpoints.
  *
- * Three routes:
+ * Session routes:
  *
  * - `POST /auth/login` — verifies a local credential and issues a session.
  * - `POST /auth/logout` — revokes the session behind the cookie.
  * - `GET /me` — the current user payload.
+ * - `POST /auth/change-password` — replaces a LOCAL password and ends all sessions.
  *
  * The login route is public — it is how a caller becomes signed in. The
- * other two are behind the session guard, which is registered globally.
+ * others are behind the session guard, which is registered globally.
  */
 @ApiTags('auth')
 @Controller()
@@ -92,6 +101,7 @@ export class AuthController {
   @ApiOkResponse({ description: 'The session was revoked.', type: LogoutDto })
   @ApiUnauthorizedResponse({ description: 'There is no session to revoke.' })
   @HttpCode(HttpStatus.OK)
+  @AllowPasswordChangePending()
   @Post('auth/logout')
   async logout(
     @Req() request: Request,
@@ -110,6 +120,42 @@ export class AuthController {
     return { revoked: Boolean(token) };
   }
 
+  @Post('auth/change-password')
+  @HttpCode(HttpStatus.OK)
+  @AllowPasswordChangePending()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Changes the LOCAL password and revokes all existing sessions',
+  })
+  @ApiOkResponse({
+    description: 'Password changed. Sign in again using the new password.',
+    type: ChangePasswordResultDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid new password or reuse of the current password.',
+  })
+  @ApiUnauthorizedResponse({
+    description:
+      'Session expired/revoked or the current password was rejected.',
+  })
+  @ApiForbiddenResponse({
+    description: 'Password changes require a LOCAL session.',
+  })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async changePassword(
+    @CurrentPrincipal() principal: AuthPrincipal,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ChangePasswordResultDto> {
+    await this.authService.changePassword(
+      principal.userId,
+      principal.sessionId,
+      dto,
+    );
+    response.clearCookie(SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS);
+    return { changed: true };
+  }
+
   @ApiOperation({ summary: 'Returns the current user payload' })
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'The current user payload', type: MeDto })
@@ -117,8 +163,9 @@ export class AuthController {
     description: 'There is no valid session behind the request.',
   })
   @Get('me')
-  me(@CurrentUserId() userId: string): Promise<MeDto> {
-    return this.authService.me(userId);
+  @AllowPasswordChangePending()
+  me(@CurrentPrincipal() principal: AuthPrincipal): Promise<MeDto> {
+    return this.authService.me(principal.userId, principal.authMethod);
   }
 
   /**

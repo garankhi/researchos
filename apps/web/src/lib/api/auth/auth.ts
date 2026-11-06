@@ -23,6 +23,8 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  ChangePasswordDto,
+  ChangePasswordResultDtoEnvelope,
   LoginDto,
   LogoutDtoEnvelope,
   MeDtoEnvelope,
@@ -229,6 +231,104 @@ export const useAuthControllerLogout = <
 > => {
   return useMutation(
     getAuthControllerLogoutMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Changes the LOCAL password and revokes all existing sessions
+ */
+export const authControllerChangePassword = (
+  changePasswordDto: ChangePasswordDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ChangePasswordResultDtoEnvelope>(
+    {
+      url: `/auth/change-password`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: changePasswordDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAuthControllerChangePasswordMutationKey = () =>
+  ['authControllerChangePassword'] as const;
+
+export const getAuthControllerChangePasswordMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authControllerChangePassword>>,
+    TError,
+    AuthControllerChangePasswordMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authControllerChangePassword>>,
+  TError,
+  AuthControllerChangePasswordMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAuthControllerChangePasswordMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authControllerChangePassword>>,
+    AuthControllerChangePasswordMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return authControllerChangePassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AuthControllerChangePasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authControllerChangePassword>>
+>;
+export type AuthControllerChangePasswordMutationBody = ChangePasswordDto;
+export type AuthControllerChangePasswordMutationError = ApiErrorResponseDto;
+export type AuthControllerChangePasswordMutationVariables = {
+  data: ChangePasswordDto;
+};
+
+/**
+ * @summary Changes the LOCAL password and revokes all existing sessions
+ */
+export const useAuthControllerChangePassword = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof authControllerChangePassword>>,
+      TError,
+      AuthControllerChangePasswordMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof authControllerChangePassword>>,
+  TError,
+  AuthControllerChangePasswordMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getAuthControllerChangePasswordMutationOptions(options),
     queryClient,
   );
 };

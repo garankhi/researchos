@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { verify } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
@@ -11,6 +15,8 @@ import { hashSessionToken } from './session.service.js';
 import { resolveSessionTtls } from './session-ttl.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { MeDto } from './dto/me.dto.js';
+import type { ChangePasswordDto } from './dto/change-password.dto.js';
+import type { AuthMethod } from '../../common/auth/auth-principal.js';
 
 /**
  * The length of the raw session token, in bytes.
@@ -223,13 +229,58 @@ export class AuthService {
     `;
   }
 
+  /** Serialize with login/reset in users → credentials → sessions order.
+   * The credential trigger timestamps the change and revokes ALL old sessions. */
+  async changePassword(
+    userId: string,
+    sessionId: string,
+    dto: ChangePasswordDto,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const users = await tx.$queryRaw<LockedUserRow[]>`
+        SELECT id, is_active FROM users WHERE id = ${userId}::uuid FOR UPDATE
+      `;
+      if (!users[0]?.is_active) throw new UnauthorizedException();
+      const credentials = await tx.$queryRaw<LockedCredentialRow[]>`
+        SELECT password_hash, must_change_password FROM local_credentials
+        WHERE user_id = ${userId}::uuid FOR UPDATE
+      `;
+      // Revalidate under the transaction locks. The request may have passed
+      // the guard before a concurrent password reset, logout or expiry.
+      const sessions = await tx.$queryRaw<
+        { id: string; auth_method: AuthMethod }[]
+      >`
+        SELECT id, auth_method FROM user_sessions
+        WHERE id = ${sessionId}::uuid AND user_id = ${userId}::uuid
+          AND revoked_at IS NULL AND expires_at > clock_timestamp()
+          AND idle_expires_at > clock_timestamp() FOR UPDATE
+      `;
+      if (!sessions[0]) throw new UnauthorizedException();
+      if (sessions[0].auth_method !== 'LOCAL') throw new ForbiddenException();
+      if (!credentials[0]) throw this.rejected();
+      if (!(await verify(credentials[0].password_hash, dto.currentPassword)))
+        throw this.rejected();
+      if (dto.newPassword === dto.currentPassword) {
+        throw new CodedHttpException(
+          domainErrorCodes.identity.passwordUnchanged,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const passwordHash = await hash(dto.newPassword);
+      await tx.$executeRaw`
+        UPDATE local_credentials SET password_hash = ${passwordHash}, must_change_password = false
+        WHERE user_id = ${userId}::uuid
+      `;
+    });
+  }
+
   /**
    * The payload of `GET /me`.
    *
    * The roles are read live, so they are never a snapshot of what the
    * session was created with.
    */
-  async me(userId: string): Promise<MeDto> {
+  async me(userId: string, authMethod: AuthMethod = 'LOCAL'): Promise<MeDto> {
     const rows = await this.prisma.$queryRaw<
       Array<{
         id: string;
@@ -280,7 +331,7 @@ export class AuthService {
       roles,
       onboardingCompleted: profileRows.onboarding_completed_at !== null,
       profileConfirmed: profileRows.profile_confirmed_at !== null,
-      mustChangePassword: credentials,
+      mustChangePassword: authMethod === 'LOCAL' && credentials,
     };
   }
 

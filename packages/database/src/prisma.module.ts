@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaService } from './prisma.service.js';
+import { BackgroundJobsService } from './background-jobs.service.js';
 
 /**
  * Provides the Prisma client to the whole application.
@@ -10,7 +11,7 @@ import { PrismaService } from './prisma.service.js';
  */
 @Global()
 @Module({
-  providers: [PrismaService],
-  exports: [PrismaService],
+  providers: [PrismaService, BackgroundJobsService],
+  exports: [PrismaService, BackgroundJobsService],
 })
 export class PrismaModule {}

@@ -68,6 +68,7 @@ export const domainErrorCodes = {
     invalidCredentials: 'invalid_credentials',
     accountInactive: 'account_inactive',
     mustChangePassword: 'must_change_password',
+    passwordUnchanged: 'password_unchanged',
   },
   opportunities: {
     notFound: 'opportunity_not_found',

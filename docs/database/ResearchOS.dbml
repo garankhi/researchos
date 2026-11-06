@@ -220,6 +220,49 @@ Enum delivery_status {
   CANCELLED
 }
 
+// Durable infrastructure jobs. Owning features insert the job and outbox in
+// the same transaction as their business write. Redis is transport only.
+Table background_jobs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  queue_prefix varchar(128) [not null, default: 'researchos']
+  owner_id uuid [not null]
+  kind varchar(64) [not null]
+  idempotency_key varchar(128) [not null]
+  payload jsonb [not null]
+  status varchar(16) [not null, default: 'PENDING']
+  generation int [not null, default: 0]
+  attempts int [not null, default: 0]
+  result jsonb
+  error_code varchar(64)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  indexes {
+    (owner_id, kind, idempotency_key) [unique, name: 'uq_background_job_request']
+  }
+  checks {
+    `status IN ('PENDING','COMPLETED','FAILED')` [name: 'ck_background_job_status']
+    `generation >= 0 AND attempts BETWEEN 0 AND 3` [name: 'ck_background_job_attempts']
+    `length(btrim(idempotency_key)) > 0` [name: 'ck_background_job_key']
+  }
+}
+
+Table outbox {
+  id uuid [pk, default: `gen_random_uuid()`]
+  job_id uuid [not null]
+  generation int [not null]
+  destination varchar(16) [not null, default: 'WORK']
+  available_at timestamptz [not null, default: `now()`]
+  dispatched_at timestamptz
+  indexes {
+    (job_id, generation, destination) [unique, name: 'uq_outbox_delivery']
+  }
+  checks {
+    `destination IN ('WORK','DLQ') AND generation >= 0` [name: 'ck_outbox_destination']
+  }
+}
+Ref: background_jobs.owner_id > users.id [delete: cascade, update: no action]
+Ref: outbox.job_id > background_jobs.id [delete: cascade, update: no action]
+
 Table users {
   id uuid [pk, default: `gen_random_uuid()`]
   fptu_guid varchar(100) [unique, note: 'Nullable until institutional ID is verified; never invent a placeholder. Do not infer authorization from email domain alone.']

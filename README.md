@@ -60,6 +60,7 @@ Worker chạy BullMQ bằng application context, không mở HTTP port. Chạy
 `pnpm infra:down` dừng Docker và giữ dữ liệu trong volume. Khi deploy, server
 sẽ có Docker, biến môi trường và volume riêng; không dùng lại dữ liệu local.
 Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
+Luồng session/đổi mật khẩu và handoff frontend: [authentication.md](./docs/authentication.md).
 
 ## Tài khoản development
 
