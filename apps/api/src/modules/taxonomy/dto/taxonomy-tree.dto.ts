@@ -25,7 +25,8 @@ export class TaxonomyTreeTopicDto {
 
   @ApiProperty({
     description: 'Detailed description or keywords of the research topic.',
-    example: 'Architectures, training techniques, and representations for deep artificial neural networks.',
+    example:
+      'Architectures, training techniques, and representations for deep artificial neural networks.',
     nullable: true,
   })
   description: string | null;
@@ -38,7 +39,8 @@ export class TaxonomyTreeTopicDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex topic ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex topic ID).',
     example: 'https://openalex.org/topics/T10001',
     nullable: true,
   })
@@ -89,7 +91,8 @@ export class TaxonomyTreeSubfieldDto {
 
   @ApiProperty({
     description: 'Detailed description or scope of the research subfield.',
-    example: 'Theory and development of computer systems able to perform tasks requiring human intelligence.',
+    example:
+      'Theory and development of computer systems able to perform tasks requiring human intelligence.',
     nullable: true,
   })
   description: string | null;
@@ -102,14 +105,16 @@ export class TaxonomyTreeSubfieldDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex subfield ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex subfield ID).',
     example: 'https://openalex.org/subfields/1702',
     nullable: true,
   })
   externalId: string | null;
 
   @ApiProperty({
-    description: 'Whether this subfield is active and selectable in the system.',
+    description:
+      'Whether this subfield is active and selectable in the system.',
     example: true,
   })
   isActive: boolean;
@@ -166,7 +171,8 @@ export class TaxonomyTreeFieldDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex field ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex field ID).',
     example: 'https://openalex.org/fields/17',
     nullable: true,
   })

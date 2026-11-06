@@ -30,7 +30,8 @@ export class TaxonomyController {
   constructor(private readonly taxonomyService: TaxonomyService) {}
 
   @ApiOperation({
-    summary: 'Lấy toàn bộ cây phân cấp nghiên cứu (Fields -> Subfields -> Topics)',
+    summary:
+      'Lấy toàn bộ cây phân cấp nghiên cứu (Fields -> Subfields -> Topics)',
   })
   @ApiOkResponse({
     description: 'Cây phân cấp nghiên cứu hoàn chỉnh',

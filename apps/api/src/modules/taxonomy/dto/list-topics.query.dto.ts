@@ -1,6 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
 import { TaxonomySource } from './taxonomy-source.enum.js';
 
@@ -33,13 +39,16 @@ export class ListTopicsQueryDto extends PaginationQueryDto {
   source?: TaxonomySource;
 
   @ApiPropertyOptional({
-    description: 'Filter topics by active status. Defaults to true (only active rows).',
+    description:
+      'Filter topics by active status. Defaults to true (only active rows).',
     example: true,
   })
   @IsOptional()
   @Transform(({ value }) => {
-    if (value === 'true' || value === true || value === 1 || value === '1') return true;
-    if (value === 'false' || value === false || value === 0 || value === '0') return false;
+    if (value === 'true' || value === true || value === 1 || value === '1')
+      return true;
+    if (value === 'false' || value === false || value === 0 || value === '0')
+      return false;
     return value;
   })
   @IsBoolean()

@@ -25,7 +25,8 @@ export class TopicResponseDto {
 
   @ApiProperty({
     description: 'Detailed description or keywords of the research topic.',
-    example: 'Architectures, training techniques, and representations for deep artificial neural networks.',
+    example:
+      'Architectures, training techniques, and representations for deep artificial neural networks.',
     nullable: true,
   })
   description: string | null;
@@ -38,7 +39,8 @@ export class TopicResponseDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex topic ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex topic ID).',
     example: 'https://openalex.org/topics/T10001',
     nullable: true,
   })

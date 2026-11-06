@@ -58,7 +58,9 @@ describe('TaxonomyController', () => {
     },
   });
 
-  const setupController = async (prismaMock: ReturnType<typeof createPrismaMock>) => {
+  const setupController = async (
+    prismaMock: ReturnType<typeof createPrismaMock>,
+  ) => {
     const moduleRef = await Test.createTestingModule({
       controllers: [TaxonomyController],
       providers: [

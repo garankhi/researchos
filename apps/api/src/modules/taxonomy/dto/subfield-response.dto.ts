@@ -39,7 +39,8 @@ export class SubfieldResponseDto {
 
   @ApiProperty({
     description: 'Detailed description or scope of the research subfield.',
-    example: 'Theory and development of computer systems able to perform tasks requiring human intelligence.',
+    example:
+      'Theory and development of computer systems able to perform tasks requiring human intelligence.',
     nullable: true,
   })
   description: string | null;
@@ -52,14 +53,16 @@ export class SubfieldResponseDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex subfield ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex subfield ID).',
     example: 'https://openalex.org/subfields/1702',
     nullable: true,
   })
   externalId: string | null;
 
   @ApiProperty({
-    description: 'Whether this subfield is active and selectable in the system.',
+    description:
+      'Whether this subfield is active and selectable in the system.',
     example: true,
   })
   isActive: boolean;

@@ -46,7 +46,8 @@ export class FieldResponseDto {
   source: TaxonomySource;
 
   @ApiProperty({
-    description: 'External identifier from the source provider (e.g. OpenAlex field ID).',
+    description:
+      'External identifier from the source provider (e.g. OpenAlex field ID).',
     example: 'https://openalex.org/fields/17',
     nullable: true,
   })
