@@ -98,7 +98,13 @@
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",
         "opportunity_not_found": "Không tìm thấy cơ hội.",
         "field_not_found": "Không tìm thấy lĩnh vực nghiên cứu yêu cầu.",
-        "topic_not_found": "Không tìm thấy chủ đề nghiên cứu yêu cầu."
+        "topic_not_found": "Không tìm thấy chủ đề nghiên cứu yêu cầu.",
+        "user_not_found": "Không tìm thấy người dùng yêu cầu.",
+        "user_already_exists": "Người dùng với mã định danh này đã tồn tại.",
+        "email_already_registered": "Địa chỉ email này đã được sử dụng.",
+        "cannot_grant_self_role": "Quản trị viên không thể tự cấp hoặc thay đổi vai trò của chính mình.",
+        "role_already_granted": "Người dùng đã có vai trò này và đang có hiệu lực.",
+        "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi."
       }
     }
   },

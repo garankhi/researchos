@@ -233,6 +233,417 @@
         ]
       }
     },
+    "/users": {
+      "get": {
+        "description": "Returns a paginated list of user accounts with effective roles. Accessible to administrators only.",
+        "operationId": "UsersController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string matching user full name or email address.",
+            "schema": {
+              "example": "Nguyễn Văn",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userType",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by user type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FACULTY",
+                "STUDENT",
+                "STAFF"
+              ]
+            }
+          },
+          {
+            "name": "departmentUnit",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by department or administrative unit.",
+            "schema": {
+              "example": "Software Engineering",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by active status.",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated user list retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedUsersResponseDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List user accounts with pagination and filtering",
+        "tags": [
+          "identity"
+        ]
+      },
+      "post": {
+        "description": "Provisions a new user account with normalized email. Accessible to administrators only.",
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A user with this email or institutional identifier already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new user account",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "description": "Returns details and live effective roles for the specified user account.",
+        "operationId": "UsersController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user account details",
+        "tags": [
+          "identity"
+        ]
+      },
+      "patch": {
+        "description": "Updates user fields or active status. Deactivating an account revokes all active sessions.",
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user account details or status",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}/roles": {
+      "post": {
+        "description": "Grants an access role (RESEARCHER or ADMIN) to the target user. Administrators cannot grant roles to themselves.",
+        "operationId": "UsersController_grantRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role granted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Administrators cannot grant roles to themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The user already holds this active role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant access role to user",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}/roles/{role}": {
+      "delete": {
+        "description": "Revokes an active access role from the specified user account.",
+        "operationId": "UsersController_revokeRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "description": "The access role to revoke.",
+            "schema": {
+              "enum": [
+                "RESEARCHER",
+                "ADMIN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role revoked successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User or active role grant was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke access role from user",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/taxonomy/tree": {
       "get": {
         "operationId": "TaxonomyController_getTree",
@@ -696,6 +1107,376 @@
           "revoked"
         ]
       },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the user account (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized email address of the account.",
+            "example": "faculty@researchos.local"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the user.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable.",
+            "example": "TS",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the account is active.",
+            "example": true
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "description": "Timestamp of the user’s last successful sign-in.",
+            "example": "2026-11-06T10:00:00.000Z",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "description": "The effective roles currently held by the user.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESEARCHER",
+                "ADMIN"
+              ]
+            },
+            "example": [
+              "RESEARCHER"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "userType",
+          "departmentUnit",
+          "fptuGuid",
+          "academicTitle",
+          "academicDegree",
+          "isActive",
+          "lastLoginAt",
+          "roles"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "The page that was returned, 1-based.",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "description": "How many records one page holds.",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records the query matched in total.",
+            "example": 137
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "How many pages the result is split into.",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a next page exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a previous page exists.",
+            "example": false
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNextPage",
+          "hasPreviousPage"
+        ]
+      },
+      "PaginatedUsersResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The user accounts belonging to this page.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The normalized email address of the account.",
+            "example": "researcher@fpt.edu.vn"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "The classification category of the user account.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "The academic department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable (e.g., GS, PGS).",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable (e.g., TS, ThS).",
+            "example": "TS",
+            "nullable": true
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "userType",
+          "departmentUnit"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The normalized email address of the account.",
+            "example": "researcher@fpt.edu.vn"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "The classification category of the user account.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "The academic department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable (e.g., GS, PGS).",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable (e.g., TS, ThS).",
+            "example": "TS",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the account is active. Setting to false deactivates the user and invalidates active sessions.",
+            "example": true
+          }
+        }
+      },
+      "GrantRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The access role to grant (RESEARCHER or ADMIN).",
+            "enum": [
+              "RESEARCHER",
+              "ADMIN"
+            ],
+            "example": "ADMIN"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Administrative justification for granting the role.",
+            "example": "Assigned as laboratory administrator."
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "RoleAssignmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the role assignment record (UUID).",
+            "example": "d0000000-0000-0000-0000-000000000001"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Identifier of the user holding this role assignment (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "role": {
+            "type": "string",
+            "description": "The assigned access role.",
+            "enum": [
+              "RESEARCHER",
+              "ADMIN"
+            ],
+            "example": "ADMIN"
+          },
+          "grantSource": {
+            "type": "string",
+            "description": "Source that granted the role (MANUAL or SYSTEM).",
+            "enum": [
+              "MANUAL",
+              "SYSTEM"
+            ],
+            "example": "MANUAL"
+          },
+          "grantedBy": {
+            "type": "string",
+            "description": "Identifier of the administrator who granted the role.",
+            "example": "a0000000-0000-0000-0000-000000000001",
+            "nullable": true
+          },
+          "grantedAt": {
+            "type": "string",
+            "description": "Timestamp when the role was granted.",
+            "example": "2026-11-06T12:00:00.000Z"
+          },
+          "revokedBy": {
+            "type": "string",
+            "description": "Identifier of the administrator who revoked the role.",
+            "example": "a0000000-0000-0000-0000-000000000001",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "description": "Timestamp when the role was revoked, or null if currently active.",
+            "example": null,
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Administrative reason given when granting or revoking.",
+            "example": "Assigned as laboratory administrator.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "role",
+          "grantSource",
+          "grantedBy",
+          "grantedAt",
+          "revokedBy",
+          "revokedAt",
+          "reason"
+        ]
+      },
+      "RevokeRoleDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Administrative reason for revoking the role.",
+            "example": "Term finished or role reassigned."
+          }
+        }
+      },
       "TaxonomyTreeTopicDto": {
         "type": "object",
         "properties": {
@@ -1086,49 +1867,6 @@
           "isActive"
         ]
       },
-      "PaginationMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number",
-            "description": "The page that was returned, 1-based.",
-            "example": 1
-          },
-          "limit": {
-            "type": "number",
-            "description": "How many records one page holds.",
-            "example": 20
-          },
-          "total": {
-            "type": "number",
-            "description": "How many records the query matched in total.",
-            "example": 137
-          },
-          "totalPages": {
-            "type": "number",
-            "description": "How many pages the result is split into.",
-            "example": 7
-          },
-          "hasNextPage": {
-            "type": "boolean",
-            "description": "Whether a next page exists.",
-            "example": true
-          },
-          "hasPreviousPage": {
-            "type": "boolean",
-            "description": "Whether a previous page exists.",
-            "example": false
-          }
-        },
-        "required": [
-          "page",
-          "limit",
-          "total",
-          "totalPages",
-          "hasNextPage",
-          "hasPreviousPage"
-        ]
-      },
       "PaginatedTopicsResponseDto": {
         "type": "object",
         "properties": {
@@ -1394,6 +2132,78 @@
           },
           "data": {
             "$ref": "#/components/schemas/LogoutDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedUsersResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedUsersResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "UserResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "RoleAssignmentResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/RoleAssignmentResponseDto"
           },
           "message": {
             "type": "string",

@@ -98,7 +98,13 @@
         "must_change_password": "You need to change your password before continuing.",
         "opportunity_not_found": "The opportunity was not found.",
         "field_not_found": "The requested research field was not found.",
-        "topic_not_found": "The requested research topic was not found."
+        "topic_not_found": "The requested research topic was not found.",
+        "user_not_found": "The requested user was not found.",
+        "user_already_exists": "A user with this identifier already exists.",
+        "email_already_registered": "This email address is already in use.",
+        "cannot_grant_self_role": "An administrator cannot grant or modify their own roles.",
+        "role_already_granted": "The user already holds this active role.",
+        "role_not_granted": "The user does not hold this active role."
       }
     }
   },

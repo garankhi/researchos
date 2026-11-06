@@ -68,6 +68,12 @@ export const domainErrorCodes = {
     invalidCredentials: 'invalid_credentials',
     accountInactive: 'account_inactive',
     mustChangePassword: 'must_change_password',
+    userNotFound: 'user_not_found',
+    userAlreadyExists: 'user_already_exists',
+    emailAlreadyRegistered: 'email_already_registered',
+    cannotGrantSelfRole: 'cannot_grant_self_role',
+    roleAlreadyGranted: 'role_already_granted',
+    roleNotGranted: 'role_not_granted',
   },
   opportunities: {
     notFound: 'opportunity_not_found',
