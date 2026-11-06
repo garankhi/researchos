@@ -45,3 +45,10 @@ packages/database/prisma.drift.generated.ts
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local installers downloaded by hand. They are not part of the project and
+# are rebuilt from the vendor when they are needed.
+*.deb
+*.rpm
+*.dmg
+*.pkg
