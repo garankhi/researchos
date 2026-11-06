@@ -8,6 +8,7 @@ import { DemoModule } from './modules/demo/demo.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
+import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
 
 /**
@@ -55,6 +56,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     HealthModule,
     IdentityModule,
     JobsModule,
+    ProfilesModule,
     TaxonomyModule,
   ],
 })

@@ -644,6 +644,139 @@
         ]
       }
     },
+    "/profiles/me": {
+      "get": {
+        "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
+        "operationId": "ProfilesController_getMyProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Researcher profile retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "profiles"
+        ]
+      },
+      "patch": {
+        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).",
+        "operationId": "ProfilesController_updateMyProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Researcher profile updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update current user profile",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/{userId}": {
+      "get": {
+        "description": "Returns a confirmed researcher profile to any authenticated user, or the unconfirmed profile to its owner.",
+        "operationId": "ProfilesController_getProfileById",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the target user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Researcher profile retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found or is unconfirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get researcher profile by user ID",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
     "/taxonomy/tree": {
       "get": {
         "operationId": "TaxonomyController_getTree",
@@ -1477,6 +1610,158 @@
           }
         }
       },
+      "ProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Identifier of the user who owns this profile (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized institutional email address.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable.",
+            "example": "TS",
+            "nullable": true
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the user.",
+            "example": "FACULTY"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Associate professor specializing in distributed systems and AI.",
+            "nullable": true
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "orcidId": {
+            "type": "string",
+            "description": "Verified 19-character ORCID identifier.",
+            "example": "0000-0002-1825-0097",
+            "nullable": true
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example",
+            "nullable": true
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821",
+            "nullable": true
+          },
+          "avatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the profile avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
+          "profileConfirmedAt": {
+            "type": "string",
+            "description": "Timestamp when the profile was confirmed by the researcher.",
+            "example": "2026-11-06T10:00:00.000Z",
+            "nullable": true
+          },
+          "papersReviewedAt": {
+            "type": "string",
+            "description": "Timestamp when publication candidate works were reviewed.",
+            "example": "2026-11-06T10:30:00.000Z",
+            "nullable": true
+          },
+          "onboardingCompletedAt": {
+            "type": "string",
+            "description": "Timestamp when onboarding flow was completed.",
+            "example": "2026-11-06T11:00:00.000Z",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "fullName",
+          "email",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "userType",
+          "bio",
+          "availabilityStatus",
+          "orcidId",
+          "googleScholarUrl",
+          "scopusAuthorId",
+          "avatarStorageKey",
+          "profileConfirmedAt",
+          "papersReviewedAt",
+          "onboardingCompletedAt"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Researcher specializing in distributed software architecture."
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example"
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821"
+          }
+        }
+      },
       "TaxonomyTreeTopicDto": {
         "type": "object",
         "properties": {
@@ -2204,6 +2489,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/RoleAssignmentResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ProfileResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProfileResponseDto"
           },
           "message": {
             "type": "string",
