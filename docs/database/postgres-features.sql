@@ -63,9 +63,10 @@ CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAG
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.group_id IS NOT NULL OR o.project_id IS NOT NULL OR o.creator_id=actor)
- AND (o.group_id IS NULL OR can_manage_group(actor,o.group_id))
- AND (o.project_id IS NULL OR EXISTS (SELECT 1 FROM research_projects p WHERE p.id=o.project_id AND p.lead_id=actor AND p.archived_at IS NULL)));
+ AND (o.creator_id=actor OR EXISTS (
+   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
+   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='CORE_MEMBER')))));
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$

@@ -675,7 +675,7 @@ Table research_opportunities {
     project_id
     (status, application_deadline)
   }
-  Note: 'Personal opportunities allow NULL group/project and are managed by creator. Group/project scope requires its management rights; creator alone grants no scoped authority. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
+  Note: 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
 }
 
 Table opportunity_applications {

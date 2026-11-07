@@ -11,6 +11,9 @@ export { PrismaService } from './prisma.service.js';
 // The generated enums are part of the domain contract: feature modules use
 // them for DTOs and query filters.
 export {
+  OpportunityKind,
+  OpportunityStatus,
+  TargetAudience,
   PublicationStatus,
   SourceKind,
   VerificationStatus,
@@ -18,3 +21,4 @@ export {
 } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';
+export type { ResearchOpportunity } from './generated/prisma/client.js';

@@ -10,11 +10,8 @@
 //   provenance: `sourceKind`, `sourceRef` and `verificationStatus`.
 // - Timestamps are stored in UTC. `createdAt`/`updatedAt` are mandatory.
 //
-// The schema is intentionally empty of domain tables at this stage: the SRS
-// contradictions listed in docs/architecture.md ("Những điểm SRS cần chốt")
-// are not resolved yet, so locking in tables now would encode wrong decisions.
-// Run `prisma migrate dev --create-only` to capture the first real migration
-// once a domain area is confirmed.
+// Opportunity mappings follow docs/database/ResearchOS.sql. That SQL remains
+// the baseline for domain tables, foreign keys, functions and CHECK constraints.
 
 generator client {
   provider = "prisma-client"
@@ -78,4 +75,57 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+enum OpportunityKind {
+  RESEARCH_COLLABORATION
+  PROJECT_FORMATION
+  DATA_METHOD_EXCHANGE
+  FUNDING_CALL
+
+  @@map("opportunity_kind")
+}
+
+enum TargetAudience {
+  FACULTY
+  STUDENT
+  ANY_RESEARCHER
+
+  @@map("target_audience")
+}
+
+enum OpportunityStatus {
+  DRAFT
+  OPEN
+  FILLED
+  CLOSED
+  EXPIRED
+
+  @@map("opportunity_status")
+}
+
+model ResearchOpportunity {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId               String?           @map("group_id") @db.Uuid
+  projectId             String?           @map("project_id") @db.Uuid
+  creatorId             String            @map("creator_id") @db.Uuid
+  title                 String            @db.VarChar(255)
+  opportunityKind       OpportunityKind   @map("opportunity_kind")
+  targetAudience        TargetAudience    @default(ANY_RESEARCHER) @map("target_audience")
+  expectedRole          String?           @map("expected_role") @db.VarChar(255)
+  requiredExpertiseTags String[]          @map("required_expertise_tags")
+  description           String?
+  responseSlaDays       Int               @default(5) @map("response_sla_days")
+  applicationDeadline   DateTime?         @map("application_deadline") @db.Timestamptz(6)
+  status                OpportunityStatus @default(DRAFT)
+  publishedAt           DateTime?         @map("published_at") @db.Timestamptz(6)
+  archivedAt            DateTime?         @map("archived_at") @db.Timestamptz(6)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createIdempotencyKey  String?           @map("create_idempotency_key") @db.VarChar(200)
+  createRequestHash     String?           @map("create_request_hash") @db.Char(64)
+  createResponse        Json?             @map("create_response")
+
+  @@unique([creatorId, createIdempotencyKey], map: "uq_opportunity_creator_create_key")
+  @@map("research_opportunities")
 }
