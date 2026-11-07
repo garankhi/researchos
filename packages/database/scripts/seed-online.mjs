@@ -1,5 +1,5 @@
-// Seeds the taxonomy from the OpenAlex API, and the development accounts for
-// local login.
+// Seeds the taxonomy from the OpenAlex API, and the development accounts and
+// the demo records for local login.
 //
 // Run with: pnpm db:seed:online
 //
@@ -11,7 +11,6 @@
 // The taxonomy is seeded once, not synced. A topic proposed by a user is the
 // only one that goes through a review queue; the imported ones need no
 // approval.
-//
 //
 // The taxonomy is imported with the compiled Prisma client rather than with
 // raw SQL, so the column and relation names are checked at compile time.
@@ -25,7 +24,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
 import { redactDatabaseUrl, resolveDatabaseUrl } from './database-url.mjs';
-import { seedDevUsers } from './dev-users.mjs';
 import {
   TAXONOMY_LEVELS,
   fail,
@@ -34,7 +32,11 @@ import {
   normalizeChild,
   normalizeRecord,
 } from './openalex.mjs';
-import { seedTaxonomy } from './seed-taxonomy.mjs';
+import {
+  reportCounts,
+  seedDemoRecords,
+  seedTaxonomy,
+} from './seed.mjs';
 
 /**
  * Fetches one taxonomy level and returns the normalised records.
@@ -80,25 +82,15 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
-    await seedTaxonomy(prisma, {
+    const idsByTopicExternalId = await seedTaxonomy(prisma, {
       fields: levels[0],
       subfields: levels[1],
       topics: levels[2],
     });
 
-    const [fields, subfields, topics] = await Promise.all([
-      prisma.research_fields.count(),
-      prisma.research_subfields.count(),
-      prisma.research_topics.count(),
-    ]);
+    await seedDemoRecords(prisma, idsByTopicExternalId);
 
-    log('');
-    log('Seed complete.');
-    log(`  research_fields    ${fields}`);
-    log(`  research_subfields ${subfields}`);
-    log(`  research_topics    ${topics}`);
-
-    await seedDevUsers(prisma);
+    await reportCounts(prisma);
   } finally {
     await prisma.$disconnect();
   }

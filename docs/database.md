@@ -35,9 +35,8 @@ packages/database/
   scripts/
     setup.mjs            Dựng database: tạo DB, áp migration, seed taxonomy
     setup-database.ps1   Tạo database và chạy migration
-    seed.mjs             Seed taxonomy từ snapshot có sẵn + tài khoản dev
-    seed-online.mjs      Seed taxonomy bằng cách tải từ OpenAlex + tài khoản dev
-    dev-users.mjs        Module tạo tài khoản development, dùng chung cho 2 seed
+    seed.mjs             Seed: taxonomy từ snapshot + tài khoản dev + dữ liệu demo
+    seed-online.mjs      Seed: taxonomy tải từ OpenAlex + tài khoản dev + dữ liệu demo
     export-taxonomy.mjs  Làm mới snapshot taxonomy
     drift-check.mjs      Kiểm tra schema khớp với SQL nguồn
     data/
@@ -116,13 +115,15 @@ Chạy từ root:
 | --- | --- |
 | `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
 | `pnpm db:setup` | Dựng database từ đầu: tạo database, áp migration, seed taxonomy |
+| `pnpm db:reset` | Xoá database hiện tại, dựng lại từ đầu rồi seed lại (offline) — **xoá sạch dữ liệu**, chỉ dùng ở máy dev |
 | `pnpm db:generate` | Sinh lại client từ `schema.prisma` |
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ khi dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:status` | Trạng thái migration |
 | `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp với SQL nguồn |
-| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
-| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
+| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, tạo tài khoản development, và ghi dữ liệu demo (profile, group, opportunity, publication) |
+| `pnpm db:seed:demo` | Chỉ ghi dữ liệu demo, bỏ qua taxonomy — dùng khi taxonomy đã có sẵn |
+| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, tạo tài khoản development, và ghi dữ liệu demo |
 | `pnpm db:studio` | Prisma Studio để xem và sửa dữ liệu |
 
 `pnpm db:setup` là lệnh onboarding cho phần database: nó tạo database nếu chưa
@@ -135,12 +136,68 @@ Lệnh `pnpm setup` ở root làm nhiều hơn thế: nó gọi `pnpm db:setup` 
 việc tạo `.env`, cài dependency, bật Docker, build và sinh client API. Xem
 [README](../README.md).
 
+### Dựng lại database: `pnpm db:reset`
+
+`pnpm db:setup` chỉ tạo database khi nó chưa tồn tại. Khi database đã tồn tại
+nhưng dữ liệu bị bẩn — migration lệch, seed chạy lỗi giữa chừng, hay chỉ muốn
+bắt đầu lại từ con số không — dùng `pnpm db:reset`:
+
+```powershell
+pnpm db:reset
+```
+
+Lệnh này **xoá sạch** database hiện tại: mọi dòng dữ liệu đều mất, kể cả
+những dòng mà seed không bao giờ ghi. Các bước chạy theo thứ tự:
+
+1. `DROP DATABASE` rồi `CREATE DATABASE` — các phiên kết nối còn treo được
+   đóng trước, vì database đang có session thì không xoá được.
+2. `prisma migrate deploy` — áp dụng migration.
+3. `node scripts/seed.mjs` — nhập taxonomy từ snapshot có sẵn trong repo, tạo
+   tài khoản development và ghi dữ liệu demo.
+
+Bước 3 là seed **offline**: taxonomy đọc từ snapshot đã commit
+(`packages/database/scripts/data/openalex-taxonomy.json`), không tải từ
+OpenAlex. Nên lệnh **không cần mạng và không cần OpenAlex API key**. Muốn
+nạp taxonomy từ nguồn thật thì chạy `pnpm db:seed:online` sau đó.
+
+Lệnh cần database user có quyền `CREATEDB` (thường là `postgres`). Chỉ dùng ở
+máy dev — không chạy trên production.
+
 `pnpm db:seed` đọc taxonomy từ snapshot
 (`packages/database/scripts/data/openalex-taxonomy.json`), nên chạy nhanh và
 offline. `pnpm db:seed:online` tải trực tiếp từ OpenAlex, cần mạng và mất
 khoảng 90 giây. Cả hai dùng chung phần ghi vào database, nên cho ra cùng kết
 quả, và cả hai cũng tạo tài khoản development.
 Chi tiết: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
+
+Cả ba lệnh seed nằm trong **một file** (`packages/database/scripts/seed.mjs`).
+Việc tách taxonomy, tài khoản và dữ liệu demo ra ba file chỉ thêm rắc rối:
+dữ liệu demo trỏ tới topic taxonomy và tài khoản đã seed, nên thứ tự chạy
+luôn là bắt buộc. File này seed theo thứ tự này:
+
+1. Taxonomy (`research_fields` → `research_subfields` → `research_topics`).
+2. Tài khoản (`users`, `local_credentials`, `user_role_assignments`).
+3. Profile (`researcher_profiles`), group (`research_groups`, `group_members`),
+   hướng nghiên cứu (`group_directions`), sở thích (`research_interests`).
+4. Opportunity (`research_opportunities`) và publication
+   (`research_outputs`, `output_revisions`, `output_authors`, `output_topics`).
+
+`search_index` **không** được seed trực tiếp. Trigger `sync_search_index`
+tự đồng bộ từ các dòng nguồn, nên index có dữ liệu đúng ngay khi dữ liệu
+demo được ghi. Đây là điểm quan trọng: quyền xem của search index được lọc
+bằng SQL (`visible_search_index`), nên mock HTTP sẽ không bao giờ kiểm chứng
+được phần lọc quyền này.
+
+`pnpm db:seed:demo` bỏ qua bước 1 và chỉ ghi lại dữ liệu demo. Lệnh này
+nhanh hơn nhiều (dưới 1 giây so với khoảng 4 giây) và là fixture mà e2e
+suite dùng.
+
+Cả hai lệnh seed đều **idempotent**: chạy hai lần cho ra cùng số dòng, với
+cùng id. Mỗi bảng được ghi bằng `upsert` trên đúng danh tính mà schema định
+nghĩa cho bảng đó. Riêng `output_revisions` không dùng `upsert`, vì schema có
+partial unique index `uq_output_editable_draft` trên `(output_id) WHERE
+released_at IS NULL` và Prisma sẽ chọn index đó làm đích `ON CONFLICT` —
+PostgreSQL không dùng được partial index làm đích `ON CONFLICT`.
 
 `pnpm db:migrate` tương đương `prisma migrate dev`: nó tạo file migration mới
 khi schema đổi và áp dụng các migration chưa chạy. **Chỉ dùng ở máy dev.**
@@ -601,8 +658,13 @@ chạy, rồi dùng `pnpm infra:status` và `pnpm infra:logs`.
 Client được sinh lại tự động trước mỗi lần build của package database, nhưng
 IDE cần chạy lệnh này để cập nhật type.
 
-**Migration bị lệch.** `pnpm --filter @researchos/database db:reset`
-xoá và dựng lại database từ đầu. Chỉ dùng ở máy dev.
+**Migration bị lệch.** `pnpm db:reset` xoá và dựng lại database từ đầu. Chỉ dùng
+ở máy dev.
+
+**`The database user in DATABASE_URL may not create databases`.** Lệnh
+`pnpm db:reset` cần user có quyền `CREATEDB` để `DROP DATABASE` và
+`CREATE DATABASE`. Grant quyền đó cho user trong `DATABASE_URL`, hoặc trỏ
+`DATABASE_URL` sang một tài khoản admin.
 
 ## 9. Migration và production
 
