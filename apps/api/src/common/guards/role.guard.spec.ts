@@ -23,6 +23,7 @@ const principal: AuthPrincipal = {
   userId: 'user-1',
   sessionId: 'session-1',
   authMethod: 'LOCAL',
+  mustChangePassword: false,
   roles: ['RESEARCHER'],
   email: 'faculty@researchos.local',
   fullName: 'Dev Faculty',

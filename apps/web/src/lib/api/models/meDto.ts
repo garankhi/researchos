@@ -35,6 +35,6 @@ export interface MeDto {
   onboardingCompleted: boolean;
   /** Whether the account confirmed its profile. A missing profile row means false. */
   profileConfirmed: boolean;
-  /** Whether the account must change its password before it can use the rest of the API. */
+  /** Whether this LOCAL session must change its password before normal protected access. False for OIDC sessions; session inspection, logout and password change remain available. */
   mustChangePassword: boolean;
 }

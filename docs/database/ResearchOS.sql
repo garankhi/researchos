@@ -248,6 +248,35 @@ CREATE TYPE "delivery_status" AS ENUM (
   'CANCELLED'
 );
 
+CREATE TABLE "background_jobs" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "queue_prefix" varchar(128) NOT NULL DEFAULT 'researchos',
+  "owner_id" uuid NOT NULL,
+  "kind" varchar(64) NOT NULL,
+  "idempotency_key" varchar(128) NOT NULL,
+  "payload" jsonb NOT NULL,
+  "status" varchar(16) NOT NULL DEFAULT 'PENDING',
+  "generation" int NOT NULL DEFAULT 0,
+  "attempts" int NOT NULL DEFAULT 0,
+  "result" jsonb,
+  "error_code" varchar(64),
+  "created_at" timestamptz NOT NULL DEFAULT (now()),
+  "updated_at" timestamptz NOT NULL DEFAULT (now()),
+  CONSTRAINT "ck_background_job_status" CHECK (status IN ('PENDING','COMPLETED','FAILED')),
+  CONSTRAINT "ck_background_job_attempts" CHECK (generation >= 0 AND attempts BETWEEN 0 AND 3),
+  CONSTRAINT "ck_background_job_key" CHECK (length(btrim(idempotency_key)) > 0)
+);
+
+CREATE TABLE "outbox" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "job_id" uuid NOT NULL,
+  "generation" int NOT NULL,
+  "destination" varchar(16) NOT NULL DEFAULT 'WORK',
+  "available_at" timestamptz NOT NULL DEFAULT (now()),
+  "dispatched_at" timestamptz,
+  CONSTRAINT "ck_outbox_destination" CHECK (destination IN ('WORK','DLQ') AND generation >= 0)
+);
+
 CREATE TABLE "users" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "fptu_guid" varchar(100) UNIQUE,
@@ -871,6 +900,10 @@ CREATE TABLE "digest_items" (
   PRIMARY KEY ("delivery_id", "subject_type", "subject_id")
 );
 
+CREATE UNIQUE INDEX "uq_background_job_request" ON "background_jobs" ("owner_id", "kind", "idempotency_key");
+
+CREATE UNIQUE INDEX "uq_outbox_delivery" ON "outbox" ("job_id", "generation", "destination");
+
 CREATE UNIQUE INDEX "uq_users_email_normalized" ON "users" ((lower(btrim(email))));
 
 CREATE INDEX ON "user_role_assignments" ("user_id", "role");
@@ -1072,6 +1105,10 @@ COMMENT ON TABLE "research_updates" IS 'Small durable feed of meaningful sharing
 COMMENT ON TABLE "digest_deliveries" IS 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs; DB ledger persists attempts (max 5), leases and delivery result. id is provider idempotency key. SENT is terminal; unknown provider outcome requires reconciliation, not blind resend. Transactional application responses are independent.';
 
 COMMENT ON TABLE "digest_items" IS 'SQL derives subject type/ID from event_id. A work matched by multiple follows/group events remains one item. Worker chooses latest relevant event, merges reasons, and renders authorized released content; snapshot records content selected for delivery. Recheck/prune before send. Event FK traces the selected event; no draft payloads.';
+
+ALTER TABLE "background_jobs" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "outbox" ADD FOREIGN KEY ("job_id") REFERENCES "background_jobs" ("id") ON DELETE CASCADE ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "user_role_assignments" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -1275,6 +1312,11 @@ ALTER TABLE "search_index" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id"
 
 -- PostgreSQL supplement to ResearchOS.dbml. Build into ResearchOS.sql, not standalone.
 -- Predicates take a TRUSTED backend actor. They are not RLS or SQL authentication.
+-- Infrastructure lifetime references are immediate, matching the additive
+-- durable-job migration rather than the diagram exporter's default deferral.
+ALTER TABLE background_jobs ALTER CONSTRAINT background_jobs_owner_id_fkey NOT DEFERRABLE;
+ALTER TABLE outbox ALTER CONSTRAINT outbox_job_id_fkey NOT DEFERRABLE;
+CREATE INDEX idx_outbox_ready ON outbox(available_at) WHERE dispatched_at IS NULL;
 CREATE UNIQUE INDEX uq_unrevoked_user_role ON user_role_assignments(user_id, role) WHERE revoked_at IS NULL;
 CREATE UNIQUE INDEX uq_local_topic_name ON research_topics(subfield_id, lower(name)) WHERE source = 'LOCAL';
 CREATE UNIQUE INDEX uq_output_editable_draft ON output_revisions(output_id) WHERE released_at IS NULL;

@@ -1,8 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
-import { createQueueOptions, SYSTEM_QUEUE } from '@researchos/queue';
+import {
+  createQueueOptions,
+  SYSTEM_QUEUE,
+  BACKGROUND_QUEUE,
+} from '@researchos/queue';
 import { ProbeProcessor } from '../../processors/probe.processor.js';
+import { BackgroundProbeProcessor } from '../../processors/background-probe.processor.js';
+import { OutboxService } from './outbox.service.js';
 
 @Module({
   imports: [
@@ -16,7 +22,8 @@ import { ProbeProcessor } from '../../processors/probe.processor.js';
         ),
     }),
     BullModule.registerQueue({ name: SYSTEM_QUEUE }),
+    BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
   ],
-  providers: [ProbeProcessor],
+  providers: [ProbeProcessor, BackgroundProbeProcessor, OutboxService],
 })
 export class JobsModule {}

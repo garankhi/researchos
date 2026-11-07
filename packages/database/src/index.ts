@@ -7,6 +7,7 @@
 
 export { PrismaModule } from './prisma.module.js';
 export { PrismaService } from './prisma.service.js';
+export { BackgroundJobsService } from './background-jobs.service.js';
 
 // The generated enums are part of the domain contract: feature modules use
 // them for DTOs and query filters.

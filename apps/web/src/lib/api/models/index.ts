@@ -8,8 +8,12 @@
 
 export * from './apiErrorResponseDto';
 export * from './apiErrorResponseDtoErrorsItem';
+export * from './changePasswordDto';
+export * from './changePasswordResultDto';
+export * from './changePasswordResultDtoEnvelope';
 export * from './confirmOutputUploadDto';
 export * from './createOutputUploadDto';
+export * from './createProbeDto';
 export * from './createResearchGroupDto';
 export * from './createUserDto';
 export * from './createUserDtoUserType';
@@ -23,6 +27,9 @@ export * from './grantRoleDtoRole';
 export * from './groupsControllerFindAllParams';
 export * from './healthStatusDto';
 export * from './healthStatusDtoEnvelope';
+export * from './jobDto';
+export * from './jobDtoEnvelope';
+export * from './jobDtoStatus';
 export * from './loginDto';
 export * from './logoutDto';
 export * from './logoutDtoEnvelope';

@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  HttpStatus,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -12,6 +13,8 @@ import { SESSION_COOKIE_NAME } from '../auth/session-cookie.js';
 import { SESSION_RESOLVER } from '../auth/session-resolver.js';
 import type { SessionResolver } from '../auth/session-resolver.js';
 import type { AuthPrincipal } from '../auth/auth-principal.js';
+import { ALLOW_PASSWORD_CHANGE_PENDING_KEY } from '../decorators/allow-password-change-pending.decorator.js';
+import { CodedHttpException, domainErrorCodes } from '../errors/error-codes.js';
 
 /**
  * The request property the resolved principal is attached to.
@@ -74,6 +77,19 @@ export class SessionGuard implements CanActivate {
 
     if (!principal) {
       throw new UnauthorizedException();
+    }
+
+    if (
+      principal.mustChangePassword &&
+      !this.reflector.get<boolean>(
+        ALLOW_PASSWORD_CHANGE_PENDING_KEY,
+        context.getHandler(),
+      )
+    ) {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.mustChangePassword,
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     // The session is alive, so its idle window slides forward. A failure

@@ -1,5 +1,10 @@
 -- PostgreSQL supplement to ResearchOS.dbml. Build into ResearchOS.sql, not standalone.
 -- Predicates take a TRUSTED backend actor. They are not RLS or SQL authentication.
+-- Infrastructure lifetime references are immediate, matching the additive
+-- durable-job migration rather than the diagram exporter's default deferral.
+ALTER TABLE background_jobs ALTER CONSTRAINT background_jobs_owner_id_fkey NOT DEFERRABLE;
+ALTER TABLE outbox ALTER CONSTRAINT outbox_job_id_fkey NOT DEFERRABLE;
+CREATE INDEX idx_outbox_ready ON outbox(available_at) WHERE dispatched_at IS NULL;
 CREATE UNIQUE INDEX uq_unrevoked_user_role ON user_role_assignments(user_id, role) WHERE revoked_at IS NULL;
 CREATE UNIQUE INDEX uq_local_topic_name ON research_topics(subfield_id, lower(name)) WHERE source = 'LOCAL';
 CREATE UNIQUE INDEX uq_output_editable_draft ON output_revisions(output_id) WHERE released_at IS NULL;

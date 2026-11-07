@@ -43,6 +43,8 @@ export interface AuthPrincipal {
   sessionId: string;
   /** How the caller proved who they are. */
   authMethod: AuthMethod;
+  /** LOCAL credentials must be replaced before normal protected access. */
+  mustChangePassword: boolean;
   /** The roles the account currently holds. */
   roles: string[];
   /** The account's email address. */
