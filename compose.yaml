@@ -44,6 +44,30 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.52
+    command:
+      - mini
+      - -dir=/data
+      - -ip.bind=0.0.0.0
+      - -s3.allowedOrigins=${WEB_ORIGIN:-http://localhost:3000}
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-researchos-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-researchos-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-researchos-local}
+    ports:
+      - "127.0.0.1:${S3_PORT:-8333}:8333"
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  seaweedfs_data:

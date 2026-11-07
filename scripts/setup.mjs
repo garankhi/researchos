@@ -5,7 +5,7 @@
 //
 //   1. `.env`         — created from `.env.example` when it is missing.
 //   2. install        — the workspace dependencies.
-//   3. infrastructure — PostgreSQL and Redis, through Docker Compose.
+//   3. infrastructure — PostgreSQL, Redis, and SeaweedFS through Docker Compose.
 //   4. database       — the database, the migrations and the seed data.
 //   5. build          — the compiled output of every workspace package.
 //   6. codegen        — the OpenAPI document and the Orval client for the web.
