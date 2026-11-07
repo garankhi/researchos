@@ -231,3 +231,22 @@ export const useOutputUploadControllerConfirmUpload = <
     queryClient,
   );
 };
+/**
+ * Checks the current file access policy and verifies the stored file before sending the attachment.
+ * @summary Download a verified output file
+ */
+export const outputDownloadControllerDownloadFile = (
+  fileId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<Blob>(
+    {
+      url: `/output-files/${fileId}/download`,
+      method: 'GET',
+      responseType: 'blob',
+      signal,
+    },
+    options,
+  );
+};

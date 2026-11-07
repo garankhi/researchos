@@ -12,12 +12,13 @@ import {
   Prisma,
   PrismaService,
 } from '@researchos/database';
-import { createS3Storage, type StorageAdapter } from '@researchos/storage';
+import type { StorageAdapter } from '@researchos/storage';
 import type {
   CreateOutputUploadDto,
   OutputFileResponseDto,
   OutputUploadResponseDto,
 } from './dto/output-upload.dto.js';
+import { ObjectStorageService } from './object-storage.service.js';
 import {
   readUploadIntent,
   signUploadIntent,
@@ -30,9 +31,10 @@ type OutputFile = Prisma.output_filesGetPayload<undefined>;
 @Injectable()
 export class OutputUploadService {
   private readonly logger = new Logger(OutputUploadService.name);
-  private storage?: StorageAdapter;
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: ObjectStorageService,
+  ) {}
 
   async createUpload(
     userId: string,
@@ -188,7 +190,7 @@ export class OutputUploadService {
     run: (storage: StorageAdapter) => Promise<T>,
   ): Promise<T> {
     try {
-      return await run((this.storage ??= createS3Storage()));
+      return await run(this.storage.adapter);
     } catch (error) {
       this.logger.warn(
         `S3 operation failed: ${error instanceof Error ? error.name : 'unknown error'}`,

@@ -34,12 +34,19 @@ export interface StorageAdapter {
   createUploadUrl(request: UploadRequest): Promise<PresignedUpload>;
   headObject(key: string): Promise<ObjectMetadata | null>;
   /** The caller owns the stream and compares its digest with application metadata. */
-  getObject(key: string): Promise<Readable>;
+  getObject(key: string, signal?: AbortSignal): Promise<Readable>;
   putObject(
     key: string,
     body: Uint8Array,
     contentType: string,
   ): Promise<ObjectMetadata>;
+}
+
+export class StorageObjectNotFoundError extends Error {
+  constructor(cause: unknown) {
+    super('The storage object was not found', { cause });
+    this.name = 'StorageObjectNotFoundError';
+  }
 }
 
 const uploadUrlTtlSeconds = 300;
@@ -151,10 +158,7 @@ class S3Storage implements StorageAdapter {
         }),
       );
     } catch (error) {
-      if (
-        error instanceof S3ServiceException &&
-        error.$metadata.httpStatusCode === 404
-      ) {
+      if (isObjectNotFound(error)) {
         return null;
       }
       throw error;
@@ -175,18 +179,26 @@ class S3Storage implements StorageAdapter {
     };
   }
 
-  async getObject(key: string): Promise<Readable> {
-    const { Body } = await this.client.send(
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        ChecksumMode: 'ENABLED',
-      }),
-    );
-    if (!(Body instanceof Readable)) {
-      throw new Error('S3 did not return a readable object body');
+  async getObject(key: string, signal?: AbortSignal): Promise<Readable> {
+    try {
+      const { Body } = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          ChecksumMode: 'ENABLED',
+        }),
+        { abortSignal: signal },
+      );
+      if (!(Body instanceof Readable)) {
+        throw new Error('S3 did not return a readable object body');
+      }
+      return Body;
+    } catch (error) {
+      if (isObjectNotFound(error)) {
+        throw new StorageObjectNotFoundError(error);
+      }
+      throw error;
     }
-    return Body;
   }
 
   async putObject(
@@ -211,4 +223,8 @@ class S3Storage implements StorageAdapter {
       sha256: checksum.toString('hex'),
     };
   }
+}
+
+function isObjectNotFound(error: unknown): boolean {
+  return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
 }
