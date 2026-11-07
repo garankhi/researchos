@@ -70,6 +70,36 @@ describe('UsersController', () => {
     return mock;
   };
 
+  /**
+   * The error Prisma 7 raises for a failed statement.
+   *
+   * The shape is the one the `pg` driver adapter produces, so the tests
+   * read the SQLSTATE and the constraint name the way the service does.
+   */
+  const databaseError = (
+    prismaCode: string,
+    sqlState: string,
+    originalMessage: string,
+    extra?: Record<string, unknown>,
+  ) =>
+    ({
+      name: 'PrismaClientKnownRequestError',
+      message: `Database error. Code: \`${sqlState}\`. Message: \`${originalMessage}\``,
+      code: prismaCode,
+      meta: {
+        driverAdapterError: {
+          name: 'DriverAdapterError',
+          cause: {
+            originalCode: sqlState,
+            originalMessage,
+            kind: 'postgres',
+            code: sqlState,
+            ...extra,
+          },
+        },
+      },
+    }) as unknown as Error;
+
   const createAccessServiceMock = () => ({
     effectiveRoles: vi.fn().mockResolvedValue({
       isResearcher: true,
@@ -266,6 +296,75 @@ describe('UsersController', () => {
         }),
       );
     });
+
+    it('throws 409 email_already_registered when the database rejects a duplicate email', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findFirst.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(null);
+      prismaMock.users.create.mockRejectedValue(
+        databaseError(
+          'P2002',
+          '23505',
+          'duplicate key value violates unique constraint "uq_users_email_normalized"',
+          {
+            kind: 'UniqueConstraintViolation',
+            constraint: { index: 'uq_users_email_normalized' },
+            table: 'users',
+          },
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.create({
+          email: 'faculty@researchos.local',
+          fullName: 'Duplicate',
+          userType: UserTypeEnum.FACULTY,
+          departmentUnit: 'Software',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.identity.emailAlreadyRegistered,
+        }),
+      );
+    });
+
+    it('throws 409 user_already_exists when the database rejects a duplicate institutional identifier', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findFirst.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(null);
+      prismaMock.users.create.mockRejectedValue(
+        databaseError(
+          'P2002',
+          '23505',
+          'duplicate key value violates unique constraint "users_fptu_guid_key"',
+          {
+            kind: 'UniqueConstraintViolation',
+            constraint: { index: 'users_fptu_guid_key' },
+            table: 'users',
+          },
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.create({
+          email: 'unique@fpt.edu.vn',
+          fullName: 'Test',
+          userType: UserTypeEnum.STUDENT,
+          departmentUnit: 'Software',
+          fptuGuid: 'FPTU001',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.identity.userAlreadyExists,
+        }),
+      );
+    });
   });
 
   describe('update', () => {
@@ -296,7 +395,11 @@ describe('UsersController', () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUnique.mockResolvedValue(mockUser);
       prismaMock.$executeRaw.mockRejectedValue(
-        new Error('Cannot remove the last active admin'),
+        databaseError(
+          'P2010',
+          '23514',
+          'Cannot remove the last active admin; appoint another active admin first',
+        ),
       );
 
       const controller = await setupController(prismaMock);
@@ -544,7 +647,11 @@ describe('UsersController', () => {
         mockRoleAssignment,
       );
       prismaMock.$executeRaw.mockRejectedValue(
-        new Error('Cannot remove the last active admin'),
+        databaseError(
+          'P2010',
+          '23514',
+          'Cannot remove the last active admin; appoint another active admin first',
+        ),
       );
 
       const controller = await setupController(prismaMock);
@@ -571,6 +678,32 @@ describe('UsersController', () => {
 
       await expect(
         controller.revokeRole(targetUserId, AccessRoleEnum.ADMIN, {}, adminId),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.identity.invalidRoleRevocation,
+        }),
+      );
+    });
+
+    it('throws 400 invalid_role_revocation when the database rejects the revocation', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user_role_assignments.findFirst.mockResolvedValue(
+        mockRoleAssignment,
+      );
+      prismaMock.user_role_assignments.update.mockRejectedValue(
+        databaseError(
+          'P2039',
+          '23514',
+          'new row for relation "user_role_assignments" violates check constraint "ck_grant_revocation"',
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.revokeRole(targetUserId, AccessRoleEnum.RESEARCHER, {}, adminId),
       ).rejects.toThrow(
         expect.objectContaining({
           status: HttpStatus.BAD_REQUEST,

@@ -6,6 +6,10 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import {
+  CHECK_VIOLATION_SQL_STATE,
+  readDatabaseFailure,
+} from '../../common/errors/database-errors.js';
 import { AccessService } from './access.service.js';
 import { AccessRoleEnum } from './dto/grant-role.dto.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
@@ -21,6 +25,14 @@ type UserRow = Prisma.usersGetPayload<Record<string, never>>;
 type RoleAssignmentRow = Prisma.user_role_assignmentsGetPayload<
   Record<string, never>
 >;
+
+/**
+ * The unique index on the normalized email — `lower(btrim(email))`.
+ *
+ * A conflict on it is an email conflict; any other unique violation is a
+ * different account attribute.
+ */
+const EMAIL_UNIQUE_CONSTRAINT = 'uq_users_email_normalized';
 
 const USER_SORT_FIELDS = {
   createdAt: 'created_at',
@@ -205,15 +217,9 @@ export class UsersService {
 
       return this.mapToUserResponse(user, roles);
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        const target = JSON.stringify(error.meta?.target ?? '');
-        if (
-          target.includes('email') ||
-          target.includes('uq_users_email_normalized')
-        ) {
+      const failure = readDatabaseFailure(error);
+      if (failure?.prismaCode === 'P2002') {
+        if (failure.constraintName === EMAIL_UNIQUE_CONSTRAINT) {
           throw new CodedHttpException(
             domainErrorCodes.identity.emailAlreadyRegistered,
             HttpStatus.CONFLICT,
@@ -478,9 +484,12 @@ export class UsersService {
   }
 
   /**
-   * Maps Prisma/PostgreSQL constraint errors (P2002 unique violations and
-   * SQLSTATE 23514 check violations from `assert_admin_removal_allowed`,
-   * `ck_grant_revocation`, and `ck_no_self_grant`) to domain `CodedHttpException`s.
+   * Maps Prisma/PostgreSQL constraint errors to domain `CodedHttpException`s.
+   *
+   * The database is the authority on these rules, so the error is read the
+   * way the database reports it — the SQLSTATE and the violated constraint
+   * name — rather than by matching on message text. See
+   * `common/errors/database-errors.ts` for the shape Prisma 7 produces.
    */
   private rethrowDatabaseConstraintError(
     error: unknown,
@@ -490,10 +499,12 @@ export class UsersService {
       throw error;
     }
 
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
+    const failure = readDatabaseFailure(error);
+    if (!failure) {
+      return;
+    }
+
+    if (failure.prismaCode === 'P2002') {
       if (options?.isRoleGrant) {
         throw new CodedHttpException(
           domainErrorCodes.identity.roleAlreadyGranted,
@@ -501,11 +512,7 @@ export class UsersService {
         );
       }
 
-      const target = JSON.stringify(error.meta?.target ?? '');
-      if (
-        target.includes('email') ||
-        target.includes('uq_users_email_normalized')
-      ) {
+      if (failure.constraintName === EMAIL_UNIQUE_CONSTRAINT) {
         throw new CodedHttpException(
           domainErrorCodes.identity.emailAlreadyRegistered,
           HttpStatus.CONFLICT,
@@ -517,29 +524,27 @@ export class UsersService {
       );
     }
 
-    const rawMessage =
-      error instanceof Error
-        ? `${error.message} ${JSON.stringify((error as { meta?: unknown }).meta ?? '')}`
-        : String(error);
+    if (failure.sqlState !== CHECK_VIOLATION_SQL_STATE) {
+      return;
+    }
 
-    if (
-      rawMessage.includes('Cannot remove the last active admin') ||
-      rawMessage.includes('assert_admin_removal_allowed')
-    ) {
+    // The last-admin guard raises from a helper function, so it names no
+    // constraint — it is the one check violation that does not.
+    if (!failure.constraintName) {
       throw new CodedHttpException(
         domainErrorCodes.identity.cannotRemoveLastAdmin,
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    if (rawMessage.includes('ck_grant_revocation')) {
+    if (failure.constraintName === 'ck_grant_revocation') {
       throw new CodedHttpException(
         domainErrorCodes.identity.invalidRoleRevocation,
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    if (rawMessage.includes('ck_no_self_grant')) {
+    if (failure.constraintName === 'ck_no_self_grant') {
       throw new CodedHttpException(
         domainErrorCodes.identity.cannotGrantSelfRole,
         HttpStatus.BAD_REQUEST,
