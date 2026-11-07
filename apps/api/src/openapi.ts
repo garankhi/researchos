@@ -11,6 +11,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .setTitle('ResearchOS API')
     .setDescription('ResearchOS backend API')
     .setVersion('0.0.1')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', description: 'Opaque app session token' })
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -5,6 +5,7 @@ import { resolveEnvFilePaths } from '@researchos/config';
 import { PrismaModule } from '@researchos/database';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { OpportunitiesModule } from './modules/opportunities/opportunities.module.js';
 
 /**
  * Composition root.
@@ -31,6 +32,7 @@ import { HealthModule } from './modules/health/health.module.js';
     PrismaModule,
     DemoModule,
     HealthModule,
+    OpportunitiesModule,
   ],
 })
 export class AppModule {}
