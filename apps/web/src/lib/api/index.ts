@@ -7,3 +7,4 @@ export * from './jobs/jobs';
 export * from './output-files/output-files';
 export * from './profiles/profiles';
 export * from './taxonomy/taxonomy';
+export * from './opportunities/opportunities';

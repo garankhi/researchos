@@ -2126,6 +2126,221 @@
           "taxonomy"
         ]
       }
+    },
+    "/opportunities": {
+      "post": {
+        "operationId": "OpportunitiesController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Actor-scoped retry key, 1–200 characters; a changed payload returns 409",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOpportunityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Creates a research opportunity",
+        "tags": [
+          "opportunities"
+        ]
+      },
+      "get": {
+        "operationId": "OpportunitiesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "groupId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "OPEN",
+                "FILLED",
+                "CLOSED",
+                "EXPIRED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityPageDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists published opportunities and opportunities managed by the caller",
+        "tags": [
+          "opportunities"
+        ]
+      }
+    },
+    "/opportunities/{opportunityId}": {
+      "get": {
+        "operationId": "OpportunitiesController_findOne",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Returns a visible research opportunity",
+        "tags": [
+          "opportunities"
+        ]
+      },
+      "patch": {
+        "operationId": "OpportunitiesController_update",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOpportunityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Updates a research opportunity managed by the caller",
+        "tags": [
+          "opportunities"
+        ]
+      }
     }
   },
   "info": {
@@ -4231,6 +4446,320 @@
           },
           "data": {
             "$ref": "#/components/schemas/TopicDetailResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "CreateOpportunityDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "opportunityKind": {
+            "type": "string",
+            "enum": [
+              "RESEARCH_COLLABORATION",
+              "PROJECT_FORMATION",
+              "DATA_METHOD_EXCHANGE",
+              "FUNDING_CALL"
+            ]
+          },
+          "targetAudience": {
+            "type": "string",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "ANY_RESEARCHER"
+            ],
+            "default": "ANY_RESEARCHER"
+          },
+          "expectedRole": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "requiredExpertiseTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "responseSlaDays": {
+            "type": "number",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT"
+            ],
+            "default": "DRAFT",
+            "description": "New opportunities always start as DRAFT; publishing uses a status action"
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title",
+          "opportunityKind"
+        ]
+      },
+      "OpportunityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "creatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "opportunityKind": {
+            "type": "string",
+            "enum": [
+              "RESEARCH_COLLABORATION",
+              "PROJECT_FORMATION",
+              "DATA_METHOD_EXCHANGE",
+              "FUNDING_CALL"
+            ]
+          },
+          "targetAudience": {
+            "type": "string",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "ANY_RESEARCHER"
+            ]
+          },
+          "expectedRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredExpertiseTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "responseSlaDays": {
+            "type": "number"
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FILLED",
+              "CLOSED",
+              "EXPIRED"
+            ]
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "groupId",
+          "projectId",
+          "creatorId",
+          "title",
+          "opportunityKind",
+          "targetAudience",
+          "expectedRole",
+          "requiredExpertiseTags",
+          "description",
+          "responseSlaDays",
+          "applicationDeadline",
+          "status",
+          "publishedAt",
+          "archivedAt"
+        ]
+      },
+      "OpportunityPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpportunityResponseDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ]
+      },
+      "UpdateOpportunityDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "opportunityKind": {
+            "type": "string",
+            "enum": [
+              "RESEARCH_COLLABORATION",
+              "PROJECT_FORMATION",
+              "DATA_METHOD_EXCHANGE",
+              "FUNDING_CALL"
+            ]
+          },
+          "targetAudience": {
+            "type": "string",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "ANY_RESEARCHER"
+            ],
+            "default": "ANY_RESEARCHER"
+          },
+          "expectedRole": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "requiredExpertiseTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "responseSlaDays": {
+            "type": "number",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "applicationDeadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "OpportunityPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OpportunityPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OpportunityResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OpportunityResponseDto"
           },
           "message": {
             "type": "string",
