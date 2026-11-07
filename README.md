@@ -80,6 +80,11 @@ cho phép web `http://localhost:3000` gửi yêu cầu cross-origin tới S3. N�
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
+Trong UI, dùng link trực tiếp `GET /output-files/:fileId/download` tới API để
+trình duyệt tải attachment bằng session cookie. Mỗi tiến trình API xử lý tối đa
+8 lượt tải đồng thời với tổng dung lượng tạm tối đa 5 GiB. Mỗi lượt có 15 phút
+để xác minh và gửi file. Khi hết chỗ, API trả `503` để client có thể thử lại.
+
 ## Tài khoản development
 
 Các tài khoản cho local login (FPTU SSO chưa có tài liệu) được `pnpm setup`
