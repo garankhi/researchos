@@ -103,6 +103,8 @@
         "user_already_exists": "A user with this identifier already exists.",
         "email_already_registered": "This email address is already in use.",
         "cannot_grant_self_role": "An administrator cannot grant or modify their own roles.",
+        "cannot_remove_last_admin": "Cannot deactivate or revoke the ADMIN role from the last active administrator.",
+        "invalid_role_revocation": "The role revocation timestamp is invalid relative to when the role was granted.",
         "role_already_granted": "The user already holds this active role.",
         "role_not_granted": "The user does not hold this active role.",
         "profile_not_found": "The requested researcher profile was not found."

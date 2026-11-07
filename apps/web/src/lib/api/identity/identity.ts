@@ -78,7 +78,7 @@ export const getUsersControllerFindAllQueryKey = (
 
 export const getUsersControllerFindAllQueryOptions = <
   TData = Awaited<ReturnType<typeof usersControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: UsersControllerFindAllParams,
   options?: {
@@ -111,11 +111,11 @@ export const getUsersControllerFindAllQueryOptions = <
 export type UsersControllerFindAllQueryResult = NonNullable<
   Awaited<ReturnType<typeof usersControllerFindAll>>
 >;
-export type UsersControllerFindAllQueryError = unknown;
+export type UsersControllerFindAllQueryError = ApiErrorResponseDto;
 
 export function useUsersControllerFindAll<
   TData = Awaited<ReturnType<typeof usersControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: UsersControllerFindAllParams,
   options: {
@@ -142,7 +142,7 @@ export function useUsersControllerFindAll<
 };
 export function useUsersControllerFindAll<
   TData = Awaited<ReturnType<typeof usersControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: UsersControllerFindAllParams,
   options?: {
@@ -169,7 +169,7 @@ export function useUsersControllerFindAll<
 };
 export function useUsersControllerFindAll<
   TData = Awaited<ReturnType<typeof usersControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: UsersControllerFindAllParams,
   options?: {
@@ -192,7 +192,7 @@ export function useUsersControllerFindAll<
 
 export function useUsersControllerFindAll<
   TData = Awaited<ReturnType<typeof usersControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: UsersControllerFindAllParams,
   options?: {

@@ -1,7 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
+import {
+  PaginationQueryDto,
+  parseBooleanQueryParam,
+} from '../../../common/dto/pagination.dto.js';
 import { UserTypeEnum } from './create-user.dto.js';
 
 /**
@@ -37,13 +40,7 @@ export class ListUsersQueryDto extends PaginationQueryDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true || value === 1 || value === '1')
-      return true;
-    if (value === 'false' || value === false || value === 0 || value === '0')
-      return false;
-    return value;
-  })
+  @Transform(({ obj, key }) => parseBooleanQueryParam(obj, key))
   @IsBoolean()
   isActive?: boolean;
 }

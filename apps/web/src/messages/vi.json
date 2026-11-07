@@ -103,6 +103,8 @@
         "user_already_exists": "Người dùng với mã định danh này đã tồn tại.",
         "email_already_registered": "Địa chỉ email này đã được sử dụng.",
         "cannot_grant_self_role": "Quản trị viên không thể tự cấp hoặc thay đổi vai trò của chính mình.",
+        "cannot_remove_last_admin": "Không thể vô hiệu hoá hoặc thu hồi vai trò ADMIN của quản trị viên hoạt động cuối cùng.",
+        "invalid_role_revocation": "Thời điểm thu hồi vai trò không hợp lệ so với thời điểm cấp vai trò.",
         "role_already_granted": "Người dùng đã có vai trò này và đang có hiệu lực.",
         "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi.",
         "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu."

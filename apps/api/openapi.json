@@ -328,6 +328,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid query parameters or sort expression.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -414,6 +424,16 @@
               }
             }
           },
+          "400": {
+            "description": "The provided user ID is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
             "description": "The requested user was not found.",
             "content": {
@@ -471,8 +491,28 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid update payload, invalid UUID, or attempt to deactivate the last active administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
             "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A user with this email or institutional identifier already exists.",
             "content": {
               "application/json": {
                 "schema": {
@@ -618,6 +658,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RoleAssignmentResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot revoke the ADMIN role from the last active administrator or revocation timestamp violates grant constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -879,6 +929,7 @@
             "in": "path",
             "description": "Identifier of the parent research field (UUID).",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -913,6 +964,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaxonomyControllerFindSubfieldsByFieldIdEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số định danh hoặc bộ lọc không hợp lệ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -1027,6 +1088,16 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Tham số tìm kiếm hoặc phân trang không hợp lệ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Tìm kiếm và phân trang danh sách các chủ đề nghiên cứu cấp 3 (Topics)",
@@ -1045,6 +1116,7 @@
             "in": "path",
             "description": "Identifier of the research topic (UUID).",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -1056,6 +1128,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TopicDetailResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Định danh chủ đề nghiên cứu không đúng định dạng UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -1379,10 +1461,10 @@
         "properties": {
           "items": {
             "description": "The user accounts belonging to this page.",
+            "type": "array",
             "items": {
-              "type": "object"
-            },
-            "type": "array"
+              "$ref": "#/components/schemas/UserResponseDto"
+            }
           },
           "meta": {
             "description": "The pagination metadata of this page.",
@@ -1781,7 +1863,7 @@
             "example": "Deep Learning and Neural Networks"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or keywords of the research topic.",
             "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
             "nullable": true
@@ -1796,7 +1878,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
             "example": "https://openalex.org/topics/T10001",
             "nullable": true
@@ -1831,7 +1913,7 @@
             "example": "a0000000-0000-0000-0000-000000000001"
           },
           "internalCode": {
-            "type": "object",
+            "type": "string",
             "description": "Stable internal code for the subfield.",
             "example": "SUBFIELD-AI",
             "nullable": true
@@ -1842,13 +1924,13 @@
             "example": "Artificial Intelligence"
           },
           "nameVi": {
-            "type": "object",
+            "type": "string",
             "description": "Vietnamese translated name of the research subfield.",
             "example": "Trí tuệ nhân tạo",
             "nullable": true
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or scope of the research subfield.",
             "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
             "nullable": true
@@ -1863,7 +1945,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
             "example": "https://openalex.org/subfields/1702",
             "nullable": true
@@ -1903,7 +1985,7 @@
             "example": "a0000000-0000-0000-0000-000000000001"
           },
           "internalCode": {
-            "type": "object",
+            "type": "string",
             "description": "Stable internal code for the field.",
             "example": "FIELD-CS",
             "nullable": true
@@ -1914,13 +1996,13 @@
             "example": "Computer Science"
           },
           "nameVi": {
-            "type": "object",
+            "type": "string",
             "description": "Vietnamese translated name of the research field.",
             "example": "Khoa học máy tính",
             "nullable": true
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or scope of the research field.",
             "example": "Study of computation, information, and automation.",
             "nullable": true
@@ -1935,7 +2017,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
             "example": "https://openalex.org/fields/17",
             "nullable": true
@@ -1974,7 +2056,7 @@
             "example": "a0000000-0000-0000-0000-000000000001"
           },
           "internalCode": {
-            "type": "object",
+            "type": "string",
             "description": "Stable internal code for the field.",
             "example": "FIELD-CS",
             "nullable": true
@@ -1985,13 +2067,13 @@
             "example": "Computer Science"
           },
           "nameVi": {
-            "type": "object",
+            "type": "string",
             "description": "Vietnamese translated name of the research field.",
             "example": "Khoa học máy tính",
             "nullable": true
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or scope of the research field.",
             "example": "Study of computation, information, and automation.",
             "nullable": true
@@ -2006,7 +2088,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
             "example": "https://openalex.org/fields/17",
             "nullable": true
@@ -2042,7 +2124,7 @@
             "example": "a0000000-0000-0000-0000-000000000001"
           },
           "internalCode": {
-            "type": "object",
+            "type": "string",
             "description": "Stable internal code for the subfield.",
             "example": "SUBFIELD-AI",
             "nullable": true
@@ -2053,13 +2135,13 @@
             "example": "Artificial Intelligence"
           },
           "nameVi": {
-            "type": "object",
+            "type": "string",
             "description": "Vietnamese translated name of the research subfield.",
             "example": "Trí tuệ nhân tạo",
             "nullable": true
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or scope of the research subfield.",
             "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
             "nullable": true
@@ -2074,7 +2156,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
             "example": "https://openalex.org/subfields/1702",
             "nullable": true
@@ -2116,7 +2198,7 @@
             "example": "Deep Learning and Neural Networks"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or keywords of the research topic.",
             "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
             "nullable": true
@@ -2131,7 +2213,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
             "example": "https://openalex.org/topics/T10001",
             "nullable": true
@@ -2157,10 +2239,10 @@
         "properties": {
           "items": {
             "description": "The research topics of this page.",
+            "type": "array",
             "items": {
-              "type": "object"
-            },
-            "type": "array"
+              "$ref": "#/components/schemas/TopicResponseDto"
+            }
           },
           "meta": {
             "description": "The pagination metadata of this page.",
@@ -2195,7 +2277,7 @@
             "example": "Deep Learning and Neural Networks"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "description": "Detailed description or keywords of the research topic.",
             "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
             "nullable": true
@@ -2210,7 +2292,7 @@
             "example": "OPENALEX"
           },
           "externalId": {
-            "type": "object",
+            "type": "string",
             "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
             "example": "https://openalex.org/topics/T10001",
             "nullable": true
