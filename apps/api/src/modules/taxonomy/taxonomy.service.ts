@@ -1,7 +1,10 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
-import { buildPaginationMeta } from '../../common/dto/pagination.dto.js';
+import {
+  buildPaginationMeta,
+  parseSortParam,
+} from '../../common/dto/pagination.dto.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { FieldResponseDto } from './dto/field-response.dto.js';
 import { ListFieldsQueryDto } from './dto/list-fields.query.dto.js';
@@ -19,6 +22,14 @@ import { TaxonomyTreeQueryDto } from './dto/taxonomy-tree.query.dto.js';
 import { TopicDetailResponseDto } from './dto/topic-detail-response.dto.js';
 import { TopicResponseDto } from './dto/topic-response.dto.js';
 
+const TOPIC_SORT_FIELDS = {
+  name: 'name',
+  createdAt: 'created_at',
+  created_at: 'created_at',
+  updatedAt: 'updated_at',
+  updated_at: 'updated_at',
+} as const;
+
 /**
  * Service providing read-only operations for the research taxonomy tree.
  *
@@ -33,24 +44,31 @@ export class TaxonomyService {
   /**
    * Retrieves the complete 3-tier hierarchical taxonomy tree:
    * Fields -> Subfields -> Topics.
+   *
+   * When filtering by `source` (e.g. `LOCAL`), `LOCAL` topics created via the
+   * "Other" flow sit beneath `OPENALEX` subfields and fields. The `source`
+   * filter is applied to leaf topics, and parent subfields/fields are retained
+   * whenever they either match `source` directly or contain matching children.
    */
   async getTree(query: TaxonomyTreeQueryDto): Promise<TaxonomyTreeFieldDto[]> {
-    const whereNode: Record<string, unknown> = {};
-    if (query.source) {
-      whereNode.source = query.source;
-    }
+    const activeFilter: Record<string, unknown> = {};
     if (query.isActive !== undefined) {
-      whereNode.is_active = query.isActive;
+      activeFilter.is_active = query.isActive;
+    }
+
+    const topicWhere: Record<string, unknown> = { ...activeFilter };
+    if (query.source) {
+      topicWhere.source = query.source;
     }
 
     const fields = await this.prisma.research_fields.findMany({
-      where: whereNode,
+      where: activeFilter,
       include: {
         research_subfields: {
-          where: whereNode,
+          where: activeFilter,
           include: {
             research_topics: {
-              where: whereNode,
+              where: topicWhere,
               orderBy: { name: 'asc' },
             },
           },
@@ -60,7 +78,30 @@ export class TaxonomyService {
       orderBy: { name: 'asc' },
     });
 
-    return fields.map((field) => this.toTreeField(field));
+    const mapped = fields.map((field) => this.toTreeField(field));
+
+    if (!query.source) {
+      return mapped;
+    }
+
+    return mapped
+      .map((field) => ({
+        id: field.id,
+        internalCode: field.internalCode,
+        name: field.name,
+        nameVi: field.nameVi,
+        description: field.description,
+        source: field.source,
+        externalId: field.externalId,
+        isActive: field.isActive,
+        subfields: field.subfields.filter(
+          (subfield) =>
+            subfield.source === query.source || subfield.topics.length > 0,
+        ),
+      }))
+      .filter(
+        (field) => field.source === query.source || field.subfields.length > 0,
+      );
   }
 
   /**
@@ -148,12 +189,19 @@ export class TaxonomyService {
       };
     }
 
+    const orderBy = parseSortParam(query.sort, TOPIC_SORT_FIELDS, {
+      name: 'asc',
+    });
+    if (!orderBy) {
+      throw new BadRequestException('validation_failed');
+    }
+
     const [topics, total] = await Promise.all([
       this.prisma.research_topics.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { name: 'asc' },
+        orderBy,
       }),
       this.prisma.research_topics.count({ where }),
     ]);
@@ -190,8 +238,16 @@ export class TaxonomyService {
     const subfield = topic.research_subfields;
     const field = subfield.research_fields;
 
+    const topicDto = this.toTopicResponse(topic);
+
     return {
-      ...this.toTopicResponse(topic),
+      id: topicDto.id,
+      subfieldId: topicDto.subfieldId,
+      name: topicDto.name,
+      description: topicDto.description,
+      source: topicDto.source,
+      externalId: topicDto.externalId,
+      isActive: topicDto.isActive,
       subfield: this.toSubfieldResponse(subfield),
       field: this.toFieldResponse(field),
     };

@@ -604,7 +604,7 @@ export const getTaxonomyControllerFindAllTopicsQueryKey = (
 
 export const getTaxonomyControllerFindAllTopicsQueryOptions = <
   TData = Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: TaxonomyControllerFindAllTopicsParams,
   options?: {
@@ -639,11 +639,11 @@ export const getTaxonomyControllerFindAllTopicsQueryOptions = <
 export type TaxonomyControllerFindAllTopicsQueryResult = NonNullable<
   Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>
 >;
-export type TaxonomyControllerFindAllTopicsQueryError = unknown;
+export type TaxonomyControllerFindAllTopicsQueryError = ApiErrorResponseDto;
 
 export function useTaxonomyControllerFindAllTopics<
   TData = Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: TaxonomyControllerFindAllTopicsParams,
   options: {
@@ -670,7 +670,7 @@ export function useTaxonomyControllerFindAllTopics<
 };
 export function useTaxonomyControllerFindAllTopics<
   TData = Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: TaxonomyControllerFindAllTopicsParams,
   options?: {
@@ -697,7 +697,7 @@ export function useTaxonomyControllerFindAllTopics<
 };
 export function useTaxonomyControllerFindAllTopics<
   TData = Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: TaxonomyControllerFindAllTopicsParams,
   options?: {
@@ -720,7 +720,7 @@ export function useTaxonomyControllerFindAllTopics<
 
 export function useTaxonomyControllerFindAllTopics<
   TData = Awaited<ReturnType<typeof taxonomyControllerFindAllTopics>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: TaxonomyControllerFindAllTopicsParams,
   options?: {

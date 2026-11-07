@@ -134,8 +134,8 @@ export class PaginationMetaDto {
 export class PaginatedResultDto<T = unknown> {
   @ApiProperty({
     description: 'The records of this page.',
-    type: 'array',
-    items: { type: 'object' },
+    isArray: true,
+    type: Object,
   })
   items: T[];
 
@@ -144,6 +144,70 @@ export class PaginatedResultDto<T = unknown> {
     type: PaginationMetaDto,
   })
   meta: PaginationMetaDto;
+}
+
+/**
+ * Parses a boolean query parameter from the raw query object before
+ * `class-transformer`'s `enableImplicitConversion` coerces non-empty strings
+ * such as `"false"`, `"0"` or invalid literals into `true`.
+ *
+ * Returns `true` or `false` for recognised boolean representations,
+ * `defaultValue` when the parameter is omitted, and the raw value untouched
+ * when unrecognized so `@IsBoolean()` rejects it with `400 Bad Request`.
+ */
+export function parseBooleanQueryParam(
+  obj: Record<string, unknown> | undefined,
+  key: string,
+  defaultValue?: boolean,
+): unknown {
+  const raw = obj?.[key];
+
+  if (raw === undefined) {
+    return defaultValue;
+  }
+
+  if (raw === true || raw === 'true' || raw === 1 || raw === '1') {
+    return true;
+  }
+
+  if (raw === false || raw === 'false' || raw === 0 || raw === '0') {
+    return false;
+  }
+
+  return raw;
+}
+
+/**
+ * Resolves a `PaginationQueryDto.sort` value (e.g. `name`, `-createdAt`)
+ * against an allowlist of sortable fields, returning a Prisma-compatible
+ * `{ [column]: 'asc' | 'desc' }` object or `null` when the key is not allowed.
+ */
+export function parseSortParam<Column extends string>(
+  sort: string | undefined,
+  allowedFields: Record<string, Column>,
+  defaultOrder: Partial<Record<Column, 'asc' | 'desc'>>,
+): Partial<Record<Column, 'asc' | 'desc'>> | null {
+  if (sort === undefined) {
+    return defaultOrder;
+  }
+
+  const trimmed = sort.trim();
+  if (trimmed.length === 0) {
+    return defaultOrder;
+  }
+
+  const isDesc = trimmed.startsWith('-');
+  const isAscPrefix = trimmed.startsWith('+');
+  const rawField = isDesc || isAscPrefix ? trimmed.slice(1) : trimmed;
+
+  if (!rawField || !Object.hasOwn(allowedFields, rawField)) {
+    return null;
+  }
+
+  const column = allowedFields[rawField];
+  return { [column]: isDesc ? 'desc' : 'asc' } as Partial<
+    Record<Column, 'asc' | 'desc'>
+  >;
 }
 
 /**

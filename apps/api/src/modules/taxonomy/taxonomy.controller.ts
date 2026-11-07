@@ -1,5 +1,6 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -65,17 +66,21 @@ export class TaxonomyController {
   @ApiParam({
     name: 'fieldId',
     description: 'Identifier of the parent research field (UUID).',
+    format: 'uuid',
   })
   @ApiOkResponse({
     description: 'Danh sách các phân ngành nghiên cứu',
     type: [SubfieldResponseDto],
+  })
+  @ApiBadRequestResponse({
+    description: 'Tham số định danh hoặc bộ lọc không hợp lệ',
   })
   @ApiNotFoundResponse({
     description: 'Không tìm thấy lĩnh vực nghiên cứu',
   })
   @Get('fields/:fieldId/subfields')
   findSubfieldsByFieldId(
-    @Param('fieldId') fieldId: string,
+    @Param('fieldId', ParseUUIDPipe) fieldId: string,
     @Query() query: ListSubfieldsQueryDto,
   ): Promise<SubfieldResponseDto[]> {
     return this.taxonomyService.findSubfieldsByFieldId(fieldId, query);
@@ -88,6 +93,9 @@ export class TaxonomyController {
   @ApiOkResponse({
     description: 'Danh sách chủ đề nghiên cứu kèm metadata phân trang',
     type: PaginatedTopicsResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Tham số tìm kiếm hoặc phân trang không hợp lệ',
   })
   @Get('topics')
   findAllTopics(
@@ -102,17 +110,21 @@ export class TaxonomyController {
   @ApiParam({
     name: 'topicId',
     description: 'Identifier of the research topic (UUID).',
+    format: 'uuid',
   })
   @ApiOkResponse({
     description: 'Chi tiết chủ đề nghiên cứu kèm cấp cha',
     type: TopicDetailResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Định danh chủ đề nghiên cứu không đúng định dạng UUID',
   })
   @ApiNotFoundResponse({
     description: 'Không tìm thấy chủ đề nghiên cứu',
   })
   @Get('topics/:topicId')
   findOneTopic(
-    @Param('topicId') topicId: string,
+    @Param('topicId', ParseUUIDPipe) topicId: string,
   ): Promise<TopicDetailResponseDto> {
     return this.taxonomyService.findOneTopic(topicId);
   }

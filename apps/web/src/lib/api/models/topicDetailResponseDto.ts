@@ -7,8 +7,6 @@
  */
 import type { FieldResponseDto } from './fieldResponseDto';
 import type { SubfieldResponseDto } from './subfieldResponseDto';
-import type { TopicDetailResponseDtoDescription } from './topicDetailResponseDtoDescription';
-import type { TopicDetailResponseDtoExternalId } from './topicDetailResponseDtoExternalId';
 import type { TopicDetailResponseDtoSource } from './topicDetailResponseDtoSource';
 
 export interface TopicDetailResponseDto {
@@ -22,14 +20,14 @@ export interface TopicDetailResponseDto {
    * Detailed description or keywords of the research topic.
    * @nullable
    */
-  description: TopicDetailResponseDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: TopicDetailResponseDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex topic ID).
    * @nullable
    */
-  externalId: TopicDetailResponseDtoExternalId;
+  externalId: string | null;
   /** Whether this topic is active and selectable in the system. */
   isActive: boolean;
   /** The parent research subfield of this topic. */

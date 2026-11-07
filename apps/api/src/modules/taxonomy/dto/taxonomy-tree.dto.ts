@@ -27,6 +27,7 @@ export class TaxonomyTreeTopicDto {
     description: 'Detailed description or keywords of the research topic.',
     example:
       'Architectures, training techniques, and representations for deep artificial neural networks.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -42,6 +43,7 @@ export class TaxonomyTreeTopicDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex topic ID).',
     example: 'https://openalex.org/topics/T10001',
+    type: String,
     nullable: true,
   })
   externalId: string | null;
@@ -72,6 +74,7 @@ export class TaxonomyTreeSubfieldDto {
   @ApiProperty({
     description: 'Stable internal code for the subfield.',
     example: 'SUBFIELD-AI',
+    type: String,
     nullable: true,
   })
   internalCode: string | null;
@@ -85,6 +88,7 @@ export class TaxonomyTreeSubfieldDto {
   @ApiProperty({
     description: 'Vietnamese translated name of the research subfield.',
     example: 'Trí tuệ nhân tạo',
+    type: String,
     nullable: true,
   })
   nameVi: string | null;
@@ -93,6 +97,7 @@ export class TaxonomyTreeSubfieldDto {
     description: 'Detailed description or scope of the research subfield.',
     example:
       'Theory and development of computer systems able to perform tasks requiring human intelligence.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -108,6 +113,7 @@ export class TaxonomyTreeSubfieldDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex subfield ID).',
     example: 'https://openalex.org/subfields/1702',
+    type: String,
     nullable: true,
   })
   externalId: string | null;
@@ -139,6 +145,7 @@ export class TaxonomyTreeFieldDto {
   @ApiProperty({
     description: 'Stable internal code for the field.',
     example: 'FIELD-CS',
+    type: String,
     nullable: true,
   })
   internalCode: string | null;
@@ -152,6 +159,7 @@ export class TaxonomyTreeFieldDto {
   @ApiProperty({
     description: 'Vietnamese translated name of the research field.',
     example: 'Khoa học máy tính',
+    type: String,
     nullable: true,
   })
   nameVi: string | null;
@@ -159,6 +167,7 @@ export class TaxonomyTreeFieldDto {
   @ApiProperty({
     description: 'Detailed description or scope of the research field.',
     example: 'Study of computation, information, and automation.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -174,6 +183,7 @@ export class TaxonomyTreeFieldDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex field ID).',
     example: 'https://openalex.org/fields/17',
+    type: String,
     nullable: true,
   })
   externalId: string | null;
