@@ -10,31 +10,54 @@ import type { CreateOpportunityDtoStatus } from './createOpportunityDtoStatus';
 import type { CreateOpportunityDtoTargetAudience } from './createOpportunityDtoTargetAudience';
 
 export interface CreateOpportunityDto {
-  /** @nullable */
+  /**
+   * Optional group scope; caller must be its lead or core member.
+   * @nullable
+   */
   groupId?: string | null;
-  /** @nullable */
+  /**
+   * Optional project scope; caller must lead it and match its group.
+   * @nullable
+   */
   projectId?: string | null;
-  /** @maxLength 255 */
+  /**
+   * Opportunity title; may be empty while drafting.
+   * @maxLength 255
+   */
   title: string;
+  /** The kind of research opportunity. */
   opportunityKind: CreateOpportunityDtoOpportunityKind;
+  /** Intended research audience; this field grants no permissions. */
   targetAudience?: CreateOpportunityDtoTargetAudience;
   /**
+   * Expected contribution or role; cannot be blank when provided.
    * @maxLength 255
    * @nullable
    */
   expectedRole?: string | null;
+  /** Expertise tags sought from applicants. */
   requiredExpertiseTags?: string[];
-  /** @nullable */
+  /**
+   * Opportunity details; required before publication.
+   * @nullable
+   */
   description?: string | null;
   /**
+   * Response SLA in calendar days, including weekends and holidays.
    * @minimum 1
    * @maximum 2147483647
    */
   responseSlaDays?: number;
-  /** @nullable */
+  /**
+   * Exact application cutoff timestamp; required before publication.
+   * @nullable
+   */
   applicationDeadline?: string | null;
   /** New opportunities always start as DRAFT; publishing uses a status action */
   status?: CreateOpportunityDtoStatus;
-  /** @nullable */
+  /**
+   * Archive timestamp; null leaves the opportunity unarchived.
+   * @nullable
+   */
   archivedAt?: string | null;
 }

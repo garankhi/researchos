@@ -6,6 +6,8 @@ Branch: `RES-121-opportunity-endpoints-crud`
 
 Implemented: 2026-11-07
 
+Rebased onto dev: 2026-11-08 (shared session authentication, domain models and migrations).
+
 ## What changed
 
 Added the NestJS `OpportunitiesModule`, registered in the API composition root.
@@ -20,27 +22,27 @@ existing success/error envelopes. No delete endpoint was requested by the ticket
 | GET | `/opportunities/:opportunityId` | Return a visible opportunity, otherwise 404 |
 | PATCH | `/opportunities/:opportunityId` | Partially update an opportunity managed by the caller |
 
-Added Prisma mappings for `research_opportunities` and its three PostgreSQL enums.
+Extended dev's existing `research_opportunities` Prisma model with retry metadata.
+The existing snake_case enums are exported with API-friendly aliases; no duplicate
+model or enum maps to the same PostgreSQL object.
 Create-request metadata lives on the opportunity itself; no new table is added.
-Existing groups, projects, users and
-sessions are accessed through parameterized SQL because they do not yet have
-Prisma mappings in this branch. The PostgreSQL baseline remains the source of
+Group/project policy checks use parameterized SQL. The PostgreSQL baseline remains the source of
 foreign keys, triggers and CHECK constraints.
 
 Regenerated `apps/api/openapi.json` and the Orval frontend client under
-`apps/web/src/lib/api`. OpenAPI declares bearer authentication and response DTOs.
+`apps/web/src/lib/api`. OpenAPI declares session-cookie authentication and response DTOs.
 The code-generation task now builds its workspace dependencies first, so the
 export uses the current generated database client and enums on a clean checkout.
 
 ## Authentication and permissions
 
-All four routes require `Authorization: Bearer <opaque-app-session-token>`.
-`SessionGuard` hashes the token with SHA-256 and resolves its user from the
-baseline's `active_user_sessions` view. Expired/revoked sessions and inactive
-accounts are rejected. LOCAL sessions additionally require local credentials
-with `must_change_password = false`. The request cannot supply the acting user
-or `creatorId` in its payload. This implements session consumption; login and
-session issuance remain separate work.
+All four routes use dev's global `SessionGuard` and the opaque
+`researchos_session` cookie issued by its login flow. `@CurrentUserId()` reads
+the server-resolved principal; this module registers no extra session guard.
+The existing session resolver rejects expired/revoked sessions and inactive
+accounts, refreshes idle expiry and enforces the LOCAL password-change gate
+(`403 must_change_password`). Missing or invalid sessions return 401.
+The request cannot supply the acting user or `creatorId` in its payload.
 
 Create and PATCH require an effective active researcher, using the baseline's
 `is_researcher` function. Personal opportunities need no group or project.
@@ -124,8 +126,7 @@ hard-deleting the row would also remove its retry history.
 
 ## Database setup
 
-This branch's original Prisma schema did not contain domain tables. These APIs
-target the existing [ResearchOS SQL baseline](database/ResearchOS.sql), including
+These APIs target the [ResearchOS SQL baseline](database/ResearchOS.sql), including
 its users, sessions, groups, projects, enums, functions and opportunity CHECK
 constraints. Generating the Prisma client alone does not install that baseline.
 
@@ -133,7 +134,16 @@ For a **new, disposable database**, initialize the baseline as documented in
 [the database README](database/README.md). Do not replay its full initialization
 SQL against an existing database.
 
-Then apply the additive column/index migration to the initialized database:
+Apply migrations through dev's standard Prisma workflow:
+
+```sh
+pnpm db:migrate:deploy
+```
+
+The additive migration is registered at
+`packages/database/prisma/migrations/20261108000000_opportunity_idempotency/migration.sql`.
+For an existing manually initialized database that is not managed by Prisma,
+the equivalent standalone SQL remains available:
 
 ```sh
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/database/migrations/RES-121-opportunity-idempotency.sql
@@ -146,8 +156,8 @@ It also replaces `can_manage_opportunity` with the shared creator/lead/core rule
 in one transaction. The baseline SQL, its PostgreSQL feature source and DBML
 policy note have been synchronized, and the SQL smoke assertion now reflects
 the ticket's creator permission.
-It is an explicit SQL deployment step; `pnpm db:migrate:deploy` does not execute
-SQL files under `docs/database/migrations`.
+Prisma executes its registered migration; the copy under `docs/database/migrations`
+is a manual alternative and is not discovered by Prisma.
 
 Generate the client and build with the repository's normal pnpm commands.
 Runtime needs `DATABASE_URL` pointing to this initialized PostgreSQL database.
@@ -158,7 +168,7 @@ Create a personal draft with a valid existing app session:
 
 ```http
 POST /opportunities
-Authorization: Bearer <app-session-token>
+Cookie: researchos_session=<app-session-token>
 Idempotency-Key: personal-opportunity-001
 Content-Type: application/json
 
@@ -188,16 +198,21 @@ an alternative publishing route.
 - `pnpm codegen`: passed; OpenAPI and frontend client regenerated.
 - `pnpm build`: passed across API, worker, database, config and web.
 - `pnpm lint`: passed with no warnings or errors.
-- `pnpm test`: passed, 94 tests total (90 API and 4 config).
-- Added 56 API tests covering request validation, session handling, researcher
+- `pnpm test`: passed after rebasing onto dev, 353 tests total (247 API, 85 web,
+  and 21 shared-package tests).
+- `pnpm db:drift`: passed; the extended Prisma model matches the SQL baseline.
+- `pnpm db:smoke`: all five suites passed against both the SQL source and the
+  complete Prisma migration chain, including the new opportunity migration.
+- Added 50 opportunity API unit tests covering request validation, researcher
   and scope denial, publication transitions, nullable PATCH fields, invisible
   details, pagination, persisted idempotency replay and conflicting payloads,
   replay after editing, and preservation of create metadata during PATCH.
 
-Unit service/session tests use mocked Prisma calls. In addition, the repeatable
+Unit service tests use mocked Prisma calls; dev retains its shared session tests.
+In addition, the repeatable
 integration harness `apps/api/scripts/test-opportunities-postgres.mjs` passed
 12 live checks against PostgreSQL 18.6 with the complete SQL baseline and actual
-Nest HTTP endpoints:
+  Nest HTTP endpoints, including dev's real cookie-based identity module:
 
 - Migration reapplication creates no additional tables.
 - All three existing schema, auth and policy SQL smoke suites pass.

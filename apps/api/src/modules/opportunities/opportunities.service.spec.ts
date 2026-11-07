@@ -20,29 +20,30 @@ const draft = {
   opportunityKind: OpportunityKind.RESEARCH_COLLABORATION,
 };
 const row = {
-  ...draft,
+  title: draft.title,
+  opportunity_kind: draft.opportunityKind,
   id,
-  creatorId: actor,
-  groupId: null,
-  projectId: null,
-  targetAudience: TargetAudience.ANY_RESEARCHER,
-  expectedRole: null,
-  requiredExpertiseTags: [],
+  creator_id: actor,
+  group_id: null,
+  project_id: null,
+  target_audience: TargetAudience.ANY_RESEARCHER,
+  expected_role: null,
+  required_expertise_tags: [],
   description: null,
-  responseSlaDays: 5,
+  response_sla_days: 5,
   status: OpportunityStatus.DRAFT,
-  applicationDeadline: null,
-  publishedAt: null,
-  archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  application_deadline: null,
+  published_at: null,
+  archived_at: null,
+  created_at: new Date(),
+  updated_at: new Date(),
 };
 
 describe('OpportunitiesService', () => {
   let service: OpportunitiesService;
   const tx = {
     $queryRaw: vi.fn(),
-    researchOpportunity: {
+    research_opportunities: {
       create: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -57,10 +58,10 @@ describe('OpportunitiesService', () => {
       $transaction: vi.fn((callback) => callback(tx)),
     } as unknown as PrismaService);
     tx.$queryRaw.mockResolvedValue([{ allowed: true }]);
-    tx.researchOpportunity.create.mockResolvedValue(row);
-    tx.researchOpportunity.findUniqueOrThrow.mockResolvedValue(row);
-    tx.researchOpportunity.update.mockResolvedValue(row);
-    tx.researchOpportunity.findUnique.mockResolvedValue(null);
+    tx.research_opportunities.create.mockResolvedValue(row);
+    tx.research_opportunities.findUniqueOrThrow.mockResolvedValue(row);
+    tx.research_opportunities.update.mockResolvedValue(row);
+    tx.research_opportunities.findUnique.mockResolvedValue(null);
   });
 
   it('sets creator from the session and lets the database supply the SLA default', async () => {
@@ -70,14 +71,14 @@ describe('OpportunitiesService', () => {
       responseSlaDays: 5,
       status: 'DRAFT',
     });
-    expect(tx.researchOpportunity.create).toHaveBeenCalledWith({
+    expect(tx.research_opportunities.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        creatorId: actor,
-        requiredExpertiseTags: [],
+        creator_id: actor,
+        required_expertise_tags: [],
       }),
     });
     expect(result).not.toHaveProperty('createdAt');
-    expect(tx.researchOpportunity.update).not.toHaveBeenCalled();
+    expect(tx.research_opportunities.update).not.toHaveBeenCalled();
   });
 
   it.each(['OPEN', 'FILLED', 'CLOSED', 'EXPIRED'] as const)(
@@ -92,7 +93,7 @@ describe('OpportunitiesService', () => {
           applicationDeadline: '2099-01-01T00:00:00Z',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(tx.researchOpportunity.create).not.toHaveBeenCalled();
+      expect(tx.research_opportunities.create).not.toHaveBeenCalled();
     },
   );
 
@@ -101,7 +102,7 @@ describe('OpportunitiesService', () => {
     await expect(service.create(actor, draft)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(tx.researchOpportunity.create).not.toHaveBeenCalled();
+    expect(tx.research_opportunities.create).not.toHaveBeenCalled();
   });
 
   it('rejects group creation without lead or core membership', async () => {
@@ -124,42 +125,42 @@ describe('OpportunitiesService', () => {
 
   it('persists and replays the original create response without inserting again', async () => {
     const first = await service.create(actor, draft, 'retry-1');
-    const saved = tx.researchOpportunity.update.mock.calls[0][0].data;
-    tx.researchOpportunity.findUnique.mockResolvedValue(saved);
+    const saved = tx.research_opportunities.update.mock.calls[0][0].data;
+    tx.research_opportunities.findUnique.mockResolvedValue(saved);
     const second = await service.create(
       actor,
       { opportunityKind: draft.opportunityKind, title: '' },
       'retry-1',
     );
     expect(second).toEqual(first);
-    expect(tx.researchOpportunity.create).toHaveBeenCalledTimes(1);
-    expect(tx.researchOpportunity.findUnique).toHaveBeenCalledWith({
+    expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
+    expect(tx.research_opportunities.findUnique).toHaveBeenCalledWith({
       where: {
-        creatorId_createIdempotencyKey: {
-          creatorId: actor,
-          createIdempotencyKey: 'retry-1',
+        creator_id_create_idempotency_key: {
+          creator_id: actor,
+          create_idempotency_key: 'retry-1',
         },
       },
-      select: { createRequestHash: true, createResponse: true },
+      select: { create_request_hash: true, create_response: true },
     });
-    expect(tx.researchOpportunity.update).toHaveBeenCalledTimes(1);
+    expect(tx.research_opportunities.update).toHaveBeenCalledTimes(1);
   });
 
   it('rejects reuse of a key with a changed payload', async () => {
     await service.create(actor, draft, 'retry-1');
-    tx.researchOpportunity.findUnique.mockResolvedValue(
-      tx.researchOpportunity.update.mock.calls[0][0].data,
+    tx.research_opportunities.findUnique.mockResolvedValue(
+      tx.research_opportunities.update.mock.calls[0][0].data,
     );
     await expect(
       service.create(actor, { ...draft, title: 'Different' }, 'retry-1'),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(tx.researchOpportunity.create).toHaveBeenCalledTimes(1);
+    expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
   });
 
   it('replays the original response after the opportunity has been edited', async () => {
     const original = await service.create(actor, draft, 'retry-1');
-    const saved = tx.researchOpportunity.update.mock.calls[0][0].data;
-    tx.researchOpportunity.findUnique.mockResolvedValue({
+    const saved = tx.research_opportunities.update.mock.calls[0][0].data;
+    tx.research_opportunities.findUnique.mockResolvedValue({
       ...row,
       ...saved,
       title: 'Edited later',
@@ -170,15 +171,15 @@ describe('OpportunitiesService', () => {
     expect(replay).not.toHaveProperty('createRequestHash');
     expect(replay).not.toHaveProperty('createIdempotencyKey');
     expect(replay).not.toHaveProperty('createResponse');
-    expect(tx.researchOpportunity.create).toHaveBeenCalledTimes(1);
+    expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
   });
 
   it('does not overwrite creation metadata when PATCHing an opportunity', async () => {
     await service.update(actor, id, { title: 'Edited later' });
-    const data = tx.researchOpportunity.update.mock.calls[0][0].data;
-    expect(data).not.toHaveProperty('createIdempotencyKey');
-    expect(data).not.toHaveProperty('createRequestHash');
-    expect(data).not.toHaveProperty('createResponse');
+    const data = tx.research_opportunities.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty('create_idempotency_key');
+    expect(data).not.toHaveProperty('create_request_hash');
+    expect(data).not.toHaveProperty('create_response');
   });
 
   it.each(['', ' ', 'x'.repeat(201)])(
@@ -197,7 +198,7 @@ describe('OpportunitiesService', () => {
     await expect(
       service.update(actor, id, { title: 'Changed' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(tx.researchOpportunity.update).not.toHaveBeenCalled();
+    expect(tx.research_opportunities.update).not.toHaveBeenCalled();
   });
 
   it('returns 404 for an absent edit target', async () => {
@@ -210,30 +211,30 @@ describe('OpportunitiesService', () => {
   });
 
   it('validates publication against the merged record and allows partial edits', async () => {
-    tx.researchOpportunity.findUniqueOrThrow.mockResolvedValue({
+    tx.research_opportunities.findUniqueOrThrow.mockResolvedValue({
       ...row,
       title: 'Complete',
       description: 'Details',
-      applicationDeadline: new Date(),
-      publishedAt: new Date(),
+      application_deadline: new Date(),
+      published_at: new Date(),
     });
     await service.update(actor, id, { description: 'Updated details' });
-    expect(tx.researchOpportunity.update).toHaveBeenCalled();
+    expect(tx.research_opportunities.update).toHaveBeenCalled();
   });
 
   it('rejects clearing a required field on an already published record', async () => {
-    tx.researchOpportunity.findUniqueOrThrow.mockResolvedValue({
+    tx.research_opportunities.findUniqueOrThrow.mockResolvedValue({
       ...row,
       title: 'Complete',
       description: 'Details',
       status: OpportunityStatus.OPEN,
-      applicationDeadline: new Date(),
-      publishedAt: new Date(),
+      application_deadline: new Date(),
+      published_at: new Date(),
     });
     await expect(
       service.update(actor, id, { description: null }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(tx.researchOpportunity.update).not.toHaveBeenCalled();
+    expect(tx.research_opportunities.update).not.toHaveBeenCalled();
   });
 
   it('conceals an invisible detail as 404', async () => {
@@ -241,14 +242,14 @@ describe('OpportunitiesService', () => {
     await expect(service.findOne(actor, id)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(tx.researchOpportunity.findUnique).not.toHaveBeenCalled();
+    expect(tx.research_opportunities.findUnique).not.toHaveBeenCalled();
   });
 
   it('returns bounded pagination metadata with a safe numeric count', async () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ id }])
       .mockResolvedValueOnce([{ total: 1n }]);
-    tx.researchOpportunity.findMany.mockResolvedValue([row]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
     expect(
       await service.findAll(actor, new ListOpportunitiesQueryDto()),
     ).toMatchObject({ page: 1, pageSize: 20, total: 1, items: [{ id }] });

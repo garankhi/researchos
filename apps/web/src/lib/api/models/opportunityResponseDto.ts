@@ -10,26 +10,55 @@ import type { OpportunityResponseDtoStatus } from './opportunityResponseDtoStatu
 import type { OpportunityResponseDtoTargetAudience } from './opportunityResponseDtoTargetAudience';
 
 export interface OpportunityResponseDto {
+  /** Opportunity identifier. */
   id: string;
-  /** @nullable */
+  /**
+   * Associated group, or null for an opportunity without group scope.
+   * @nullable
+   */
   groupId: string | null;
-  /** @nullable */
+  /**
+   * Associated project, if any.
+   * @nullable
+   */
   projectId: string | null;
+  /** Authenticated researcher who created the opportunity. */
   creatorId: string;
+  /** Opportunity title. */
   title: string;
+  /** Kind of research opportunity. */
   opportunityKind: OpportunityResponseDtoOpportunityKind;
+  /** Intended audience; grants no access by itself. */
   targetAudience: OpportunityResponseDtoTargetAudience;
-  /** @nullable */
+  /**
+   * Expected contribution or role.
+   * @nullable
+   */
   expectedRole: string | null;
+  /** Expertise tags sought from applicants. */
   requiredExpertiseTags: string[];
-  /** @nullable */
+  /**
+   * Detailed opportunity description.
+   * @nullable
+   */
   description: string | null;
+  /** Response SLA measured in calendar days. */
   responseSlaDays: number;
-  /** @nullable */
+  /**
+   * Exact application cutoff timestamp.
+   * @nullable
+   */
   applicationDeadline: string | null;
+  /** Current lifecycle status. */
   status: OpportunityResponseDtoStatus;
-  /** @nullable */
+  /**
+   * Server-assigned publication timestamp.
+   * @nullable
+   */
   publishedAt: string | null;
-  /** @nullable */
+  /**
+   * Archive timestamp, if archived.
+   * @nullable
+   */
   archivedAt: string | null;
 }

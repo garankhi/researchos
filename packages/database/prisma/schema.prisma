@@ -615,9 +615,9 @@ model research_opportunities {
   archived_at              DateTime?                  @db.Timestamptz(6)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
-  create_idempotency_key String? @db.VarChar(200)
-  create_request_hash String? @db.Char(64)
-  create_response Json?
+  create_idempotency_key   String?                    @db.VarChar(200)
+  create_request_hash      String?                    @db.Char(64)
+  create_response          Json?
   opportunity_applications opportunity_applications[]
   users                    users                      @relation(fields: [creator_id], references: [id], onUpdate: NoAction)
   research_groups          research_groups?           @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)

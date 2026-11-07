@@ -9,15 +9,26 @@ import type { OpportunitiesControllerFindAllStatus } from './opportunitiesContro
 
 export type OpportunitiesControllerFindAllParams = {
   /**
+   * One-based page number.
    * @minimum 1
    */
   page?: number;
   /**
+   * Maximum records per page.
    * @minimum 1
    * @maximum 100
    */
   pageSize?: number;
+  /**
+   * Filter by group scope.
+   */
   groupId?: string;
+  /**
+   * Filter by project scope.
+   */
   projectId?: string;
+  /**
+   * Filter by lifecycle status without widening visibility.
+   */
   status?: OpportunitiesControllerFindAllStatus;
 };

@@ -647,6 +647,9 @@ CREATE TABLE "achievement_posts" (
 );
 
 CREATE TABLE "research_opportunities" (
+  "create_idempotency_key" varchar(200),
+  "create_request_hash" char(64),
+  "create_response" jsonb,
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "group_id" uuid,
   "project_id" uuid,
@@ -965,6 +968,8 @@ CREATE UNIQUE INDEX ON "output_files" ("output_id", "id");
 CREATE INDEX ON "group_output_links" ("group_id", "status", "requested_at");
 
 CREATE INDEX ON "research_opportunities" ("group_id");
+
+CREATE UNIQUE INDEX "uq_opportunity_creator_create_key" ON "research_opportunities" ("creator_id", "create_idempotency_key");
 
 CREATE INDEX ON "research_opportunities" ("project_id");
 

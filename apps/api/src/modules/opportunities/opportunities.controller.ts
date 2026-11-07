@@ -15,6 +15,7 @@ import {
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
@@ -36,12 +37,15 @@ export class OpportunitiesController {
   @Post()
   @ApiOperation({ summary: 'Creates a research opportunity' })
   @ApiHeader({
-    name: 'Idempotency-Key',
+    name: 'idempotency-key',
     required: false,
     description:
       'Actor-scoped retry key, 1–200 characters; a changed payload returns 409',
   })
-  @ApiCreatedResponse({ type: OpportunityResponseDto })
+  @ApiCreatedResponse({
+    description: 'Created draft or replay of its original create response.',
+    type: OpportunityResponseDto,
+  })
   create(
     @CurrentUserId() actorId: string,
     @Body() dto: CreateOpportunityDto,
@@ -55,7 +59,10 @@ export class OpportunitiesController {
     summary:
       'Lists published opportunities and opportunities managed by the caller',
   })
-  @ApiOkResponse({ type: OpportunityPageDto })
+  @ApiOkResponse({
+    description: 'Visible opportunities and pagination information.',
+    type: OpportunityPageDto,
+  })
   findAll(
     @CurrentUserId() actorId: string,
     @Query() query: ListOpportunitiesQueryDto,
@@ -65,7 +72,15 @@ export class OpportunitiesController {
 
   @Get(':opportunityId')
   @ApiOperation({ summary: 'Returns a visible research opportunity' })
-  @ApiOkResponse({ type: OpportunityResponseDto })
+  @ApiParam({
+    name: 'opportunityId',
+    description: 'Opportunity UUID.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'The visible opportunity.',
+    type: OpportunityResponseDto,
+  })
   findOne(
     @CurrentUserId() actorId: string,
     @Param('opportunityId', new ParseUUIDPipe()) id: string,
@@ -77,7 +92,15 @@ export class OpportunitiesController {
   @ApiOperation({
     summary: 'Updates a research opportunity managed by the caller',
   })
-  @ApiOkResponse({ type: OpportunityResponseDto })
+  @ApiParam({
+    name: 'opportunityId',
+    description: 'UUID of the opportunity to edit.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Updated opportunity details; lifecycle status is unchanged.',
+    type: OpportunityResponseDto,
+  })
   update(
     @CurrentUserId() actorId: string,
     @Param('opportunityId', new ParseUUIDPipe()) id: string,

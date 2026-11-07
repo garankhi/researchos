@@ -16,8 +16,8 @@ import {
   OpportunityResponseDto,
 } from './dto/opportunity-response.dto.js';
 
-// All identifiers/values are bound parameters. Raw SQL is used only for the
-// canonical session/group/project tables, which are not yet mapped in Prisma.
+// DTOs use camelCase; dev's introspected Prisma domain models use snake_case.
+// Policy queries use bound parameters and the canonical PostgreSQL functions.
 @Injectable()
 export class OpportunitiesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -94,16 +94,22 @@ export class OpportunitiesService {
   }
 
   private dates(dto: CreateOpportunityDto | UpdateOpportunityDto) {
-    const { applicationDeadline, archivedAt, ...data } = dto;
+    const { applicationDeadline, archivedAt } = dto;
     return {
-      ...data,
-      applicationDeadline:
+      title: dto.title,
+      opportunity_kind: dto.opportunityKind,
+      target_audience: dto.targetAudience,
+      expected_role: dto.expectedRole,
+      required_expertise_tags: dto.requiredExpertiseTags,
+      description: dto.description,
+      response_sla_days: dto.responseSlaDays,
+      application_deadline:
         applicationDeadline === undefined
           ? undefined
           : applicationDeadline === null
             ? null
             : new Date(applicationDeadline),
-      archivedAt:
+      archived_at:
         archivedAt === undefined
           ? undefined
           : archivedAt === null
@@ -115,20 +121,20 @@ export class OpportunitiesService {
   private response(row: ResearchOpportunity): OpportunityResponseDto {
     return {
       id: row.id,
-      groupId: row.groupId,
-      projectId: row.projectId,
-      creatorId: row.creatorId,
+      groupId: row.group_id,
+      projectId: row.project_id,
+      creatorId: row.creator_id,
       title: row.title,
-      opportunityKind: row.opportunityKind,
-      targetAudience: row.targetAudience,
-      expectedRole: row.expectedRole,
-      requiredExpertiseTags: row.requiredExpertiseTags ?? [],
+      opportunityKind: row.opportunity_kind,
+      targetAudience: row.target_audience,
+      expectedRole: row.expected_role,
+      requiredExpertiseTags: row.required_expertise_tags ?? [],
       description: row.description,
-      responseSlaDays: row.responseSlaDays,
+      responseSlaDays: row.response_sla_days,
       status: row.status,
-      applicationDeadline: row.applicationDeadline?.toISOString() ?? null,
-      publishedAt: row.publishedAt?.toISOString() ?? null,
-      archivedAt: row.archivedAt?.toISOString() ?? null,
+      applicationDeadline: row.application_deadline?.toISOString() ?? null,
+      publishedAt: row.published_at?.toISOString() ?? null,
+      archivedAt: row.archived_at?.toISOString() ?? null,
     };
   }
 
@@ -183,47 +189,49 @@ export class OpportunitiesService {
         if (key !== undefined) {
           // Transaction-scoped lock serializes retries across API processes.
           await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${actorId + ':' + key}, 0))::text`;
-          const previous = await tx.researchOpportunity.findUnique({
+          const previous = await tx.research_opportunities.findUnique({
             where: {
-              creatorId_createIdempotencyKey: {
-                creatorId: actorId,
-                createIdempotencyKey: key,
+              creator_id_create_idempotency_key: {
+                creator_id: actorId,
+                create_idempotency_key: key,
               },
             },
-            select: { createRequestHash: true, createResponse: true },
+            select: { create_request_hash: true, create_response: true },
           });
           if (previous) {
-            if (previous.createRequestHash !== hash)
+            if (previous.create_request_hash !== hash)
               throw new ConflictException(
                 'Idempotency-Key was already used with a different payload',
               );
-            if (!previous.createResponse)
+            if (!previous.create_response)
               throw new ConflictException(
                 'The original create response is unavailable',
               );
-            return previous.createResponse as unknown as OpportunityResponseDto;
+            return previous.create_response as unknown as OpportunityResponseDto;
           }
         }
         await this.checkScope(tx, actorId, dto);
-        const row = await tx.researchOpportunity.create({
+        const row = await tx.research_opportunities.create({
           data: {
             ...this.dates(dto),
             title: dto.title,
-            opportunityKind: dto.opportunityKind,
-            creatorId: actorId,
+            opportunity_kind: dto.opportunityKind,
+            group_id: dto.groupId,
+            project_id: dto.projectId,
+            creator_id: actorId,
             status: OpportunityStatus.DRAFT,
-            publishedAt: null,
-            requiredExpertiseTags: dto.requiredExpertiseTags ?? [],
+            published_at: null,
+            required_expertise_tags: dto.requiredExpertiseTags ?? [],
           },
         });
         const response = this.response(row);
         if (key !== undefined)
-          await tx.researchOpportunity.update({
+          await tx.research_opportunities.update({
             where: { id: row.id },
             data: {
-              createIdempotencyKey: key,
-              createRequestHash: hash,
-              createResponse: response as unknown as Prisma.InputJsonValue,
+              create_idempotency_key: key,
+              create_request_hash: hash,
+              create_response: response as unknown as Prisma.InputJsonValue,
             },
           });
         return response;
@@ -248,9 +256,9 @@ export class OpportunitiesService {
         const [count] = await tx.$queryRaw<
           { total: bigint }[]
         >`SELECT count(*) AS total FROM research_opportunities o WHERE ${conditions}`;
-        const rows = await tx.researchOpportunity.findMany({
+        const rows = await tx.research_opportunities.findMany({
           where: { id: { in: ids.map(({ id }) => id) } },
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
         });
         return {
           items: rows.map((row) => this.response(row)),
@@ -270,7 +278,9 @@ export class OpportunitiesService {
         SELECT o.id FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
       `;
         if (!visible) throw new NotFoundException('Opportunity not found');
-        const row = await tx.researchOpportunity.findUnique({ where: { id } });
+        const row = await tx.research_opportunities.findUnique({
+          where: { id },
+        });
         if (!row) throw new NotFoundException('Opportunity not found');
         return this.response(row);
       },
@@ -295,17 +305,17 @@ export class OpportunitiesService {
           throw new ForbiddenException(
             'Only the creator, group lead or core members can edit an opportunity',
           );
-        const current = await tx.researchOpportunity.findUniqueOrThrow({
+        const current = await tx.research_opportunities.findUniqueOrThrow({
           where: { id },
         });
         const data = this.dates(dto);
         // Undefined means retain the persisted value; explicit null clears it.
         const changed = Object.fromEntries(
-          Object.entries(data).filter(([, value]) => value !== undefined),
+          Object.entries(dto).filter(([, value]) => value !== undefined),
         );
-        this.validateRecord({ ...current, ...changed });
+        this.validateRecord(Object.assign({}, this.response(current), changed));
         return this.response(
-          await tx.researchOpportunity.update({ where: { id }, data }),
+          await tx.research_opportunities.update({ where: { id }, data }),
         );
       }),
     );

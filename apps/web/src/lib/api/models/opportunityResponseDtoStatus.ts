@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Current lifecycle status.
+ */
 export type OpportunityResponseDtoStatus =
   (typeof OpportunityResponseDtoStatus)[keyof typeof OpportunityResponseDtoStatus];
 

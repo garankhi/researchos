@@ -6,8 +6,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { PrismaService } from '@researchos/database';
+import { ConfigModule } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { PrismaModule, PrismaService } from '@researchos/database';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 
 const requireDatabase = createRequire(
@@ -140,12 +143,26 @@ try {
   );
 
   process.env.DATABASE_URL = testUrl.href;
-  const { AppModule } = await import('../dist/app.module.js');
+  const { IdentityModule } =
+    await import('../dist/modules/identity/identity.module.js');
+  const { OpportunitiesModule } =
+    await import('../dist/modules/opportunities/opportunities.module.js');
   const { HttpExceptionFilter } =
     await import('../dist/common/filters/http-exception.filter.js');
   const { ApiResponseInterceptor } =
     await import('../dist/common/interceptors/api-response.interceptor.js');
-  app = await NestFactory.create(AppModule, { logger: false });
+  // Use the real feature and identity modules without unrelated Redis/S3 jobs.
+  const fixture = await Test.createTestingModule({
+    imports: [
+      ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
+      ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 1000 }]),
+      PrismaModule,
+      IdentityModule,
+      OpportunitiesModule,
+    ],
+  }).compile();
+  app = fixture.createNestApplication({ logger: false });
+  app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -159,7 +176,7 @@ try {
   await app.init();
   const prisma = app.get(PrismaService);
   const http = request(app.getHttpServer());
-  const as = (role) => ({ Authorization: `Bearer ${tokens[role]}` });
+  const as = (role) => ({ Cookie: `researchos_session=${tokens[role]}` });
   const body = {
     title: 'Draft opportunity',
     opportunityKind: 'RESEARCH_COLLABORATION',
@@ -178,7 +195,7 @@ try {
     assert.equal(personal.creatorId, ids.creator);
     assert.equal(
       (
-        await prisma.researchOpportunity.findUniqueOrThrow({
+        await prisma.research_opportunities.findUniqueOrThrow({
           where: { id: personal.id },
         })
       ).status,
@@ -360,7 +377,7 @@ try {
         'UPDATE local_credentials SET must_change_password=true WHERE user_id=$1',
         [ids.guest],
       );
-      await http.get('/opportunities').set(as('guest')).expect(401);
+      await http.get('/opportunities').set(as('guest')).expect(403);
       await db.query(
         "UPDATE user_sessions SET expires_at=created_at+interval '1 microsecond',idle_expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",
         [ids.outsider],

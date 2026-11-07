@@ -8,8 +8,12 @@
 import type { OpportunityResponseDto } from './opportunityResponseDto';
 
 export interface OpportunityPageDto {
+  /** Visible opportunities on this page. */
   items: OpportunityResponseDto[];
+  /** Current one-based page number. */
   page: number;
+  /** Maximum number of items per page. */
   pageSize: number;
+  /** Total opportunities matching the filters and caller visibility. */
   total: number;
 }

@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * The kind of research opportunity.
+ */
 export type CreateOpportunityDtoOpportunityKind =
   (typeof CreateOpportunityDtoOpportunityKind)[keyof typeof CreateOpportunityDtoOpportunityKind];
 

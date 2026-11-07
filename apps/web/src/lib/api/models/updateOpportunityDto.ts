@@ -9,25 +9,42 @@ import type { UpdateOpportunityDtoOpportunityKind } from './updateOpportunityDto
 import type { UpdateOpportunityDtoTargetAudience } from './updateOpportunityDtoTargetAudience';
 
 export interface UpdateOpportunityDto {
-  /** @maxLength 255 */
+  /**
+   * Opportunity title; may be empty while drafting.
+   * @maxLength 255
+   */
   title?: string;
+  /** The kind of research opportunity. */
   opportunityKind?: UpdateOpportunityDtoOpportunityKind;
+  /** Intended research audience; this field grants no permissions. */
   targetAudience?: UpdateOpportunityDtoTargetAudience;
   /**
+   * Expected contribution or role; cannot be blank when provided.
    * @maxLength 255
    * @nullable
    */
   expectedRole?: string | null;
+  /** Expertise tags sought from applicants. */
   requiredExpertiseTags?: string[];
-  /** @nullable */
+  /**
+   * Opportunity details; required before publication.
+   * @nullable
+   */
   description?: string | null;
   /**
+   * Response SLA in calendar days, including weekends and holidays.
    * @minimum 1
    * @maximum 2147483647
    */
   responseSlaDays?: number;
-  /** @nullable */
+  /**
+   * Exact application cutoff timestamp; required before publication.
+   * @nullable
+   */
   applicationDeadline?: string | null;
-  /** @nullable */
+  /**
+   * Archive timestamp; null leaves the opportunity unarchived.
+   * @nullable
+   */
   archivedAt?: string | null;
 }

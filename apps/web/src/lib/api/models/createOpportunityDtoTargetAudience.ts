@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Intended research audience; this field grants no permissions.
+ */
 export type CreateOpportunityDtoTargetAudience =
   (typeof CreateOpportunityDtoTargetAudience)[keyof typeof CreateOpportunityDtoTargetAudience];
 

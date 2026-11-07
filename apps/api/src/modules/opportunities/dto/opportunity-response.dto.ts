@@ -6,45 +6,100 @@ import {
 } from '@researchos/database';
 
 export class OpportunityResponseDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({ description: 'Opportunity identifier.', format: 'uuid' })
   id: string;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  @ApiProperty({
+    description:
+      'Associated group, or null for an opportunity without group scope.',
+    type: String,
+    format: 'uuid',
+    nullable: true,
+  })
   groupId: string | null;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  @ApiProperty({
+    description: 'Associated project, if any.',
+    type: String,
+    format: 'uuid',
+    nullable: true,
+  })
   projectId: string | null;
-  @ApiProperty({ format: 'uuid' })
+  @ApiProperty({
+    description: 'Authenticated researcher who created the opportunity.',
+    format: 'uuid',
+  })
   creatorId: string;
-  @ApiProperty()
+  @ApiProperty({ description: 'Opportunity title.' })
   title: string;
-  @ApiProperty({ enum: OpportunityKind })
+  @ApiProperty({
+    description: 'Kind of research opportunity.',
+    enum: OpportunityKind,
+  })
   opportunityKind: OpportunityKind;
-  @ApiProperty({ enum: TargetAudience })
+  @ApiProperty({
+    description: 'Intended audience; grants no access by itself.',
+    enum: TargetAudience,
+  })
   targetAudience: TargetAudience;
-  @ApiProperty({ type: String, nullable: true })
+  @ApiProperty({
+    description: 'Expected contribution or role.',
+    type: String,
+    nullable: true,
+  })
   expectedRole: string | null;
-  @ApiProperty({ type: [String] })
+  @ApiProperty({
+    description: 'Expertise tags sought from applicants.',
+    type: [String],
+  })
   requiredExpertiseTags: string[];
-  @ApiProperty({ type: String, nullable: true })
+  @ApiProperty({
+    description: 'Detailed opportunity description.',
+    type: String,
+    nullable: true,
+  })
   description: string | null;
-  @ApiProperty()
+  @ApiProperty({ description: 'Response SLA measured in calendar days.' })
   responseSlaDays: number;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  @ApiProperty({
+    description: 'Exact application cutoff timestamp.',
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
   applicationDeadline: string | null;
-  @ApiProperty({ enum: OpportunityStatus })
+  @ApiProperty({
+    description: 'Current lifecycle status.',
+    enum: OpportunityStatus,
+  })
   status: OpportunityStatus;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  @ApiProperty({
+    description: 'Server-assigned publication timestamp.',
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
   publishedAt: string | null;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  @ApiProperty({
+    description: 'Archive timestamp, if archived.',
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
   archivedAt: string | null;
 }
 
 export class OpportunityPageDto {
-  @ApiProperty({ type: [OpportunityResponseDto] })
+  @ApiProperty({
+    description: 'Visible opportunities on this page.',
+    type: [OpportunityResponseDto],
+  })
   items: OpportunityResponseDto[];
-  @ApiProperty()
+  @ApiProperty({ description: 'Current one-based page number.' })
   page: number;
-  @ApiProperty()
+  @ApiProperty({ description: 'Maximum number of items per page.' })
   pageSize: number;
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      'Total opportunities matching the filters and caller visibility.',
+  })
   total: number;
 }

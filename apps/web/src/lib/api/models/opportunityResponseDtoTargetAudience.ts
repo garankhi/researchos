@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Intended audience; grants no access by itself.
+ */
 export type OpportunityResponseDtoTargetAudience =
   (typeof OpportunityResponseDtoTargetAudience)[keyof typeof OpportunityResponseDtoTargetAudience];
 

@@ -729,6 +729,9 @@ Table achievement_posts {
 }
 
 Table research_opportunities {
+  create_idempotency_key varchar(200)
+  create_request_hash char(64)
+  create_response jsonb
   id uuid [pk, default: `gen_random_uuid()`]
   group_id uuid
   project_id uuid
@@ -751,7 +754,9 @@ Table research_opportunities {
     `status = 'DRAFT' OR (application_deadline IS NOT NULL AND published_at IS NOT NULL AND length(btrim(title)) > 0 AND description IS NOT NULL AND length(btrim(description)) > 0)` [name: 'ck_published_opportunity']
     `expected_role IS NULL OR length(btrim(expected_role)) > 0` [name: 'ck_expected_role_text']
   }
-  indexes { group_id
+  indexes {
+    (creator_id, create_idempotency_key) [unique, name: 'uq_opportunity_creator_create_key']
+    group_id
     project_id
     (status, application_deadline)
   }
