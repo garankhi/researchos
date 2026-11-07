@@ -21,6 +21,7 @@ vi.mock('@node-rs/argon2', () => ({
 }));
 
 import { verify, hash } from '@node-rs/argon2';
+import { ROLES } from '../../common/constants/roles.js';
 
 /**
  * A stub of the transaction client the login runs in.
@@ -319,7 +320,7 @@ describe('AuthService', () => {
 
       expect(result.token).toEqual(expect.any(String));
       expect(result.me.id).toBe('user-1');
-      expect(result.me.roles).toEqual(['RESEARCHER']);
+      expect(result.me.roles).toEqual([ROLES.RESEARCHER]);
     });
 
     it('stores only the hash of the token', async () => {

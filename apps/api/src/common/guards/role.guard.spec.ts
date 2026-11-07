@@ -12,6 +12,7 @@ import type { SessionResolver } from '../auth/session-resolver.js';
 import { ROLES_METADATA_KEY } from '../decorators/roles.decorator.js';
 import { PRINCIPAL_REQUEST_KEY } from './session.guard.js';
 import type { AuthPrincipal } from '../auth/auth-principal.js';
+import { ROLES } from '../constants/roles.js';
 
 /**
  * The role guard answers one question: does the caller hold every role
@@ -24,7 +25,7 @@ const principal: AuthPrincipal = {
   sessionId: 'session-1',
   authMethod: 'LOCAL',
   mustChangePassword: false,
-  roles: ['RESEARCHER'],
+  roles: [ROLES.RESEARCHER],
   email: 'faculty@researchos.local',
   fullName: 'Dev Faculty',
 };
@@ -91,7 +92,7 @@ describe('RoleGuard', () => {
   });
 
   it('refuses a request without a principal', async () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([ROLES.ADMIN]);
 
     await expect(
       guard.canActivate(contextWith(undefined)),
@@ -99,14 +100,16 @@ describe('RoleGuard', () => {
   });
 
   it('allows a caller that holds the required role', async () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['RESEARCHER']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      ROLES.RESEARCHER,
+    ]);
 
     await expect(guard.canActivate(contextWith(principal))).resolves.toBe(true);
     expect(effectiveRoles).toHaveBeenCalledWith(principal.userId);
   });
 
   it('refuses a caller that does not hold the required role', async () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([ROLES.ADMIN]);
 
     await expect(
       guard.canActivate(contextWith(principal)),
@@ -115,8 +118,8 @@ describe('RoleGuard', () => {
 
   it('requires every listed role, not just one', async () => {
     vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
-      'RESEARCHER',
-      'ADMIN',
+      ROLES.RESEARCHER,
+      ROLES.ADMIN,
     ]);
 
     await expect(
@@ -128,14 +131,14 @@ describe('RoleGuard', () => {
     // The principal carries the roles it had when the request was
     // resolved. The guard asks the resolver again, so a grant revoked
     // between the two takes effect immediately.
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([ROLES.ADMIN]);
     effectiveRoles.mockResolvedValue({ isResearcher: true, isAdmin: true });
 
     await expect(guard.canActivate(contextWith(principal))).resolves.toBe(true);
   });
 
   it('refuses a role that was revoked after the session was issued', async () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([ROLES.ADMIN]);
     effectiveRoles.mockResolvedValue({ isResearcher: true, isAdmin: false });
 
     await expect(

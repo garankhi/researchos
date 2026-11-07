@@ -30,6 +30,7 @@ apps/api/src/
   main.ts                  Bootstrap: CORS, global pipe, global filter, Swagger
   app.module.ts           Chỉ nối module, không có logic nghiệp vụ
   common/                 Guard, decorator, filter, interceptor, pipe
+    constants/
     filters/
     guards/
     decorators/
@@ -462,8 +463,9 @@ Hai guard chạy global, theo thứ tự:
 - **Mọi route được bảo vệ sẵn.** Guard session đăng ký global, nên route
   không cần `@UseGuards(SessionGuard)`. Route công khai opt out bằng
   `@Public()` — đây là ngoại lệ hẹp, không phải mặc định.
-- Role của route khai báo bằng `@Roles('ADMIN')`. Guard yêu cầu **tất cả**
-  role được liệt kê, không phải "một trong".
+- Role của route khai báo bằng `@Roles(ROLES.ADMIN)`. Guard yêu cầu **tất cả**
+  role được liệt kê, không phải "một trong". Tên role lấy từ `ROLES` trong
+  `src/common/constants/roles.ts` — literal rỗng là lỗi compile.
 - Role được đọc **trực tiếp** ở mỗi request, không chụp lại trong session:
   thu hồi quyền có hiệu lực ở request kế tiếp, không cần đăng nhập lại.
 - `@CurrentUserId()` trả về `string`, không phải `string | undefined`: guard

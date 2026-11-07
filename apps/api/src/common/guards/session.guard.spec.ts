@@ -9,6 +9,7 @@ import { SESSION_COOKIE_NAME } from '../auth/session-cookie.js';
 import type { AuthPrincipal } from '../auth/auth-principal.js';
 import { CodedHttpException, domainErrorCodes } from '../errors/error-codes.js';
 import { ALLOW_PASSWORD_CHANGE_PENDING_KEY } from '../decorators/allow-password-change-pending.decorator.js';
+import { ROLES } from '../constants/roles.js';
 
 /**
  * The session guard is the front door: everything that is not explicitly
@@ -23,7 +24,7 @@ const principal: AuthPrincipal = {
   sessionId: 'session-1',
   authMethod: 'LOCAL',
   mustChangePassword: false,
-  roles: ['RESEARCHER'],
+  roles: [ROLES.RESEARCHER],
   email: 'faculty@researchos.local',
   fullName: 'Dev Faculty',
 };
@@ -93,7 +94,7 @@ describe('SessionGuard', () => {
   it('blocks a password-change-pending admin before granting protected access', async () => {
     resolve.mockResolvedValue({
       ...principal,
-      roles: ['ADMIN'],
+      roles: [ROLES.ADMIN],
       mustChangePassword: true,
     });
     const rejection = guard.canActivate(

@@ -15,12 +15,14 @@ apps/api/src/common/
     auth-principal.ts      The request-scoped identity — a plain type
     session-resolver.ts    The contract the identity module implements
     session-cookie.ts      The cookie name and its options
+  constants/
+    roles.ts               The role names — ROLES.ADMIN, ROLES.RESEARCHER
   guards/
     session.guard.ts       Is there a valid session? → 401
     role.guard.ts          Does the caller hold the roles? → 403
   decorators/
     public.decorator.ts    @Public() — reachable without a session
-    roles.decorator.ts     @Roles('ADMIN') — the roles a route requires
+    roles.decorator.ts     @Roles(ROLES.ADMIN) — the roles a route requires
     current-user-id.decorator.ts  @CurrentUserId() — the caller's id
 ```
 
@@ -112,14 +114,14 @@ bug here can only fail the write, never extend a session.
 route requires?**
 
 ```typescript
-@Roles('ADMIN')
+@Roles(ROLES.ADMIN)
 @Get('users')
 listUsers(): UsersDto { ... }
 ```
 
 - A route with **no** `@Roles` is open to any signed-in caller — the session
   guard still applies.
-- `@Roles('ADMIN', 'RESEARCHER')` requires **every** listed role, not one
+- `@Roles(ROLES.ADMIN, ROLES.RESEARCHER)` requires **every** listed role, not one
   of them.
 - A caller that is signed in but holds the wrong role gets a `403`
   (`ForbiddenException`) — not a `401`.
@@ -187,6 +189,18 @@ declared so.**
 Declares the roles a route requires. The guard refuses with a `403` when the
 caller is signed in but does not hold every listed role.
 
+The role names come from `ROLES` in `common/constants/roles.ts`:
+
+```typescript
+import { ROLES } from '../../common/constants/roles.js';
+
+@Roles(ROLES.ADMIN)
+```
+
+A bare string literal is a compile error, because the decorator takes
+`Role[]` and `Role` is derived from `ROLES`. The names are the same two
+values the database's `access_role` enum carries.
+
 ### `@CurrentUserId()`
 
 Injects the authenticated caller's user id into a handler parameter.
@@ -209,7 +223,7 @@ behind it always has one. The decorator throws rather than handing
 | --- | --- |
 | is open to everyone | `@Public()` |
 | needs a signed-in caller | nothing — the session guard is global |
-| needs a specific role | `@Roles('ADMIN')` |
+| needs a specific role | `@Roles(ROLES.ADMIN)` |
 | needs the caller's id | `@CurrentUserId() userId: string` |
 | is restricted per record | nothing at the route level; the **service** checks it |
 
@@ -298,7 +312,7 @@ per `docs/api-convention.md`.
 | `@UseGuards(SessionGuard)` on a route | Duplicates the global protection and implies the routes without it are unprotected |
 | A public route without `@Public()` | A `401` on a route that should be open |
 | A protected route missing `@Public()` | The route is unreachable for signed-out callers |
-| `@Roles('ADMIN', 'RESEARCHER')` read as "either" | The guard requires **every** listed role; a route that means "either" cannot use `@Roles` |
+| `@Roles(ROLES.ADMIN, ROLES.RESEARCHER)` read as "either" | The guard requires **every** listed role; a route that means "either" cannot use `@Roles` |
 | A role check in the controller | Bypassable, duplicated, invisible to the guard layer |
 | A per-record check in `common/guards/` | The guard has to know every domain entity — the boundary `common/` must not cross |
 | Trusting `principal.roles` for a role check | The roles are a snapshot; a revoked grant would still pass until the next login |

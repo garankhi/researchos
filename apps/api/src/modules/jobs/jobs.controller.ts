@@ -23,6 +23,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUserId, Roles } from '../../common/decorators/index.js';
+import { ROLES } from '../../common/constants/roles.js';
 import { CreateProbeDto } from './dto/create-probe.dto.js';
 import { JobDto } from './dto/job.dto.js';
 import { JobStatusService } from './job-status.service.js';
@@ -40,7 +41,7 @@ export class JobsController {
   constructor(private readonly jobs: JobStatusService) {}
 
   @Post('probes')
-  @Roles('ADMIN')
+  @Roles(ROLES.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Submits an admin diagnostic job through the transactional outbox',
@@ -84,7 +85,7 @@ export class JobsController {
   }
 
   @Post(':id/retry')
-  @Roles('ADMIN')
+  @Roles(ROLES.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Reprocesses an owned failed job in a new bounded generation',

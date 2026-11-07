@@ -9,6 +9,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ROLES_METADATA_KEY } from '../decorators/roles.decorator.js';
+import { ROLES, type Role } from '../constants/roles.js';
 import { SESSION_RESOLVER } from '../auth/session-resolver.js';
 import type { SessionResolver } from '../auth/session-resolver.js';
 import { PRINCIPAL_REQUEST_KEY } from './session.guard.js';
@@ -38,7 +39,7 @@ export class RoleGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
+    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(
       ROLES_METADATA_KEY,
       [context.getHandler(), context.getClass()],
     );
@@ -61,14 +62,14 @@ export class RoleGuard implements CanActivate {
 
     const access = await this.resolver.effectiveRoles(principal.userId);
 
-    const granted = new Set<string>();
+    const granted = new Set<Role>();
 
     if (access.isAdmin) {
-      granted.add('ADMIN');
+      granted.add(ROLES.ADMIN);
     }
 
     if (access.isResearcher) {
-      granted.add('RESEARCHER');
+      granted.add(ROLES.RESEARCHER);
     }
 
     const allowed = requiredRoles.every((role) => granted.has(role));

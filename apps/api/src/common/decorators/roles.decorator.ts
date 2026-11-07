@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import type { Role } from '../constants/roles.js';
 
 /**
  * The metadata key the role requirement is stored under.
@@ -11,7 +12,7 @@ export const ROLES_METADATA_KEY = 'researchos:roles';
  * Declares the roles a route requires.
  *
  * ```typescript
- * @Roles('ADMIN')
+ * @Roles(ROLES.ADMIN)
  * @Get('users')
  * listUsers(): UsersDto {
  *   ...
@@ -22,9 +23,13 @@ export const ROLES_METADATA_KEY = 'researchos:roles';
  * but does not hold every listed role. A route with no `@Roles` is open
  * to any signed-in caller — the session guard still applies.
  *
+ * The role names come from `ROLES` in `common/constants/roles.ts`, so a
+ * typo is a compile error instead of a route that silently accepts
+ * everybody.
+ *
  * Per-record checks — ownership, group membership, a record's visibility —
  * are not roles and do not belong here. They stay in the owning module's
  * service, where the record is known.
  */
-export const Roles = (...roles: string[]) =>
+export const Roles = (...roles: Role[]) =>
   SetMetadata(ROLES_METADATA_KEY, roles);

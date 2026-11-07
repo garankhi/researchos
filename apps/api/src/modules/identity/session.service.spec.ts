@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionService, hashSessionToken } from './session.service.js';
 import { AccessService } from './access.service.js';
 import { PrismaService } from '@researchos/database';
+import { ROLES } from '../../common/constants/roles.js';
 
 /**
  * The session service owns the rules the guard must not know: the hash,
@@ -149,7 +150,7 @@ describe('SessionService', () => {
         sessionId: 'session-1',
         authMethod: 'LOCAL',
         mustChangePassword: false,
-        roles: ['RESEARCHER'],
+        roles: [ROLES.RESEARCHER],
         email: 'faculty@researchos.local',
         fullName: 'Dev Faculty',
       });
@@ -175,7 +176,7 @@ describe('SessionService', () => {
 
       const principal = await service.resolve('token');
 
-      expect(principal?.roles).toEqual(['RESEARCHER', 'ADMIN']);
+      expect(principal?.roles).toEqual([ROLES.RESEARCHER, ROLES.ADMIN]);
     });
 
     it('reports an administrator as both roles', async () => {
@@ -199,7 +200,7 @@ describe('SessionService', () => {
       const principal = await service.resolve('token');
 
       expect(principal?.authMethod).toBe('OIDC');
-      expect(principal?.roles).toEqual(['RESEARCHER', 'ADMIN']);
+      expect(principal?.roles).toEqual([ROLES.RESEARCHER, ROLES.ADMIN]);
     });
   });
 

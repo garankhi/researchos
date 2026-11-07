@@ -9,6 +9,7 @@ import { hash, verify } from '@node-rs/argon2';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { ROLES, type Role } from '../../common/constants/roles.js';
 import { HttpStatus } from '@nestjs/common';
 import { AccessService } from './access.service.js';
 import { hashSessionToken } from './session.service.js';
@@ -310,14 +311,14 @@ export class AuthService {
       this.mustChangePassword(userId),
     ]);
 
-    const roles: string[] = [];
+    const roles: Role[] = [];
 
     if (access.isResearcher) {
-      roles.push('RESEARCHER');
+      roles.push(ROLES.RESEARCHER);
     }
 
     if (access.isAdmin) {
-      roles.push('ADMIN');
+      roles.push(ROLES.ADMIN);
     }
 
     return {

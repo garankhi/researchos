@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ROLES, type Role } from '../../../common/constants/roles.js';
 
 /**
  * The payload of `GET /me` and of a successful login.
@@ -64,10 +65,10 @@ export class MeDto {
       'the two roles; a faculty account is a researcher through the ' +
       'baseline rule, without an explicit grant.',
     type: 'array',
-    items: { type: 'string', enum: ['RESEARCHER', 'ADMIN'] },
-    example: ['RESEARCHER'],
+    items: { type: 'string', enum: Object.values(ROLES) },
+    example: [ROLES.RESEARCHER],
   })
-  roles: string[];
+  roles: Role[];
 
   @ApiProperty({
     description:

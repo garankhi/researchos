@@ -184,7 +184,8 @@ Each row links to the section that shows the how.
       protected by default
       → [auth-and-guards.md](reference/auth-and-guards.md#public)
 - [ ] A route that needs a role carries `@Roles(...)` — the guard requires
-      **every** listed role
+      **every** listed role, and the names come from `ROLES` in
+      `common/constants/roles.ts`, never a string literal
       → [auth-and-guards.md](reference/auth-and-guards.md#the-role-guard)
 - [ ] A handler that needs the caller's id takes
       `@CurrentUserId() userId: string` — never `string | undefined`

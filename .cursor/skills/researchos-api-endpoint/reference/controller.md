@@ -216,7 +216,7 @@ handler, per `docs/api-convention.md`.
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Not signed in.' })
 @ApiForbiddenResponse({ description: 'The caller does not hold the required role.' })
-@Roles('ADMIN')
+@Roles(ROLES.ADMIN)
 @Get('users')
 listUsers(): UsersDto { ... }
 ```

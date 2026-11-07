@@ -19,6 +19,8 @@
  * the whole app to one module.
  */
 
+import type { Role } from '../constants/roles.js';
+
 /**
  * How the caller proved who they are.
  *
@@ -46,7 +48,7 @@ export interface AuthPrincipal {
   /** LOCAL credentials must be replaced before normal protected access. */
   mustChangePassword: boolean;
   /** The roles the account currently holds. */
-  roles: string[];
+  roles: Role[];
   /** The account's email address. */
   email: string;
   /** The account's display name. */

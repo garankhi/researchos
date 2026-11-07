@@ -5,6 +5,7 @@ import { PrismaService } from '@researchos/database';
 import { AccessService } from './access.service.js';
 import { resolveSessionTtls } from './session-ttl.js';
 import type { AuthPrincipal } from '../../common/auth/auth-principal.js';
+import { ROLES, type Role } from '../../common/constants/roles.js';
 import type {
   EffectiveAccess,
   SessionResolver,
@@ -180,16 +181,16 @@ export class SessionService implements SessionResolver {
    * researcher without an explicit grant — so the roles are read from the
    * same view the guard reads them from.
    */
-  private async roleNamesFor(userId: string): Promise<string[]> {
+  private async roleNamesFor(userId: string): Promise<Role[]> {
     const access = await this.access.effectiveRoles(userId);
-    const roles: string[] = [];
+    const roles: Role[] = [];
 
     if (access.isResearcher) {
-      roles.push('RESEARCHER');
+      roles.push(ROLES.RESEARCHER);
     }
 
     if (access.isAdmin) {
-      roles.push('ADMIN');
+      roles.push(ROLES.ADMIN);
     }
 
     return roles;

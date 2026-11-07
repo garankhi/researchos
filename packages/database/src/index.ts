@@ -18,4 +18,9 @@ export {
   Visibility,
 } from './generated/prisma/client.js';
 
+// `access_role` is the database's role vocabulary. The API re-exports it
+// as `ROLES` so a route writes `@Roles(ROLES.ADMIN)` and the enum stays
+// the single definition of the vocabulary.
+export { access_role } from './generated/prisma/client.js';
+
 export { Prisma } from './generated/prisma/client.js';
