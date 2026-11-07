@@ -1,7 +1,7 @@
 import { Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { PrismaService } from '@researchos/database';
+import { PrismaService, type Prisma } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DURABLE_PROBE_JOB,
@@ -9,6 +9,52 @@ import {
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
+
+type BackgroundJobOutcome =
+  { result: Prisma.InputJsonValue } | { error: Error };
+
+type BackgroundJobContext = {
+  job: Prisma.background_jobsGetPayload<undefined>;
+  attempts: number;
+  tx: Prisma.TransactionClient;
+};
+
+type BackgroundJobHandler = (
+  context: BackgroundJobContext,
+) => BackgroundJobOutcome | Promise<BackgroundJobOutcome>;
+
+const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
+  [DURABLE_PROBE_JOB, runDiagnosticProbe],
+]);
+
+function unsupportedJob(): BackgroundJobOutcome {
+  return {
+    error: new UnrecoverableError('Unsupported background job payload'),
+  };
+}
+
+function runDiagnosticProbe({
+  job,
+  attempts,
+}: BackgroundJobContext): BackgroundJobOutcome {
+  const payload = job.payload as { failuresBeforeSuccess?: unknown } | null;
+  const failures = payload?.failuresBeforeSuccess;
+  if (
+    typeof failures !== 'number' ||
+    !Number.isInteger(failures) ||
+    failures < 0 ||
+    failures > JOB_ATTEMPTS
+  ) {
+    return unsupportedJob();
+  }
+
+  // Only the original generation simulates failures. A manual retry can succeed.
+  if (job.generation === 0 && attempts <= failures) {
+    return { error: new Error('Diagnostic probe simulated transient failure') };
+  }
+
+  return { result: { processedAt: new Date().toISOString() } };
+}
 
 @Processor(BACKGROUND_QUEUE, { concurrency: 2 })
 export class BackgroundProbeProcessor extends WorkerHost {
@@ -45,33 +91,28 @@ export class BackgroundProbeProcessor extends WorkerHost {
         stored.status !== 'PENDING'
       )
         return null;
-      const payload = stored.payload as { failuresBeforeSuccess?: unknown };
-      const failures = payload?.failuresBeforeSuccess;
-      const invalid =
-        stored.kind !== DURABLE_PROBE_JOB ||
-        !Number.isInteger(failures) ||
-        typeof failures !== 'number' ||
-        failures < 0 ||
-        failures > JOB_ATTEMPTS;
       const attempts = Math.min(
         Math.max(stored.attempts, job.attemptsMade) + 1,
         JOB_ATTEMPTS,
       );
-      // Generation zero can simulate exhaustion; explicit reprocessing of a
-      // diagnostic job succeeds, demonstrating recovery without editing input.
-      const failed =
-        invalid || (stored.generation === 0 && attempts <= Number(failures));
-      const terminal = invalid || (failed && attempts >= JOB_ATTEMPTS);
+      const handler = backgroundJobHandlers.get(stored.kind);
+      // DB-only handlers write via tx to commit their side effects with completion.
+      // Return expected errors before writing, or throw to roll back partial writes.
+      const outcome = handler
+        ? await handler({ job: stored, attempts, tx })
+        : unsupportedJob();
+      const error = 'error' in outcome ? outcome.error : null;
+      const terminal =
+        error instanceof UnrecoverableError ||
+        (error !== null && attempts >= JOB_ATTEMPTS);
       await tx.background_jobs.update({
         where: { id: stored.id },
         data: {
           attempts,
           updated_at: new Date(),
-          status: terminal ? 'FAILED' : failed ? 'PENDING' : 'COMPLETED',
+          status: terminal ? 'FAILED' : error ? 'PENDING' : 'COMPLETED',
           error_code: terminal ? 'job_failed' : null,
-          ...(!failed
-            ? { result: { processedAt: new Date().toISOString() } }
-            : {}),
+          ...('result' in outcome ? { result: outcome.result } : {}),
           ...(terminal
             ? {
                 outbox: {
@@ -81,15 +122,10 @@ export class BackgroundProbeProcessor extends WorkerHost {
             : {}),
         },
       });
-      // Real DB-only handlers must perform side effects inside this transaction
-      // with the completion update. External providers need a stable business key.
-      return failed ? { invalid } : null;
+      return error;
     });
     // Throw only after persisting the failed attempt/DLQ transaction.
-    if (failure?.invalid)
-      throw new UnrecoverableError('Unsupported background job payload');
-    if (failure)
-      throw new Error('Diagnostic probe simulated transient failure');
+    if (failure) throw failure;
   }
 
   @OnWorkerEvent('error')

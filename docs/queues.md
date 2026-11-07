@@ -64,8 +64,9 @@ Feature ghi DB rồi phát job phải gọi helper dùng chung
 `BackgroundJobsService.submitInTransaction(tx, ownerId, kind, key, payload)`
 trong chính transaction ghi nghiệp vụ. Helper không enqueue Redis. Worker chỉ
 thấy outbox sau commit; rollback xóa cả thay đổi nghiệp vụ lẫn job/outbox.
-`submit(...)` là dạng tiện dụng khi chỉ cần tạo job. Handler export/digest/
-OpenAlex thuộc feature tương ứng và cần bổ sung processor riêng trước khi submit.
+`submit(...)` là dạng tiện dụng khi chỉ cần tạo job. Feature dùng chung
+`background-jobs` đăng ký cặp `[kind, handler]` trong `backgroundJobHandlers`
+của worker trước khi submit. Handler tự kiểm tra payload và xử lý job của mình.
 Tác vụ gọi dịch vụ ngoài phải truyền business idempotency key cho nhà cung cấp;
 transaction SQL không đảm bảo exactly-once cho email hay HTTP side effect.
 
