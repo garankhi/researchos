@@ -38,12 +38,12 @@ export interface UpdateOpportunityDto {
    */
   responseSlaDays?: number;
   /**
-   * Exact application cutoff timestamp; required before publication.
+   * Exact application cutoff timestamp; required before publication. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.
    * @nullable
    */
   applicationDeadline?: string | null;
   /**
-   * Archive timestamp; null leaves the opportunity unarchived.
+   * Archive timestamp; null leaves the opportunity unarchived. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.
    * @nullable
    */
   archivedAt?: string | null;

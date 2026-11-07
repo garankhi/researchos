@@ -18,6 +18,18 @@ import {
 
 // DTOs use camelCase; dev's introspected Prisma domain models use snake_case.
 // Policy queries use bound parameters and the canonical PostgreSQL functions.
+
+/**
+ * Normalizes a UUID for comparison.
+ *
+ * PostgreSQL returns a UUID in lower case, while the caller may send the
+ * same UUID in upper case — the DTO accepts both. A missing id stays
+ * missing, so that "no group" and "some group" never compare equal.
+ */
+function normalizeUuid(value: string | null | undefined): string | null {
+  return value ? value.toLowerCase() : null;
+}
+
 @Injectable()
 export class OpportunitiesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -68,7 +80,10 @@ export class OpportunitiesService {
         throw new ForbiddenException(
           'Project management permission is required',
         );
-      if (project.groupId !== (dto.groupId ?? null))
+      // PostgreSQL returns a UUID in lower case, while the caller may send
+      // the same UUID in upper case. The ids are equal, so they are
+      // compared in a single case rather than rejected as a mismatch.
+      if (normalizeUuid(project.groupId) !== normalizeUuid(dto.groupId))
         throw new BadRequestException('Project and group scopes must match');
     }
   }

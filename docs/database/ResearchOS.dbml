@@ -760,7 +760,7 @@ Table research_opportunities {
     project_id
     (status, application_deadline)
   }
-  Note: 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
+  Note: 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
 }
 
 Table opportunity_applications {
@@ -967,7 +967,7 @@ Table search_index {
   revision_id uuid
   owner_id uuid
   visibility visibility_level [not null]
-  access_group_id uuid
+  access_group_id uuid [note: 'The group that scopes the row, used only when visibility is RESEARCH_GROUP. An opportunity is a public posting, so its index row is always FPTU_COMMUNITY and this column stays NULL for it; a group publishes an opportunity to attract people from outside the group.']
   title text [not null]
   body text
   authors_text text [note: 'Author names joined for searching. Primary source is output_authors.author_name_string ordered by author_order; authors_snapshot is the fallback because it is free-form JSON with no guaranteed schema.']

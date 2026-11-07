@@ -378,6 +378,7 @@ RETURNING issuer,redirect_uri,pkce_verifier_ciphertext,encryption_key_id,nonce_h
 ## Opportunity và application
 
 - Tạo DRAFT, kể cả cá nhân không có group/project. DB không cho insert trực tiếp OPEN; publish bằng update sau kiểm tra dữ liệu, hạn nhận còn tương lai và chưa archive.
+- **Opportunity là tin tuyển dụng công khai.** Mọi researcher đọc được mọi opportunity không phải DRAFT và chưa archive, kể cả opportunity của nhóm khác: nhóm đăng tin để *mời người ngoài vào nhóm*, nên phạm vi của bản ghi mô tả ai đăng chứ không thu hẹp ai được xem. Vì vậy dòng search index của `OPPORTUNITY` luôn là `FPTU_COMMUNITY` với `access_group_id IS NULL` (`sync_opportunity_search_index`), khớp với API.
 - Cá nhân: creator quản lý. Có group: phải có quyền quản lý group. Có project: phải là lead project active; có cả hai thì kiểm tra cả hai và project phải thuộc đúng group. `creator_id` không vượt qua scope. MVP chưa có ủy quyền quản lý bổ sung.
 - `opportunity_kind`: RESEARCH_COLLABORATION / PROJECT_FORMATION / DATA_METHOD_EXCHANGE / FUNDING_CALL. `target_audience` là bộ lọc/matching; không cấp quyền researcher và không chặn theo user_type thay cho quyền thật.
 - `expected_role` tự nhập tối đa 255 ký tự, nullable; chuẩn hóa whitespace, chuỗi rỗng thành NULL. `required_expertise_tags` riêng biệt. Role project giữ enum cũ.

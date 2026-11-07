@@ -3191,7 +3191,7 @@
           },
           "applicationDeadline": {
             "type": "string",
-            "description": "Exact application cutoff timestamp; required before publication.",
+            "description": "Exact application cutoff timestamp; required before publication. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
             "format": "date-time",
             "nullable": true
           },
@@ -3205,7 +3205,7 @@
           },
           "archivedAt": {
             "type": "string",
-            "description": "Archive timestamp; null leaves the opportunity unarchived.",
+            "description": "Archive timestamp; null leaves the opportunity unarchived. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
             "format": "date-time",
             "nullable": true
           }
@@ -3417,13 +3417,13 @@
           },
           "applicationDeadline": {
             "type": "string",
-            "description": "Exact application cutoff timestamp; required before publication.",
+            "description": "Exact application cutoff timestamp; required before publication. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
             "format": "date-time",
             "nullable": true
           },
           "archivedAt": {
             "type": "string",
-            "description": "Archive timestamp; null leaves the opportunity unarchived.",
+            "description": "Archive timestamp; null leaves the opportunity unarchived. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
             "format": "date-time",
             "nullable": true
           }

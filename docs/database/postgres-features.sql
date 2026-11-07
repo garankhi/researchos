@@ -659,13 +659,12 @@ BEGIN
     DELETE FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=target;
     RETURN;
   END IF;
-  -- A group-scoped opportunity is visible to that group's members only;
-  -- a personal one is public. The scope lives on the opportunity row.
-  IF op.group_id IS NOT NULL THEN
-    evis:='RESEARCH_GROUP'; egroup:=op.group_id;
-  ELSE
-    evis:='FPTU_COMMUNITY'; egroup:=NULL;
-  END IF;
+  -- An opportunity is a public job posting. The group that published it
+  -- wants to attract people from outside the group, so the scope of the
+  -- record does not narrow who may read it: a group-scoped opportunity is
+  -- as public as a personal one. The scope still lives on the row, but it
+  -- describes who published it, not who may see it.
+  evis:='FPTU_COMMUNITY'; egroup:=NULL;
   etitle:=op.title; ebody:=coalesce(op.description,'');
   eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=op.creator_id),'');
   INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)

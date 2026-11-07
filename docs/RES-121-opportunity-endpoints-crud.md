@@ -67,6 +67,16 @@ authenticated caller read non-draft, unarchived opportunities, plus drafts and
 archived records they manage. Invisible detail requests return 404. List filtering
 and counts apply the same visibility predicate before pagination.
 
+**An opportunity is a public job posting.** A group publishes one to attract
+people from outside the group, so the scope of the record describes *who
+published it*, not *who may read it*. Every researcher therefore reads every
+non-draft, unarchived opportunity, including one that belongs to a group they
+are not a member of. The search index agrees with the API: `sync_opportunity_search_index`
+files every opportunity as `FPTU_COMMUNITY`, with no group scope on the index
+row. The group scope still governs *writing*: creating in a group requires its
+lead or a core member, and a project scope still has to match its group.
+`targetAudience` is a matching filter, never a permission.
+
 ## Input and publication rules
 
 The API uses camelCase fields mapped to the ticket's snake_case database columns.
@@ -82,7 +92,15 @@ or incomplete publication details, matching the database constraints.
   `applicationDeadline`, and `publishedAt`. PostgreSQL stamps `publishedAt` when
   an opportunity is opened; callers do not supply that timestamp.
 - `expectedRole`, when present and non-null, must contain non-whitespace text.
+- `applicationDeadline` and `archivedAt` must be RFC 3339 date-times with a
+  timezone offset, e.g. `2026-11-07T10:00:00+07:00`. The ISO 8601 week date
+  (`2026-W45-7`), the basic format (`20261107`) and a date without an offset
+  are rejected with 400, because none of them names an instant the API can
+  store. The same rule applies to PATCH, which inherits the create validation.
 - UUIDs, enum values, date strings, tag arrays and pagination are validated.
+- A UUID may be sent in upper or lower case. PostgreSQL returns lower case, and
+  the scope comparison normalizes both sides, so the same group is not rejected
+  for its casing.
 - Unknown fields, including `creatorId` and server-owned `publishedAt`, are rejected.
 - PATCH rejects every `status` value, including `DRAFT` and null. It cannot
   reopen a closed opportunity or skip lifecycle transitions. Dedicated
@@ -158,6 +176,14 @@ policy note have been synchronized, and the SQL smoke assertion now reflects
 the ticket's creator permission.
 Prisma executes its registered migration; the copy under `docs/database/migrations`
 is a manual alternative and is not discovered by Prisma.
+
+A second migration, registered at
+`packages/database/prisma/migrations/20261108120000_opportunity_public_visibility/migration.sql`,
+makes the search index agree with the public-posting rule: it replaces
+`sync_opportunity_search_index` so that every opportunity is indexed as
+`FPTU_COMMUNITY` with no group scope, and it reindexes the existing rows.
+Its standalone copy is
+`docs/database/migrations/RES-121-opportunity-public-visibility.sql`.
 
 Generate the client and build with the repository's normal pnpm commands.
 Runtime needs `DATABASE_URL` pointing to this initialized PostgreSQL database.

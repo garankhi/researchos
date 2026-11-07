@@ -8,7 +8,6 @@ import {
   Equals,
   IsArray,
   IsEnum,
-  IsISO8601,
   IsInt,
   IsString,
   IsUUID,
@@ -18,6 +17,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { IsRfc3339DateTime } from '../../../common/validation/is-rfc3339-date-time.js';
 
 export class CreateOpportunityDto {
   @ApiPropertyOptional({
@@ -113,13 +113,13 @@ export class CreateOpportunityDto {
 
   @ApiPropertyOptional({
     description:
-      'Exact application cutoff timestamp; required before publication.',
+      'Exact application cutoff timestamp; required before publication. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.',
     type: String,
     format: 'date-time',
     nullable: true,
   })
   @ValidateIf((_o, value) => value != null)
-  @IsISO8601({ strict: true })
+  @IsRfc3339DateTime({ message: 'application_deadline_invalid' })
   applicationDeadline?: string | null;
 
   @ApiPropertyOptional({
@@ -133,12 +133,13 @@ export class CreateOpportunityDto {
   status?: OpportunityStatus;
 
   @ApiPropertyOptional({
-    description: 'Archive timestamp; null leaves the opportunity unarchived.',
+    description:
+      'Archive timestamp; null leaves the opportunity unarchived. RFC 3339 with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.',
     type: String,
     format: 'date-time',
     nullable: true,
   })
   @ValidateIf((_o, value) => value != null)
-  @IsISO8601({ strict: true })
+  @IsRfc3339DateTime({ message: 'archived_at_invalid' })
   archivedAt?: string | null;
 }

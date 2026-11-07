@@ -123,6 +123,41 @@ describe('OpportunitiesService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('accepts an upper case group id that names the same group', async () => {
+    // PostgreSQL returns a UUID in lower case, while the DTO accepts the
+    // same UUID in upper case. The two name the same group, so the scope
+    // check must not treat them as a mismatch.
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([{ leadId: actor, groupId: id }]);
+    await expect(
+      service.create(actor, {
+        ...draft,
+        groupId: id.toUpperCase(),
+        projectId: id,
+      }),
+    ).resolves.toMatchObject({ id });
+    expect(tx.research_opportunities.create).toHaveBeenCalled();
+  });
+
+  it('still rejects a project scoped to a genuinely different group', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([
+        { leadId: actor, groupId: '00000000-0000-4000-8000-00000000ffff' },
+      ]);
+    await expect(
+      service.create(actor, {
+        ...draft,
+        groupId: id.toUpperCase(),
+        projectId: id,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.research_opportunities.create).not.toHaveBeenCalled();
+  });
+
   it('persists and replays the original create response without inserting again', async () => {
     const first = await service.create(actor, draft, 'retry-1');
     const saved = tx.research_opportunities.update.mock.calls[0][0].data;
