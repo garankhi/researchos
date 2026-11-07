@@ -30,6 +30,7 @@
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:drift": "node scripts/drift-check.mjs",
+    "db:smoke": "node scripts/schema-smoke.mjs",
     "db:setup": "node scripts/setup.mjs",
     "db:seed": "pnpm run build && node scripts/seed.mjs",
     "db:seed:demo": "pnpm run build && node scripts/seed.mjs --demo",

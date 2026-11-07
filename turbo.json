@@ -77,6 +77,10 @@
       "passThroughEnv": ["DATABASE_URL"],
       "cache": false
     },
+    "db:smoke": {
+      "passThroughEnv": ["DATABASE_URL"],
+      "cache": false
+    },
     "db:setup": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["DATABASE_URL"],
