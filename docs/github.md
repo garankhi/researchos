@@ -21,6 +21,7 @@ Hai workflow, tách theo phụ thuộc:
 | --- | --- | --- | --- |
 | `ci.yml` | `checks` | PR, push vào `main`/`dev` | Không |
 | `schema-drift.yml` | `db-drift` | PR, push vào `dev`/`main` | Có (Postgres) |
+| `schema-drift.yml` | `db-smoke` | PR, push vào `dev`/`main` | Có (Postgres) |
 
 Job `checks` chạy: install theo lockfile, **codegen**, kiểm tra artifact
 generated không bị stale, lint, test và build. Không cần database, Redis
@@ -29,6 +30,15 @@ hoặc secrets vì bộ unit test hiện tại dùng stub.
 Job `db-drift` cần Postgres service nên để riêng một workflow. Một job trong
 `ci.yml` không có `on:` riêng — nó thừa hưởng trigger của workflow, nên
 tách ra mới nói rõ được check này chạy khi nào.
+
+Job `db-smoke` chạy `pnpm db:smoke`: các smoke test SQL trong
+`docs/database/` dựng database thử từ **hai** bản dựng schema — schema nguồn
+`docs/database/ResearchOS.sql` và chuỗi migration trong
+`packages/database/prisma/migrations/` — rồi chạy test trên cả hai. Cần cả
+hai vì database đang chạy được nâng cấp bằng migration: đổi schema nguồn mà
+không mirror sang migration thì database đã deploy vẫn giữ hành vi cũ, và
+không test nào khác nhận ra. Script tự tạo và tự xoá database thử, không
+đụng database của service.
 
 Workflow dùng Node.js 24, pnpm 12.15.0 và cache pnpm. Các action được pin
 bằng commit SHA; quyền token mặc định là read, không được duyệt PR.

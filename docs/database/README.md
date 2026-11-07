@@ -14,7 +14,10 @@ Cập nhật ngày 30/10/2026. Bản 4.3 sửa bàn giao khi INSERT bị bỏ qu
 - [schema-auth-smoke.sql](schema-auth-smoke.sql): kiểm tra STAFF/ADMIN, grant MANUAL/SYSTEM, credentials, session LOCAL/OIDC và không vượt quyền tài nguyên; tự rollback fixtures.
 - [schema-policy-smoke.sql](schema-policy-smoke.sql): kiểm tra policy, DOI gồm tab/CR/LF, group singleton của sinh viên researcher, giữ nội dung khi inactive, bàn giao và conflict không gây đổi người thiếu lịch sử; tự rollback fixtures.
 - [schema-search-smoke.sql](schema-search-smoke.sql): kiểm tra phần F0 mới: `output_import_state`, `field_provenance`, `search_index` (4 loại entity) và `owner_output_versions`; tự rollback fixtures.
+- [schema-search-rebuild-smoke.sql](schema-search-rebuild-smoke.sql): kiểm tra `rebuild_search_index()` — dựng lại index bị mất, idempotent, xoá dòng thừa, và cho kết quả giống hệt index do trigger tạo; tự rollback fixtures.
 - [schema-concurrency.py](schema-concurrency.py): kiểm tra bằng hai kết nối thật; **chỉ dùng database thử nghiệm**, fixtures được giữ lại.
+
+Toàn bộ các file `schema-*-smoke.sql` được chạy tự động bằng `pnpm db:smoke`: lệnh dựng database tạm từ **cả hai** bản dựng schema — `ResearchOS.sql` và chuỗi migration trong `packages/database/prisma/migrations/` — chạy test trên cả hai rồi xoá database tạm. CI chạy lệnh này ở job `db-smoke`.
 
 DBML không biểu diễn đầy đủ partial index, trigger và chính sách truy vấn của PostgreSQL. Vì vậy dùng DBML để xem sơ đồ; dùng **ResearchOS.sql** khi tạo database. Không dùng riêng SQL export từ web rồi cho rằng đã có các ràng buộc bổ sung.
 
@@ -500,7 +503,9 @@ Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchO
 | `owner_output_versions` + `visible_owner_output_versions` | postgres-features.sql | Bản làm việc của owner: công trình ACCEPTED chưa publish, không vào Discovery/Search |
 | `visible_search_index` | postgres-features.sql | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity, kể cả điều kiện tài khoản active |
 | `sync_search_index` + trigger | postgres-features.sql | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
-| `sync_search_index_output` | postgres-features.sql | Hàm dựng lại dòng index OUTPUT cho một bài; dùng chung cho nhánh publish và cho thay đổi tác giả |
+| `sync_search_index_output` | postgres-features.sql | Hàm dựng lại dòng index OUTPUT cho một bài; dùng chung cho nhánh publish, cho thay đổi tác giả và cho rebuild |
+| `sync_researcher_search_index`, `sync_group_search_index`, `sync_opportunity_search_index` | postgres-features.sql | Hàm dựng lại dòng index cho một researcher / group / opportunity; trigger và rebuild cùng gọi |
+| `rebuild_search_index` | postgres-features.sql | Dựng lại toàn bộ index từ bảng nguồn; dùng chung hàm phụ với trigger nên hai đường không lệch nhau |
 | `sync_search_index_authors` | postgres-features.sql | Trigger `output_authors` insert/update/delete → dựng lại document của bài |
 | `sync_search_index_profile_del` | postgres-features.sql | Trigger `researcher_profiles` delete → xoá dòng index RESEARCHER kể cả khi account còn lại |
 | `idx_revision_fts`, `idx_output_visibility_lookup`, `idx_search_index_*` | postgres-features.sql | GIN FTS, GIN trigram và index lọc theo scope |
@@ -519,6 +524,22 @@ Ba nhận xét review trên PR #1 (RES-152) được sửa trong `postgres-featu
 
 Mỗi lỗi có một khối assert riêng trong `schema-search-smoke.sql`, và cả ba khối đều **fail** khi thao tác tạm thời gỡ lại fix — đã kiểm tra trên PostgreSQL 18.6.
 
+## Dựng lại search index — 07/11/2026 (RES-94)
+
+Trigger `sync_search_index` chỉ nhìn thấy dòng được ghi **sau khi** nó tồn tại. Dòng đã có sẵn trong database từ trước khi trigger được tạo — hoặc được ghi lúc trigger đang thiếu — nằm ngoài index mãi mãi. `rebuild_search_index()` là đường đưa chúng trở lại:
+
+```sql
+SELECT rebuild_search_index();
+```
+
+Hàm xoá các dòng index không còn dựa trên bản ghi nguồn hợp lệ, rồi dựng lại mọi dòng hợp lệ cho cả 4 loại entity. Mỗi lần gọi là upsert theo khoá `(entity_type, entity_id)`, nên gọi hai lần cho kết quả giống nhau.
+
+**Không tự viết lại luật index.** `rebuild_search_index()` gọi đúng các hàm mà trigger gọi — `sync_search_index_output`, `sync_researcher_search_index`, `sync_group_search_index`, `sync_opportunity_search_index` — và trigger `sync_search_index()` được viết lại để chỉ rẽ nhánh theo bảng rồi gọi hàm tương ứng. Luật "dòng này có được index hay không" nằm trong một chỗ cho mỗi loại entity, nên đường trigger và đường rebuild không thể lệch nhau.
+
+Thay đổi này **không** đổi schema: không bảng, cột, index hay ràng buộc nào bị đụng, nên `schema.prisma` không đổi. Migration `20261107160000_search_index_rebuild` chỉ dùng `CREATE OR REPLACE` cho các hàm, nên áp lên database đang có là an toàn.
+
+Smoke test mới `schema-search-rebuild-smoke.sql` kiểm tra: rebuild trên database rỗng không tạo dòng nào; index bị xoá hết thì rebuild dựng lại đủ; gọi hai lần cho kết quả giống nhau; dòng của bản nháp, tài khoản bị vô hiệu hoá, group đã archive và opportunity đã đóng đều bị gỡ; và index do trigger tạo giống hệt index do rebuild tạo.
+
 ## Kiểm chứng thực tế và cách tái chạy
 
 Đã kiểm tra lại bản 4.3 ngày 30/10/2026:
@@ -530,10 +551,19 @@ Mỗi lỗi có một khối assert riêng trong `schema-search-smoke.sql`, và 
 - `schema-smoke.sql`: PASS các nhóm identity/session, taxonomy/interest, publication A–D, opportunity/application, follow/digest. Bao gồm FK, unique, normalization, upsert, LOCAL/imported cùng tồn tại, immutable release, scope file, private/group, SLA, withdrawal/resubmission, opt-out và terminal delivery.
 - `schema-search-smoke.sql` (mới, 31/10/2026; mở rộng 01/11/2026): PASS `output_import_state` mặc định NONE và chặn ACCEPTED không owner; `field_provenance` giữ một dòng cho mỗi `source_ref` và chặn ref trắng; `search_index` chặn `RESEARCH_GROUP` thiếu `access_group_id`, chặn entity đa hình trỏ về bản ghi không tồn tại, index/không index theo vòng đời DRAFT → SHARED → ARCHIVED, và payload FTS tra được; `owner_output_versions` hiện bản làm việc của owner nhưng không phải released version, chỉ owner thấy, và không có trong search index. Ba khối mới: `visible_search_index` yêu cầu tài khoản active (actor NULL / không tồn tại / inactive thì không thấy dòng nào, kể cả dòng PRIVATE của chính mình); `output_authors` insert/update/delete dựng lại document ngay (tên thêm vào tra được, tên xoá không còn khớp); xoá `researcher_profiles` xoá dòng index RESEARCHER nhưng account vẫn còn.
 - `schema-concurrency.py`: hai kết nối thực; chỉ một đơn chưa rút khi nộp trùng; rút/phản hồi chỉ một bên thắng; insert chờ đóng rồi bị từ chối; hai bàn giao cùng người cũ chỉ một lần thành công; hai transaction dùng helper khóa admin giữ admin cuối cùng. Bổ sung LOCAL/OIDC login–deactivation theo cả hai thứ tự, mở lại tài khoản không hồi sinh phiên; login–reset theo thứ tự khóa user → credentials, login đọc hash mới hoặc session vừa tạo bị revoke. Hash trong test là dữ liệu giả, không phải kiểm thử xác thực mật khẩu.
+- `schema-search-rebuild-smoke.sql` (mới, 07/11/2026): PASS rebuild trên index rỗng, dựng lại sau khi xoá sạch index, idempotent khi gọi hai lần, gỡ dòng của bản nháp/tài khoản bị vô hiệu hoá/group đã archive/opportunity đã đóng, và cho index giống hệt index do trigger tạo.
+- `pnpm db:smoke` (mới, 07/11/2026): PASS toàn bộ 5 file smoke test trên **cả hai** bản dựng schema — `ResearchOS.sql` và chuỗi migration — trên PostgreSQL 18.3. Migration mới `20261107160000_search_index_rebuild` áp sạch trên database trống, và `rebuild_search_index()` tồn tại sau khi áp chuỗi migration.
+- **Kiểm tra âm:** gỡ vòng lặp `OPPORTUNITY` trong `rebuild_search_index()` rồi sinh lại `ResearchOS.sql` làm smoke test **fail** với `Assertion failed: the rebuild indexes the open opportunity`. Cùng lúc đó, bản dựng từ chuỗi migration vẫn pass — đúng như mong đợi, vì migration không bị đổi. Đây là lý do `pnpm db:smoke` phải chạy cả hai bản dựng.
 - Chưa chạy giao diện dbdiagram.io; xác nhận bằng parser chính thức, không khẳng định đã thao tác trên website.
 - Không chạy vào database có dữ liệu của dự án. Chỉ dùng dữ liệu giả trong cluster mới riêng biệt, không chạy verify mật khẩu/login/API, không gọi IdP/OpenAlex/email/AI. Test quyền là test predicate/ràng buộc DB, không khẳng định API quản trị đã hoạt động. Cluster thử nghiệm được dừng sau kiểm tra.
 
+> **Lưu ý về PostgreSQL 18.** Trước PostgreSQL 18, `ON DELETE RESTRICT` trả SQLSTATE `23503` (`foreign_key_violation`); từ PostgreSQL 18 nó trả `23001` (`restrict_violation`). `schema-smoke.sql` khẳng định `23001`, nên file này **chỉ** chạy được trên PostgreSQL 18 trở lên. CI dùng `postgres:18.6-alpine`.
+
 ```powershell
+# Chạy toàn bộ smoke test trên cả schema nguồn và chuỗi migration.
+# Lệnh tự dựng và tự xoá database thử; không đụng database dev.
+pnpm db:smoke
+
 # Chỉ kiểm tra parser và editor diagnostics, không ghi lại SQL.
 ./docs/database/build-schema.ps1 -CheckOnly
 
@@ -546,6 +576,7 @@ psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_te
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-smoke.sql
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-policy-smoke.sql
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-search-smoke.sql
+psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/schema-search-rebuild-smoke.sql
 python docs/database/schema-concurrency.py --psql 'C:/Program Files/PostgreSQL/18/bin/psql.exe' --port 55440 --database researchos_test --user schema_test --confirm-disposable
 ```
 
