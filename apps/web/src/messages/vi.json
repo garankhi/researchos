@@ -107,7 +107,10 @@
         "invalid_role_revocation": "Thời điểm thu hồi vai trò không hợp lệ so với thời điểm cấp vai trò.",
         "role_already_granted": "Người dùng đã có vai trò này và đang có hiệu lực.",
         "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi.",
-        "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu."
+        "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu.",
+        "group_not_found": "Không tìm thấy nhóm nghiên cứu yêu cầu.",
+        "group_code_already_exists": "Mã nhóm nghiên cứu này đã tồn tại.",
+        "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động."
       }
     }
   },

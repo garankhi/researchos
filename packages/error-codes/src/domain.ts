@@ -64,6 +64,11 @@ export type DomainCodeMap = Record<string, Record<string, string>>;
  * exists to prevent.
  */
 export const domainErrorCodes = {
+  groups: {
+    groupNotFound: 'group_not_found',
+    groupCodeAlreadyExists: 'group_code_already_exists',
+    groupLeaderIneligible: 'group_leader_ineligible',
+  },
   identity: {
     invalidCredentials: 'invalid_credentials',
     accountInactive: 'account_inactive',

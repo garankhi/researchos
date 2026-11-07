@@ -78,47 +78,340 @@
         ]
       }
     },
-    "/health": {
-      "get": {
-        "operationId": "HealthController_check",
+    "/research-groups": {
+      "post": {
+        "description": "Creates a new research group. When leadId is omitted, the authenticated researcher becomes the group leader.",
+        "operationId": "GroupsController_create",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResearchGroupDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Service status",
+          "201": {
+            "description": "Research group created successfully.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or designated leader is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller does not hold the RESEARCHER role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The specified leader user account was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A research group with this code already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Liveness probe for the API process",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new research group",
         "tags": [
-          "health"
+          "groups"
+        ]
+      },
+      "get": {
+        "description": "Returns a paginated list of research groups visible to the caller (public active groups, groups the caller leads, and groups the caller is a member of).",
+        "operationId": "GroupsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string matching group name or group code.",
+            "schema": {
+              "example": "AI-LAB",
+              "type": "string"
+            }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups led by a specific researcher (UUID).",
+            "schema": {
+              "format": "uuid",
+              "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups by active status.",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated research group list retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResearchGroupsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or sort expression.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List research groups with pagination and filtering",
+        "tags": [
+          "groups"
         ]
       }
     },
-    "/health/ready": {
+    "/research-groups/{groupId}": {
       "get": {
-        "operationId": "HealthController_checkReadiness",
-        "parameters": [],
+        "description": "Returns a single research group if visible to the caller. Returns 403 when the group is archived/inactive and the caller is neither the leader nor a member.",
+        "operationId": "GroupsController_findOne",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Service status",
+            "description": "Research group retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided groupId is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to view this research group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research group was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Readiness probe including a database round trip",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get research group details by ID",
         "tags": [
-          "health"
+          "groups"
+        ]
+      },
+      "patch": {
+        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.",
+        "operationId": "GroupsController_update",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResearchGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Research group updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update payload, invalid UUID, or designated leader is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to modify this research group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research group or leader user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A research group with this code already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update or archive a research group",
+        "tags": [
+          "groups"
         ]
       }
     },
@@ -691,6 +984,50 @@
         "summary": "Revoke access role from user",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness probe for the API process",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_checkReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness probe including a database round trip",
+        "tags": [
+          "health"
         ]
       }
     },
@@ -1500,36 +1837,202 @@
       }
     },
     "schemas": {
-      "HealthStatusDto": {
+      "CreateResearchGroupDto": {
         "type": "object",
         "properties": {
-          "status": {
+          "code": {
             "type": "string",
-            "example": "ok",
-            "description": "ok when healthy, degraded when a dependency is unreachable"
+            "description": "Unique short code identifying the research group.",
+            "example": "AI-LAB",
+            "maxLength": 50
           },
-          "service": {
+          "name": {
             "type": "string",
-            "example": "researchos-api",
-            "description": "Name of the service that answered the probe."
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab",
+            "maxLength": 255
           },
-          "uptimeSeconds": {
-            "type": "number",
-            "example": 42,
-            "description": "Process uptime in seconds"
-          },
-          "timestamp": {
+          "leadId": {
             "type": "string",
-            "example": "2026-10-29T01:30:00.000Z",
-            "description": "ISO timestamp of when the probe answered."
+            "description": "Identifier of the researcher leading the group (UUID). Defaults to the authenticated creator when omitted.",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
           }
         },
         "required": [
-          "status",
-          "service",
-          "uptimeSeconds",
-          "timestamp"
+          "code",
+          "name"
         ]
+      },
+      "ResearchGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research group (UUID).",
+            "example": "7b0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e99"
+          },
+          "code": {
+            "type": "string",
+            "description": "Unique short code of the research group.",
+            "example": "AI-LAB"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab"
+          },
+          "leadId": {
+            "type": "string",
+            "description": "Unique identifier of the group leader (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the research group is currently active.",
+            "example": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the group was archived, or null if currently active.",
+            "example": null,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the group was created.",
+            "example": "2026-11-07T08:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the group was last updated.",
+            "example": "2026-11-07T08:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "leadId",
+          "description",
+          "isActive",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "The page that was returned, 1-based.",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "description": "How many records one page holds.",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records the query matched in total.",
+            "example": 137
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "How many pages the result is split into.",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a next page exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a previous page exists.",
+            "example": false
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNextPage",
+          "hasPreviousPage"
+        ]
+      },
+      "PaginatedResearchGroupsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The research groups belonging to this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResearchGroupResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "UpdateResearchGroupDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Unique short code identifying the research group.",
+            "example": "AI-LAB",
+            "maxLength": 50
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab",
+            "maxLength": 255
+          },
+          "leadId": {
+            "type": "string",
+            "description": "Identifier of the researcher leading the group (UUID). Defaults to the authenticated creator when omitted.",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the research group is active. Setting to false archives the group (`is_active = false` and sets `archived_at`).",
+            "example": true
+          }
+        }
       },
       "LoginDto": {
         "type": "object",
@@ -1741,49 +2244,6 @@
           "isActive",
           "lastLoginAt",
           "roles"
-        ]
-      },
-      "PaginationMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number",
-            "description": "The page that was returned, 1-based.",
-            "example": 1
-          },
-          "limit": {
-            "type": "number",
-            "description": "How many records one page holds.",
-            "example": 20
-          },
-          "total": {
-            "type": "number",
-            "description": "How many records the query matched in total.",
-            "example": 137
-          },
-          "totalPages": {
-            "type": "number",
-            "description": "How many pages the result is split into.",
-            "example": 7
-          },
-          "hasNextPage": {
-            "type": "boolean",
-            "description": "Whether a next page exists.",
-            "example": true
-          },
-          "hasPreviousPage": {
-            "type": "boolean",
-            "description": "Whether a previous page exists.",
-            "example": false
-          }
-        },
-        "required": [
-          "page",
-          "limit",
-          "total",
-          "totalPages",
-          "hasNextPage",
-          "hasPreviousPage"
         ]
       },
       "PaginatedUsersResponseDto": {
@@ -2021,6 +2481,37 @@
             "example": "Term finished or role reassigned."
           }
         }
+      },
+      "HealthStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok",
+            "description": "ok when healthy, degraded when a dependency is unreachable"
+          },
+          "service": {
+            "type": "string",
+            "example": "researchos-api",
+            "description": "Name of the service that answered the probe."
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "example": 42,
+            "description": "Process uptime in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-29T01:30:00.000Z",
+            "description": "ISO timestamp of when the probe answered."
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "uptimeSeconds",
+          "timestamp"
+        ]
       },
       "ProfileResponseDto": {
         "type": "object",
@@ -2916,7 +3407,7 @@
           "message"
         ]
       },
-      "HealthStatusDtoEnvelope": {
+      "PaginatedResearchGroupsResponseDtoEnvelope": {
         "type": "object",
         "properties": {
           "success": {
@@ -2927,7 +3418,31 @@
             "default": true
           },
           "data": {
-            "$ref": "#/components/schemas/HealthStatusDto"
+            "$ref": "#/components/schemas/PaginatedResearchGroupsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ResearchGroupResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResearchGroupResponseDto"
           },
           "message": {
             "type": "string",
@@ -3048,6 +3563,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/RoleAssignmentResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "HealthStatusDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthStatusDto"
           },
           "message": {
             "type": "string",
