@@ -615,12 +615,16 @@ model research_opportunities {
   archived_at              DateTime?                  @db.Timestamptz(6)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  create_idempotency_key String? @db.VarChar(200)
+  create_request_hash String? @db.Char(64)
+  create_response Json?
   opportunity_applications opportunity_applications[]
   users                    users                      @relation(fields: [creator_id], references: [id], onUpdate: NoAction)
   research_groups          research_groups?           @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   research_projects        research_projects?         @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   research_updates         research_updates[]
 
+  @@unique([creator_id, create_idempotency_key], map: "uq_opportunity_creator_create_key")
   @@index([group_id])
   @@index([project_id])
   @@index([status, application_deadline])

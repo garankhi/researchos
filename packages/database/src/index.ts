@@ -12,6 +12,9 @@ export { BackgroundJobsService } from './background-jobs.service.js';
 // The generated enums are part of the domain contract: feature modules use
 // them for DTOs and query filters.
 export {
+  opportunity_kind as OpportunityKind,
+  opportunity_status as OpportunityStatus,
+  target_audience as TargetAudience,
   PublicationStatus,
   SourceKind,
   VerificationStatus,
@@ -20,3 +23,4 @@ export {
 } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';
+export type { research_opportunities as ResearchOpportunity } from './generated/prisma/client.js';
