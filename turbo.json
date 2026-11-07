@@ -26,6 +26,7 @@
       "passThroughEnv": ["*"]
     },
     "openapi": {
+      "dependsOn": ["^build"],
       "cache": false,
       "outputs": ["openapi.json"]
     },
