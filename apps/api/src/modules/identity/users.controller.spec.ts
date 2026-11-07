@@ -703,7 +703,12 @@ describe('UsersController', () => {
       const controller = await setupController(prismaMock);
 
       await expect(
-        controller.revokeRole(targetUserId, AccessRoleEnum.RESEARCHER, {}, adminId),
+        controller.revokeRole(
+          targetUserId,
+          AccessRoleEnum.RESEARCHER,
+          {},
+          adminId,
+        ),
       ).rejects.toThrow(
         expect.objectContaining({
           status: HttpStatus.BAD_REQUEST,

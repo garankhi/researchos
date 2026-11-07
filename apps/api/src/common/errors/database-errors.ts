@@ -82,8 +82,7 @@ function driverAdapterCause(
   meta: Record<string, unknown> | undefined,
 ): DriverAdapterCause | undefined {
   const adapterError = meta?.['driverAdapterError'] as
-    | { cause?: DriverAdapterCause }
-    | undefined;
+    { cause?: DriverAdapterCause } | undefined;
 
   const cause = adapterError?.cause;
   return typeof cause === 'object' && cause !== null ? cause : undefined;
