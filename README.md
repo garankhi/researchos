@@ -73,6 +73,13 @@ và credentials local từ `.env.example`. `WEB_ORIGIN` trong `.env` ở root m�
 cho phép web `http://localhost:3000` gửi yêu cầu cross-origin tới S3. Nếu đổi
 `S3_PORT`, cập nhật `S3_ENDPOINT` tương ứng.
 
+Để bật API upload file, đặt `S3_UPLOAD_TOKEN_SECRET` trong `.env` ở root hoặc
+`apps/api/.env`. Tạo giá trị bằng lệnh sau rồi lưu vào file `.env` local:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
 ## Tài khoản development
 
 Các tài khoản cho local login (FPTU SSO chưa có tài liệu) được `pnpm setup`

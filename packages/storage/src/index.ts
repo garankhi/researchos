@@ -5,12 +5,14 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export interface UploadRequest {
   key: string;
   contentType: string;
+  sizeBytes: number;
   /** Hex SHA-256 of the entire object, as stored by ResearchOS. */
   sha256: string;
 }
@@ -30,7 +32,7 @@ export interface ObjectMetadata {
 
 export interface StorageAdapter {
   createUploadUrl(request: UploadRequest): Promise<PresignedUpload>;
-  headObject(key: string): Promise<ObjectMetadata>;
+  headObject(key: string): Promise<ObjectMetadata | null>;
   /** The caller owns the stream and compares its digest with application metadata. */
   getObject(key: string): Promise<Readable>;
   putObject(
@@ -102,8 +104,12 @@ class S3Storage implements StorageAdapter {
   async createUploadUrl({
     key,
     contentType,
+    sizeBytes,
     sha256,
   }: UploadRequest): Promise<PresignedUpload> {
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1) {
+      throw new Error('Upload size must be a positive integer');
+    }
     if (!/^[a-f\d]{64}$/i.test(sha256)) {
       throw new Error('Upload SHA-256 must be a 64-character hex digest');
     }
@@ -111,6 +117,7 @@ class S3Storage implements StorageAdapter {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
+      ContentLength: sizeBytes,
       ContentType: contentType,
       ChecksumSHA256: checksum,
       IfNoneMatch: '*',
@@ -118,12 +125,13 @@ class S3Storage implements StorageAdapter {
 
     const url = await getSignedUrl(this.client, command, {
       expiresIn: uploadUrlTtlSeconds,
-      signableHeaders: new Set(['content-type', 'if-none-match']),
+      signableHeaders: new Set(['content-length', 'content-type', 'if-none-match']),
       unhoistableHeaders: new Set([checksumHeader]),
     });
 
     return {
       url,
+      // Browsers set the signed Content-Length from the File or Blob body.
       headers: {
         'content-type': contentType,
         'if-none-match': '*',
@@ -132,14 +140,25 @@ class S3Storage implements StorageAdapter {
     };
   }
 
-  async headObject(key: string): Promise<ObjectMetadata> {
-    const result = await this.client.send(
-      new HeadObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        ChecksumMode: 'ENABLED',
-      }),
-    );
+  async headObject(key: string): Promise<ObjectMetadata | null> {
+    let result;
+    try {
+      result = await this.client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          ChecksumMode: 'ENABLED',
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof S3ServiceException &&
+        error.$metadata.httpStatusCode === 404
+      ) {
+        return null;
+      }
+      throw error;
+    }
     if (result.ContentLength === undefined) {
       throw new Error('S3 did not return the object size');
     }

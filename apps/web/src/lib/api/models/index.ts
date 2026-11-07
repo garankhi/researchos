@@ -8,6 +8,8 @@
 
 export * from './apiErrorResponseDto';
 export * from './apiErrorResponseDtoErrorsItem';
+export * from './confirmOutputUploadDto';
+export * from './createOutputUploadDto';
 export * from './createUserDto';
 export * from './createUserDtoUserType';
 export * from './demoControllerGetSlowEnvelope';
@@ -30,6 +32,12 @@ export * from './meDto';
 export * from './meDtoEnvelope';
 export * from './meDtoRolesItem';
 export * from './meDtoUserType';
+export * from './outputFileResponseDto';
+export * from './outputFileResponseDtoEnvelope';
+export * from './outputFileVisibility';
+export * from './outputUploadResponseDto';
+export * from './outputUploadResponseDtoEnvelope';
+export * from './outputUploadResponseDtoHeaders';
 export * from './paginatedTopicsResponseDto';
 export * from './paginatedTopicsResponseDtoEnvelope';
 export * from './paginatedTopicsResponseDtoItemsItem';

@@ -777,6 +777,214 @@
         ]
       }
     },
+    "/outputs/{outputId}/file-uploads": {
+      "post": {
+        "description": "Issues a presigned PUT URL and confirmation token to a user who can manage the output.",
+        "operationId": "OutputUploadController_createUpload",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research output.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutputUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The upload URL, required request headers, and confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputUploadResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid output ID, upload metadata, or confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot manage this output or use this upload token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API request rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Upload signing or object storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Prepare an output file upload",
+        "tags": [
+          "output-files"
+        ]
+      }
+    },
+    "/outputs/{outputId}/file-uploads/confirm": {
+      "post": {
+        "description": "Verifies the uploaded object and records its metadata. Repeating confirmation returns the same file.",
+        "operationId": "OutputUploadController_confirmUpload",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research output.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmOutputUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The confirmed output file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputFileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid output ID, upload metadata, or confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot manage this output or use this upload token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The object is missing or does not match the declared upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API request rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Upload signing or object storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Confirm an output file upload",
+        "tags": [
+          "output-files"
+        ]
+      }
+    },
     "/taxonomy/tree": {
       "get": {
         "operationId": "TaxonomyController_getTree",
@@ -1087,6 +1295,13 @@
   "tags": [],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "researchos_session"
+      }
+    },
     "schemas": {
       "HealthStatusDto": {
         "type": "object",
@@ -1761,6 +1976,153 @@
             "example": "57193294821"
           }
         }
+      },
+      "OutputFileVisibility": {
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "RESEARCH_GROUP",
+          "FPTU_COMMUNITY"
+        ],
+        "description": "File visibility. Defaults to PRIVATE."
+      },
+      "CreateOutputUploadDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "File name without a directory path.",
+            "maxLength": 255
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "MIME type sent with the PUT request.",
+            "example": "application/pdf"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Expected file size in bytes.",
+            "minimum": 1,
+            "maximum": 5368709120
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 of the file as a 64-character hex digest.",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "visibility": {
+            "description": "File visibility. Defaults to PRIVATE.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputFileVisibility"
+              }
+            ]
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "Required for RESEARCH_GROUP visibility and omitted otherwise.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "sha256"
+        ]
+      },
+      "OutputUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned URL for a single PUT upload."
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers to send with the PUT request. Use a raw File or Blob body so the browser sends its signed Content-Length automatically.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "uploadToken": {
+            "type": "string",
+            "description": "Token to send to the confirmation endpoint after uploading."
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "headers",
+          "uploadToken"
+        ]
+      },
+      "ConfirmOutputUploadDto": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "description": "Token issued by the API for this upload."
+          }
+        },
+        "required": [
+          "uploadToken"
+        ]
+      },
+      "OutputFileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the confirmed file.",
+            "format": "uuid"
+          },
+          "outputId": {
+            "type": "string",
+            "description": "Identifier of the parent output.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Content-Type stored on the uploaded object."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Verified size in bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Verified SHA-256 as a hex digest."
+          },
+          "visibility": {
+            "description": "File visibility.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputFileVisibility"
+              }
+            ]
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "Group allowed by the file visibility, if applicable.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "outputId",
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "sha256",
+          "visibility",
+          "accessGroupId"
+        ]
       },
       "TaxonomyTreeTopicDto": {
         "type": "object",
@@ -2513,6 +2875,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputUploadResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputUploadResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputFileResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputFileResponseDto"
           },
           "message": {
             "type": "string",

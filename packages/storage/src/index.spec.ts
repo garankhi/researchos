@@ -11,13 +11,14 @@ const config = {
 };
 
 describe('S3 upload signing', () => {
-  it('signs the checksum, content type, and create-only precondition', async () => {
+  it('signs the size, checksum, content type, and create-only precondition', async () => {
     const checksum = createHash('sha256').update('example').digest();
     const storage = createS3Storage(config);
 
     const upload = await storage.createUploadUrl({
       key: 'file with spaces.txt',
       contentType: 'text/plain',
+      sizeBytes: 7,
       sha256: checksum.toString('hex'),
     });
 
@@ -25,7 +26,7 @@ describe('S3 upload signing', () => {
     expect(url.origin).toBe(config.S3_ENDPOINT);
     expect(url.pathname).toBe('/researchos-test/file%20with%20spaces.txt');
     expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe(
-      'content-type;host;if-none-match;x-amz-checksum-sha256',
+      'content-length;content-type;host;if-none-match;x-amz-checksum-sha256',
     );
     expect(url.searchParams.get('X-Amz-Expires')).toBe('300');
     expect(url.searchParams.has('x-amz-checksum-sha256')).toBe(false);
@@ -42,9 +43,22 @@ describe('S3 upload signing', () => {
       storage.createUploadUrl({
         key: 'example.txt',
         contentType: 'text/plain',
+        sizeBytes: 1,
         sha256: 'not-a-hash',
       }),
     ).rejects.toThrow(/SHA-256/);
+  });
+
+  it('rejects zero bytes before signing', async () => {
+    const storage = createS3Storage(config);
+    await expect(
+      storage.createUploadUrl({
+        key: 'empty.txt',
+        contentType: 'text/plain',
+        sizeBytes: 0,
+        sha256: createHash('sha256').digest('hex'),
+      }),
+    ).rejects.toThrow(/positive integer/);
   });
 
   it('requires dedicated credentials for a custom endpoint', () => {

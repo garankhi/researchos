@@ -230,6 +230,9 @@ importers:
       '@researchos/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@researchos/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@types/cookie-parser':
         specifier: ^1.4.10
         version: 1.4.10(@types/express@5.0.6)

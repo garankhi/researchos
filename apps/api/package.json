@@ -39,6 +39,7 @@
     "@researchos/database": "workspace:*",
     "@researchos/error-codes": "workspace:*",
     "@researchos/queue": "workspace:*",
+    "@researchos/storage": "workspace:*",
     "@types/cookie-parser": "^1.4.10",
     "bullmq": "6.5.3",
     "class-transformer": "0.5.1",
