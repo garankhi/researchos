@@ -96,7 +96,9 @@
         "password_too_long": "Mật khẩu không được vượt quá 1024 ký tự.",
         "status_invalid": "Trạng thái không hợp lệ.",
         "email_already_registered": "Email này đã được đăng ký.",
-        "status_required": "Trạng thái là bắt buộc."
+        "status_required": "Trạng thái là bắt buộc.",
+        "application_deadline_invalid": "Hạn nhận phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00.",
+        "archived_at_invalid": "Thời điểm lưu trữ phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00."
       },
       "domain": {
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",

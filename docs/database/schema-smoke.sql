@@ -133,7 +133,7 @@ BEGIN
  UPDATE research_opportunities SET status='OPEN' WHERE id=opp;
  PERFORM pg_temp.assert_true((SELECT expected_role='Experiment lead' AND published_at IS NOT NULL FROM research_opportunities WHERE id=opp),'role normalization/publish');
  INSERT INTO research_opportunities(id,group_id,creator_id,title,opportunity_kind) VALUES(scoped,g1,a,'Scoped','RESEARCH_COLLABORATION');
- PERFORM pg_temp.assert_true(NOT can_manage_opportunity(a,scoped) AND can_manage_opportunity(b,scoped),'creator not scoped leader');
+ PERFORM pg_temp.assert_true(can_manage_opportunity(a,scoped) AND can_manage_opportunity(b,scoped),'creator and current group leader can manage opportunity');
  PERFORM pg_temp.expect_error(format('INSERT INTO opportunity_applications(opportunity_id,applicant_id,applicant_note) VALUES(%L,%L,''guest'')',opp,s),'23514');
  INSERT INTO opportunity_applications(id,opportunity_id,applicant_id,applicant_note) VALUES(app1,opp,a,'First');
  PERFORM pg_temp.assert_true(EXISTS(SELECT 1 FROM visible_opportunity_applications(a) WHERE id=app1) AND EXISTS(SELECT 1 FROM visible_opportunity_applications(x) WHERE id=app1) AND NOT EXISTS(SELECT 1 FROM visible_opportunity_applications(b) WHERE id=app1),'application privacy predicate');

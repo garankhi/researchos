@@ -647,6 +647,9 @@ CREATE TABLE "achievement_posts" (
 );
 
 CREATE TABLE "research_opportunities" (
+  "create_idempotency_key" varchar(200),
+  "create_request_hash" char(64),
+  "create_response" jsonb,
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "group_id" uuid,
   "project_id" uuid,
@@ -964,6 +967,8 @@ CREATE UNIQUE INDEX ON "output_files" ("output_id", "id");
 
 CREATE INDEX ON "group_output_links" ("group_id", "status", "requested_at");
 
+CREATE UNIQUE INDEX "uq_opportunity_creator_create_key" ON "research_opportunities" ("creator_id", "create_idempotency_key");
+
 CREATE INDEX ON "research_opportunities" ("group_id");
 
 CREATE INDEX ON "research_opportunities" ("project_id");
@@ -1068,7 +1073,7 @@ COMMENT ON TABLE "output_revision_files" IS 'Reuse one immutable stored file in 
 
 COMMENT ON TABLE "group_output_links" IS 'Group curation only. Leader may directly insert ACCEPTED for an owned released work; no self-application. Pending/rejected new request preserves previous accepted pin. Removal clears ONLY this group pin. New released revision needs separate acceptance to replace group content. Root visibility always applies. No minimum group size.';
 
-COMMENT ON TABLE "research_opportunities" IS 'Personal opportunities allow NULL group/project and are managed by creator. Group/project scope requires its management rights; creator alone grants no scoped authority. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.';
+COMMENT ON TABLE "research_opportunities" IS 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.';
 
 COMMENT ON TABLE "opportunity_applications" IS 'SQL partial UNIQUE(opportunity_id,applicant_id) WHERE status <> WITHDRAWN. Resubmission inserts new ID only after previous withdrawal. Terminal rows are immutable; transition only from PENDING. SQL locks parent when inserting, checks OPEN/deadline/archive and researcher eligibility. Backend authenticates withdrawal actor and response handler; conditional updates prevent response/withdraw races. Closing does not decline old applications.';
 
@@ -1095,6 +1100,8 @@ COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering
 COMMENT ON COLUMN "search_index"."entity_type" IS 'Which tab the row belongs to: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. Constrained by the search_entity_type enum. Researcher, group and opportunity have no visibility column of their own - their access is derived from state (confirmed profile, active group, OPEN opportunity).';
 
 COMMENT ON COLUMN "search_index"."entity_id" IS 'Primary key of the source row, together with entity_type. Polymorphic, so it carries no foreign key; guard_search_index_entity verifies it and sync_search_index_delete cleans it up.';
+
+COMMENT ON COLUMN "search_index"."access_group_id" IS 'The group that scopes the row, used only when visibility is RESEARCH_GROUP. An opportunity is a public posting, so its index row is always FPTU_COMMUNITY and this column stays NULL for it; a group publishes an opportunity to attract people from outside the group.';
 
 COMMENT ON COLUMN "search_index"."authors_text" IS 'Author names joined for searching. Primary source is output_authors.author_name_string ordered by author_order; authors_snapshot is the fallback because it is free-form JSON with no guaranteed schema.';
 
@@ -1386,9 +1393,10 @@ CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAG
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.group_id IS NOT NULL OR o.project_id IS NOT NULL OR o.creator_id=actor)
- AND (o.group_id IS NULL OR can_manage_group(actor,o.group_id))
- AND (o.project_id IS NULL OR EXISTS (SELECT 1 FROM research_projects p WHERE p.id=o.project_id AND p.lead_id=actor AND p.archived_at IS NULL)));
+ AND (o.creator_id=actor OR EXISTS (
+   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
+   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='CORE_MEMBER')))));
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1970,13 +1978,12 @@ BEGIN
     DELETE FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=target;
     RETURN;
   END IF;
-  -- A group-scoped opportunity is visible to that group's members only;
-  -- a personal one is public. The scope lives on the opportunity row.
-  IF op.group_id IS NOT NULL THEN
-    evis:='RESEARCH_GROUP'; egroup:=op.group_id;
-  ELSE
-    evis:='FPTU_COMMUNITY'; egroup:=NULL;
-  END IF;
+  -- An opportunity is a public job posting. The group that published it
+  -- wants to attract people from outside the group, so the scope of the
+  -- record does not narrow who may read it: a group-scoped opportunity is
+  -- as public as a personal one. The scope still lives on the row, but it
+  -- describes who published it, not who may see it.
+  evis:='FPTU_COMMUNITY'; egroup:=NULL;
   etitle:=op.title; ebody:=coalesce(op.description,'');
   eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=op.creator_id),'');
   INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)

@@ -96,7 +96,9 @@
         "password_too_long": "Password must not exceed 1024 characters.",
         "status_invalid": "The status is invalid.",
         "email_already_registered": "This email is already registered.",
-        "status_required": "Status is required."
+        "status_required": "Status is required.",
+        "application_deadline_invalid": "The application deadline must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
+        "archived_at_invalid": "The archive timestamp must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00."
       },
       "domain": {
         "invalid_credentials": "The email or password is incorrect.",

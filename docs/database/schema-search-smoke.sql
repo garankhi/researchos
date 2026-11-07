@@ -240,4 +240,41 @@ BEGIN
  PERFORM pg_temp.assert_true(n=1,'the account survives the profile deletion');
  RAISE NOTICE 'PASS researcher_profiles deletion clears the search row';
 END $$;
+
+-- An opportunity is a public job posting. A group publishes it to attract
+-- people from outside the group, so the scope of the row never narrows who
+-- may read it: the index row is community-wide even when the opportunity
+-- belongs to a group.
+DO $$
+DECLARE
+ u uuid=gen_random_uuid(); lead uuid=gen_random_uuid(); g uuid; op uuid; outsider uuid=gen_random_uuid(); n int;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(u,'FACULTY','opp-search@test.invalid','Opportunity Tester','FPTU'),
+      (lead,'FACULTY','opp-lead@test.invalid','Opportunity Lead','FPTU'),
+      (outsider,'FACULTY','opp-outsider@test.invalid','Opportunity Outsider','FPTU');
+ INSERT INTO research_groups(id,code,name,lead_id,description)
+ VALUES(gen_random_uuid(),'OPP-SEARCH-GRP','Opportunity Search Group',lead,'Opportunity search group.');
+
+ -- A group-scoped opportunity, published by the group's lead.
+ INSERT INTO research_opportunities(id,group_id,opportunity_kind,target_audience,creator_id,title,description)
+ VALUES(gen_random_uuid(),(SELECT id FROM research_groups WHERE code='OPP-SEARCH-GRP'),'RESEARCH_COLLABORATION','ANY_RESEARCHER',lead,'Group Opportunity','Group opportunity description.');
+ UPDATE research_opportunities
+    SET status='OPEN', application_deadline=clock_timestamp()+interval '30 days'
+  WHERE title='Group Opportunity';
+
+ SELECT id INTO op FROM research_opportunities WHERE title='Group Opportunity';
+
+ -- The index row is community-wide, and carries no group scope.
+ PERFORM pg_temp.assert_true(
+  EXISTS(SELECT 1 FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=op
+    AND visibility='FPTU_COMMUNITY' AND access_group_id IS NULL),
+  'a group opportunity is indexed as community-wide');
+
+ -- An actor outside the group still sees it.
+ SELECT count(*) INTO n FROM visible_search_index(outsider) WHERE entity_id=op;
+ PERFORM pg_temp.assert_true(n=1,'an outsider sees a group opportunity in the index');
+
+ RAISE NOTICE 'PASS a group opportunity is indexed as a public posting';
+END $$;
 ROLLBACK;

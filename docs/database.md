@@ -490,7 +490,7 @@ nhưng thiếu `OPPORTUNITY`), vì tập giá trị của hai bảng khác nhau.
 | `OUTPUT` | `research_outputs` + `output_revisions` | `sharing_status = 'SHARED'`, revision = `current_release_id` | theo `research_outputs.visibility` | `research_outputs.owner_id` |
 | `RESEARCHER` | `users` + `researcher_profiles` | tài khoản active **và** `profile_confirmed_at` đã set | `FPTU_COMMUNITY` | chính người dùng |
 | `GROUP` | `research_groups` | `is_active` và chưa `archived_at` | `FPTU_COMMUNITY` | `lead_id` |
-| `OPPORTUNITY` | `research_opportunities` | `status = 'OPEN'` và chưa `archived_at` | `FPTU_COMMUNITY`, hoặc `RESEARCH_GROUP` nếu có `group_id` | `creator_id` |
+| `OPPORTUNITY` | `research_opportunities` | `status = 'OPEN'` và chưa `archived_at` | `FPTU_COMMUNITY` (luôn) | `creator_id` |
 
 Ba điểm phải giữ:
 
@@ -505,7 +505,13 @@ Ba điểm phải giữ:
    **suy ra** từ trạng thái:
    - researcher: profile đã xác nhận → công khai; chưa xác nhận → không index
    - group: đang active → công khai
-   - opportunity: `OPEN` → công khai; có `group_id` → chỉ thành viên group đó
+   - opportunity: `OPEN` → công khai. **Luôn công khai**, kể cả khi có
+     `group_id`: một opportunity là *tin tuyển dụng*, nhóm đăng để mời
+     người ngoài vào nhóm, nên phạm vi của bản ghi mô tả ai đăng chứ không
+     thu hẹp ai được xem. Vì vậy `access_group_id` của dòng index
+     `OPPORTUNITY` luôn `NULL`, và `RESEARCH_GROUP` chỉ còn dùng cho
+     `OUTPUT` — xem migration
+     `20261108120000_opportunity_public_visibility`.
 
 3. **Một bảng, một hàm lọc quyền.** Cả 4 loại dùng chung bộ ba giá trị
    visibility, nên `visible_search_index(actor)` áp cùng một quy tắc cho tất cả.

@@ -74,9 +74,10 @@ CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAG
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.group_id IS NOT NULL OR o.project_id IS NOT NULL OR o.creator_id=actor)
- AND (o.group_id IS NULL OR can_manage_group(actor,o.group_id))
- AND (o.project_id IS NULL OR EXISTS (SELECT 1 FROM research_projects p WHERE p.id=o.project_id AND p.lead_id=actor AND p.archived_at IS NULL)));
+ AND (o.creator_id=actor OR EXISTS (
+   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
+   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='CORE_MEMBER')))));
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -658,13 +659,12 @@ BEGIN
     DELETE FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=target;
     RETURN;
   END IF;
-  -- A group-scoped opportunity is visible to that group's members only;
-  -- a personal one is public. The scope lives on the opportunity row.
-  IF op.group_id IS NOT NULL THEN
-    evis:='RESEARCH_GROUP'; egroup:=op.group_id;
-  ELSE
-    evis:='FPTU_COMMUNITY'; egroup:=NULL;
-  END IF;
+  -- An opportunity is a public job posting. The group that published it
+  -- wants to attract people from outside the group, so the scope of the
+  -- record does not narrow who may read it: a group-scoped opportunity is
+  -- as public as a personal one. The scope still lives on the row, but it
+  -- describes who published it, not who may see it.
+  evis:='FPTU_COMMUNITY'; egroup:=NULL;
   etitle:=op.title; ebody:=coalesce(op.description,'');
   eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=op.creator_id),'');
   INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)

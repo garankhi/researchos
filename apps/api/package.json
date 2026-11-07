@@ -25,7 +25,8 @@
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "test:queue": "vitest run --config ./vitest.config.queue-e2e.ts",
-    "queue:probe": "node dist/queue-probe.js"
+    "queue:probe": "node dist/queue-probe.js",
+    "test:postgres": "nest build && node scripts/test-opportunities-postgres.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
