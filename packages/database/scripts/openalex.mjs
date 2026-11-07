@@ -31,8 +31,17 @@ export const PAGE_SIZE = 200;
 
 /**
  * Reports a failure and ends the run.
+ *
+ * The `name` is set explicitly, so that the callers can recognise the error
+ * and print the message on its own, instead of a stack trace. A subclass of
+ * `Error` inherits the name `Error` otherwise.
  */
-export class SeedError extends Error {}
+export class SeedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'SeedError';
+  }
+}
 
 /**
  * Throws a `SeedError` with the given message.

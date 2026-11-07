@@ -45,7 +45,7 @@ export function resolveDatabaseUrl() {
   }
 
   return fail(
-    'DATABASE_URL is not set. The seed needs a PostgreSQL connection string.\n' +
+    'DATABASE_URL is not set. The command needs a PostgreSQL connection string.\n' +
       'Set it in the root .env file or in the environment.',
   );
 }
@@ -55,4 +55,38 @@ export function resolveDatabaseUrl() {
  */
 export function redactDatabaseUrl(url) {
   return url.replace(/\/\/[^@]*@/, '//***@');
+}
+
+/**
+ * Parses a PostgreSQL connection string into its parts.
+ *
+ * The URL is parsed with the URL parser, which handles the userinfo, the
+ * port and the database name. The password is percent-decoded, because it
+ * may contain characters that are escaped in the URL.
+ *
+ * The query string is dropped. Prisma uses it for the schema name, which
+ * the plain PostgreSQL driver does not know about.
+ */
+export function parseDatabaseUrl(url) {
+  const parsed = new URL(url);
+
+  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+
+  if (!database) {
+    fail(`The connection string has no database name: ${url}`);
+  }
+
+  const [user, password] = (
+    parsed.username ? `${parsed.username}:${parsed.password}` : ''
+  )
+    .split(':')
+    .map((part) => decodeURIComponent(part));
+
+  return {
+    host: parsed.hostname,
+    port: parsed.port || '5432',
+    user: user || 'postgres',
+    password: password ?? '',
+    database,
+  };
 }
