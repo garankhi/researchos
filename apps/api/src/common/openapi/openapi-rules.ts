@@ -111,6 +111,7 @@ export function checkOpenApiDocument(
   for (const [name, schema] of Object.entries<JsonSchema>(schemas)) {
     checkSchemaProperties(name, schema, schemas, violations);
     checkReservedFieldNames(name, schema, violations);
+    checkPaginatedItemSchema(name, schema, violations);
   }
 
   return violations;
@@ -366,6 +367,41 @@ function checkReservedFieldNames(
         `The DTO declares "${used.join('" and "')}", which are reserved for ` +
         `the response envelope. The frontend would unwrap the payload one ` +
         `level too far. Rename one of them.`,
+    });
+  }
+}
+
+/**
+ * A concrete paginated response DTO (`Paginated*ResponseDto`) must declare a
+ * `$ref` for `items.items` rather than a generic `{ type: "object" }`, so Orval
+ * preserves the element type in the generated frontend client.
+ */
+function checkPaginatedItemSchema(
+  name: string,
+  schema: JsonSchema,
+  violations: OpenApiViolation[],
+): void {
+  if (
+    isGeneratedSchema(name) ||
+    !name.startsWith('Paginated') ||
+    name === 'PaginatedResultDto'
+  ) {
+    return;
+  }
+
+  const itemsProp = schema.properties?.items;
+  if (!itemsProp || itemsProp.type !== 'array') {
+    return;
+  }
+
+  if (typeof itemsProp.items?.$ref !== 'string') {
+    violations.push({
+      rule: 'paginatedResponse.itemsRef',
+      location: `components.schemas.${name}.items`,
+      message:
+        `Paginated response "${name}" does not reference a concrete item ` +
+        `schema in "items.items.$ref" (found ${JSON.stringify(itemsProp.items)}). ` +
+        `Declare @ApiProperty({ type: [ItemDto] }) on the subclass's items field.`,
     });
   }
 }

@@ -4,6 +4,7 @@ import {
   SwaggerModule,
   type OpenAPIObject,
 } from '@nestjs/swagger';
+import { SESSION_COOKIE_NAME } from './common/auth/session-cookie.js';
 import { applyEnvelopeTransform } from './common/openapi/envelope-transform.js';
 
 export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
@@ -11,6 +12,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     .setTitle('ResearchOS API')
     .setDescription('ResearchOS backend API')
     .setVersion('0.0.1')
+    .addCookieAuth(SESSION_COOKIE_NAME)
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

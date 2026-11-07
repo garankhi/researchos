@@ -22,6 +22,7 @@ and fails `pnpm --filter api test` when a rule is broken. The rules are:
 | `schemaProperty.description` | Every DTO property has a description |
 | `component.name` | No component is named `String`, `Number` or `Boolean` |
 | `schema.reservedFields` | No business DTO uses both `success` and `data` |
+| `paginatedResponse.itemsRef` | A paginated response's `items` reference a concrete item schema |
 
 The `description` rules are what make the `description` on a DTO field
 mandatory rather than a nice-to-have: `apps/api/src/openapi-rules.spec.ts`
@@ -84,6 +85,27 @@ exactly as you would without the envelope:
 Describing the envelope by hand (`type: HealthStatusDtoEnvelope`) would
 double-wrap it: the transform already wraps every `2xx` response, and it
 skips an already-wrapped schema, so the mistake is silent rather than loud.
+
+## A paginated response names its item type
+
+A paginated response is a `PaginatedResultDto` subclass whose `items` field
+must declare the concrete record type:
+
+```typescript
+// Right — the generated client knows what `items` holds.
+export class PaginatedUsersResponseDto extends PaginatedResultDto<UserResponseDto> {
+  @ApiProperty({
+    description: 'The user accounts belonging to this page.',
+    type: [UserResponseDto],
+  })
+  declare items: UserResponseDto[];
+}
+```
+
+If `items` degrades to a generic `{ type: "object" }`, Orval generates
+`items: { [key: string]: unknown }[]` and every consumer has to cast. The
+`paginatedResponse.itemsRef` rule fails the test run when a `Paginated*`
+schema does not reference a concrete item schema.
 
 ## Swagger decorator checklist
 

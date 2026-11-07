@@ -8,6 +8,8 @@ import { AccessService } from './access.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { SessionService } from './session.service.js';
+import { UsersController } from './users.controller.js';
+import { UsersService } from './users.service.js';
 
 /**
  * The identity module.
@@ -43,11 +45,12 @@ import { SessionService } from './session.service.js';
  * two sources of truth for the session rules.
  */
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, UsersController],
   providers: [
     AccessService,
     AuthService,
     SessionService,
+    UsersService,
 
     // The resolver the guards ask. It is the session service itself, so
     // there is exactly one implementation of the session rules.
@@ -58,6 +61,6 @@ import { SessionService } from './session.service.js';
     { provide: APP_GUARD, useClass: RoleGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
-  exports: [SESSION_RESOLVER, AccessService, SessionService],
+  exports: [SESSION_RESOLVER, AccessService, SessionService, UsersService],
 })
 export class IdentityModule {}

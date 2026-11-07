@@ -16,6 +16,7 @@ export {
   SourceKind,
   VerificationStatus,
   Visibility,
+  visibility_level as OutputFileVisibility,
 } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';

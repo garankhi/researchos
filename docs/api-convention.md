@@ -552,6 +552,23 @@ Lý do: mutator của Orval chỉ giữ lại `data` khi unwrap, nên một fiel
 Dùng `buildPaginationMeta(query, count, total)` để dựng `meta` — đừng tự
 tính `totalPages`.
 
+Mỗi resource có một `PaginatedResultDto` riêng, và `items` của nó phải khai
+báo kiểu item cụ thể — nếu không, Orval sinh ra
+`items: { [key: string]: unknown }[]` và mọi nơi phải cast:
+
+```typescript
+export class PaginatedUsersResponseDto extends PaginatedResultDto<UserResponseDto> {
+  @ApiProperty({
+    description: 'The user accounts belonging to this page.',
+    type: [UserResponseDto],
+  })
+  declare items: UserResponseDto[];
+}
+```
+
+Quy tắc `paginatedResponse.itemsRef` (§13) fail test khi một schema
+`Paginated*` không trỏ tới schema item cụ thể.
+
 Frontend dùng `usePagination()` trong `apps/web/src/utils/pagination.ts` để có
 một cách phân trang giống nhau cho mọi danh sách.
 
@@ -603,6 +620,7 @@ fail `pnpm --filter api test` khi có quy tắc bị vi phạm.
 | `schemaProperty.description` | Mọi trường của DTO có `description` |
 | `component.name` | Không có component tên `String`/`Number`/`Boolean` |
 | `schema.reservedFields` | Không DTO nào dùng cả `success` và `data` |
+| `paginatedResponse.itemsRef` | `items` của response phân trang trỏ tới schema item cụ thể |
 
 Message của lỗi nêu rõ quy tắc, vị trí và cách sửa, nên một lần test đỏ là
 đủ để biết cần thêm decorator nào:

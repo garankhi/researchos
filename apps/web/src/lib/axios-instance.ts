@@ -54,6 +54,24 @@ export function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {
   );
 }
 
+async function rejectApiError(error: unknown): Promise<never> {
+  const response = Axios.isAxiosError(error) ? error.response : undefined;
+  const body: unknown = response?.data;
+  if (
+    response &&
+    typeof Blob !== 'undefined' &&
+    body instanceof Blob &&
+    /^application\/json(?:\s*;|$)/i.test(body.type)
+  ) {
+    try {
+      response.data = JSON.parse(await body.text()) as unknown;
+    } catch {
+      // Preserve the original Axios error when a proxy returns invalid JSON.
+    }
+  }
+  throw error;
+}
+
 export const axiosInstance = <T>(
   config: AxiosRequestConfig,
   options?: AxiosRequestConfig,
@@ -64,13 +82,9 @@ export const axiosInstance = <T>(
     ...options,
     cancelToken: source.token,
   }).then(({ data: body }) => {
-    // Failed requests never reach this point: axios rejects on a 4xx/5xx
-    // before the response is handed over, so the error body keeps its full
-    // envelope — `message`, `statusCode`, `path` and `timestamp` stay
-    // readable through `error.response.data`.
     const payload = isEnvelope(body) ? body.data : body;
     return payload as Unwrap<T>;
-  });
+  }, rejectApiError);
 
   // Lets react-query cancel in-flight requests on unmount / refetch.
   // @ts-expect-error keep Orval's expected cancel contract

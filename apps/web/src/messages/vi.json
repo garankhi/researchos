@@ -103,7 +103,21 @@
         "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",
         "password_unchanged": "Mật khẩu mới phải khác mật khẩu hiện tại.",
-        "opportunity_not_found": "Không tìm thấy cơ hội."
+        "opportunity_not_found": "Không tìm thấy cơ hội.",
+        "field_not_found": "Không tìm thấy lĩnh vực nghiên cứu yêu cầu.",
+        "topic_not_found": "Không tìm thấy chủ đề nghiên cứu yêu cầu.",
+        "user_not_found": "Không tìm thấy người dùng yêu cầu.",
+        "user_already_exists": "Người dùng với mã định danh này đã tồn tại.",
+        "email_already_registered": "Địa chỉ email này đã được sử dụng.",
+        "cannot_grant_self_role": "Quản trị viên không thể tự cấp hoặc thay đổi vai trò của chính mình.",
+        "cannot_remove_last_admin": "Không thể vô hiệu hoá hoặc thu hồi vai trò ADMIN của quản trị viên hoạt động cuối cùng.",
+        "invalid_role_revocation": "Thời điểm thu hồi vai trò không hợp lệ so với thời điểm cấp vai trò.",
+        "role_already_granted": "Người dùng đã có vai trò này và đang có hiệu lực.",
+        "role_not_granted": "Người dùng hiện không có vai trò này để thu hồi.",
+        "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu.",
+        "group_not_found": "Không tìm thấy nhóm nghiên cứu yêu cầu.",
+        "group_code_already_exists": "Mã nhóm nghiên cứu này đã tồn tại.",
+        "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động."
       }
     }
   },

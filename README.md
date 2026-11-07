@@ -1,7 +1,7 @@
 # ResearchOS
 
 Monorepo pnpm gồm Next.js (web), NestJS (API) và NestJS (worker), dùng
-PostgreSQL và Prisma. PostgreSQL và Redis chạy bằng Docker Compose ở local.
+PostgreSQL và Prisma. PostgreSQL, Redis và SeaweedFS chạy bằng Docker Compose ở local.
 
 ## Cấu trúc
 
@@ -29,7 +29,7 @@ docs/
 Cần Node.js 24 và pnpm 12.15.0. Mở Docker Desktop trước khi chạy.
 
 Lệnh này làm hết phần thiết lập trên một máy mới: tạo `.env`, cài dependency,
-bật PostgreSQL/Redis bằng Docker, dựng database (migration + seed), build và
+bật hạ tầng bằng Docker, dựng database (migration + seed), build và
 sinh client API cho web.
 
 ```powershell
@@ -62,6 +62,30 @@ sẽ có Docker, biến môi trường và volume riêng; không dùng lại d�
 Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
 Luồng session/đổi mật khẩu và handoff frontend: [authentication.md](./docs/authentication.md).
 
+## S3 local
+
+`pnpm infra:up` khởi động SeaweedFS cùng PostgreSQL và Redis. Để chỉ khởi động
+SeaweedFS, chạy `docker compose up -d --wait seaweedfs` sau khi đã tạo `.env`.
+
+Endpoint S3 mặc định là `http://localhost:8333`. SeaweedFS tạo bucket private
+`researchos-local` khi khởi động và lưu object trong volume `seaweedfs_data`.
+Bucket mới bắt đầu rỗng. Dùng URL dạng `http://localhost:8333/<bucket>/<key>`
+và credentials local từ `.env.example`. `WEB_ORIGIN` trong `.env` ở root mặc định
+cho phép web `http://localhost:3000` gửi yêu cầu cross-origin tới S3. Nếu đổi
+`S3_PORT`, cập nhật `S3_ENDPOINT` tương ứng.
+
+Để bật API upload file, đặt `S3_UPLOAD_TOKEN_SECRET` trong `.env` ở root hoặc
+`apps/api/.env`. Tạo giá trị bằng lệnh sau rồi lưu vào file `.env` local:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+Trong UI, dùng link trực tiếp `GET /output-files/:fileId/download` tới API để
+trình duyệt tải attachment bằng session cookie. Mỗi tiến trình API xử lý tối đa
+8 lượt tải đồng thời với tổng dung lượng tạm tối đa 5 GiB. Mỗi lượt có 15 phút
+để xác minh và gửi file. Khi hết chỗ, API trả `503` để client có thể thử lại.
+
 ## Tài khoản development
 
 Các tài khoản cho local login (FPTU SSO chưa có tài liệu) được `pnpm setup`
@@ -84,10 +108,10 @@ khoản.
 | Lệnh | Tác dụng |
 | --- | --- |
 | `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
-| `pnpm infra:up` | Chạy PostgreSQL/Redis và chờ healthcheck |
+| `pnpm infra:up` | Chạy PostgreSQL, Redis và SeaweedFS, rồi chờ healthcheck |
 | `pnpm infra:down` | Dừng hạ tầng local, giữ dữ liệu |
-| `pnpm infra:status` | Xem trạng thái PostgreSQL/Redis |
-| `pnpm infra:logs` | Xem log PostgreSQL/Redis |
+| `pnpm infra:status` | Xem trạng thái hạ tầng local |
+| `pnpm infra:logs` | Xem log hạ tầng local |
 | `pnpm dev` | Chạy web và API |
 | `pnpm dev:worker` | Chạy worker |
 | `pnpm build` | Build toàn workspace |

@@ -78,47 +78,340 @@
         ]
       }
     },
-    "/health": {
-      "get": {
-        "operationId": "HealthController_check",
+    "/research-groups": {
+      "post": {
+        "description": "Creates a new research group. When leadId is omitted, the authenticated researcher becomes the group leader.",
+        "operationId": "GroupsController_create",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResearchGroupDto"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Service status",
+          "201": {
+            "description": "Research group created successfully.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or designated leader is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller does not hold the RESEARCHER role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The specified leader user account was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A research group with this code already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Liveness probe for the API process",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new research group",
         "tags": [
-          "health"
+          "groups"
+        ]
+      },
+      "get": {
+        "description": "Returns a paginated list of research groups visible to the caller (public active groups, groups the caller leads, and groups the caller is a member of).",
+        "operationId": "GroupsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string matching group name or group code.",
+            "schema": {
+              "example": "AI-LAB",
+              "type": "string"
+            }
+          },
+          {
+            "name": "leadId",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups led by a specific researcher (UUID).",
+            "schema": {
+              "format": "uuid",
+              "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups by active status.",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated research group list retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResearchGroupsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or sort expression.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List research groups with pagination and filtering",
+        "tags": [
+          "groups"
         ]
       }
     },
-    "/health/ready": {
+    "/research-groups/{groupId}": {
       "get": {
-        "operationId": "HealthController_checkReadiness",
-        "parameters": [],
+        "description": "Returns a single research group if visible to the caller. Returns 403 when the group is archived/inactive and the caller is neither the leader nor a member.",
+        "operationId": "GroupsController_findOne",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Service status",
+            "description": "Research group retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided groupId is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to view this research group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research group was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Readiness probe including a database round trip",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get research group details by ID",
         "tags": [
-          "health"
+          "groups"
+        ]
+      },
+      "patch": {
+        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.",
+        "operationId": "GroupsController_update",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResearchGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Research group updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchGroupResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update payload, invalid UUID, or designated leader is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to modify this research group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research group or leader user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A research group with this code already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update or archive a research group",
+        "tags": [
+          "groups"
         ]
       }
     },
@@ -297,6 +590,511 @@
         "summary": "Returns the current user payload",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/users": {
+      "get": {
+        "description": "Returns a paginated list of user accounts with effective roles. Accessible to administrators only.",
+        "operationId": "UsersController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string matching user full name or email address.",
+            "schema": {
+              "example": "Nguyễn Văn",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userType",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by user type.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FACULTY",
+                "STUDENT",
+                "STAFF"
+              ]
+            }
+          },
+          {
+            "name": "departmentUnit",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by department or administrative unit.",
+            "schema": {
+              "example": "Software Engineering",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter accounts by active status.",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated user list retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedUsersResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or sort expression.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List user accounts with pagination and filtering",
+        "tags": [
+          "identity"
+        ]
+      },
+      "post": {
+        "description": "Provisions a new user account with normalized email. Accessible to administrators only.",
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A user with this email or institutional identifier already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new user account",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "description": "Returns details and live effective roles for the specified user account.",
+        "operationId": "UsersController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided user ID is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user account details",
+        "tags": [
+          "identity"
+        ]
+      },
+      "patch": {
+        "description": "Updates user fields or active status. Deactivating an account revokes all active sessions.",
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update payload, invalid UUID, or attempt to deactivate the last active administrator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A user with this email or institutional identifier already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user account details or status",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}/roles": {
+      "post": {
+        "description": "Grants an access role (RESEARCHER or ADMIN) to the target user. Administrators cannot grant roles to themselves.",
+        "operationId": "UsersController_grantRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role granted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Administrators cannot grant roles to themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested user was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The user already holds this active role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Grant access role to user",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/users/{id}/roles/{role}": {
+      "delete": {
+        "description": "Revokes an active access role from the specified user account.",
+        "operationId": "UsersController_revokeRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "path",
+            "description": "The access role to revoke.",
+            "schema": {
+              "enum": [
+                "RESEARCHER",
+                "ADMIN"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role revoked successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot revoke the ADMIN role from the last active administrator or revocation timestamp violates grant constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User or active role grant was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke access role from user",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness probe for the API process",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_checkReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatusDtoEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness probe including a database round trip",
+        "tags": [
+          "health"
         ]
       }
     },
@@ -540,6 +1338,794 @@
           "jobs"
         ]
       }
+    },
+    "/profiles/me": {
+      "get": {
+        "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
+        "operationId": "ProfilesController_getMyProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Researcher profile retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "profiles"
+        ]
+      },
+      "patch": {
+        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).",
+        "operationId": "ProfilesController_updateMyProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Researcher profile updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update current user profile",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/{userId}": {
+      "get": {
+        "description": "Returns a confirmed researcher profile to any authenticated user, or the unconfirmed profile to its owner.",
+        "operationId": "ProfilesController_getProfileById",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the target user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Researcher profile retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found or is unconfirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get researcher profile by user ID",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/outputs/{outputId}/file-uploads": {
+      "post": {
+        "description": "Issues a presigned PUT URL and confirmation token to a user who can manage the output.",
+        "operationId": "OutputUploadController_createUpload",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research output.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutputUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The upload URL, required request headers, and confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputUploadResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid output ID, upload metadata, or confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot manage this output or use this upload token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API request rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Upload signing or object storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Prepare an output file upload",
+        "tags": [
+          "output-files"
+        ]
+      }
+    },
+    "/outputs/{outputId}/file-uploads/confirm": {
+      "post": {
+        "description": "Verifies the uploaded object and records its metadata. Repeating confirmation returns the same file.",
+        "operationId": "OutputUploadController_confirmUpload",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research output.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmOutputUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The confirmed output file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputFileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid output ID, upload metadata, or confirmation token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot manage this output or use this upload token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The object is missing or does not match the declared upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API request rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Upload signing or object storage is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Confirm an output file upload",
+        "tags": [
+          "output-files"
+        ]
+      }
+    },
+    "/output-files/{fileId}/download": {
+      "get": {
+        "description": "Checks the current file access policy and verifies the stored file before sending the attachment.",
+        "operationId": "OutputDownloadController_downloadFile",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the output file.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The verified file as an attachment.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Length": {
+                "description": "File size in bytes.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The file identifier is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file is missing or unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The stored object does not match the recorded file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API request rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Download capacity was exceeded, verification timed out, or storage was unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Download a verified output file",
+        "tags": [
+          "output-files"
+        ]
+      }
+    },
+    "/taxonomy/tree": {
+      "get": {
+        "operationId": "TaxonomyController_getTree",
+        "parameters": [
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter the taxonomy tree by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter nodes by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cây phân cấp nghiên cứu hoàn chỉnh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerGetTreeEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy toàn bộ cây phân cấp nghiên cứu (Fields -> Subfields -> Topics)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/fields": {
+      "get": {
+        "operationId": "TaxonomyController_findAllFields",
+        "parameters": [
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter fields by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter fields by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách các lĩnh vực nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerFindAllFieldsEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liệt kê danh sách các lĩnh vực nghiên cứu cấp 1 (Fields)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/fields/{fieldId}/subfields": {
+      "get": {
+        "operationId": "TaxonomyController_findSubfieldsByFieldId",
+        "parameters": [
+          {
+            "name": "fieldId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the parent research field (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter subfields by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter subfields by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách các phân ngành nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyControllerFindSubfieldsByFieldIdEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số định danh hoặc bộ lọc không hợp lệ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy lĩnh vực nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liệt kê danh sách các phân ngành nghiên cứu (Subfields) theo lĩnh vực",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topics": {
+      "get": {
+        "operationId": "TaxonomyController_findAllTopics",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "subfieldId",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by parent subfield identifier (UUID).",
+            "schema": {
+              "example": "b0000000-0000-0000-0000-000000000001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string to match topic name (fuzzy / trigram search).",
+            "schema": {
+              "example": "Machine Learning",
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by origin source (OPENALEX or LOCAL).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOCAL",
+                "OPENALEX"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter topics by active status. Defaults to true (only active rows).",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách chủ đề nghiên cứu kèm metadata phân trang",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTopicsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tham số tìm kiếm hoặc phân trang không hợp lệ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tìm kiếm và phân trang danh sách các chủ đề nghiên cứu cấp 3 (Topics)",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topics/{topicId}": {
+      "get": {
+        "operationId": "TaxonomyController_findOneTopic",
+        "parameters": [
+          {
+            "name": "topicId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of the research topic (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chi tiết chủ đề nghiên cứu kèm cấp cha",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicDetailResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Định danh chủ đề nghiên cứu không đúng định dạng UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy chủ đề nghiên cứu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lấy chi tiết một chủ đề nghiên cứu kèm thông tin cấp cha",
+        "tags": [
+          "taxonomy"
+        ]
+      }
     }
   },
   "info": {
@@ -551,37 +2137,210 @@
   "tags": [],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "researchos_session"
+      }
+    },
     "schemas": {
-      "HealthStatusDto": {
+      "CreateResearchGroupDto": {
         "type": "object",
         "properties": {
-          "status": {
+          "code": {
             "type": "string",
-            "example": "ok",
-            "description": "ok when healthy, degraded when a dependency is unreachable"
+            "description": "Unique short code identifying the research group.",
+            "example": "AI-LAB",
+            "maxLength": 50
           },
-          "service": {
+          "name": {
             "type": "string",
-            "example": "researchos-api",
-            "description": "Name of the service that answered the probe."
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab",
+            "maxLength": 255
           },
-          "uptimeSeconds": {
-            "type": "number",
-            "example": 42,
-            "description": "Process uptime in seconds"
-          },
-          "timestamp": {
+          "leadId": {
             "type": "string",
-            "example": "2026-10-29T01:30:00.000Z",
-            "description": "ISO timestamp of when the probe answered."
+            "description": "Identifier of the researcher leading the group (UUID). Defaults to the authenticated creator when omitted.",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
           }
         },
         "required": [
-          "status",
-          "service",
-          "uptimeSeconds",
-          "timestamp"
+          "code",
+          "name"
         ]
+      },
+      "ResearchGroupResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research group (UUID).",
+            "example": "7b0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e99"
+          },
+          "code": {
+            "type": "string",
+            "description": "Unique short code of the research group.",
+            "example": "AI-LAB"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab"
+          },
+          "leadId": {
+            "type": "string",
+            "description": "Unique identifier of the group leader (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the research group is currently active.",
+            "example": true
+          },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the group was archived, or null if currently active.",
+            "example": null,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the group was created.",
+            "example": "2026-11-07T08:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the group was last updated.",
+            "example": "2026-11-07T08:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "leadId",
+          "description",
+          "isActive",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "The page that was returned, 1-based.",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "description": "How many records one page holds.",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records the query matched in total.",
+            "example": 137
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "How many pages the result is split into.",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a next page exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a previous page exists.",
+            "example": false
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNextPage",
+          "hasPreviousPage"
+        ]
+      },
+      "PaginatedResearchGroupsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The research groups belonging to this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResearchGroupResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "UpdateResearchGroupDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Unique short code identifying the research group.",
+            "example": "AI-LAB",
+            "maxLength": 50
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the research group.",
+            "example": "Artificial Intelligence & Machine Learning Lab",
+            "maxLength": 255
+          },
+          "leadId": {
+            "type": "string",
+            "description": "Identifier of the researcher leading the group (UUID). Defaults to the authenticated creator when omitted.",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "example": "Focuses on applied deep learning, natural language processing, and intelligent educational tools.",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the research group is active. Setting to false archives the group (`is_active = false` and sets `archived_at`).",
+            "example": true
+          }
+        }
       },
       "LoginDto": {
         "type": "object",
@@ -736,6 +2495,364 @@
           "changed"
         ]
       },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the user account (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized email address of the account.",
+            "example": "faculty@researchos.local"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the user.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable.",
+            "example": "TS",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the account is active.",
+            "example": true
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "description": "Timestamp of the user’s last successful sign-in.",
+            "example": "2026-11-06T10:00:00.000Z",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "description": "The effective roles currently held by the user.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESEARCHER",
+                "ADMIN"
+              ]
+            },
+            "example": [
+              "RESEARCHER"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "userType",
+          "departmentUnit",
+          "fptuGuid",
+          "academicTitle",
+          "academicDegree",
+          "isActive",
+          "lastLoginAt",
+          "roles"
+        ]
+      },
+      "PaginatedUsersResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The user accounts belonging to this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The normalized email address of the account.",
+            "example": "researcher@fpt.edu.vn"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "The classification category of the user account.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "The academic department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable (e.g., GS, PGS).",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable (e.g., TS, ThS).",
+            "example": "TS",
+            "nullable": true
+          }
+        },
+        "required": [
+          "email",
+          "fullName",
+          "userType",
+          "departmentUnit"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The normalized email address of the account.",
+            "example": "researcher@fpt.edu.vn"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The full display name of the user.",
+            "example": "Nguyễn Văn A"
+          },
+          "userType": {
+            "type": "string",
+            "description": "The classification category of the user account.",
+            "enum": [
+              "FACULTY",
+              "STUDENT",
+              "STAFF"
+            ],
+            "example": "FACULTY"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "The academic department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "fptuGuid": {
+            "type": "string",
+            "description": "Unique institutional identifier synchronized from FPTU HR.",
+            "example": "FPTU00123",
+            "nullable": true
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable (e.g., GS, PGS).",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable (e.g., TS, ThS).",
+            "example": "TS",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the account is active. Setting to false deactivates the user and invalidates active sessions.",
+            "example": true
+          }
+        }
+      },
+      "GrantRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The access role to grant (RESEARCHER or ADMIN).",
+            "enum": [
+              "RESEARCHER",
+              "ADMIN"
+            ],
+            "example": "ADMIN"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Administrative justification for granting the role.",
+            "example": "Assigned as laboratory administrator."
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "RoleAssignmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the role assignment record (UUID).",
+            "example": "d0000000-0000-0000-0000-000000000001"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Identifier of the user holding this role assignment (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "role": {
+            "type": "string",
+            "description": "The assigned access role.",
+            "enum": [
+              "RESEARCHER",
+              "ADMIN"
+            ],
+            "example": "ADMIN"
+          },
+          "grantSource": {
+            "type": "string",
+            "description": "Source that granted the role (MANUAL or SYSTEM).",
+            "enum": [
+              "MANUAL",
+              "SYSTEM"
+            ],
+            "example": "MANUAL"
+          },
+          "grantedBy": {
+            "type": "string",
+            "description": "Identifier of the administrator who granted the role.",
+            "example": "a0000000-0000-0000-0000-000000000001",
+            "nullable": true
+          },
+          "grantedAt": {
+            "type": "string",
+            "description": "Timestamp when the role was granted.",
+            "example": "2026-11-06T12:00:00.000Z"
+          },
+          "revokedBy": {
+            "type": "string",
+            "description": "Identifier of the administrator who revoked the role.",
+            "example": "a0000000-0000-0000-0000-000000000001",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "description": "Timestamp when the role was revoked, or null if currently active.",
+            "example": null,
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Administrative reason given when granting or revoking.",
+            "example": "Assigned as laboratory administrator.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "role",
+          "grantSource",
+          "grantedBy",
+          "grantedAt",
+          "revokedBy",
+          "revokedAt",
+          "reason"
+        ]
+      },
+      "RevokeRoleDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Administrative reason for revoking the role.",
+            "example": "Term finished or role reassigned."
+          }
+        }
+      },
+      "HealthStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok",
+            "description": "ok when healthy, degraded when a dependency is unreachable"
+          },
+          "service": {
+            "type": "string",
+            "example": "researchos-api",
+            "description": "Name of the service that answered the probe."
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "example": 42,
+            "description": "Process uptime in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-10-29T01:30:00.000Z",
+            "description": "ISO timestamp of when the probe answered."
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "uptimeSeconds",
+          "timestamp"
+        ]
+      },
       "CreateProbeDto": {
         "type": "object",
         "properties": {
@@ -789,6 +2906,792 @@
           "status",
           "attempts",
           "statusUrl"
+        ]
+      },
+      "ProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Identifier of the user who owns this profile (UUID).",
+            "example": "1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized institutional email address.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable.",
+            "example": "TS",
+            "nullable": true
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the user.",
+            "example": "FACULTY"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Associate professor specializing in distributed systems and AI.",
+            "nullable": true
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "orcidId": {
+            "type": "string",
+            "description": "Verified 19-character ORCID identifier.",
+            "example": "0000-0002-1825-0097",
+            "nullable": true
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example",
+            "nullable": true
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821",
+            "nullable": true
+          },
+          "avatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the profile avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
+          "profileConfirmedAt": {
+            "type": "string",
+            "description": "Timestamp when the profile was confirmed by the researcher.",
+            "example": "2026-11-06T10:00:00.000Z",
+            "nullable": true
+          },
+          "papersReviewedAt": {
+            "type": "string",
+            "description": "Timestamp when publication candidate works were reviewed.",
+            "example": "2026-11-06T10:30:00.000Z",
+            "nullable": true
+          },
+          "onboardingCompletedAt": {
+            "type": "string",
+            "description": "Timestamp when onboarding flow was completed.",
+            "example": "2026-11-06T11:00:00.000Z",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "fullName",
+          "email",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "userType",
+          "bio",
+          "availabilityStatus",
+          "orcidId",
+          "googleScholarUrl",
+          "scopusAuthorId",
+          "avatarStorageKey",
+          "profileConfirmedAt",
+          "papersReviewedAt",
+          "onboardingCompletedAt"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Researcher specializing in distributed software architecture."
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example"
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821"
+          }
+        }
+      },
+      "OutputFileVisibility": {
+        "type": "string",
+        "enum": [
+          "PRIVATE",
+          "RESEARCH_GROUP",
+          "FPTU_COMMUNITY"
+        ],
+        "description": "File visibility. Defaults to PRIVATE."
+      },
+      "CreateOutputUploadDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "File name without a directory path.",
+            "maxLength": 255
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "MIME type sent with the PUT request.",
+            "example": "application/pdf"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Expected file size in bytes.",
+            "minimum": 1,
+            "maximum": 5368709120
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 of the file as a 64-character hex digest.",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "visibility": {
+            "description": "File visibility. Defaults to PRIVATE.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputFileVisibility"
+              }
+            ]
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "Required for RESEARCH_GROUP visibility and omitted otherwise.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "sha256"
+        ]
+      },
+      "OutputUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned URL for a single PUT upload."
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers to send with the PUT request. Use a raw File or Blob body so the browser sends its signed Content-Length automatically.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "uploadToken": {
+            "type": "string",
+            "description": "Token to send to the confirmation endpoint after uploading."
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "headers",
+          "uploadToken"
+        ]
+      },
+      "ConfirmOutputUploadDto": {
+        "type": "object",
+        "properties": {
+          "uploadToken": {
+            "type": "string",
+            "description": "Token issued by the API for this upload."
+          }
+        },
+        "required": [
+          "uploadToken"
+        ]
+      },
+      "OutputFileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the confirmed file.",
+            "format": "uuid"
+          },
+          "outputId": {
+            "type": "string",
+            "description": "Identifier of the parent output.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Content-Type stored on the uploaded object."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Verified size in bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Verified SHA-256 as a hex digest."
+          },
+          "visibility": {
+            "description": "File visibility.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputFileVisibility"
+              }
+            ]
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "Group allowed by the file visibility, if applicable.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "outputId",
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "sha256",
+          "visibility",
+          "accessGroupId"
+        ]
+      },
+      "TaxonomyTreeTopicDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "TaxonomyTreeSubfieldDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research subfield (UUID).",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "fieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research field.",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "string",
+            "description": "Stable internal code for the subfield.",
+            "example": "SUBFIELD-AI",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research subfield.",
+            "example": "Artificial Intelligence"
+          },
+          "nameVi": {
+            "type": "string",
+            "description": "Vietnamese translated name of the research subfield.",
+            "example": "Trí tuệ nhân tạo",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or scope of the research subfield.",
+            "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
+            "example": "https://openalex.org/subfields/1702",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this subfield is active and selectable in the system.",
+            "example": true
+          },
+          "topics": {
+            "description": "List of research topics belonging to this subfield.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeTopicDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "topics"
+        ]
+      },
+      "TaxonomyTreeFieldDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research field (UUID).",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "string",
+            "description": "Stable internal code for the field.",
+            "example": "FIELD-CS",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research field.",
+            "example": "Computer Science"
+          },
+          "nameVi": {
+            "type": "string",
+            "description": "Vietnamese translated name of the research field.",
+            "example": "Khoa học máy tính",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or scope of the research field.",
+            "example": "Study of computation, information, and automation.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
+            "example": "https://openalex.org/fields/17",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this field is active and selectable in the system.",
+            "example": true
+          },
+          "subfields": {
+            "description": "List of research subfields belonging to this field.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeSubfieldDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "subfields"
+        ]
+      },
+      "FieldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research field (UUID).",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "string",
+            "description": "Stable internal code for the field.",
+            "example": "FIELD-CS",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research field.",
+            "example": "Computer Science"
+          },
+          "nameVi": {
+            "type": "string",
+            "description": "Vietnamese translated name of the research field.",
+            "example": "Khoa học máy tính",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or scope of the research field.",
+            "example": "Study of computation, information, and automation.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex field ID).",
+            "example": "https://openalex.org/fields/17",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this field is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "SubfieldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research subfield (UUID).",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "fieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research field.",
+            "example": "a0000000-0000-0000-0000-000000000001"
+          },
+          "internalCode": {
+            "type": "string",
+            "description": "Stable internal code for the subfield.",
+            "example": "SUBFIELD-AI",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "English name of the research subfield.",
+            "example": "Artificial Intelligence"
+          },
+          "nameVi": {
+            "type": "string",
+            "description": "Vietnamese translated name of the research subfield.",
+            "example": "Trí tuệ nhân tạo",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or scope of the research subfield.",
+            "example": "Theory and development of computer systems able to perform tasks requiring human intelligence.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex subfield ID).",
+            "example": "https://openalex.org/subfields/1702",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this subfield is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "fieldId",
+          "internalCode",
+          "name",
+          "nameVi",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "TopicResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive"
+        ]
+      },
+      "PaginatedTopicsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The research topics of this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TopicResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "TopicDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research topic (UUID).",
+            "example": "c0000000-0000-0000-0000-000000000001"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent research subfield.",
+            "example": "b0000000-0000-0000-0000-000000000001"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Deep Learning and Neural Networks"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or keywords of the research topic.",
+            "example": "Architectures, training techniques, and representations for deep artificial neural networks.",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the taxonomy entry (OPENALEX or LOCAL).",
+            "enum": [
+              "LOCAL",
+              "OPENALEX"
+            ],
+            "example": "OPENALEX"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External identifier from the source provider (e.g. OpenAlex topic ID).",
+            "example": "https://openalex.org/topics/T10001",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether this topic is active and selectable in the system.",
+            "example": true
+          },
+          "subfield": {
+            "description": "The parent research subfield of this topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubfieldResponseDto"
+              }
+            ]
+          },
+          "field": {
+            "description": "The root research field of this topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subfieldId",
+          "name",
+          "description",
+          "source",
+          "externalId",
+          "isActive",
+          "subfield",
+          "field"
         ]
       },
       "ApiErrorResponseDto": {
@@ -899,7 +3802,7 @@
           "message"
         ]
       },
-      "HealthStatusDtoEnvelope": {
+      "PaginatedResearchGroupsResponseDtoEnvelope": {
         "type": "object",
         "properties": {
           "success": {
@@ -910,7 +3813,31 @@
             "default": true
           },
           "data": {
-            "$ref": "#/components/schemas/HealthStatusDto"
+            "$ref": "#/components/schemas/PaginatedResearchGroupsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ResearchGroupResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResearchGroupResponseDto"
           },
           "message": {
             "type": "string",
@@ -995,6 +3922,102 @@
           "message"
         ]
       },
+      "PaginatedUsersResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedUsersResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "UserResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "RoleAssignmentResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/RoleAssignmentResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "HealthStatusDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "JobDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -1007,6 +4030,207 @@
           },
           "data": {
             "$ref": "#/components/schemas/JobDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ProfileResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputUploadResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputUploadResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputFileResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputFileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerGetTreeEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTreeFieldDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerFindAllFieldsEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TaxonomyControllerFindSubfieldsByFieldIdEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubfieldResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedTopicsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedTopicsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicDetailResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicDetailResponseDto"
           },
           "message": {
             "type": "string",

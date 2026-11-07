@@ -2,6 +2,7 @@ import { describe, expect, it, expectTypeOf } from 'vitest';
 import { AxiosError } from 'axios';
 import type { AxiosAdapter, AxiosResponse } from 'axios';
 import { AXIOS_INSTANCE, axiosInstance, isEnvelope } from './axios-instance';
+import { apiErrorCode } from './api-error';
 import type { Unwrap } from './axios-instance';
 import type {
   HealthStatusDto,
@@ -163,6 +164,38 @@ describe('axiosInstance', () => {
 
   it('exposes the underlying instance so a caller can reach its defaults', () => {
     expect(AXIOS_INSTANCE.defaults.baseURL).toBeDefined();
+  });
+
+  it('decodes JSON errors from a download requested as a Blob', async () => {
+    const errorBody = { success: false, data: null, message: 'conflict' };
+    const blob = new Blob([JSON.stringify(errorBody)], {
+      type: 'application/json',
+    });
+    const result = axiosInstance<Blob>(
+      {
+        url: '/output-files/test/download',
+        method: 'GET',
+        responseType: 'blob',
+      },
+      { adapter: adapterFor(blob, 409) },
+    );
+    await expect(result).rejects.toMatchObject({
+      response: { data: errorBody },
+    });
+    expect(await result.catch(apiErrorCode)).toBe('conflict');
+  });
+
+  it('keeps binary success responses intact', async () => {
+    const file = new Blob(['test file'], { type: 'application/octet-stream' });
+    const result = await axiosInstance<Blob>(
+      {
+        url: '/output-files/test/download',
+        method: 'GET',
+        responseType: 'blob',
+      },
+      { adapter: adapterFor(file) },
+    );
+    expect(result).toBe(file);
   });
 });
 

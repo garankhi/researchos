@@ -64,14 +64,34 @@ export type DomainCodeMap = Record<string, Record<string, string>>;
  * exists to prevent.
  */
 export const domainErrorCodes = {
+  groups: {
+    groupNotFound: 'group_not_found',
+    groupCodeAlreadyExists: 'group_code_already_exists',
+    groupLeaderIneligible: 'group_leader_ineligible',
+  },
   identity: {
     invalidCredentials: 'invalid_credentials',
     accountInactive: 'account_inactive',
     mustChangePassword: 'must_change_password',
     passwordUnchanged: 'password_unchanged',
+    userNotFound: 'user_not_found',
+    userAlreadyExists: 'user_already_exists',
+    emailAlreadyRegistered: 'email_already_registered',
+    cannotGrantSelfRole: 'cannot_grant_self_role',
+    cannotRemoveLastAdmin: 'cannot_remove_last_admin',
+    invalidRoleRevocation: 'invalid_role_revocation',
+    roleAlreadyGranted: 'role_already_granted',
+    roleNotGranted: 'role_not_granted',
   },
   opportunities: {
     notFound: 'opportunity_not_found',
+  },
+  profiles: {
+    profileNotFound: 'profile_not_found',
+  },
+  taxonomy: {
+    fieldNotFound: 'field_not_found',
+    topicNotFound: 'topic_not_found',
   },
 } as const satisfies DomainCodeMap;
 

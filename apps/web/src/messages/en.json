@@ -103,7 +103,21 @@
         "account_inactive": "This account has been deactivated. Please contact an administrator.",
         "must_change_password": "You need to change your password before continuing.",
         "password_unchanged": "The new password must differ from your current password.",
-        "opportunity_not_found": "The opportunity was not found."
+        "opportunity_not_found": "The opportunity was not found.",
+        "field_not_found": "The requested research field was not found.",
+        "topic_not_found": "The requested research topic was not found.",
+        "user_not_found": "The requested user was not found.",
+        "user_already_exists": "A user with this identifier already exists.",
+        "email_already_registered": "This email address is already in use.",
+        "cannot_grant_self_role": "An administrator cannot grant or modify their own roles.",
+        "cannot_remove_last_admin": "Cannot deactivate or revoke the ADMIN role from the last active administrator.",
+        "invalid_role_revocation": "The role revocation timestamp is invalid relative to when the role was granted.",
+        "role_already_granted": "The user already holds this active role.",
+        "role_not_granted": "The user does not hold this active role.",
+        "profile_not_found": "The requested researcher profile was not found.",
+        "group_not_found": "The requested research group was not found.",
+        "group_code_already_exists": "A research group with this code already exists.",
+        "group_leader_ineligible": "The designated group leader must be an active researcher."
       }
     }
   },

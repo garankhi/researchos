@@ -1,6 +1,6 @@
 # Database và Prisma
 
-Ngày cập nhật: 02/11/2026.
+Ngày cập nhật: 07/11/2026.
 
 Prisma 7.10.1 đã được cài đặt trong `packages/database`. Package này giữ
 schema, migration và client dùng chung cho cả `apps/api` và `apps/worker`.
@@ -35,9 +35,8 @@ packages/database/
   scripts/
     setup.mjs            Dựng database: tạo DB, áp migration, seed taxonomy
     setup-database.ps1   Tạo database và chạy migration
-    seed.mjs             Seed taxonomy từ snapshot có sẵn + tài khoản dev
-    seed-online.mjs      Seed taxonomy bằng cách tải từ OpenAlex + tài khoản dev
-    dev-users.mjs        Module tạo tài khoản development, dùng chung cho 2 seed
+    seed.mjs             Seed: taxonomy từ snapshot + tài khoản dev + dữ liệu demo
+    seed-online.mjs      Seed: taxonomy tải từ OpenAlex + tài khoản dev + dữ liệu demo
     export-taxonomy.mjs  Làm mới snapshot taxonomy
     drift-check.mjs      Kiểm tra schema khớp với SQL nguồn
     data/
@@ -116,13 +115,16 @@ Chạy từ root:
 | --- | --- |
 | `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
 | `pnpm db:setup` | Dựng database từ đầu: tạo database, áp migration, seed taxonomy |
+| `pnpm db:reset` | Xoá database hiện tại, dựng lại từ đầu rồi seed lại (offline) — **xoá sạch dữ liệu**, chỉ dùng ở máy dev |
 | `pnpm db:generate` | Sinh lại client từ `schema.prisma` |
 | `pnpm db:migrate` | Tạo và áp dụng migration (chỉ khi dev) |
 | `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
 | `pnpm db:status` | Trạng thái migration |
 | `pnpm db:drift` | Kiểm tra `schema.prisma` còn khớp với SQL nguồn |
-| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
-| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
+| `pnpm db:smoke` | Chạy các smoke test SQL trên cả schema nguồn và chuỗi migration |
+| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, tạo tài khoản development, và ghi dữ liệu demo (profile, group, opportunity, publication) |
+| `pnpm db:seed:demo` | Chỉ ghi dữ liệu demo, bỏ qua taxonomy — dùng khi taxonomy đã có sẵn |
+| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, tạo tài khoản development, và ghi dữ liệu demo |
 | `pnpm db:studio` | Prisma Studio để xem và sửa dữ liệu |
 
 `pnpm db:setup` là lệnh onboarding cho phần database: nó tạo database nếu chưa
@@ -135,12 +137,68 @@ Lệnh `pnpm setup` ở root làm nhiều hơn thế: nó gọi `pnpm db:setup` 
 việc tạo `.env`, cài dependency, bật Docker, build và sinh client API. Xem
 [README](../README.md).
 
+### Dựng lại database: `pnpm db:reset`
+
+`pnpm db:setup` chỉ tạo database khi nó chưa tồn tại. Khi database đã tồn tại
+nhưng dữ liệu bị bẩn — migration lệch, seed chạy lỗi giữa chừng, hay chỉ muốn
+bắt đầu lại từ con số không — dùng `pnpm db:reset`:
+
+```powershell
+pnpm db:reset
+```
+
+Lệnh này **xoá sạch** database hiện tại: mọi dòng dữ liệu đều mất, kể cả
+những dòng mà seed không bao giờ ghi. Các bước chạy theo thứ tự:
+
+1. `DROP DATABASE` rồi `CREATE DATABASE` — các phiên kết nối còn treo được
+   đóng trước, vì database đang có session thì không xoá được.
+2. `prisma migrate deploy` — áp dụng migration.
+3. `node scripts/seed.mjs` — nhập taxonomy từ snapshot có sẵn trong repo, tạo
+   tài khoản development và ghi dữ liệu demo.
+
+Bước 3 là seed **offline**: taxonomy đọc từ snapshot đã commit
+(`packages/database/scripts/data/openalex-taxonomy.json`), không tải từ
+OpenAlex. Nên lệnh **không cần mạng và không cần OpenAlex API key**. Muốn
+nạp taxonomy từ nguồn thật thì chạy `pnpm db:seed:online` sau đó.
+
+Lệnh cần database user có quyền `CREATEDB` (thường là `postgres`). Chỉ dùng ở
+máy dev — không chạy trên production.
+
 `pnpm db:seed` đọc taxonomy từ snapshot
 (`packages/database/scripts/data/openalex-taxonomy.json`), nên chạy nhanh và
 offline. `pnpm db:seed:online` tải trực tiếp từ OpenAlex, cần mạng và mất
 khoảng 90 giây. Cả hai dùng chung phần ghi vào database, nên cho ra cùng kết
 quả, và cả hai cũng tạo tài khoản development.
 Chi tiết: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
+
+Cả ba lệnh seed nằm trong **một file** (`packages/database/scripts/seed.mjs`).
+Việc tách taxonomy, tài khoản và dữ liệu demo ra ba file chỉ thêm rắc rối:
+dữ liệu demo trỏ tới topic taxonomy và tài khoản đã seed, nên thứ tự chạy
+luôn là bắt buộc. File này seed theo thứ tự này:
+
+1. Taxonomy (`research_fields` → `research_subfields` → `research_topics`).
+2. Tài khoản (`users`, `local_credentials`, `user_role_assignments`).
+3. Profile (`researcher_profiles`), group (`research_groups`, `group_members`),
+   hướng nghiên cứu (`group_directions`), sở thích (`research_interests`).
+4. Opportunity (`research_opportunities`) và publication
+   (`research_outputs`, `output_revisions`, `output_authors`, `output_topics`).
+
+`search_index` **không** được seed trực tiếp. Trigger `sync_search_index`
+tự đồng bộ từ các dòng nguồn, nên index có dữ liệu đúng ngay khi dữ liệu
+demo được ghi. Đây là điểm quan trọng: quyền xem của search index được lọc
+bằng SQL (`visible_search_index`), nên mock HTTP sẽ không bao giờ kiểm chứng
+được phần lọc quyền này.
+
+`pnpm db:seed:demo` bỏ qua bước 1 và chỉ ghi lại dữ liệu demo. Lệnh này
+nhanh hơn nhiều (dưới 1 giây so với khoảng 4 giây) và là fixture mà e2e
+suite dùng.
+
+Cả hai lệnh seed đều **idempotent**: chạy hai lần cho ra cùng số dòng, với
+cùng id. Mỗi bảng được ghi bằng `upsert` trên đúng danh tính mà schema định
+nghĩa cho bảng đó. Riêng `output_revisions` không dùng `upsert`, vì schema có
+partial unique index `uq_output_editable_draft` trên `(output_id) WHERE
+released_at IS NULL` và Prisma sẽ chọn index đó làm đích `ON CONFLICT` —
+PostgreSQL không dùng được partial index làm đích `ON CONFLICT`.
 
 `pnpm db:migrate` tương đương `prisma migrate dev`: nó tạo file migration mới
 khi schema đổi và áp dụng các migration chưa chạy. **Chỉ dùng ở máy dev.**
@@ -153,6 +211,20 @@ so sánh với `schema.prisma` đã commit, rồi xoá database tạm. Lệnh ch
 không đụng vào database dev. Nếu SQL nguồn đã đổi mà `schema.prisma` chưa
 được introspect lại, lệnh báo lỗi và in ra phần diff cần sửa. Chi tiết quy
 trình đồng bộ: [đồng bộ schema vào Prisma](./database-prisma-sync.md).
+
+`pnpm db:smoke` chạy các smoke test SQL trong `docs/database/`. Lệnh dựng
+database tạm **hai lần** — một lần từ `docs/database/ResearchOS.sql`, một lần
+từ chuỗi migration trong `packages/database/prisma/migrations/` — rồi chạy
+toàn bộ smoke test trên cả hai, rồi xoá database tạm.
+
+Cần cả hai vì `db:drift` chỉ so **hình dạng** schema, còn smoke test kiểm tra
+**hành vi**: một trigger ngừng bảo trì `search_index`, hoặc một hàm trả về
+sai dòng, vẫn qua kiểm tra drift. Và cần cả hai bản dựng vì database đang chạy
+được nâng cấp bằng migration: đổi SQL nguồn mà không mirror sang migration
+thì database đã deploy vẫn giữ hành vi cũ.
+
+Các file smoke test là SQL thuần, tự mở transaction và tự rollback, nên
+chạy lại nhiều lần không để lại dữ liệu.
 
 ## 5. Quy tắc schema
 
@@ -385,6 +457,11 @@ Bảng `search_index` là nguồn dữ liệu cho màn hình Search. Mô hình:
 
   Draft của chính owner (`sharing_status = 'DRAFT'`) **không** vào index —
   đúng với nguyên tắc ở §5.1.1: bài DRAFT chỉ hiện ở hồ sơ cá nhân.
+  Luật index của mỗi loại entity nằm trong một hàm phụ riêng
+  (`sync_search_index_output`, `sync_researcher_search_index`,
+  `sync_group_search_index`, `sync_opportunity_search_index`); trigger chỉ
+  rẽ nhánh rồi gọi hàm, nên đường trigger và đường dựng lại index dùng chung
+  một luật — xem §5.7.4.
 - **`visibility` và `access_group_id` được copy vào index** để lọc quyền
   ngay tại bảng index, không cần join ngược về `research_outputs`. Check
   `ck_search_index_scope` giữ đúng quy tắc của `ck_output_access_scope`.
@@ -522,6 +599,59 @@ kiểm tra toàn vẹn (xem §5.7.1). Ba entity không có cột `visibility` n�
 > `search_index` phủ 4 loại trên. Project, seminar, research record và topic
 > chưa vào Search trong MVP.
 
+#### 5.7.3 Dựng lại index: `rebuild_search_index()` (RES-94)
+
+Trigger chỉ nhìn thấy những dòng được ghi **sau khi** nó tồn tại. Một dòng
+đã có trong database từ trước khi trigger được tạo — hoặc được ghi lúc
+trigger đang thiếu — sẽ nằm ngoài index mãi mãi, và không có đường nào đưa
+nó trở lại. `rebuild_search_index()` là đường đó:
+
+```sql
+SELECT rebuild_search_index();
+```
+
+Hàm làm hai việc, theo thứ tự:
+
+1. **Xoá dòng không còn được index.** Một dòng `search_index` không còn dựa
+   trên bản ghi nguồn hợp lệ (output đã archive, tài khoản bị vô hiệu hoá,
+   group đã archive, opportunity đã đóng) là dòng thừa, bất kể ai đã ghi
+   nó.
+2. **Dựng lại mọi dòng hợp lệ** từ bảng nguồn, cho cả 4 loại entity.
+
+Mỗi lần gọi là **upsert** theo khoá `(entity_type, entity_id)`, nên gọi hai
+lần cho kết quả giống nhau — hàm idempotent, có thể chạy lại an toàn.
+
+#### 5.7.4 Vì sao trigger và hàm rebuild không lệch nhau
+
+`rebuild_search_index()` **không** tự viết lại luật index. Nó gọi đúng các
+hàm mà trigger gọi:
+
+| Hàm | Phạm vi |
+| --- | --- |
+| `sync_search_index_output(target uuid)` | một công trình (`OUTPUT`) |
+| `sync_researcher_search_index(target uuid)` | một tài khoản (`RESEARCHER`) |
+| `sync_group_search_index(target uuid)` | một group (`GROUP`) |
+| `sync_opportunity_search_index(target uuid)` | một cơ hội (`OPPORTUNITY`) |
+
+Trigger `sync_search_index()` chỉ còn làm việc rẽ nhánh theo bảng và gọi
+đúng hàm tương ứng. Luật "dòng này có được index hay không" nằm trong **một**
+chỗ cho mỗi loại entity, nên đường trigger và đường rebuild không thể lệch
+nhau: sửa luật ở hàm thì cả hai đường đổi theo.
+
+Một hàm phụ cũng xoá dòng index khi entity **không** được index (bản nháp,
+tài khoản inactive, group đã archive, opportunity đã đóng). Nhờ vậy
+rebuild cũng sửa được một index đang chứa dòng sai, chứ không chỉ bổ sung
+dòng thiếu.
+
+Hàm rebuild chỉ đọc bảng nguồn và ghi vào `search_index`, nên nó **không** kích
+hoạt trigger bảo trì và không đổi dữ liệu nào khác.
+
+> **Giới hạn:** `rebuild_search_index()` dựng lại toàn bộ index trong một
+> lệnh. Với dữ liệu lớn thì đây là thao tác nặng; chạy nó khi index lệch, không
+> phải định kỳ. Nó cũng không gọi lại từng trigger theo đúng thứ tự thời gian,
+> nên `updated_at` của dòng index là thời điểm chạy rebuild, không phải thời
+> điểm dòng nguồn thay đổi lần cuối.
+
 ## 6. Truy cập dữ liệu trong code
 
 Service dùng `PrismaService` được inject qua constructor:
@@ -601,8 +731,13 @@ chạy, rồi dùng `pnpm infra:status` và `pnpm infra:logs`.
 Client được sinh lại tự động trước mỗi lần build của package database, nhưng
 IDE cần chạy lệnh này để cập nhật type.
 
-**Migration bị lệch.** `pnpm --filter @researchos/database db:reset`
-xoá và dựng lại database từ đầu. Chỉ dùng ở máy dev.
+**Migration bị lệch.** `pnpm db:reset` xoá và dựng lại database từ đầu. Chỉ dùng
+ở máy dev.
+
+**`The database user in DATABASE_URL may not create databases`.** Lệnh
+`pnpm db:reset` cần user có quyền `CREATEDB` để `DROP DATABASE` và
+`CREATE DATABASE`. Grant quyền đó cho user trong `DATABASE_URL`, hoặc trỏ
+`DATABASE_URL` sang một tài khoản admin.
 
 ## 9. Migration và production
 

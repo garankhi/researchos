@@ -14,6 +14,12 @@ export default defineConfig({
       clean: true,
       formatter: 'prettier',
       override: {
+        operations: {
+          OutputDownloadController_downloadFile: {
+            // Download links should reach the API on every click.
+            query: { useQuery: false, useMutation: false },
+          },
+        },
         mutator: {
           path: './src/lib/axios-instance.ts',
           name: 'axiosInstance',
