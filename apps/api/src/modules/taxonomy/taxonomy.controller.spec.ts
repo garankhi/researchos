@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
@@ -98,6 +98,73 @@ describe('TaxonomyController', () => {
       expect(result[0].subfields[0].topics[0].id).toBe(mockTopic.id);
       expect(result[0].subfields[0].topics[0].name).toBe('Deep Learning');
     });
+
+    it('retains OPENALEX parent field and subfield when filtering source=LOCAL', async () => {
+      const prismaMock = createPrismaMock();
+      const localTopic = {
+        ...mockTopic,
+        id: '44444444-4444-4444-4444-444444444444',
+        name: 'Custom Local Topic',
+        source: 'LOCAL',
+        external_id: null,
+      };
+      const emptySubfield = {
+        ...mockSubfield,
+        id: '55555555-5555-5555-5555-555555555555',
+        name: 'Empty Subfield',
+        research_topics: [],
+      };
+      const treeFieldWithLocalTopic = {
+        ...mockField,
+        research_subfields: [
+          {
+            ...mockSubfield,
+            research_topics: [localTopic],
+          },
+          emptySubfield,
+        ],
+      };
+      const emptyField = {
+        ...mockField,
+        id: '66666666-6666-6666-6666-666666666666',
+        name: 'Empty Field',
+        research_subfields: [emptySubfield],
+      };
+      prismaMock.research_fields.findMany.mockResolvedValue([
+        treeFieldWithLocalTopic,
+        emptyField,
+      ]);
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getTree({
+        source: TaxonomySource.LOCAL,
+        isActive: true,
+      });
+
+      expect(prismaMock.research_fields.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { is_active: true },
+          include: expect.objectContaining({
+            research_subfields: expect.objectContaining({
+              where: { is_active: true },
+              include: expect.objectContaining({
+                research_topics: expect.objectContaining({
+                  where: { is_active: true, source: TaxonomySource.LOCAL },
+                }),
+              }),
+            }),
+          }),
+        }),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(mockField.id);
+      expect(result[0].subfields).toHaveLength(1);
+      expect(result[0].subfields[0].id).toBe(mockSubfield.id);
+      expect(result[0].subfields[0].topics).toHaveLength(1);
+      expect(result[0].subfields[0].topics[0].source).toBe(
+        TaxonomySource.LOCAL,
+      );
+    });
   });
 
   describe('findAllFields', () => {
@@ -169,6 +236,33 @@ describe('TaxonomyController', () => {
       expect(result.meta.limit).toBe(20);
       expect(result.meta.totalPages).toBe(1);
       expect(result.meta.hasNextPage).toBe(false);
+    });
+
+    it('honors sort parameter and rejects unknown sort keys with 400', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_topics.findMany.mockResolvedValue([mockTopic]);
+      prismaMock.research_topics.count.mockResolvedValue(1);
+
+      const controller = await setupController(prismaMock);
+      await controller.findAllTopics({
+        page: 1,
+        limit: 20,
+        sort: '-name',
+      });
+
+      expect(prismaMock.research_topics.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { name: 'desc' },
+        }),
+      );
+
+      await expect(
+        controller.findAllTopics({
+          page: 1,
+          limit: 20,
+          sort: 'invalidField',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

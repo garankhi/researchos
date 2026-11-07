@@ -5,8 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { TaxonomyTreeTopicDtoDescription } from './taxonomyTreeTopicDtoDescription';
-import type { TaxonomyTreeTopicDtoExternalId } from './taxonomyTreeTopicDtoExternalId';
 import type { TaxonomyTreeTopicDtoSource } from './taxonomyTreeTopicDtoSource';
 
 export interface TaxonomyTreeTopicDto {
@@ -20,14 +18,14 @@ export interface TaxonomyTreeTopicDto {
    * Detailed description or keywords of the research topic.
    * @nullable
    */
-  description: TaxonomyTreeTopicDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: TaxonomyTreeTopicDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex topic ID).
    * @nullable
    */
-  externalId: TaxonomyTreeTopicDtoExternalId;
+  externalId: string | null;
   /** Whether this topic is active and selectable in the system. */
   isActive: boolean;
 }

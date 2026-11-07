@@ -5,10 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { FieldResponseDtoDescription } from './fieldResponseDtoDescription';
-import type { FieldResponseDtoExternalId } from './fieldResponseDtoExternalId';
-import type { FieldResponseDtoInternalCode } from './fieldResponseDtoInternalCode';
-import type { FieldResponseDtoNameVi } from './fieldResponseDtoNameVi';
 import type { FieldResponseDtoSource } from './fieldResponseDtoSource';
 
 export interface FieldResponseDto {
@@ -18,26 +14,26 @@ export interface FieldResponseDto {
    * Stable internal code for the field.
    * @nullable
    */
-  internalCode: FieldResponseDtoInternalCode;
+  internalCode: string | null;
   /** English name of the research field. */
   name: string;
   /**
    * Vietnamese translated name of the research field.
    * @nullable
    */
-  nameVi: FieldResponseDtoNameVi;
+  nameVi: string | null;
   /**
    * Detailed description or scope of the research field.
    * @nullable
    */
-  description: FieldResponseDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: FieldResponseDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex field ID).
    * @nullable
    */
-  externalId: FieldResponseDtoExternalId;
+  externalId: string | null;
   /** Whether this field is active and selectable in the system. */
   isActive: boolean;
 }

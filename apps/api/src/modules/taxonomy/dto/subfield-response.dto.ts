@@ -20,6 +20,7 @@ export class SubfieldResponseDto {
   @ApiProperty({
     description: 'Stable internal code for the subfield.',
     example: 'SUBFIELD-AI',
+    type: String,
     nullable: true,
   })
   internalCode: string | null;
@@ -33,6 +34,7 @@ export class SubfieldResponseDto {
   @ApiProperty({
     description: 'Vietnamese translated name of the research subfield.',
     example: 'Trí tuệ nhân tạo',
+    type: String,
     nullable: true,
   })
   nameVi: string | null;
@@ -41,6 +43,7 @@ export class SubfieldResponseDto {
     description: 'Detailed description or scope of the research subfield.',
     example:
       'Theory and development of computer systems able to perform tasks requiring human intelligence.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -56,6 +59,7 @@ export class SubfieldResponseDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex subfield ID).',
     example: 'https://openalex.org/subfields/1702',
+    type: String,
     nullable: true,
   })
   externalId: string | null;

@@ -5,10 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { TaxonomyTreeFieldDtoDescription } from './taxonomyTreeFieldDtoDescription';
-import type { TaxonomyTreeFieldDtoExternalId } from './taxonomyTreeFieldDtoExternalId';
-import type { TaxonomyTreeFieldDtoInternalCode } from './taxonomyTreeFieldDtoInternalCode';
-import type { TaxonomyTreeFieldDtoNameVi } from './taxonomyTreeFieldDtoNameVi';
 import type { TaxonomyTreeFieldDtoSource } from './taxonomyTreeFieldDtoSource';
 import type { TaxonomyTreeSubfieldDto } from './taxonomyTreeSubfieldDto';
 
@@ -19,26 +15,26 @@ export interface TaxonomyTreeFieldDto {
    * Stable internal code for the field.
    * @nullable
    */
-  internalCode: TaxonomyTreeFieldDtoInternalCode;
+  internalCode: string | null;
   /** English name of the research field. */
   name: string;
   /**
    * Vietnamese translated name of the research field.
    * @nullable
    */
-  nameVi: TaxonomyTreeFieldDtoNameVi;
+  nameVi: string | null;
   /**
    * Detailed description or scope of the research field.
    * @nullable
    */
-  description: TaxonomyTreeFieldDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: TaxonomyTreeFieldDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex field ID).
    * @nullable
    */
-  externalId: TaxonomyTreeFieldDtoExternalId;
+  externalId: string | null;
   /** Whether this field is active and selectable in the system. */
   isActive: boolean;
   /** List of research subfields belonging to this field. */

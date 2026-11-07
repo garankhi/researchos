@@ -27,6 +27,7 @@ export class TopicResponseDto {
     description: 'Detailed description or keywords of the research topic.',
     example:
       'Architectures, training techniques, and representations for deep artificial neural networks.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -42,6 +43,7 @@ export class TopicResponseDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex topic ID).',
     example: 'https://openalex.org/topics/T10001',
+    type: String,
     nullable: true,
   })
   externalId: string | null;

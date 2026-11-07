@@ -72,6 +72,8 @@ export const domainErrorCodes = {
     userAlreadyExists: 'user_already_exists',
     emailAlreadyRegistered: 'email_already_registered',
     cannotGrantSelfRole: 'cannot_grant_self_role',
+    cannotRemoveLastAdmin: 'cannot_remove_last_admin',
+    invalidRoleRevocation: 'invalid_role_revocation',
     roleAlreadyGranted: 'role_already_granted',
     roleNotGranted: 'role_not_granted',
   },

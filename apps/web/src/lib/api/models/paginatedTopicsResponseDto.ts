@@ -5,12 +5,12 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { PaginatedTopicsResponseDtoItemsItem } from './paginatedTopicsResponseDtoItemsItem';
 import type { PaginationMetaDto } from './paginationMetaDto';
+import type { TopicResponseDto } from './topicResponseDto';
 
 export interface PaginatedTopicsResponseDto {
   /** The research topics of this page. */
-  items: PaginatedTopicsResponseDtoItemsItem[];
+  items: TopicResponseDto[];
   /** The pagination metadata of this page. */
   meta: PaginationMetaDto;
 }

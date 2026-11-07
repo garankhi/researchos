@@ -1,8 +1,15 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
-import { buildPaginationMeta } from '../../common/dto/pagination.dto.js';
+import {
+  buildPaginationMeta,
+  parseSortParam,
+} from '../../common/dto/pagination.dto.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import {
+  CHECK_VIOLATION_SQL_STATE,
+  readDatabaseFailure,
+} from '../../common/errors/database-errors.js';
 import { AccessService } from './access.service.js';
 import { AccessRoleEnum } from './dto/grant-role.dto.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
@@ -18,6 +25,28 @@ type UserRow = Prisma.usersGetPayload<Record<string, never>>;
 type RoleAssignmentRow = Prisma.user_role_assignmentsGetPayload<
   Record<string, never>
 >;
+
+/**
+ * The unique index on the normalized email — `lower(btrim(email))`.
+ *
+ * A conflict on it is an email conflict; any other unique violation is a
+ * different account attribute.
+ */
+const EMAIL_UNIQUE_CONSTRAINT = 'uq_users_email_normalized';
+
+const USER_SORT_FIELDS = {
+  createdAt: 'created_at',
+  created_at: 'created_at',
+  updatedAt: 'updated_at',
+  updated_at: 'updated_at',
+  fullName: 'full_name',
+  full_name: 'full_name',
+  email: 'email',
+  departmentUnit: 'department_unit',
+  department_unit: 'department_unit',
+  lastLoginAt: 'last_login_at',
+  last_login_at: 'last_login_at',
+} as const;
 
 /**
  * Service managing user accounts and role assignments.
@@ -67,13 +96,20 @@ export class UsersService {
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
     const skip = (page - 1) * limit;
 
+    const orderBy = parseSortParam(query.sort, USER_SORT_FIELDS, {
+      created_at: 'desc',
+    });
+    if (!orderBy) {
+      throw new BadRequestException('validation_failed');
+    }
+
     const [total, userRows] = await Promise.all([
       this.prisma.users.count({ where }),
       this.prisma.users.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { created_at: 'desc' },
+        orderBy,
       }),
     ]);
 
@@ -181,15 +217,9 @@ export class UsersService {
 
       return this.mapToUserResponse(user, roles);
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        const target = JSON.stringify(error.meta?.target ?? '');
-        if (
-          target.includes('email') ||
-          target.includes('uq_users_email_normalized')
-        ) {
+      const failure = readDatabaseFailure(error);
+      if (failure?.prismaCode === 'P2002') {
+        if (failure.constraintName === EMAIL_UNIQUE_CONSTRAINT) {
           throw new CodedHttpException(
             domainErrorCodes.identity.emailAlreadyRegistered,
             HttpStatus.CONFLICT,
@@ -206,6 +236,11 @@ export class UsersService {
 
   /**
    * Updates an existing user account or active status (soft-deactivate).
+   *
+   * When deactivating (`isActive: false`), calls `SELECT assert_admin_removal_allowed($id::uuid)`
+   * inside the same transaction to prevent deactivating the last active administrator.
+   * When activating (`isActive: true`), acquires the shared advisory lock
+   * `pg_advisory_xact_lock(1920233327, 1)` per database conventions.
    */
   async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
     const existing = await this.prisma.users.findUnique({
@@ -220,6 +255,44 @@ export class UsersService {
     }
 
     const data: Prisma.usersUpdateInput = {};
+
+    if (dto.email !== undefined) {
+      const normalizedEmail = dto.email.trim().toLowerCase();
+      const emailConflict = await this.prisma.users.findFirst({
+        where: {
+          id: { not: id },
+          email: { equals: normalizedEmail, mode: 'insensitive' },
+        },
+      });
+      if (emailConflict) {
+        throw new CodedHttpException(
+          domainErrorCodes.identity.emailAlreadyRegistered,
+          HttpStatus.CONFLICT,
+        );
+      }
+      data.email = normalizedEmail;
+    }
+
+    if (dto.fptuGuid !== undefined) {
+      const normalizedGuid =
+        typeof dto.fptuGuid === 'string' ? dto.fptuGuid.trim() || null : null;
+      if (normalizedGuid) {
+        const guidConflict = await this.prisma.users.findFirst({
+          where: {
+            id: { not: id },
+            fptu_guid: normalizedGuid,
+          },
+        });
+        if (guidConflict) {
+          throw new CodedHttpException(
+            domainErrorCodes.identity.userAlreadyExists,
+            HttpStatus.CONFLICT,
+          );
+        }
+      }
+      data.fptu_guid = normalizedGuid;
+    }
+
     if (dto.fullName !== undefined) {
       data.full_name = dto.fullName.trim();
     }
@@ -230,34 +303,52 @@ export class UsersService {
       data.department_unit = dto.departmentUnit.trim();
     }
     if (dto.academicTitle !== undefined) {
-      data.academic_title = dto.academicTitle ? dto.academicTitle.trim() : null;
+      data.academic_title =
+        typeof dto.academicTitle === 'string'
+          ? dto.academicTitle.trim() || null
+          : null;
     }
     if (dto.academicDegree !== undefined) {
-      data.academic_degree = dto.academicDegree
-        ? dto.academicDegree.trim()
-        : null;
+      data.academic_degree =
+        typeof dto.academicDegree === 'string'
+          ? dto.academicDegree.trim() || null
+          : null;
     }
     if (dto.isActive !== undefined) {
       data.is_active = dto.isActive;
     }
 
-    const updated = await this.prisma.users.update({
-      where: { id },
-      data,
-    });
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        if (dto.isActive === false) {
+          await tx.$executeRaw`SELECT assert_admin_removal_allowed(${id}::uuid)`;
+        } else if (dto.isActive === true) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(1920233327, 1)`;
+        }
 
-    const access = await this.accessService.effectiveRoles(updated.id);
-    const roles: string[] = [];
-    if (access.isResearcher) roles.push('RESEARCHER');
-    if (access.isAdmin) roles.push('ADMIN');
+        return tx.users.update({
+          where: { id },
+          data,
+        });
+      });
 
-    return this.mapToUserResponse(updated, roles);
+      const access = await this.accessService.effectiveRoles(updated.id);
+      const roles: string[] = [];
+      if (access.isResearcher) roles.push('RESEARCHER');
+      if (access.isAdmin) roles.push('ADMIN');
+
+      return this.mapToUserResponse(updated, roles);
+    } catch (error) {
+      this.rethrowDatabaseConstraintError(error);
+      throw error;
+    }
   }
 
   /**
    * Grants an access role to a target user.
    *
    * Enforces business rule: administrators cannot grant roles to themselves.
+   * Acquires the shared advisory lock when granting the `ADMIN` role.
    */
   async grantRole(
     userId: string,
@@ -298,33 +389,36 @@ export class UsersService {
     }
 
     try {
-      const assignment = await this.prisma.user_role_assignments.create({
-        data: {
-          user_id: userId,
-          role: dto.role,
-          grant_source: 'MANUAL',
-          granted_by: adminId,
-          reason: dto.reason?.trim() || null,
-        },
+      const assignment = await this.prisma.$transaction(async (tx) => {
+        if (dto.role === AccessRoleEnum.ADMIN) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(1920233327, 1)`;
+        }
+
+        return tx.user_role_assignments.create({
+          data: {
+            user_id: userId,
+            role: dto.role,
+            grant_source: 'MANUAL',
+            granted_by: adminId,
+            reason: dto.reason?.trim() || null,
+          },
+        });
       });
 
       return this.mapToRoleAssignmentResponse(assignment);
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new CodedHttpException(
-          domainErrorCodes.identity.roleAlreadyGranted,
-          HttpStatus.CONFLICT,
-        );
-      }
+      this.rethrowDatabaseConstraintError(error, { isRoleGrant: true });
       throw error;
     }
   }
 
   /**
    * Revokes an active access role from a target user.
+   *
+   * When revoking `ADMIN`, calls `SELECT assert_admin_removal_allowed($userId::uuid)`
+   * inside the same transaction before updating `user_role_assignments`.
+   * Validates `ck_grant_revocation` (`revoked_at >= granted_at`) and surfaces
+   * violations as 400 Bad Request (`invalid_role_revocation`).
    */
   async revokeRole(
     userId: string,
@@ -358,16 +452,104 @@ export class UsersService {
       );
     }
 
-    const revoked = await this.prisma.user_role_assignments.update({
-      where: { id: activeGrant.id },
-      data: {
-        revoked_at: new Date(),
-        revoked_by: adminId,
-        reason: dto.reason?.trim() || activeGrant.reason,
-      },
-    });
+    const revokedAt = new Date();
+    if (revokedAt.getTime() < activeGrant.granted_at.getTime()) {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.invalidRoleRevocation,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-    return this.mapToRoleAssignmentResponse(revoked);
+    try {
+      const revoked = await this.prisma.$transaction(async (tx) => {
+        if (role === AccessRoleEnum.ADMIN) {
+          await tx.$executeRaw`SELECT assert_admin_removal_allowed(${userId}::uuid)`;
+        }
+
+        return tx.user_role_assignments.update({
+          where: { id: activeGrant.id },
+          data: {
+            revoked_at: revokedAt,
+            revoked_by: adminId,
+            reason: dto.reason?.trim() || activeGrant.reason,
+          },
+        });
+      });
+
+      return this.mapToRoleAssignmentResponse(revoked);
+    } catch (error) {
+      this.rethrowDatabaseConstraintError(error);
+      throw error;
+    }
+  }
+
+  /**
+   * Maps Prisma/PostgreSQL constraint errors to domain `CodedHttpException`s.
+   *
+   * The database is the authority on these rules, so the error is read the
+   * way the database reports it — the SQLSTATE and the violated constraint
+   * name — rather than by matching on message text. See
+   * `common/errors/database-errors.ts` for the shape Prisma 7 produces.
+   */
+  private rethrowDatabaseConstraintError(
+    error: unknown,
+    options?: { isRoleGrant?: boolean },
+  ): void {
+    if (error instanceof CodedHttpException) {
+      throw error;
+    }
+
+    const failure = readDatabaseFailure(error);
+    if (!failure) {
+      return;
+    }
+
+    if (failure.prismaCode === 'P2002') {
+      if (options?.isRoleGrant) {
+        throw new CodedHttpException(
+          domainErrorCodes.identity.roleAlreadyGranted,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (failure.constraintName === EMAIL_UNIQUE_CONSTRAINT) {
+        throw new CodedHttpException(
+          domainErrorCodes.identity.emailAlreadyRegistered,
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw new CodedHttpException(
+        domainErrorCodes.identity.userAlreadyExists,
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    if (failure.sqlState !== CHECK_VIOLATION_SQL_STATE) {
+      return;
+    }
+
+    // The last-admin guard raises from a helper function, so it names no
+    // constraint — it is the one check violation that does not.
+    if (!failure.constraintName) {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.cannotRemoveLastAdmin,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (failure.constraintName === 'ck_grant_revocation') {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.invalidRoleRevocation,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (failure.constraintName === 'ck_no_self_grant') {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.cannotGrantSelfRole,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   private mapToUserResponse(user: UserRow, roles: string[]): UserResponseDto {

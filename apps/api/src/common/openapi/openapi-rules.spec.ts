@@ -315,6 +315,94 @@ describe('checkOpenApiDocument', () => {
     });
   });
 
+  describe('paginatedResponse.itemsRef', () => {
+    it('rejects a paginated response whose items have no concrete schema', () => {
+      const doc = documentWith(
+        { '/profiles': { get: operation() } },
+        {
+          PaginatedProfilesResponseDto: {
+            type: 'object',
+            properties: {
+              items: {
+                description: 'The records of this page.',
+                type: 'array',
+                items: { type: 'object' },
+              },
+            },
+          },
+        },
+      );
+
+      expect(rulesOf(doc)).toContain('paginatedResponse.itemsRef');
+    });
+
+    it('accepts a paginated response whose items reference a concrete schema', () => {
+      const doc = documentWith(
+        { '/profiles': { get: operation() } },
+        {
+          PaginatedProfilesResponseDto: {
+            type: 'object',
+            properties: {
+              items: {
+                description: 'The records of this page.',
+                type: 'array',
+                items: { $ref: '#/components/schemas/ProfileDto' },
+              },
+            },
+          },
+          ProfileDto: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Identifier of the profile.' },
+            },
+          },
+        },
+      );
+
+      expect(rulesOf(doc)).not.toContain('paginatedResponse.itemsRef');
+    });
+
+    it('does not check the generic base class', () => {
+      const doc = documentWith(
+        { '/profiles': { get: operation() } },
+        {
+          PaginatedResultDto: {
+            type: 'object',
+            properties: {
+              items: {
+                description: 'The records of this page.',
+                type: 'array',
+                items: { type: 'object' },
+              },
+            },
+          },
+        },
+      );
+
+      expect(rulesOf(doc)).not.toContain('paginatedResponse.itemsRef');
+    });
+
+    it('does not check a schema that is not a paginated response', () => {
+      const doc = documentWith(
+        { '/profiles': { get: operation() } },
+        {
+          ProfileResponseDto: {
+            type: 'object',
+            properties: {
+              items: {
+                description: 'The records of this page.',
+                type: 'array',
+                items: { type: 'object' },
+              },
+            },
+          },
+        },
+      );
+
+      expect(rulesOf(doc)).not.toContain('paginatedResponse.itemsRef');
+    });
+  });
+
   it('reports the location of a violation', () => {
     const doc = documentWith({
       '/profiles/{id}': {

@@ -56,6 +56,9 @@ export class UsersController {
     description: 'Paginated user list retrieved successfully.',
     type: PaginatedUsersResponseDto,
   })
+  @ApiBadRequestResponse({
+    description: 'Invalid query parameters or sort expression.',
+  })
   @Get()
   async findAll(
     @Query() query: ListUsersQueryDto,
@@ -76,6 +79,9 @@ export class UsersController {
   @ApiOkResponse({
     description: 'User details retrieved successfully.',
     type: UserResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'The provided user ID is not a valid UUID.',
   })
   @ApiNotFoundResponse({
     description: 'The requested user was not found.',
@@ -119,8 +125,16 @@ export class UsersController {
     description: 'User updated successfully.',
     type: UserResponseDto,
   })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid update payload, invalid UUID, or attempt to deactivate the last active administrator.',
+  })
   @ApiNotFoundResponse({
     description: 'The requested user was not found.',
+  })
+  @ApiConflictResponse({
+    description:
+      'A user with this email or institutional identifier already exists.',
   })
   @Patch(':id')
   async update(
@@ -180,6 +194,10 @@ export class UsersController {
   @ApiOkResponse({
     description: 'Role revoked successfully.',
     type: RoleAssignmentResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Cannot revoke the ADMIN role from the last active administrator or revocation timestamp violates grant constraint.',
   })
   @ApiNotFoundResponse({
     description: 'User or active role grant was not found.',

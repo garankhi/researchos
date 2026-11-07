@@ -1,4 +1,8 @@
-import { HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
@@ -6,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AccessService } from './access.service.js';
 import { UserTypeEnum } from './dto/create-user.dto.js';
 import { AccessRoleEnum } from './dto/grant-role.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UsersController } from './users.controller.js';
 import { UsersService } from './users.service.js';
 
@@ -40,22 +45,60 @@ describe('UsersController', () => {
     reason: 'Promoted to admin',
   };
 
-  const createPrismaMock = () => ({
-    users: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    user_role_assignments: {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    $queryRaw: vi.fn(),
-  });
+  const createPrismaMock = () => {
+    const mock = {
+      users: {
+        findMany: vi.fn(),
+        findUnique: vi.fn(),
+        findFirst: vi.fn(),
+        count: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      user_role_assignments: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      $queryRaw: vi.fn(),
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $transaction: vi.fn(),
+    };
+    mock.$transaction.mockImplementation(
+      async (cb: (tx: typeof mock) => unknown) => cb(mock),
+    );
+    return mock;
+  };
+
+  /**
+   * The error Prisma 7 raises for a failed statement.
+   *
+   * The shape is the one the `pg` driver adapter produces, so the tests
+   * read the SQLSTATE and the constraint name the way the service does.
+   */
+  const databaseError = (
+    prismaCode: string,
+    sqlState: string,
+    originalMessage: string,
+    extra?: Record<string, unknown>,
+  ) =>
+    ({
+      name: 'PrismaClientKnownRequestError',
+      message: `Database error. Code: \`${sqlState}\`. Message: \`${originalMessage}\``,
+      code: prismaCode,
+      meta: {
+        driverAdapterError: {
+          name: 'DriverAdapterError',
+          cause: {
+            originalCode: sqlState,
+            originalMessage,
+            kind: 'postgres',
+            code: sqlState,
+            ...extra,
+          },
+        },
+      },
+    }) as unknown as Error;
 
   const createAccessServiceMock = () => ({
     effectiveRoles: vi.fn().mockResolvedValue({
@@ -126,6 +169,25 @@ describe('UsersController', () => {
           }),
         }),
       );
+    });
+
+    it('honors sort parameter and rejects invalid sort keys with 400', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.count.mockResolvedValue(0);
+      prismaMock.users.findMany.mockResolvedValue([]);
+
+      const controller = await setupController(prismaMock);
+      await controller.findAll({ sort: 'fullName' });
+
+      expect(prismaMock.users.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { full_name: 'asc' },
+        }),
+      );
+
+      await expect(
+        controller.findAll({ sort: 'unknownSortKey' }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -234,10 +296,79 @@ describe('UsersController', () => {
         }),
       );
     });
+
+    it('throws 409 email_already_registered when the database rejects a duplicate email', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findFirst.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(null);
+      prismaMock.users.create.mockRejectedValue(
+        databaseError(
+          'P2002',
+          '23505',
+          'duplicate key value violates unique constraint "uq_users_email_normalized"',
+          {
+            kind: 'UniqueConstraintViolation',
+            constraint: { index: 'uq_users_email_normalized' },
+            table: 'users',
+          },
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.create({
+          email: 'faculty@researchos.local',
+          fullName: 'Duplicate',
+          userType: UserTypeEnum.FACULTY,
+          departmentUnit: 'Software',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.identity.emailAlreadyRegistered,
+        }),
+      );
+    });
+
+    it('throws 409 user_already_exists when the database rejects a duplicate institutional identifier', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findFirst.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(null);
+      prismaMock.users.create.mockRejectedValue(
+        databaseError(
+          'P2002',
+          '23505',
+          'duplicate key value violates unique constraint "users_fptu_guid_key"',
+          {
+            kind: 'UniqueConstraintViolation',
+            constraint: { index: 'users_fptu_guid_key' },
+            table: 'users',
+          },
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.create({
+          email: 'unique@fpt.edu.vn',
+          fullName: 'Test',
+          userType: UserTypeEnum.STUDENT,
+          departmentUnit: 'Software',
+          fptuGuid: 'FPTU001',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.identity.userAlreadyExists,
+        }),
+      );
+    });
   });
 
   describe('update', () => {
-    it('updates user attributes and returns updated profile', async () => {
+    it('updates user attributes, calls assert_admin_removal_allowed when deactivating, and returns updated profile', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUnique.mockResolvedValue(mockUser);
       prismaMock.users.update.mockResolvedValue({
@@ -251,12 +382,104 @@ describe('UsersController', () => {
       });
 
       expect(result.isActive).toBe(false);
+      expect(prismaMock.$executeRaw).toHaveBeenCalled();
       expect(prismaMock.users.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: targetUserId },
           data: { is_active: false },
         }),
       );
+    });
+
+    it('throws 400 cannot_remove_last_admin when deactivating the last active admin', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.$executeRaw.mockRejectedValue(
+        databaseError(
+          'P2010',
+          '23514',
+          'Cannot remove the last active admin; appoint another active admin first',
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.update(targetUserId, { isActive: false }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.identity.cannotRemoveLastAdmin,
+        }),
+      );
+    });
+
+    it('persists normalized email and fptuGuid and returns 409 on conflict', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.users.findFirst.mockResolvedValue(null);
+      prismaMock.users.update.mockResolvedValue({
+        ...mockUser,
+        email: 'updated@fpt.edu.vn',
+        fptu_guid: 'FPTU999',
+      });
+
+      const controller = await setupController(prismaMock);
+      const updated = await controller.update(targetUserId, {
+        email: '  Updated@fpt.edu.vn ',
+        fptuGuid: ' FPTU999 ',
+      });
+
+      expect(updated.email).toBe('updated@fpt.edu.vn');
+      expect(updated.fptuGuid).toBe('FPTU999');
+      expect(prismaMock.users.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            email: 'updated@fpt.edu.vn',
+            fptu_guid: 'FPTU999',
+          }),
+        }),
+      );
+
+      prismaMock.users.findFirst.mockResolvedValueOnce({
+        ...mockUser,
+        id: 'other-user-id',
+      });
+      await expect(
+        controller.update(targetUserId, { email: 'taken@fpt.edu.vn' }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.identity.emailAlreadyRegistered,
+        }),
+      );
+    });
+
+    it('rejects null for non-nullable fields (fullName, departmentUnit, email, userType, isActive) with 400', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      });
+
+      for (const payload of [
+        { fullName: null },
+        { departmentUnit: null },
+        { email: null },
+        { userType: null },
+        { isActive: null },
+      ]) {
+        await expect(
+          pipe.transform(payload, { type: 'body', metatype: UpdateUserDto }),
+        ).rejects.toThrow(BadRequestException);
+      }
+
+      const validPartial = await pipe.transform(
+        { fullName: 'Valid Name', academicTitle: null },
+        { type: 'body', metatype: UpdateUserDto },
+      );
+      expect(validPartial.fullName).toBe('Valid Name');
     });
 
     it('throws 404 when updating non-existent user', async () => {
@@ -415,6 +638,83 @@ describe('UsersController', () => {
       expect(result.revokedBy).toBe(adminId);
       expect(result.revokedAt).toBe(now.toISOString());
       expect(result.reason).toBe('Revoked by admin');
+    });
+
+    it('throws 400 cannot_remove_last_admin when revoking ADMIN from the last active admin', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user_role_assignments.findFirst.mockResolvedValue(
+        mockRoleAssignment,
+      );
+      prismaMock.$executeRaw.mockRejectedValue(
+        databaseError(
+          'P2010',
+          '23514',
+          'Cannot remove the last active admin; appoint another active admin first',
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.revokeRole(targetUserId, AccessRoleEnum.ADMIN, {}, adminId),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.identity.cannotRemoveLastAdmin,
+        }),
+      );
+    });
+
+    it('throws 400 invalid_role_revocation when granted_at is in the future or violates ck_grant_revocation', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user_role_assignments.findFirst.mockResolvedValue({
+        ...mockRoleAssignment,
+        granted_at: new Date(Date.now() + 60_000),
+      });
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.revokeRole(targetUserId, AccessRoleEnum.ADMIN, {}, adminId),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.identity.invalidRoleRevocation,
+        }),
+      );
+    });
+
+    it('throws 400 invalid_role_revocation when the database rejects the revocation', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(mockUser);
+      prismaMock.user_role_assignments.findFirst.mockResolvedValue(
+        mockRoleAssignment,
+      );
+      prismaMock.user_role_assignments.update.mockRejectedValue(
+        databaseError(
+          'P2039',
+          '23514',
+          'new row for relation "user_role_assignments" violates check constraint "ck_grant_revocation"',
+        ),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.revokeRole(
+          targetUserId,
+          AccessRoleEnum.RESEARCHER,
+          {},
+          adminId,
+        ),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.identity.invalidRoleRevocation,
+        }),
+      );
     });
   });
 });

@@ -5,10 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { TaxonomyTreeSubfieldDtoDescription } from './taxonomyTreeSubfieldDtoDescription';
-import type { TaxonomyTreeSubfieldDtoExternalId } from './taxonomyTreeSubfieldDtoExternalId';
-import type { TaxonomyTreeSubfieldDtoInternalCode } from './taxonomyTreeSubfieldDtoInternalCode';
-import type { TaxonomyTreeSubfieldDtoNameVi } from './taxonomyTreeSubfieldDtoNameVi';
 import type { TaxonomyTreeSubfieldDtoSource } from './taxonomyTreeSubfieldDtoSource';
 import type { TaxonomyTreeTopicDto } from './taxonomyTreeTopicDto';
 
@@ -21,26 +17,26 @@ export interface TaxonomyTreeSubfieldDto {
    * Stable internal code for the subfield.
    * @nullable
    */
-  internalCode: TaxonomyTreeSubfieldDtoInternalCode;
+  internalCode: string | null;
   /** English name of the research subfield. */
   name: string;
   /**
    * Vietnamese translated name of the research subfield.
    * @nullable
    */
-  nameVi: TaxonomyTreeSubfieldDtoNameVi;
+  nameVi: string | null;
   /**
    * Detailed description or scope of the research subfield.
    * @nullable
    */
-  description: TaxonomyTreeSubfieldDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: TaxonomyTreeSubfieldDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex subfield ID).
    * @nullable
    */
-  externalId: TaxonomyTreeSubfieldDtoExternalId;
+  externalId: string | null;
   /** Whether this subfield is active and selectable in the system. */
   isActive: boolean;
   /** List of research topics belonging to this subfield. */

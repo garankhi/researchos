@@ -5,10 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { SubfieldResponseDtoDescription } from './subfieldResponseDtoDescription';
-import type { SubfieldResponseDtoExternalId } from './subfieldResponseDtoExternalId';
-import type { SubfieldResponseDtoInternalCode } from './subfieldResponseDtoInternalCode';
-import type { SubfieldResponseDtoNameVi } from './subfieldResponseDtoNameVi';
 import type { SubfieldResponseDtoSource } from './subfieldResponseDtoSource';
 
 export interface SubfieldResponseDto {
@@ -20,26 +16,26 @@ export interface SubfieldResponseDto {
    * Stable internal code for the subfield.
    * @nullable
    */
-  internalCode: SubfieldResponseDtoInternalCode;
+  internalCode: string | null;
   /** English name of the research subfield. */
   name: string;
   /**
    * Vietnamese translated name of the research subfield.
    * @nullable
    */
-  nameVi: SubfieldResponseDtoNameVi;
+  nameVi: string | null;
   /**
    * Detailed description or scope of the research subfield.
    * @nullable
    */
-  description: SubfieldResponseDtoDescription;
+  description: string | null;
   /** Source of the taxonomy entry (OPENALEX or LOCAL). */
   source: SubfieldResponseDtoSource;
   /**
    * External identifier from the source provider (e.g. OpenAlex subfield ID).
    * @nullable
    */
-  externalId: SubfieldResponseDtoExternalId;
+  externalId: string | null;
   /** Whether this subfield is active and selectable in the system. */
   isActive: boolean;
 }

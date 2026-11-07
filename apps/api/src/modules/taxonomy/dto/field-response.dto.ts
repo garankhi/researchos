@@ -14,6 +14,7 @@ export class FieldResponseDto {
   @ApiProperty({
     description: 'Stable internal code for the field.',
     example: 'FIELD-CS',
+    type: String,
     nullable: true,
   })
   internalCode: string | null;
@@ -27,6 +28,7 @@ export class FieldResponseDto {
   @ApiProperty({
     description: 'Vietnamese translated name of the research field.',
     example: 'Khoa học máy tính',
+    type: String,
     nullable: true,
   })
   nameVi: string | null;
@@ -34,6 +36,7 @@ export class FieldResponseDto {
   @ApiProperty({
     description: 'Detailed description or scope of the research field.',
     example: 'Study of computation, information, and automation.',
+    type: String,
     nullable: true,
   })
   description: string | null;
@@ -49,6 +52,7 @@ export class FieldResponseDto {
     description:
       'External identifier from the source provider (e.g. OpenAlex field ID).',
     example: 'https://openalex.org/fields/17',
+    type: String,
     nullable: true,
   })
   externalId: string | null;
