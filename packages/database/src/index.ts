@@ -12,6 +12,7 @@ export { BackgroundJobsService } from './background-jobs.service.js';
 // The generated enums are part of the domain contract: feature modules use
 // them for DTOs and query filters.
 export {
+  group_member_role as GroupMemberRole,
   opportunity_kind as OpportunityKind,
   opportunity_status as OpportunityStatus,
   target_audience as TargetAudience,
