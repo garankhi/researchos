@@ -119,7 +119,11 @@
         "profile_not_found": "The requested researcher profile was not found.",
         "group_not_found": "The requested research group was not found.",
         "group_code_already_exists": "A research group with this code already exists.",
-        "group_leader_ineligible": "The designated group leader must be an active researcher."
+        "group_leader_ineligible": "The designated group leader must be an active researcher.",
+        "provenance_field_locked": "This field was confirmed by a person and cannot be overwritten by an automated sync.",
+        "provenance_human_source_not_allowed": "User-typed fields are human by definition and carry no provenance row.",
+        "provenance_unk_cannot_verify": "A field with untraceable origin cannot be marked as verified without human adjudication.",
+        "provenance_auto_verify_not_allowed": "An AI-inferred value without a replayable trace cannot be automatically verified."
       }
     }
   },

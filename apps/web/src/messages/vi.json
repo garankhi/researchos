@@ -119,7 +119,11 @@
         "profile_not_found": "Không tìm thấy hồ sơ nghiên cứu viên yêu cầu.",
         "group_not_found": "Không tìm thấy nhóm nghiên cứu yêu cầu.",
         "group_code_already_exists": "Mã nhóm nghiên cứu này đã tồn tại.",
-        "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động."
+        "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động.",
+        "provenance_field_locked": "Trường này đã được con người xác nhận nên job đồng bộ không được ghi đè.",
+        "provenance_human_source_not_allowed": "Trường do người dùng nhập là HUMAN theo định nghĩa nên không có dòng provenance.",
+        "provenance_unk_cannot_verify": "Trường không truy được nguồn gốc không thể đánh dấu đã xác minh nếu chưa có người phân xử.",
+        "provenance_auto_verify_not_allowed": "Giá trị do AI suy luận không có trace phát lại không thể tự động xác minh."
       }
     }
   },
