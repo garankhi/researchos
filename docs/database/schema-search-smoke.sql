@@ -18,6 +18,10 @@ BEGIN
 END $$;
 
 -- Output import state: NONE by default, ACCEPTED requires an owner.
+--
+-- The column holds the state of the work, not the state of a review. There is
+-- no global REJECTED or DISMISSED value: a rejection belongs to a researcher
+-- and lives in publication_claims, so a rejected work stays a CANDIDATE.
 DO $$
 DECLARE
  u uuid=gen_random_uuid(); o uuid; r uuid; n int; s output_import_state;
@@ -33,6 +37,126 @@ BEGIN
  INSERT INTO research_outputs(id,sharing_status,owner_id,created_by,import_state)
  VALUES(gen_random_uuid(),'DRAFT',u,u,'ACCEPTED');
  RAISE NOTICE 'PASS output_import_state default and ck_output_import_owner';
+END $$;
+
+-- A rejection is per researcher, and it never touches the work.
+--
+-- The work keeps import_state = 'CANDIDATE' when one researcher rejects it:
+-- a work is shared between researchers, and one of them saying "not mine"
+-- says nothing about whether a co-author may still claim it. The decision
+-- lives in publication_claims, so it is reversible - the rejection list
+-- reads the same row back.
+DO $$
+DECLARE
+ alice uuid=gen_random_uuid(); bob uuid=gen_random_uuid(); carol uuid=gen_random_uuid();
+ o uuid; n int; s output_import_state;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(alice,'FACULTY','reject-alice@test.invalid','Alice Rejector','FPTU'),
+      (bob,'FACULTY','reject-bob@test.invalid','Bob Coauthor','FPTU'),
+      (carol,'FACULTY','reject-carol@test.invalid','Carol Outsider','FPTU');
+
+ -- A candidate pulled from OpenAlex: nobody owns it yet.
+ INSERT INTO research_outputs(id,sharing_status,created_by,import_state)
+ VALUES(gen_random_uuid(),'DRAFT',alice,'CANDIDATE') RETURNING id INTO o;
+
+ -- Both researchers get a suggestion claim for the same work.
+ INSERT INTO publication_claims(output_id,user_id,status,match_source)
+ VALUES(o,alice,'SUGGESTED','OPENALEX'),(o,bob,'SUGGESTED','OPENALEX');
+
+ -- Alice rejects it.
+ UPDATE publication_claims SET status='REJECTED',reviewed_at=clock_timestamp()
+  WHERE output_id=o AND user_id=alice;
+
+ -- The work itself is unchanged: it is still a candidate.
+ SELECT import_state INTO s FROM research_outputs WHERE id=o;
+ PERFORM pg_temp.assert_true(s='CANDIDATE','a rejected candidate stays a candidate');
+
+ -- Alice no longer sees it in the suggestion list...
+ SELECT count(*) INTO n FROM visible_candidate_suggestions(alice) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=0,'a rejected candidate leaves the suggestion list');
+
+ -- ...but she does see it in the rejection list, so the decision is reversible.
+ SELECT count(*) INTO n FROM visible_rejected_candidates(alice) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'the rejected candidate stays in the rejection list');
+
+ -- Bob still gets it: the rejection is not global.
+ SELECT count(*) INTO n FROM visible_candidate_suggestions(bob) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'another researcher still sees the candidate');
+
+ -- Carol, who has no claim, sees nothing.
+ SELECT count(*) INTO n FROM visible_candidate_suggestions(carol) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=0,'an unrelated researcher sees no candidate');
+ SELECT count(*) INTO n FROM visible_rejected_candidates(carol) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=0,'an unrelated researcher sees no rejection');
+
+ -- Alice can still reach the work through the review queue, so she can
+ -- accept it later without the row being deleted.
+ SELECT count(*) INTO n FROM visible_candidate_reviews(alice) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'a rejected candidate stays in the review queue');
+
+ -- Accepting it later is the reverse transition on the same row. The claim
+ -- goes back to SUGGESTED, which puts the work back into the suggestion
+ -- list, and it can then be confirmed with an author_id.
+ UPDATE publication_claims SET status='SUGGESTED',reviewed_at=NULL
+  WHERE output_id=o AND user_id=alice;
+ SELECT count(*) INTO n FROM visible_candidate_suggestions(alice) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'reversing the rejection restores the suggestion');
+
+ -- A confirmed claim needs the author it claims to be.
+ PERFORM pg_temp.expect_error(
+  format('UPDATE publication_claims SET status=''CONFIRMED'',reviewed_at=clock_timestamp() WHERE output_id=%L AND user_id=%L',o,alice),'23514');
+
+ RAISE NOTICE 'PASS per-researcher rejection leaves the work a candidate and stays reversible';
+END $$;
+
+-- The candidate review queue has its own access rule. A candidate has no
+-- owner and is not shared, so can_view_output cannot reach it at all.
+DO $$
+DECLARE
+ u uuid=gen_random_uuid(); other uuid=gen_random_uuid(); o uuid; n int;
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(u,'FACULTY','candidate@test.invalid','Candidate Puller','FPTU'),
+      (other,'FACULTY','candidate-other@test.invalid','Other Researcher','FPTU');
+ INSERT INTO research_outputs(id,sharing_status,created_by,import_state)
+ VALUES(gen_random_uuid(),'DRAFT',u,'CANDIDATE') RETURNING id INTO o;
+
+ -- The puller can see their own candidate.
+ PERFORM pg_temp.assert_true(can_view_candidate(u,o),'the puller sees their candidate');
+
+ -- Another researcher cannot, until they have a claim for it.
+ PERFORM pg_temp.assert_true(NOT can_view_candidate(other,o),'an unrelated researcher sees no candidate');
+ PERFORM pg_temp.assert_true(NOT can_view_output(other,o),'can_view_output does not reach a candidate');
+
+ INSERT INTO publication_claims(output_id,user_id,status,match_source)
+ VALUES(o,other,'SUGGESTED','OPENALEX');
+ PERFORM pg_temp.assert_true(can_view_candidate(other,o),'a claim opens the candidate');
+
+ -- An accepted work is not a candidate any more.
+ UPDATE research_outputs SET import_state='ACCEPTED',owner_id=u WHERE id=o;
+ PERFORM pg_temp.assert_true(NOT can_view_candidate(u,o),'an accepted work is not a candidate');
+
+ -- A candidate is not an owner working copy either.
+ UPDATE research_outputs SET import_state='CANDIDATE',owner_id=NULL WHERE id=o;
+ SELECT count(*) INTO n FROM owner_output_versions WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=0,'a candidate is not an owner working copy');
+
+ -- A candidate never reaches Discovery or Search.
+ SELECT count(*) INTO n FROM released_output_versions WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=0,'a candidate is not a released version');
+ SELECT count(*) INTO n FROM search_index WHERE entity_type='OUTPUT' AND entity_id=o;
+ PERFORM pg_temp.assert_true(n=0,'a candidate is not in the search index');
+
+ -- The claim of somebody else does not hide the candidate from the actor
+ -- who pulled it: the review queue holds one row per work, not one row
+ -- per claim. The claim above already belongs to `other`.
+ SELECT count(*) INTO n FROM visible_candidate_reviews(u) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'the puller sees the candidate once, not once per claim');
+ SELECT count(*) INTO n FROM visible_candidate_suggestions(u) WHERE output_id=o;
+ PERFORM pg_temp.assert_true(n=1,'the puller sees the candidate in the suggestion list');
+
+ RAISE NOTICE 'PASS candidate access rule and its exclusion from the released views';
 END $$;
 
 -- Field provenance: a blank source_ref is rejected, the PK keeps history per source_ref.

@@ -512,6 +512,7 @@ model publication_claims {
   users            users            @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
   @@unique([output_id, user_id], map: "publication_claims_output_id_user_id_idx")
+  @@index([user_id, status], map: "publication_claims_user_id_status_idx")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1206,8 +1207,6 @@ enum output_import_state {
   NONE
   CANDIDATE
   ACCEPTED
-  REJECTED
-  DISMISSED
 }
 
 enum output_sharing_status {

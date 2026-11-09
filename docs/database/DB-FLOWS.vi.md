@@ -175,6 +175,20 @@ Guest được tìm kiếm và đọc nội dung được phép. Guest không đ
 
 Trong `users`, `academic_title` là **học hàm** như GS/PGS; `academic_degree` là **học vị** như ThS/TS. Hai cột này mô tả hồ sơ, không cấp ADMIN hoặc RESEARCHER.
 
+**Từ chối là quyết định của từng researcher, không phải của công trình.** Một bài có nhiều tác giả, nên `publication_claims.status = 'REJECTED'` nghĩa là "cô An không muốn bài này" — cô An vẫn không thấy bài đó trong danh sách gợi ý, nhưng một đồng tác giả khác vẫn thấy và vẫn có thể claim. Vì vậy `research_outputs.import_state` không có giá trị REJECTED: bài bị từ chối vẫn là `CANDIDATE`.
+
+Bài bị từ chối **không bị xoá**. Cô An vẫn thấy nó trong rejection list (`visible_rejected_candidates`) và có thể accept lại bất cứ lúc nào, vì dòng claim không bao giờ bị xoá — quyết định luôn đảo ngược được.
+
+Ba danh sách đọc từ cùng một nguồn, khác nhau ở trạng thái claim:
+
+| Danh sách | Hàm | Nội dung |
+|---|---|---|
+| Review | `visible_candidate_reviews(actor)` | mọi candidate mà actor được xem |
+| Gợi ý | `visible_candidate_suggestions(actor)` | trên, trừ claim `REJECTED` |
+| Đã từ chối | `visible_rejected_candidates(actor)` | chỉ claim `REJECTED` của actor |
+
+Candidate có không owner và không được share, nên `can_view_output` không mở được cho nó. Quy tắc riêng là `can_view_candidate`: researcher có claim cho bài đó, hoặc chính researcher đó pull bài đó. Candidate không bao giờ lọt vào Discovery hay Search.
+
 Ví dụ bài P1 có tên tác giả “An Nguyen”. Hệ thống gợi ý cho cô An rằng đây có thể là bài của cô. Khi xác nhận, backend cập nhật claim và mapping tác giả phù hợp trong một transaction, sau khi kiểm tra không có xung đột.
 
 Xác nhận này chỉ nói **cô An là tác giả**. Nó không tự đổi `research_outputs.owner_id`, không tự phát hành bài và không tự gắn bài vào group.
@@ -238,6 +252,8 @@ Chỉ khi hệ thống suy luận interest mới dùng **INFERRED + SUGGESTED**.
 
 MVP dùng flow cô An chủ động thêm công trình mình có quyền quản lý; backend đặt cô làm owner từ tài khoản đã xác thực. Tự động nhập hàng loạt bài từ bên ngoài mà chưa biết người quản lý để phase sau. Cột owner cho phép NULL nhằm hỗ trợ trường hợp tương lai đó, không mở đường đăng bài vô chủ.
 
+> **Ghi chú (09/11/2026):** luồng nhập hàng loạt từ OpenAlex **đã thuộc MVP**, nhưng nó là một luồng riêng: bài được pull về là `CANDIDATE`, chưa có owner, và chưa được đăng. Cô An review từng bài ở màn hình review (xem Flow 3), accept thì bài trở thành bản nháp của cô, reject thì bài ẩn khỏi danh sách gợi ý của cô và vào rejection list. Flow 5 bên dưới mô tả phần sau đó: soạn nội dung rồi publish.
+
 ### Ba lớp dữ liệu của một công trình
 
 | Lớp | Bảng | Ví dụ |
@@ -260,6 +276,15 @@ MVP dùng flow cô An chủ động thêm công trình mình có quyền quản 
 | 4. Bấm đăng | Phát hành V1, đặt `current_release_id=V1`, chuyển P1 sang SHARED, ghi `first_shared_at` | Thấy V1 nếu được phép theo visibility |
 
 Backend phải xác thực người bấm đăng là **owner và còn quyền researcher**. Các thay đổi ở bước 4 phải cùng thành công hoặc cùng bị hủy trong một transaction.
+
+**Bấm đăng nhận `visibility` từ người dùng, không hardcode.** Trong luồng OpenAlex, sau khi accept hệ thống hỏi cô An có muốn share ngay không; nếu có, cô An chọn phạm vi:
+
+| `visibility` | `access_group_id` | Ai thấy |
+|---|---|---|
+| `FPTU_COMMUNITY` | NULL | toàn bộ cộng đồng FPTU |
+| `RESEARCH_GROUP` | group của cô An | các thành viên group đó |
+
+`PRIVATE` **không** phải một lựa chọn khi đăng: `PRIVATE` nghĩa là chưa share, còn đăng là hành động share. Nếu cô An không muốn share, bài đứng yên ở bản nháp của cô và chỉ hiện trong hồ sơ cá nhân.
 
 SQL đồng thời ghi sự kiện chia sẻ vào `research_updates` để làm nguồn cho digest. Không có `group_output_links` cũng không cản bài xuất hiện trong Discovery.
 

@@ -496,7 +496,7 @@ Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchO
 
 | Thành phần | Nguồn | Ghi chú |
 |---|---|---|
-| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED / REJECTED / DISMISSED |
+| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED — trạng thái **của công trình**, không phải của người review; xem mục "Từ chối theo từng researcher" bên dưới |
 | `research_outputs.import_state` + `ck_output_import_owner` | DBML | ACCEPTED bắt buộc có `owner_id` |
 | `field_provenance` | DBML | PK 4 cột `(entity_type, entity_id, field_name, source_ref)` để giữ lịch sử khi ghi đè; `ck_field_provenance_ref` chặn `source_ref` trắng |
 | `search_entity_type` | DBML | Enum 4 giá trị: OUTPUT / RESEARCHER / GROUP / OPPORTUNITY |
@@ -540,6 +540,27 @@ Hàm xoá các dòng index không còn dựa trên bản ghi nguồn hợp lệ,
 Thay đổi này **không** đổi schema: không bảng, cột, index hay ràng buộc nào bị đụng, nên `schema.prisma` không đổi. Migration `20261107160000_search_index_rebuild` chỉ dùng `CREATE OR REPLACE` cho các hàm, nên áp lên database đang có là an toàn.
 
 Smoke test mới `schema-search-rebuild-smoke.sql` kiểm tra: rebuild trên database rỗng không tạo dòng nào; index bị xoá hết thì rebuild dựng lại đủ; gọi hai lần cho kết quả giống nhau; dòng của bản nháp, tài khoản bị vô hiệu hoá, group đã archive và opportunity đã đóng đều bị gỡ; và index do trigger tạo giống hệt index do rebuild tạo.
+
+## Từ chối theo từng researcher — 09/11/2026 (RES-13)
+
+`output_import_state` từng có `REJECTED` và `DISMISSED`. Cả hai đều là **trạng thái của công trình**, và cả hai đều sai: một công trình có nhiều tác giả, nên một researcher nói "không phải của tôi" không nói gì về việc một đồng tác giả khác có thể claim hay không. `DISMISSED` và `REJECTED` còn là cùng một ý ("đừng gợi ý lại cho tôi") với hai cái tên.
+
+Quyết định của một researcher giờ nằm ở `publication_claims.status = 'REJECTED'` — đúng bảng vốn đã có hình dạng một dòng cho mỗi (công trình, researcher). Cột `import_state` chỉ còn `NONE` / `CANDIDATE` / `ACCEPTED`, và một bài bị từ chối **vẫn là `CANDIDATE`**.
+
+| Thành phần | Nguồn | Ghi chú |
+|---|---|---|
+| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED |
+| `can_view_candidate` | postgres-features.sql | Candidate không có owner và không được share, nên `can_view_output` không mở được cho nó. Quy tắc riêng: researcher có claim cho bài đó, hoặc chính researcher đó pull bài đó |
+| `visible_candidate_reviews(actor)` | postgres-features.sql | Toàn bộ candidate mà actor được xem |
+| `visible_candidate_suggestions(actor)` | postgres-features.sql | Trên, trừ claim `REJECTED` — bài đã từ chối thì không còn hiện để gợi ý |
+| `visible_rejected_candidates(actor)` | postgres-features.sql | Rejection list — bài vẫn tìm được và accept lại được, vì dòng claim không bao giờ bị xoá |
+| `publication_claims (user_id, status)` | DBML | Index phục vụ cả hai danh sách, không phải quét mọi claim của một công trình |
+
+Mỗi function join claim **của riêng actor**, nên một công trình là **một dòng** trong mỗi danh sách dù bao nhiêu researcher cùng claim nó, và việc một người từ chối không ảnh hưởng tới người khác.
+
+`owner_output_versions` loại `CANDIDATE` — candidate không phải bản làm việc của owner, vì chưa ai sở hữu nó. Candidate không bao giờ lọt vào Discovery hay Search: `released_output_versions` chỉ lấy `sharing_status = 'SHARED'` và `sync_search_index_output` chỉ index bài đã share.
+
+Migration `20261109090000_per_researcher_rejection` dựng lại kiểu enum (Postgres không có `ALTER TYPE ... DROP VALUE`), nên nó phải bỏ `ck_output_import_owner`, `owner_output_versions` và `visible_owner_output_versions` trước rồi tạo lại. `ResearchOS.sql` và `schema.prisma` được sinh lại từ nguồn.
 
 ## Kiểm chứng thực tế và cách tái chạy
 
