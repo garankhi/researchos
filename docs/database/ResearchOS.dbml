@@ -401,6 +401,8 @@ Table field_provenance {
   }
   checks {
     `length(btrim(source_ref)) > 0` [name: 'ck_field_provenance_ref']
+    `(source <> 'UNK' OR verified_at IS NULL)` [name: 'ck_field_provenance_unk_unverified']
+    `(source <> 'AI_INF' OR verified_at IS NULL OR is_locked)` [name: 'ck_field_provenance_no_auto_verify']
   }
   Note: 'Field-level provenance for auto-generated data. source classifies WHO STANDS BEHIND the value (PAPER/AI_TRACE/AI_INF/HUMAN/EXT/UNK), not the channel the data travelled through; sourceKind/sourceRef carry the channel. PK includes source_ref so an overwritten field keeps its history. Only auto-generated fields get a row - a field typed by a user is HUMAN by definition. is_locked is set when a human confirms a value: a sync job must never overwrite a locked field. AI without a replayable trace is AI_INF, never UNK; UNK means the value exists but its origin cannot be traced.'
 }

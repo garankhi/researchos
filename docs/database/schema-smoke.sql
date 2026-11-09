@@ -159,6 +159,35 @@ BEGIN
  PERFORM pg_temp.expect_error(format('INSERT INTO opportunity_applications(opportunity_id,applicant_id,applicant_note) VALUES(%L,%L,''archived'')',opp,b),'23514');
  RAISE NOTICE 'PASS opportunity/application authority, SLA, withdrawal/resubmission, closed/expired/archive and terminal states';
 
+ -- RES-14 provenance rules: UNK never VERIFIED, AI_INF never auto-verified,
+ -- locked fields never overwritten by sync. PK includes source_ref so an
+ -- overwritten field keeps its history.
+ INSERT INTO field_provenance(entity_type,entity_id,field_name,source,source_ref,synced_at)
+ VALUES('OUTPUT',work,'title','PAPER','OPENALEX:W1',clock_timestamp()),
+       ('OUTPUT',work,'venue','EXT','OPENALEX:W1',clock_timestamp()),
+       ('OUTPUT',work,'abstract','AI_INF','AI:suggest-1',clock_timestamp()),
+       ('OUTPUT',work,'publisher','UNK','LEGACY:1',clock_timestamp());
+ PERFORM pg_temp.assert_true((SELECT count(*)=4 FROM field_provenance WHERE entity_id=work),'four provenance rows, one per origin');
+ -- An overwritten field keeps history: same field, new source_ref is a new row.
+ INSERT INTO field_provenance(entity_type,entity_id,field_name,source,source_ref,synced_at)
+ VALUES('OUTPUT',work,'title','PAPER','OPENALEX:W2',clock_timestamp());
+ PERFORM pg_temp.assert_true((SELECT count(*)=2 FROM field_provenance WHERE entity_id=work AND field_name='title'),'overwritten field keeps both origins');
+ -- Same origin re-sync must not duplicate: tested at the service layer via upsert.
+ PERFORM pg_temp.expect_error(format('INSERT INTO field_provenance(entity_type,entity_id,field_name,source,source_ref,verified_at) VALUES(''OUTPUT'',%L,''publisher'',''UNK'',''LEGACY:1'',clock_timestamp())',work),'23514');
+ PERFORM pg_temp.expect_error(format('INSERT INTO field_provenance(entity_type,entity_id,field_name,source,source_ref,verified_at) VALUES(''OUTPUT'',%L,''abstract'',''AI_INF'',''AI:suggest-1'',clock_timestamp())',work),'23514');
+ -- Human confirmation locks the field; a later sync under any source_ref is rejected.
+ UPDATE field_provenance SET is_locked=true,verified_at=clock_timestamp()
+ WHERE entity_id=work AND field_name='title' AND source_ref='OPENALEX:W1';
+ PERFORM pg_temp.expect_error(format('INSERT INTO field_provenance(entity_type,entity_id,field_name,source,source_ref) VALUES(''OUTPUT'',%L,''title'',''EXT'',''OPENALEX:W3'')',work),'23514');
+ PERFORM pg_temp.expect_error(format('UPDATE field_provenance SET synced_at=clock_timestamp() WHERE entity_id=%L AND field_name=''title'' AND source_ref=''OPENALEX:W1''',work),'23514');
+ -- Re-confirming a locked row (touching only is_locked/verified_at) is allowed.
+ UPDATE field_provenance SET verified_at=clock_timestamp() WHERE entity_id=work AND field_name='title' AND source_ref='OPENALEX:W1';
+ -- AI_INF confirmed by a human locks with verified_at (one-way: human wins over machine).
+ UPDATE field_provenance SET is_locked=true,verified_at=clock_timestamp()
+ WHERE entity_id=work AND field_name='abstract' AND source_ref='AI:suggest-1';
+ PERFORM pg_temp.assert_true((SELECT is_locked AND verified_at IS NOT NULL FROM field_provenance WHERE entity_id=work AND field_name='abstract' AND source_ref='AI:suggest-1'),'AI_INF locks only via human confirmation');
+ RAISE NOTICE 'PASS provenance verification rules, per-origin history and human-wins lock';
+
  PERFORM pg_temp.expect_error(format('INSERT INTO user_follows(follower_id,entity_type,entity_id) VALUES(%L,''OUTPUT'',%L)',s,work),'23514');
  PERFORM pg_temp.expect_error(format('INSERT INTO digest_preferences(user_id,enabled) VALUES(%L,true)',s),'23514');
  INSERT INTO user_follows(follower_id,entity_type,entity_id) VALUES(b,'OUTPUT',work),(b,'GROUP',g2);
