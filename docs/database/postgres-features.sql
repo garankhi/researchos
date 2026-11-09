@@ -72,6 +72,67 @@ CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAG
  WHERE o.id=target AND (o.owner_id=actor OR (o.sharing_status='SHARED' AND
  (o.visibility='FPTU_COMMUNITY' OR (o.visibility='RESEARCH_GROUP' AND is_group_member(actor,o.access_group_id))))));
 $$;
+-- A candidate is a work pulled from OpenAlex that nobody owns yet. It has no
+-- owner, so can_view_output cannot reach it: that predicate only opens for the
+-- owner or for a shared work. The review flow needs its own rule, and the
+-- rule is deliberately narrow.
+--
+-- A candidate is visible to a researcher when that researcher has a claim row
+-- for it - the row is what suggested the work to them in the first place - or
+-- when they pulled it themselves. Nothing else opens a candidate: it is not
+-- shared, so it never reaches Discovery or Search.
+--
+-- A rejected candidate stays visible here on purpose. The rejection hides the
+-- work from the suggestion list, not from the rejection list, so the
+-- researcher can still find it and accept it later.
+CREATE FUNCTION can_view_candidate(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+ SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs o
+ WHERE o.id=target AND o.import_state='CANDIDATE' AND (o.created_by=actor
+ OR EXISTS (SELECT 1 FROM publication_claims c WHERE c.output_id=o.id AND c.user_id=actor)));
+$$;
+-- The review queue: every candidate the researcher may look at.
+--
+-- The function reads the candidates and joins the claim of this one actor
+-- in. The claim is joined on the actor, so a candidate claimed by several
+-- researchers is one row here, and a candidate the actor pulled themselves
+-- has no claim of their own and arrives with an empty claim.
+CREATE FUNCTION visible_candidate_reviews(actor uuid)
+RETURNS TABLE(output_id uuid,doi varchar(255),created_by uuid,created_at timestamptz,
+  claim_id uuid,user_id uuid,claim_status claim_status,match_source varchar(50),reviewed_at timestamptz)
+LANGUAGE sql STABLE AS $$
+ SELECT o.id,o.doi,o.created_by,o.created_at,
+        c.id,c.user_id,c.status,c.match_source,c.reviewed_at
+ FROM research_outputs o
+ LEFT JOIN publication_claims c ON c.output_id=o.id AND c.user_id=actor
+ WHERE o.import_state='CANDIDATE' AND can_view_candidate(actor,o.id);
+$$;
+-- The suggestion queue: the candidates that are still waiting for a decision.
+-- A rejected claim removes the work from this list for that researcher only.
+CREATE FUNCTION visible_candidate_suggestions(actor uuid)
+RETURNS TABLE(output_id uuid,doi varchar(255),created_by uuid,created_at timestamptz,
+  claim_id uuid,user_id uuid,claim_status claim_status,match_source varchar(50),reviewed_at timestamptz)
+LANGUAGE sql STABLE AS $$
+ SELECT o.id,o.doi,o.created_by,o.created_at,
+        c.id,c.user_id,c.status,c.match_source,c.reviewed_at
+ FROM research_outputs o
+ LEFT JOIN publication_claims c ON c.output_id=o.id AND c.user_id=actor
+ WHERE o.import_state='CANDIDATE' AND can_view_candidate(actor,o.id)
+ AND c.status IS DISTINCT FROM 'REJECTED';
+$$;
+-- The rejection list: the candidates this researcher rejected, kept so the
+-- work can be accepted later. The row is never deleted, so the decision stays
+-- reversible.
+CREATE FUNCTION visible_rejected_candidates(actor uuid)
+RETURNS TABLE(output_id uuid,doi varchar(255),created_by uuid,created_at timestamptz,
+  claim_id uuid,user_id uuid,claim_status claim_status,match_source varchar(50),reviewed_at timestamptz)
+LANGUAGE sql STABLE AS $$
+ SELECT o.id,o.doi,o.created_by,o.created_at,
+        c.id,c.user_id,c.status,c.match_source,c.reviewed_at
+ FROM research_outputs o
+ JOIN publication_claims c ON c.output_id=o.id AND c.user_id=actor
+ WHERE o.import_state='CANDIDATE' AND c.status='REJECTED'
+ AND can_view_candidate(actor,o.id);
+$$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
  AND (o.creator_id=actor OR EXISTS (
@@ -311,6 +372,8 @@ $$;
 -- but the researcher can still see it in their own profile.
 -- The working copy is the editable draft revision (uq_output_editable_draft allows
 -- one per output); current_release_id is only set once the revision is released.
+-- A candidate is not a working copy: nobody owns it yet, and it is read
+-- through the candidate review functions instead.
 CREATE VIEW owner_output_versions AS
  SELECT o.id AS output_id,o.owner_id,o.doi,o.visibility,o.access_group_id,o.first_shared_at,o.import_state,
  r.id AS revision_id,r.revision_no,r.title,r.abstract,r.venue,r.publisher,r.publication_year,r.publication_status,
@@ -318,7 +381,7 @@ CREATE VIEW owner_output_versions AS
  FROM research_outputs o
  LEFT JOIN output_revisions r ON r.output_id = o.id
   AND (r.id = o.current_release_id OR (o.current_release_id IS NULL AND r.released_at IS NULL))
- WHERE o.sharing_status <> 'SHARED';
+ WHERE o.sharing_status <> 'SHARED' AND o.import_state <> 'CANDIDATE';
 CREATE FUNCTION visible_owner_output_versions(actor uuid) RETURNS SETOF owner_output_versions LANGUAGE sql STABLE AS $$
  SELECT r.* FROM owner_output_versions r WHERE r.owner_id = actor AND can_view_output(actor,r.output_id);
 $$;

@@ -152,8 +152,6 @@ Enum output_import_state {
   NONE
   CANDIDATE
   ACCEPTED
-  REJECTED
-  DISMISSED
 }
 Enum search_entity_type {
   OUTPUT
@@ -531,7 +529,7 @@ Table research_outputs {
   visibility visibility_level [not null, default: 'PRIVATE']
   access_group_id uuid
   provenance_tag data_provenance_type [not null, default: 'PAPER']
-  import_state output_import_state [not null, default: 'NONE', note: 'State of the external ingest for this work. NONE: not from an external pull. CANDIDATE: pulled from OpenAlex, not yet reviewed. ACCEPTED: the researcher confirmed it is theirs; owner_id is set. REJECTED: the researcher said it is not their work; recorded in publication_claims as REJECTED and never suggested to them again. DISMISSED: the researcher did not want it in their profile; kept aside and may be offered again. A rejected candidate is still stored - the rejection is a state, not a deletion.']
+  import_state output_import_state [not null, default: 'NONE', note: 'State of the external ingest for this work. NONE: not from an external pull. CANDIDATE: pulled from OpenAlex, still waiting for a researcher to review it. ACCEPTED: a researcher confirmed the work is theirs; owner_id is set. This is a property of the work, not of a reviewer: rejecting a candidate is recorded per researcher in publication_claims.status = REJECTED and never changes this column, because one researcher rejecting a work says nothing about whether a co-author may still claim it. There is no global REJECTED or DISMISSED state - a rejected candidate is still stored, it is just never suggested again to the researcher who rejected it.']
   last_synced_at timestamptz
   first_shared_at timestamptz
   archived_at timestamptz
@@ -641,8 +639,11 @@ Table publication_claims {
     `(status = 'SUGGESTED' AND reviewed_at IS NULL) OR (status IN ('CONFIRMED', 'REJECTED') AND reviewed_at IS NOT NULL)` [name: 'ck_claim_review']
     `status <> 'CONFIRMED' OR author_id IS NOT NULL` [name: 'ck_confirmed_claim_author']
   }
-  indexes { (output_id, user_id) [unique] }
-  Note: 'API confirms the claim and maps output_authors.user_id in one transaction after resolving author conflicts. A claim never approves institutional publication.'
+  indexes {
+    (output_id, user_id) [unique]
+    (user_id, status)
+  }
+  Note: 'One row per (work, researcher). The claim is where a researcher says something about a work that was suggested to them, and it is the only place a rejection lives: status = REJECTED means this researcher does not want this work, and the work itself stays import_state = CANDIDATE because one researcher rejecting a work says nothing about whether a co-author may still claim it. The (user_id, status) index serves the review queue (status = SUGGESTED) and the rejection list (status = REJECTED) without scanning every claim of the work. API confirms the claim and maps output_authors.user_id in one transaction after resolving author conflicts. A claim never approves institutional publication.'
 }
 
 Table output_topics {

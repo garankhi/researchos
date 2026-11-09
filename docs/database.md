@@ -242,23 +242,41 @@ lại sẽ mất thông tin và làm mọi truy vấn lọc phải suy đoán.
 Quy trình một bài được nghiệp thu từ F0:
 
 ```
-user pull OpenAlex → candidate → user ACCEPT → DRAFT + PRIVATE
-                                                          ↓ (chưa publish)
-                                                    hồ sơ cá nhân của chính user
-                                                          ↓ user PUBLISH
-                                          release revision + SHARED + visibility
-                                                          ↓
-                                              Discovery + Search + Follow/Digest
+user pull OpenAlex → candidate → user REVIEW
+                                          ├── REJECT → claim REJECTED (bài vẫn CANDIDATE, ẩn với riêng user này)
+                                          └── ACCEPT → claim CONFIRMED + import_state=ACCEPTED
+                                                        ↓ system hỏi "có share ngay không?"
+                                                  DRAFT + PRIVATE (giữ riêng)  hoặc  PUBLISH
+                                                                              ↓
+                                                          release revision + SHARED + visibility
+                                                                              ↓
+                                                              Discovery + Search + Follow/Digest
 ```
 
-Ba điểm phải giữ đúng:
+Năm điểm phải giữ đúng:
 
 1. **Accept chỉ set `import_state = 'ACCEPTED'`**, không đụng `sharing_status`
    (vẫn `DRAFT`) và không set `current_release_id`. Lý do: `guard_output_release`
    chỉ cho phép `current_release_id` trỏ tới một revision **đã release**
    (`released_at IS NOT NULL`), nên set sớm sẽ vi phạm trigger.
 
-2. **Bài DRAFT hiện cho chính owner, không hiện cho ai khác.** View
+2. **Reject không đụng tới bài.** Quyết định của một researcher nằm ở
+   `publication_claims.status = 'REJECTED'`, **không** phải ở
+   `research_outputs.import_state`. Lý do: một bài có nhiều tác giả — một
+   researcher nói "không phải của tôi" không nói gì về việc một đồng tác giả
+   khác có thể claim hay không. Vì vậy `output_import_state` chỉ còn ba giá
+   trị: `NONE` (không phải từ nguồn ngoài), `CANDIDATE` (đã pull, chờ quyết
+   định), `ACCEPTED` (đã có người claim, `owner_id` được set).
+
+   Không có `DISMISSED`: nó và `REJECTED` là cùng một ý ("đừng gợi ý lại cho
+   tôi"), chỉ khác tên. Một trạng thái đảo ngược duy nhất là đủ, và nó nằm ở
+   claim.
+
+   Bài bị reject **vẫn được lưu** và **vẫn là `CANDIDATE`**. Người dùng xem
+   được nó trong *rejection list* (`visible_rejected_candidates`) và có thể
+   accept lại bất cứ lúc nào — quyết định không bao giờ bị xoá.
+
+3. **Bài DRAFT hiện cho chính owner, không hiện cho ai khác.** View
    `owner_output_versions` + function `visible_owner_output_versions(actor)` lấy
    các output có `sharing_status <> 'SHARED'` của đúng owner đó. View
    `released_output_versions` — nguồn của Discovery và Search — vẫn chỉ lấy
@@ -269,17 +287,26 @@ Ba điểm phải giữ đúng:
    user **không** xuất hiện trong kết quả tìm kiếm — nó chỉ hiện trong hồ sơ
    cá nhân. Đây là hai danh sách tách biệt, không phải một danh sách có điều kiện.
 
-4. **Publish là bước kế tiếp của luồng accept, và nó nằm trong MVP.** Publish
-   là hành động `POST /outputs/:outputId/publish`, thực hiện trong **một
-   transaction**:
+4. **Publish là bước kế tiếp của luồng accept, và nó nằm trong MVP.** Sau khi
+   accept, hệ thống **hỏi** user có muốn share ngay không. Publish là hành động
+   `POST /outputs/:outputId/publish`, thực hiện trong **một transaction**:
 
    | Bước | Thay đổi | Ràng buộc bảo vệ |
    | --- | --- | --- |
    | 1 | release revision draft: `released_at`, `released_by` | trigger `guard_revision` — chỉ researcher quản lý được release, title không rỗng |
    | 2 | `research_outputs.current_release_id` → revision vừa release | trigger `guard_output_release` — `current_release_id` chỉ trỏ tới revision đã release |
    | 3 | `sharing_status = 'SHARED'`, `first_shared_at = now()` | check `ck_shared_output` — cần đủ owner + current release + first shared |
-   | 4 | `visibility = 'FPTU_COMMUNITY'` | check `ck_output_access_scope` — `FPTU_COMMUNITY` thì `access_group_id` phải NULL |
+   | 4 | `visibility` = giá trị user chọn | check `ck_output_access_scope` — `RESEARCH_GROUP` thì `access_group_id` phải NOT NULL; `FPTU_COMMUNITY` thì phải NULL |
    | 5 | revision `publication_status = 'PUBLISHED'` | — |
+
+   **Publish nhận `visibility` làm tham số, không hardcode.** `PRIVATE` **không**
+   phải một lựa chọn publish: `PRIVATE` nghĩa là chưa share, và publish là
+   hành động share. Hai giá trị hợp lệ:
+
+   | `visibility` | `access_group_id` | Ai thấy |
+   | --- | --- | --- |
+   | `FPTU_COMMUNITY` | NULL | toàn bộ cộng đồng FPTU |
+   | `RESEARCH_GROUP` | group của user | các thành viên group đó |
 
    **Chỉ owner được publish.** Quyền kiểm tra là `can_manage_output(actor,
    output)`, tức `owner_id = actor`. Đồng tác giả trên `output_authors` không
@@ -294,14 +321,51 @@ Ba điểm phải giữ đúng:
    Trigger `emit_research_update` tự ghi event `OUTPUT_SHARED` vào
    `research_updates`; Follow/Digest ở Main flow 3 đọc từ đó.
 
+#### 5.1.2 Luồng review: ba danh sách, một nguồn dữ liệu
+
+Candidate có **không có owner** và **không được share**, nên `can_view_output`
+không mở được cho nó — predicate đó chỉ mở cho owner hoặc cho bài đã share.
+Luồng review cần một quy tắc riêng, và quy tắc đó là `can_view_candidate`:
+
+```sql
+can_view_candidate(actor, output)
+  = is_researcher(actor)
+    AND output.import_state = 'CANDIDATE'
+    AND (output.created_by = actor          -- user tự pull
+         OR có publication_claims của actor) -- user được gợi ý bài này
+```
+
+Ba danh sách đọc từ cùng một nguồn (`publication_claims`), khác nhau ở
+`status`:
+
+| Hàm | Điều kiện | Ý nghĩa |
+| --- | --- | --- |
+| `visible_candidate_reviews(actor)` | claim của actor **hoặc** actor tự pull | toàn bộ candidate mà actor được xem |
+| `visible_candidate_suggestions(actor)` | trên, **trừ** claim `REJECTED` | danh sách gợi ý — bài đã reject thì không hiện nữa |
+| `visible_rejected_candidates(actor)` | claim của actor là `REJECTED` | rejection list — bài vẫn tìm được, accept lại được |
+
+Một candidate có thể được nhiều researcher claim cùng lúc. Mỗi function join
+claim **của riêng actor**, nên một bài là **một dòng** trong mỗi danh sách, và
+việc một người reject không ảnh hưởng tới người khác.
+
+Candidate **không bao giờ** lọt vào Discovery hay Search: `released_output_versions`
+chỉ lấy `sharing_status = 'SHARED'`, `sync_search_index_output` chỉ index bài
+đã share, và `owner_output_versions` đã loại `CANDIDATE` (candidate không
+phải bản làm việc của owner — chưa ai sở hữu nó).
+
 Bảng tổng kết:
 
 | Giai đoạn | `import_state` | `sharing_status` | `released_at` | Ai thấy |
 | --- | --- | --- | --- | --- |
-| Candidate | `CANDIDATE` | `DRAFT` | NULL | chỉ user (màn hình review) |
+| Candidate, chờ quyết định | `CANDIDATE` | `DRAFT` | NULL | researcher có claim (màn hình review) |
+| Candidate, đã reject | `CANDIDATE` | `DRAFT` | NULL | researcher đã reject — qua rejection list, không qua suggestion |
 | Accepted, chưa publish | `ACCEPTED` | `DRAFT` | NULL | chỉ owner (hồ sơ cá nhân) |
-| Published | `ACCEPTED` | `SHARED` | có | `FPTU_COMMUNITY` — Discovery + Search |
+| Published | `ACCEPTED` | `SHARED` | có | theo `visibility` — Discovery + Search |
 
+> **Ngoài MVP:** hành động "correct" — sửa metadata của bài gợi ý (tiêu đề,
+> tác giả, venue) khi OpenAlex ghi sai. Trong MVP, user sửa metadata *sau khi
+> accept*, trên bản draft của mình.
+>
 > **Ngoài MVP:** tạo publication mới từ đầu bên trong platform rồi publish nó.
 > Trong MVP, chỉ bài đã đi qua luồng ingest từ bên ngoài (OpenAlex) mới
 > có đường publish này.
