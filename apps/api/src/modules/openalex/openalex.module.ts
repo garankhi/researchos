@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ProvenanceModule } from '../provenance/provenance.module.js';
+import { OpenAlexIngestService } from './openalex-ingest.service.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
 import { OpenAlexClient } from './openalex.client.js';
 
@@ -10,7 +12,8 @@ import { OpenAlexClient } from './openalex.client.js';
  * No controller: nothing here is an HTTP endpoint of our own.
  */
 @Module({
-  providers: [OpenAlexClient, OpenAlexLookupService],
-  exports: [OpenAlexClient, OpenAlexLookupService],
+  imports: [ProvenanceModule],
+  providers: [OpenAlexClient, OpenAlexLookupService, OpenAlexIngestService],
+  exports: [OpenAlexClient, OpenAlexLookupService, OpenAlexIngestService],
 })
 export class OpenAlexModule {}
