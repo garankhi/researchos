@@ -66,11 +66,13 @@ Feature ghi DB rồi phát job phải gọi helper dùng chung
 trong chính transaction ghi nghiệp vụ. Helper không enqueue Redis. Worker chỉ
 thấy outbox sau commit; rollback xóa cả thay đổi nghiệp vụ lẫn job/outbox.
 `submit(...)` là dạng tiện dụng khi chỉ cần tạo job. Feature dùng chung
-`background-jobs` đăng ký handler theo `kind` trong `BackgroundJobProcessor`
-trước khi submit. Handler tự kiểm tra payload. Handler gọi dịch vụ ngoài chạy
-sau khi processor nhả khóa SQL và tự quản lý lease và kết quả. Digest SMTP demo
-dùng ledger để điều phối retry. Khi SMTP đã nhận thư nhưng mất phản hồi, lần
-retry có thể gửi trùng. Xem [hướng dẫn worker](../apps/worker/README.md).
+`background-jobs` đăng ký handler ghi DB theo `kind` trong
+`BackgroundJobProcessor`. Outbox định tuyến `digest-send` sang `digest-jobs`
+trong cùng `QUEUE_PREFIX`. Chỉ worker bật SMTP mới nhận queue đó. Digest khóa
+delivery trước background job, cùng thứ tự với producer. Worker nhả khóa SQL
+trước khi gọi SMTP và dùng ledger để điều phối retry. Khi SMTP đã nhận thư
+nhưng mất phản hồi, lần retry có thể gửi trùng. Xem
+[hướng dẫn worker](../apps/worker/README.md).
 
 Outbox/job/DLQ được giữ để phục vụ idempotency và điều tra; chưa có chính sách
 prune tự động. Khi bổ sung retention cần quyết định rõ thời hạn idempotency,

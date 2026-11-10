@@ -14,6 +14,7 @@ import {
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  DIGEST_QUEUE,
   DIGEST_SEND_JOB,
   backgroundTransportId,
   createQueueOptions,
@@ -43,6 +44,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   let jobs: BackgroundJobsService;
   let databaseUrl: string;
   let queue: Queue;
+  let backgroundQueue: Queue;
   let dlq: Queue;
   let worker: ChildProcess | undefined;
   let created = false;
@@ -83,7 +85,8 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     process.env.QUEUE_PREFIX = prefix;
     jobs = new BackgroundJobsService(prisma);
     const options = createQueueOptions(process.env.REDIS_URL!, prefix);
-    queue = new Queue(BACKGROUND_QUEUE, options);
+    queue = new Queue(DIGEST_QUEUE, options);
+    backgroundQueue = new Queue(BACKGROUND_QUEUE, options);
     dlq = new Queue(DEAD_LETTER_QUEUE, options);
 
     author = await createUser();
@@ -116,8 +119,10 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   afterAll(async () => {
     await stopWorker();
     await queue?.obliterate({ force: true });
+    await backgroundQueue?.obliterate({ force: true });
     await dlq?.obliterate({ force: true });
     await queue?.close();
+    await backgroundQueue?.close();
     await dlq?.close();
     await prisma?.$disconnect();
     if (created) await admin.$executeRawUnsafe(`DROP DATABASE "${database}"`);
@@ -126,26 +131,28 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     else process.env.QUEUE_PREFIX = originalPrefix;
   });
 
-  async function startWorker() {
-    worker = fork(
-      resolve(workspace, 'apps/worker/test/fixtures/digest-worker.mjs'),
-      {
-        cwd: workspace,
-        execArgv: [],
-        env: {
-          ...process.env,
-          DATABASE_URL: databaseUrl,
-          QUEUE_PREFIX: prefix,
-          DIGEST_SMTP_ENABLED: 'true',
-        },
-        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-        windowsHide: true,
+  function launchWorker(entry: string, smtpEnabled: boolean) {
+    const child = fork(resolve(workspace, entry), {
+      cwd: workspace,
+      execArgv: [],
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+        QUEUE_PREFIX: prefix,
+        DIGEST_SMTP_ENABLED: String(smtpEnabled),
       },
-    );
-    worker.on('message', (mail) => received.push(mail as Request));
-    worker.stderr?.on('data', (data: Buffer) => {
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+    child.stderr?.on('data', (data: Buffer) => {
       workerOutput += data.toString();
     });
+    return child;
+  }
+
+  async function startWorker() {
+    worker = launchWorker('apps/worker/test/fixtures/digest-worker.mjs', true);
+    worker.on('message', (mail) => received.push(mail as Request));
     await vi.waitFor(
       async () => {
         expect(await queue.getWorkersCount(), workerOutput).toBeGreaterThan(0);
@@ -155,12 +162,15 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   }
 
   async function stopWorker() {
-    if (!worker || worker.exitCode !== null || worker.signalCode !== null)
-      return;
-    const exited = once(worker, 'exit');
-    worker.kill('SIGKILL');
-    await exited;
+    if (worker) await killWorker(worker);
     worker = undefined;
+  }
+
+  async function killWorker(child: ChildProcess) {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    const exited = once(child, 'exit');
+    child.kill('SIGKILL');
+    await exited;
   }
 
   async function createUser(type: 'FACULTY' | 'STAFF' = 'FACULTY') {
@@ -297,6 +307,24 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     });
   }
 
+  async function waitForDatabaseLock(queryFragment: string) {
+    await expect
+      .poll(
+        async () => {
+          const [row] = await prisma.$queryRaw<[{ blocked: boolean }]>`
+        SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'
+            AND query LIKE ${`%${queryFragment}%`}
+        ) AS blocked
+      `;
+          return row.blocked;
+        },
+        { timeout: 3_000 },
+      )
+      .toBe(true);
+  }
+
   it('commits the reference and outbox with the delivery or rolls everything back', async () => {
     const user = await createUser();
     await expect(
@@ -311,6 +339,89 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     expect(
       await prisma.background_jobs.count({ where: { owner_id: user } }),
     ).toBe(0);
+  });
+
+  it('allows idempotent resubmission while the worker waits for the delivery lock', async () => {
+    const index = received.length;
+    const recipient = await createUser();
+    await prisma.digest_preferences.create({
+      data: { user_id: recipient, enabled: true },
+    });
+    const { delivery, job } = await prisma.$transaction(async (tx) => {
+      const prepared = await prepare(tx, recipient, [publicOutput]);
+      await tx.digest_deliveries.update({
+        where: { id: prepared.delivery.id },
+        data: { next_attempt_at: new Date(Date.now() + 60_000) },
+      });
+      return prepared;
+    });
+
+    const deliveryLocked = Promise.withResolvers<void>();
+    const submitAgain = Promise.withResolvers<void>();
+    const producer = prisma.$transaction(
+      async (tx) => {
+        await tx.digest_deliveries.update({
+          where: { id: delivery.id },
+          data: { next_attempt_at: new Date(0) },
+        });
+        deliveryLocked.resolve();
+        await submitAgain.promise;
+        return jobs.submitInTransaction(
+          tx,
+          recipient,
+          DIGEST_SEND_JOB,
+          delivery.id,
+          { deliveryId: delivery.id },
+        );
+      },
+      { timeout: 10_000 },
+    );
+    try {
+      await Promise.race([deliveryLocked.promise, producer]);
+      const wakeup = await queue.add(
+        'execute',
+        { jobId: job.id, generation: 0 },
+        { jobId: randomUUID() },
+      );
+      await waitForDatabaseLock('FROM digest_deliveries');
+      submitAgain.resolve();
+      expect((await producer).id).toBe(job.id);
+      await waitMail(index);
+      respond(index, accepted);
+      await expect
+        .poll(() => wakeup.getState(), { timeout: 8_000 })
+        .toBe('completed');
+      expect((await waitStatus(delivery.id, 'SENT')).attempts).toBe(1);
+    } finally {
+      submitAgain.resolve();
+      await Promise.allSettled([producer]);
+    }
+  });
+
+  it('routes digest wake-ups only to SMTP-enabled workers on a shared prefix', async () => {
+    const index = received.length;
+    const disabled = launchWorker('apps/worker/dist/main.js', false);
+    try {
+      await expect
+        .poll(() => backgroundQueue.getWorkersCount(), { timeout: 15_000 })
+        .toBe(2);
+      expect(await queue.getWorkersCount()).toBe(1);
+
+      const { delivery, job } = await fixture();
+      const legacy = await backgroundQueue.add('execute', {
+        jobId: job.id,
+        generation: 0,
+      });
+      await expect
+        .poll(() => legacy.getState(), { timeout: 8_000 })
+        .toBe('completed');
+      await waitMail(index);
+      respond(index, accepted);
+      expect((await waitStatus(delivery.id, 'SENT')).attempts).toBe(1);
+      expect(received).toHaveLength(index + 1);
+    } finally {
+      await killWorker(disabled);
+    }
   });
 
   it('prunes private/draft items, escapes the live snapshot, and records acceptance after opt-out', async () => {
@@ -400,21 +511,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
         where: { id: delivery.id },
         data: { next_attempt_at: new Date(0) },
       });
-      await expect
-        .poll(
-          async () => {
-            const rows = await prisma.$queryRaw<{ blocked: boolean }[]>`
-          SELECT EXISTS (
-            SELECT 1 FROM pg_stat_activity
-            WHERE datname = current_database() AND wait_event_type = 'Lock'
-              AND query LIKE '%UPDATE digest_items%'
-          ) AS blocked
-        `;
-            return rows[0]?.blocked;
-          },
-          { timeout: 3_000 },
-        )
-        .toBe(true);
+      await waitForDatabaseLock('UPDATE digest_items');
       await prisma.research_outputs.update({
         where: { id: event.output_id! },
         data: { visibility: 'PRIVATE' },
@@ -488,6 +585,21 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     await expect
       .poll(() => dlq.getJob(backgroundTransportId(job.id, 0)))
       .toBeDefined();
+  });
+
+  it('can send on a later attempt after SMTP authentication is restored', async () => {
+    const index = received.length;
+    const { delivery, job } = await fixture();
+    await waitMail(index);
+    respond(index, { accepted: false, code: 'smtp_auth' });
+    expect((await waitStatus(delivery.id, 'FAILED')).last_error).toBe(
+      'smtp_auth',
+    );
+    expect(await dlq.getJob(backgroundTransportId(job.id, 0))).toBeUndefined();
+    await releaseBackoff(delivery.id, job.id);
+    await waitMail(index + 1);
+    respond(index + 1, accepted);
+    expect((await waitStatus(delivery.id, 'SENT')).attempts).toBe(2);
   });
 
   it.each(['inactive', 'revoked'] as const)(

@@ -10,6 +10,7 @@ import { PrismaService } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  DIGEST_QUEUE,
   DIGEST_SEND_JOB,
   backgroundTransportId,
   createQueueOptions,
@@ -27,7 +28,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly work: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
-  private readonly digestEnabled: boolean;
+  private readonly digestWork?: Queue;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -38,11 +39,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       config.get<string>('QUEUE_PREFIX') ?? 'researchos',
     );
     this.prefix = options.prefix!;
-    this.digestEnabled = config.get<string>('DIGEST_SMTP_ENABLED') === 'true';
     this.work = new Queue(BACKGROUND_QUEUE, options);
     this.deadLetters = new Queue(DEAD_LETTER_QUEUE, options);
-    for (const queue of [this.work, this.deadLetters]) {
-      queue.on('error', (error: Error) => this.logger.error(error.message));
+    if (config.get<string>('DIGEST_SMTP_ENABLED') === 'true') {
+      this.digestWork = new Queue(DIGEST_QUEUE, options);
+    }
+    for (const queue of [this.work, this.deadLetters, this.digestWork]) {
+      queue?.on('error', (error: Error) => this.logger.error(error.message));
     }
   }
 
@@ -73,6 +76,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         Promise.all([
           this.work.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
+          this.digestWork?.waitUntilReady(),
         ]),
         new Promise<never>((_, reject) => {
           timeout = setTimeout(
@@ -112,7 +116,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
           )
         ) AND (
           o.destination <> 'WORK' OR j.kind <> ${DIGEST_SEND_JOB} OR (
-            ${this.digestEnabled} AND (d.id IS NULL OR d.status IN ('SENT', 'CANCELLED') OR (
+            ${this.digestWork !== undefined} AND (d.id IS NULL OR d.status IN ('SENT', 'CANCELLED') OR (
               d.next_attempt_at <= now() AND (d.locked_until IS NULL OR d.locked_until <= now())
             ))
           )
@@ -121,7 +125,12 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         for (const row of rows) {
           const digest = row.kind === DIGEST_SEND_JOB;
           const queue =
-            row.destination === 'DLQ' ? this.deadLetters : this.work;
+            row.destination === 'DLQ'
+              ? this.deadLetters
+              : digest
+                ? this.digestWork
+                : this.work;
+          if (!queue) continue;
           const transportId = backgroundTransportId(row.job_id, row.generation);
           const existing = await queue.getJob(transportId);
           if (
@@ -190,6 +199,10 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     this.stopping = true;
     clearTimeout(this.timer);
     await this.active;
-    await Promise.all([this.work.close(), this.deadLetters.close()]);
+    await Promise.all([
+      this.work.close(),
+      this.deadLetters.close(),
+      this.digestWork?.close(),
+    ]);
   }
 }

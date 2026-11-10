@@ -10,7 +10,7 @@ export type MailOutcome =
   | { accepted: true; messageId: string }
   | {
       accepted: false;
-      code: 'smtp_transient' | 'smtp_permanent' | 'smtp_unknown';
+      code: 'smtp_auth' | 'smtp_transient' | 'smtp_permanent' | 'smtp_unknown';
     };
 
 export interface MailProvider {

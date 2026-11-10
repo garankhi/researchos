@@ -43,6 +43,7 @@ describe('Gmail SMTP adapter', () => {
   it.each([
     [{ responseCode: 421 }, 'smtp_transient'],
     [{ responseCode: 550 }, 'smtp_permanent'],
+    [{ responseCode: 535, code: 'EAUTH' }, 'smtp_auth'],
     [
       { code: 'ETIMEDOUT', command: 'CONN', timeoutType: 'CONNECT_TIMEOUT' },
       'smtp_transient',

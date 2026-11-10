@@ -3,6 +3,7 @@ import type { QueueOptions } from 'bullmq';
 export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
+export const DIGEST_QUEUE = 'digest-jobs';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
 export const DIGEST_SEND_JOB = 'digest-send';
@@ -25,6 +26,21 @@ export function digestDeliveryId(payload: unknown): string | undefined {
 export interface BackgroundJobPayload {
   jobId: string;
   generation: number;
+}
+
+export function isBackgroundJobPayload(
+  value: unknown,
+): value is BackgroundJobPayload {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'jobId' in value &&
+    isJobUuid(value.jobId) &&
+    'generation' in value &&
+    typeof value.generation === 'number' &&
+    Number.isSafeInteger(value.generation) &&
+    value.generation >= 0
+  );
 }
 
 export function backgroundTransportId(

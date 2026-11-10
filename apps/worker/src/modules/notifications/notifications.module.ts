@@ -4,11 +4,13 @@ import { DigestSender } from './digest-sender.service.js';
 import { DigestTemplate } from './digest-template.js';
 import { GmailSmtpProvider } from './gmail-smtp.provider.js';
 import { MAIL_PROVIDER } from './mail-provider.js';
+import { DigestJobConsumer } from '../../processors/digest-job.consumer.js';
 
 @Module({
   providers: [
     DigestTemplate,
     DigestSender,
+    DigestJobConsumer,
     {
       provide: MAIL_PROVIDER,
       inject: [ConfigService],
@@ -21,6 +23,5 @@ import { MAIL_PROVIDER } from './mail-provider.js';
           : null,
     },
   ],
-  exports: [DigestSender],
 })
 export class NotificationsModule {}

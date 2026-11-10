@@ -7,11 +7,10 @@ import {
   DIGEST_SEND_JOB,
   DURABLE_PROBE_JOB,
   JOB_ATTEMPTS,
-  isJobUuid,
+  isBackgroundJobPayload,
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
-import { DigestSender } from '../modules/notifications/digest-sender.service.js';
 
 type BackgroundJobOutcome =
   { result: Prisma.InputJsonValue } | { error: Error };
@@ -26,14 +25,9 @@ type BackgroundJobHandler = (
   context: BackgroundJobContext,
 ) => BackgroundJobOutcome | Promise<BackgroundJobOutcome>;
 
-type ExternalJobHandler = (
-  ref: BackgroundJobPayload,
-  prefix: string,
-) => Promise<void>;
-
-type RegisteredJobHandler =
-  | { mode: 'transactional'; run: BackgroundJobHandler }
-  | { mode: 'external'; run: ExternalJobHandler };
+const handlers = new Map<string, BackgroundJobHandler>([
+  [DURABLE_PROBE_JOB, runDiagnosticProbe],
+]);
 
 function unsupportedJob(): BackgroundJobOutcome {
   return {
@@ -67,36 +61,20 @@ function runDiagnosticProbe({
 @Processor(BACKGROUND_QUEUE, { concurrency: 2 })
 export class BackgroundJobProcessor extends WorkerHost {
   private readonly logger = new Logger(BackgroundJobProcessor.name);
-  private readonly handlers: Map<string, RegisteredJobHandler>;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) private readonly config: ConfigService,
-    @Inject(DigestSender) digestSender: DigestSender,
   ) {
     super();
-    this.handlers = new Map<string, RegisteredJobHandler>([
-      [DURABLE_PROBE_JOB, { mode: 'transactional', run: runDiagnosticProbe }],
-      [
-        DIGEST_SEND_JOB,
-        {
-          mode: 'external',
-          run: (ref, prefix) => digestSender.process(ref, prefix),
-        },
-      ],
-    ]);
   }
 
   async process(job: Job<BackgroundJobPayload>): Promise<void> {
-    if (
-      !isJobUuid(job.data?.jobId) ||
-      !Number.isSafeInteger(job.data?.generation) ||
-      job.data.generation < 0
-    ) {
+    if (!isBackgroundJobPayload(job.data)) {
       throw new UnrecoverableError('Invalid background job reference');
     }
     const prefix = this.config.get<string>('QUEUE_PREFIX') ?? 'researchos';
-    const result = await this.prisma.$transaction(async (tx) => {
+    const failure = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM background_jobs WHERE id = ${job.data.jobId}::uuid FOR UPDATE
       `;
@@ -112,9 +90,11 @@ export class BackgroundJobProcessor extends WorkerHost {
         stored.status !== 'PENDING'
       )
         return null;
-      const handler = this.handlers.get(stored.kind);
-      // External handlers acquire their own lease once this row lock is released.
-      if (handler?.mode === 'external') return handler.run;
+      // An old digest wake-up may still be on this queue during deployment.
+      // Its durable outbox entry will be dispatched to the digest queue.
+      if (stored.kind === DIGEST_SEND_JOB) return null;
+
+      const handler = handlers.get(stored.kind);
 
       const attempts = Math.min(
         Math.max(stored.attempts, job.attemptsMade) + 1,
@@ -123,7 +103,7 @@ export class BackgroundJobProcessor extends WorkerHost {
       // DB-only handlers write via tx to commit their side effects with completion.
       // Return expected errors before writing, or throw to roll back partial writes.
       const outcome = handler
-        ? await handler.run({ job: stored, attempts, tx })
+        ? await handler({ job: stored, attempts, tx })
         : unsupportedJob();
       const error = 'error' in outcome ? outcome.error : null;
       const terminal =
@@ -149,8 +129,7 @@ export class BackgroundJobProcessor extends WorkerHost {
       return error;
     });
     // Throw only after persisting the failed attempt/DLQ transaction.
-    if (typeof result === 'function') await result(job.data, prefix);
-    else if (result) throw result;
+    if (failure) throw failure;
   }
 
   @OnWorkerEvent('error')

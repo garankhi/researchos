@@ -54,6 +54,8 @@ export class GmailSmtpProvider implements MailProvider {
         timeoutType?: string;
         code?: string;
       };
+      // Authentication is a sender configuration failure, independent of this recipient.
+      if (code === 'EAUTH') return { accepted: false, code: 'smtp_auth' };
       if (responseCode && responseCode >= 500 && responseCode < 600) {
         return { accepted: false, code: 'smtp_permanent' };
       }

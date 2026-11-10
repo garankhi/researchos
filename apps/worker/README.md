@@ -154,8 +154,10 @@ and `DIGEST_SMTP_APP_PASSWORD` in the worker's environment or its ignored local
 account. The worker uses the authenticated address as the sender and requires
 STARTTLS to `smtp.gmail.com:587`. Verify outbound access from the worker host.
 `pnpm dev:worker` forwards the environment through Turbo's `dev` task.
-Leave SMTP disabled in environments where mail should remain queued. CI uses a
-provider double and supplies its own isolated Redis prefix and test database.
+Digest work uses the `digest-jobs` queue in the same Redis prefix as other
+durable jobs. SMTP-enabled workers publish and consume this queue. Other workers
+can share the prefix and continue processing probes. CI uses a provider double
+and supplies its own isolated Redis prefix and test database.
 
 The sender rechecks eligibility, opt-in, recipient address and visibility after
 committing the prepared snapshot. If any inputs change before submission, it
@@ -170,8 +172,10 @@ An explicit `vi` preference selects Vietnamese.
 - The SQL claim lasts two minutes and increments the lifetime attempt counter
   once. SMTP I/O runs after the claim commits. The attempt number fences
   completion after a later worker takes the lease.
-- Known transient and unknown outcomes retry after 1, 2, 4 and 8 minutes. A
-  worker crash leaves the lease and schedules recovery after lease expiry plus
+- Transient failures, sender authentication failures (`smtp_auth`) and unknown
+  outcomes retry after 1, 2, 4 and 8 minutes. Fix SMTP credentials before the
+  remaining attempts are exhausted. A worker crash leaves the lease and
+  schedules recovery after lease expiry plus
   the corresponding delay. An expired fifth lease is finalized as failed.
 - Each digest BullMQ job is one wake-up and is removed after completion or
   failure. The outbox republishes a missing wake-up for an eligible SQL row.

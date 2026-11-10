@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Inject, Injectable } from '@nestjs/common';
-import { PrismaService, type Prisma } from '@researchos/database';
+import { Prisma, PrismaService } from '@researchos/database';
 import {
   DIGEST_MAX_ATTEMPTS,
   DIGEST_SEND_JOB,
@@ -31,6 +31,7 @@ interface AuthorizedDigest {
 
 interface Claim {
   id: string;
+  ownerId: string;
   attempt: number;
   content: AuthorizedDigest;
 }
@@ -45,19 +46,30 @@ export class DigestSender {
     @Inject(MAIL_PROVIDER) private readonly mail: MailProvider | null,
   ) {}
 
+  get enabled(): boolean {
+    return this.mail !== null;
+  }
+
   async process(ref: BackgroundJobPayload, prefix: string): Promise<void> {
     if (!this.mail) return;
     const claim = await this.prisma.$transaction(async (tx) => {
-      const job = await this.lockJob(tx, ref, prefix);
-      if (!job) return null;
+      const candidate = await this.findJob(tx, ref, prefix);
+      if (!candidate) return null;
 
-      const deliveryId = digestDeliveryId(job.payload);
-      if (!deliveryId) {
-        await this.finishJob(tx, ref, 'invalid_digest_reference');
+      // The producer writes the delivery before it submits the job. Match that
+      // lock order when claiming and when recording the outcome.
+      const deliveryId = digestDeliveryId(candidate.payload);
+      const delivery = deliveryId
+        ? await this.lockDelivery(tx, deliveryId, candidate.owner_id)
+        : undefined;
+      const job = await this.findJob(tx, ref, prefix, true);
+      if (
+        !job ||
+        job.owner_id !== candidate.owner_id ||
+        digestDeliveryId(job.payload) !== deliveryId
+      )
         return null;
-      }
-      const delivery = await this.lockDelivery(tx, deliveryId, job.owner_id);
-      if (!delivery) {
+      if (!deliveryId || !delivery) {
         await this.finishJob(tx, ref, 'invalid_digest_reference');
         return null;
       }
@@ -111,6 +123,7 @@ export class DigestSender {
       });
       return {
         id: deliveryId,
+        ownerId: job.owner_id,
         attempt,
         content,
       } satisfies Claim;
@@ -202,12 +215,17 @@ export class DigestSender {
     outcome: SendOutcome,
   ) {
     await this.prisma.$transaction(async (tx) => {
-      const job = await this.lockJob(tx, ref, prefix);
-      if (!job) return;
-      const delivery = await this.lockDelivery(tx, claim.id, job.owner_id);
+      const delivery = await this.lockDelivery(tx, claim.id, claim.ownerId);
       if (
         delivery?.status !== 'PROCESSING' ||
         delivery.attempts !== claim.attempt
+      )
+        return;
+      const job = await this.findJob(tx, ref, prefix, true);
+      if (
+        !job ||
+        job.owner_id !== claim.ownerId ||
+        digestDeliveryId(job.payload) !== claim.id
       )
         return;
 
@@ -259,10 +277,11 @@ export class DigestSender {
     });
   }
 
-  private async lockJob(
+  private async findJob(
     tx: Prisma.TransactionClient,
     ref: BackgroundJobPayload,
     prefix: string,
+    lock = false,
   ) {
     const rows = await tx.$queryRaw<
       { owner_id: string; payload: Prisma.JsonValue }[]
@@ -270,7 +289,7 @@ export class DigestSender {
       SELECT owner_id, payload FROM background_jobs
       WHERE id = ${ref.jobId}::uuid AND generation = ${ref.generation}
         AND queue_prefix = ${prefix} AND kind = ${DIGEST_SEND_JOB} AND status = 'PENDING'
-      FOR UPDATE
+      ${lock ? Prisma.sql`FOR UPDATE` : Prisma.empty}
     `;
     return rows[0];
   }
