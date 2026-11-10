@@ -415,6 +415,362 @@
         ]
       }
     },
+    "/research-groups/{groupId}/members": {
+      "get": {
+        "operationId": "GroupMembersController_findAll",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated group member list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMemberPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List group members (lead and members only)",
+        "tags": [
+          "groups"
+        ]
+      },
+      "post": {
+        "operationId": "GroupMembersController_add",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGroupMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Member added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMemberResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User is already a member of this group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an existing user to a group",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/members/{userId}": {
+      "patch": {
+        "operationId": "GroupMembersController_update",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "User whose membership is being updated.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Member role changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMemberResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a group member role",
+        "tags": [
+          "groups"
+        ]
+      },
+      "delete": {
+        "operationId": "GroupMembersController_remove",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "User whose membership is being removed.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Member removed."
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The lead cannot be removed while the group is active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a group member",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -2558,6 +2914,105 @@
           }
         }
       },
+      "GroupMemberResponseDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "description": "Group this membership belongs to.",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User this membership belongs to.",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the member within the group.",
+            "enum": [
+              "CORE_MEMBER",
+              "COLLABORATOR",
+              "STUDENT_MEMBER"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "description": "Timestamp when the user joined the group.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "groupId",
+          "userId",
+          "role",
+          "joinedAt"
+        ]
+      },
+      "GroupMemberPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Members belonging to this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupMemberResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "AddGroupMemberDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Role of the member within the group.",
+            "enum": [
+              "CORE_MEMBER",
+              "COLLABORATOR",
+              "STUDENT_MEMBER"
+            ]
+          },
+          "userId": {
+            "type": "string",
+            "description": "Existing user to add to the group.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "role",
+          "userId"
+        ]
+      },
+      "UpdateGroupMemberDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Role of the member within the group.",
+            "enum": [
+              "CORE_MEMBER",
+              "COLLABORATOR",
+              "STUDENT_MEMBER"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -4359,6 +4814,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/ResearchGroupResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "GroupMemberPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupMemberPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "GroupMemberResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupMemberResponseDto"
           },
           "message": {
             "type": "string",

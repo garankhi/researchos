@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 
+export * from './addGroupMemberDto';
+export * from './addGroupMemberDtoRole';
 export * from './apiErrorResponseDto';
 export * from './apiErrorResponseDtoErrorsItem';
 export * from './changePasswordDto';
@@ -28,6 +30,12 @@ export * from './fieldResponseDto';
 export * from './fieldResponseDtoSource';
 export * from './grantRoleDto';
 export * from './grantRoleDtoRole';
+export * from './groupMemberPageDto';
+export * from './groupMemberPageDtoEnvelope';
+export * from './groupMemberResponseDto';
+export * from './groupMemberResponseDtoEnvelope';
+export * from './groupMemberResponseDtoRole';
+export * from './groupMembersControllerFindAllParams';
 export * from './groupsControllerFindAllParams';
 export * from './healthStatusDto';
 export * from './healthStatusDtoEnvelope';
@@ -97,6 +105,8 @@ export * from './topicDetailResponseDtoEnvelope';
 export * from './topicDetailResponseDtoSource';
 export * from './topicResponseDto';
 export * from './topicResponseDtoSource';
+export * from './updateGroupMemberDto';
+export * from './updateGroupMemberDtoRole';
 export * from './updateOpportunityDto';
 export * from './updateOpportunityDtoOpportunityKind';
 export * from './updateOpportunityDtoTargetAudience';

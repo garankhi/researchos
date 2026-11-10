@@ -22,11 +22,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddGroupMemberDto,
   ApiErrorResponseDto,
   CreateResearchGroupDto,
+  GroupMemberPageDtoEnvelope,
+  GroupMemberResponseDtoEnvelope,
+  GroupMembersControllerFindAllParams,
   GroupsControllerFindAllParams,
   PaginatedResearchGroupsResponseDtoEnvelope,
   ResearchGroupResponseDtoEnvelope,
+  UpdateGroupMemberDto,
   UpdateResearchGroupDto,
 } from '../models';
 
@@ -580,6 +585,495 @@ export const useGroupsControllerUpdate = <
 > => {
   return useMutation(
     getGroupsControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary List group members (lead and members only)
+ */
+export const groupMembersControllerFindAll = (
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupMemberPageDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/members`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupMembersControllerFindAllQueryKey = (
+  groupId: string,
+  params?: GroupMembersControllerFindAllParams,
+) => {
+  return [
+    `/research-groups/${groupId}/members`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGroupMembersControllerFindAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGroupMembersControllerFindAllQueryKey(groupId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof groupMembersControllerFindAll>>
+  > = ({ signal }) =>
+    groupMembersControllerFindAll(groupId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: groupId !== null && groupId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GroupMembersControllerFindAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof groupMembersControllerFindAll>>
+>;
+export type GroupMembersControllerFindAllQueryError = ApiErrorResponseDto;
+
+export function useGroupMembersControllerFindAll<
+  TData = Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof groupMembersControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGroupMembersControllerFindAll<
+  TData = Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof groupMembersControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGroupMembersControllerFindAll<
+  TData = Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List group members (lead and members only)
+ */
+
+export function useGroupMembersControllerFindAll<
+  TData = Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: GroupMembersControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupMembersControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGroupMembersControllerFindAllQueryOptions(
+    groupId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Add an existing user to a group
+ */
+export const groupMembersControllerAdd = (
+  groupId: string,
+  addGroupMemberDto: AddGroupMemberDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupMemberResponseDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/members`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: addGroupMemberDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupMembersControllerAddMutationKey = () =>
+  ['groupMembersControllerAdd'] as const;
+
+export const getGroupMembersControllerAddMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof groupMembersControllerAdd>>,
+    TError,
+    GroupMembersControllerAddMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof groupMembersControllerAdd>>,
+  TError,
+  GroupMembersControllerAddMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGroupMembersControllerAddMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof groupMembersControllerAdd>>,
+    GroupMembersControllerAddMutationVariables
+  > = (props) => {
+    const { groupId, data } = props ?? {};
+
+    return groupMembersControllerAdd(groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GroupMembersControllerAddMutationResult = NonNullable<
+  Awaited<ReturnType<typeof groupMembersControllerAdd>>
+>;
+export type GroupMembersControllerAddMutationBody = AddGroupMemberDto;
+export type GroupMembersControllerAddMutationError = ApiErrorResponseDto;
+export type GroupMembersControllerAddMutationVariables = {
+  groupId: string;
+  data: AddGroupMemberDto;
+};
+
+/**
+ * @summary Add an existing user to a group
+ */
+export const useGroupMembersControllerAdd = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof groupMembersControllerAdd>>,
+      TError,
+      GroupMembersControllerAddMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof groupMembersControllerAdd>>,
+  TError,
+  GroupMembersControllerAddMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getGroupMembersControllerAddMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Change a group member role
+ */
+export const groupMembersControllerUpdate = (
+  groupId: string,
+  userId: string,
+  updateGroupMemberDto: UpdateGroupMemberDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupMemberResponseDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/members/${userId}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateGroupMemberDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupMembersControllerUpdateMutationKey = () =>
+  ['groupMembersControllerUpdate'] as const;
+
+export const getGroupMembersControllerUpdateMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof groupMembersControllerUpdate>>,
+    TError,
+    GroupMembersControllerUpdateMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof groupMembersControllerUpdate>>,
+  TError,
+  GroupMembersControllerUpdateMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGroupMembersControllerUpdateMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof groupMembersControllerUpdate>>,
+    GroupMembersControllerUpdateMutationVariables
+  > = (props) => {
+    const { groupId, userId, data } = props ?? {};
+
+    return groupMembersControllerUpdate(groupId, userId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GroupMembersControllerUpdateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof groupMembersControllerUpdate>>
+>;
+export type GroupMembersControllerUpdateMutationBody = UpdateGroupMemberDto;
+export type GroupMembersControllerUpdateMutationError = ApiErrorResponseDto;
+export type GroupMembersControllerUpdateMutationVariables = {
+  groupId: string;
+  userId: string;
+  data: UpdateGroupMemberDto;
+};
+
+/**
+ * @summary Change a group member role
+ */
+export const useGroupMembersControllerUpdate = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof groupMembersControllerUpdate>>,
+      TError,
+      GroupMembersControllerUpdateMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof groupMembersControllerUpdate>>,
+  TError,
+  GroupMembersControllerUpdateMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getGroupMembersControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Remove a group member
+ */
+export const groupMembersControllerRemove = (
+  groupId: string,
+  userId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<void>(
+    {
+      url: `/research-groups/${groupId}/members/${userId}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupMembersControllerRemoveMutationKey = () =>
+  ['groupMembersControllerRemove'] as const;
+
+export const getGroupMembersControllerRemoveMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof groupMembersControllerRemove>>,
+    TError,
+    GroupMembersControllerRemoveMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof groupMembersControllerRemove>>,
+  TError,
+  GroupMembersControllerRemoveMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGroupMembersControllerRemoveMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof groupMembersControllerRemove>>,
+    GroupMembersControllerRemoveMutationVariables
+  > = (props) => {
+    const { groupId, userId } = props ?? {};
+
+    return groupMembersControllerRemove(groupId, userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GroupMembersControllerRemoveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof groupMembersControllerRemove>>
+>;
+
+export type GroupMembersControllerRemoveMutationError = ApiErrorResponseDto;
+export type GroupMembersControllerRemoveMutationVariables = {
+  groupId: string;
+  userId: string;
+};
+
+/**
+ * @summary Remove a group member
+ */
+export const useGroupMembersControllerRemove = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof groupMembersControllerRemove>>,
+      TError,
+      GroupMembersControllerRemoveMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof groupMembersControllerRemove>>,
+  TError,
+  GroupMembersControllerRemoveMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getGroupMembersControllerRemoveMutationOptions(options),
     queryClient,
   );
 };
