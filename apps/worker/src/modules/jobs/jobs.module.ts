@@ -7,11 +7,13 @@ import {
   BACKGROUND_QUEUE,
 } from '@researchos/queue';
 import { ProbeProcessor } from '../../processors/probe.processor.js';
-import { BackgroundProbeProcessor } from '../../processors/background-probe.processor.js';
+import { BackgroundJobProcessor } from '../../processors/background-job.processor.js';
 import { OutboxService } from './outbox.service.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
+    NotificationsModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
@@ -24,6 +26,6 @@ import { OutboxService } from './outbox.service.js';
     BullModule.registerQueue({ name: SYSTEM_QUEUE }),
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
   ],
-  providers: [ProbeProcessor, BackgroundProbeProcessor, OutboxService],
+  providers: [ProbeProcessor, BackgroundJobProcessor, OutboxService],
 })
 export class JobsModule {}

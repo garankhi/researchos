@@ -10,6 +10,7 @@ import { PrismaService } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  DIGEST_SEND_JOB,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
@@ -26,6 +27,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly work: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
+  private readonly digestEnabled: boolean;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -36,6 +38,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       config.get<string>('QUEUE_PREFIX') ?? 'researchos',
     );
     this.prefix = options.prefix!;
+    this.digestEnabled = config.get<string>('DIGEST_SMTP_ENABLED') === 'true';
     this.work = new Queue(BACKGROUND_QUEUE, options);
     this.deadLetters = new Queue(DEAD_LETTER_QUEUE, options);
     for (const queue of [this.work, this.deadLetters]) {
@@ -93,24 +96,37 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
             generation: number;
             destination: string;
             dispatched_at: Date | null;
+            kind: string;
           }[]
         >`
-        SELECT o.* FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+        SELECT o.*, j.kind FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+        LEFT JOIN digest_deliveries d ON d.id = CASE
+          WHEN j.kind = ${DIGEST_SEND_JOB} AND j.payload->>'deliveryId' ~*
+            '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+          THEN (j.payload->>'deliveryId')::uuid END AND d.user_id = j.owner_id
         WHERE j.queue_prefix = ${this.prefix} AND o.available_at <= now() AND (
           o.dispatched_at IS NULL OR (
             o.destination = 'WORK' AND j.status = 'PENDING'
             AND o.generation = j.generation
             AND o.dispatched_at < now() - interval '30 seconds'
           )
+        ) AND (
+          o.destination <> 'WORK' OR j.kind <> ${DIGEST_SEND_JOB} OR (
+            ${this.digestEnabled} AND (d.id IS NULL OR d.status IN ('SENT', 'CANCELLED') OR (
+              d.next_attempt_at <= now() AND (d.locked_until IS NULL OR d.locked_until <= now())
+            ))
+          )
         ) ORDER BY o.available_at LIMIT 10 FOR UPDATE OF o SKIP LOCKED
       `;
         for (const row of rows) {
+          const digest = row.kind === DIGEST_SEND_JOB;
           const queue =
             row.destination === 'DLQ' ? this.deadLetters : this.work;
           const transportId = backgroundTransportId(row.job_id, row.generation);
           const existing = await queue.getJob(transportId);
           if (
             row.destination === 'WORK' &&
+            !digest &&
             existing &&
             (await existing.getState()) === 'failed'
           ) {
@@ -150,7 +166,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
                 jobId: transportId,
                 ...(row.destination === 'DLQ'
                   ? { removeOnComplete: false, removeOnFail: false }
-                  : {}),
+                  : digest
+                    ? {
+                        attempts: 1,
+                        removeOnComplete: true,
+                        removeOnFail: true,
+                      }
+                    : {}),
               },
             );
           }

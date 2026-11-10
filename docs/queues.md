@@ -32,7 +32,8 @@ lại cùng job; input khác trả `409`. Người khác đọc/retry trả `404
 Chưa đăng nhập trả `401`; probe/retry thiếu ADMIN trả `403`.
 
 `status` là `PENDING` (gồm đang chờ, đang xử lý, đang retry), `COMPLETED` hoặc
-`FAILED`. `attempts` là số lần thực thi trong generation hiện tại. Poll theo
+`FAILED`. `attempts` là số lượt xử lý tích lũy của digest, tối đa 5. Với các job
+khác, đó là số lần thực thi trong generation hiện tại. Poll theo
 `statusUrl`, ví dụ mỗi giây, dừng ở trạng thái cuối; endpoint không trả payload,
 stack trace hay thông tin process. Chưa có màn hình polling; client Orval đã có
 contract để các feature dùng lại.
@@ -44,8 +45,8 @@ sau `Queue.add` nhưng trước commit sẽ phát lại cùng transport ID
 `<logical-job-id>-<generation>`. API/worker phải dùng cùng `QUEUE_PREFIX`; scope
 này cũng được lưu trong database để worker khác prefix không lấy nhầm job.
 
-Queue `background-jobs` thực thi job có tối đa 3 attempts, backoff exponential.
-Handler khóa bản ghi job và commit kết quả cùng thay đổi nghiệp vụ trong một
+Probe trên queue `background-jobs` có tối đa 3 attempts, backoff exponential.
+Handler chỉ ghi DB khóa bản ghi job và commit kết quả cùng thay đổi nghiệp vụ trong một
 transaction. Redelivery sau khi Redis đã dọn job cũng không lặp side effect DB.
 Sau 30 giây, dispatcher kiểm tra lại các job PENDING đã phát: Redis mất job thì
 phát lại; BullMQ đã đánh failed ngoài handler (ví dụ stalled quá giới hạn) thì
@@ -65,10 +66,11 @@ Feature ghi DB rồi phát job phải gọi helper dùng chung
 trong chính transaction ghi nghiệp vụ. Helper không enqueue Redis. Worker chỉ
 thấy outbox sau commit; rollback xóa cả thay đổi nghiệp vụ lẫn job/outbox.
 `submit(...)` là dạng tiện dụng khi chỉ cần tạo job. Feature dùng chung
-`background-jobs` đăng ký cặp `[kind, handler]` trong `backgroundJobHandlers`
-của worker trước khi submit. Handler tự kiểm tra payload và xử lý job của mình.
-Tác vụ gọi dịch vụ ngoài phải truyền business idempotency key cho nhà cung cấp;
-transaction SQL không đảm bảo exactly-once cho email hay HTTP side effect.
+`background-jobs` đăng ký handler theo `kind` trong `BackgroundJobProcessor`
+trước khi submit. Handler tự kiểm tra payload. Handler gọi dịch vụ ngoài chạy
+sau khi processor nhả khóa SQL và tự quản lý lease và kết quả. Digest SMTP demo
+dùng ledger để điều phối retry. Khi SMTP đã nhận thư nhưng mất phản hồi, lần
+retry có thể gửi trùng. Xem [hướng dẫn worker](../apps/worker/README.md).
 
 Outbox/job/DLQ được giữ để phục vụ idempotency và điều tra; chưa có chính sách
 prune tự động. Khi bổ sung retention cần quyết định rõ thời hạn idempotency,
@@ -103,8 +105,9 @@ pnpm test:queue
 ```
 
 Lệnh tự build API/worker/package dùng chung và khởi động worker ở process
-riêng. Test dùng một prefix Redis ngẫu nhiên, không cần Redis/database thứ
-hai. API và worker kết nối database hiện có nhưng không ghi dữ liệu
+riêng. Test dùng một prefix Redis ngẫu nhiên. `DATABASE_URL` cần dùng tài khoản
+PostgreSQL có quyền `CREATEDB` để suite digest tạo và dọn database tạm trên
+cùng máy chủ. API và worker kết nối database hiện có nhưng không ghi dữ liệu
 nghiệp vụ cho probe cũ. Bộ durable-job tạo user/session/job fixture riêng, dọn
 chúng sau test và chỉ dùng queue prefix UUID của lần chạy. Test bao gồm:
 

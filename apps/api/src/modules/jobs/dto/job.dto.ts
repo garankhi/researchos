@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { DIGEST_MAX_ATTEMPTS } from '@researchos/queue';
 
 export class JobDto {
   @ApiProperty({
@@ -15,9 +16,10 @@ export class JobDto {
   status!: string;
 
   @ApiProperty({
-    description: 'Execution attempts in the current generation.',
+    description:
+      'Lifetime processing attempts for digest jobs. For other jobs, execution attempts in the current generation.',
     minimum: 0,
-    maximum: 3,
+    maximum: DIGEST_MAX_ATTEMPTS,
   })
   attempts!: number;
 

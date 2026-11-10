@@ -130,3 +130,58 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Gmail SMTP digest (RES-67)
+
+The worker accepts prepared digest deliveries through the durable `digest-send`
+job kind. The producer writes the delivery and items and calls this helper in
+the same transaction, using the recipient as the job owner:
+
+```ts
+await backgroundJobs.submitInTransaction(tx, recipientId, DIGEST_SEND_JOB, deliveryId, {
+  deliveryId,
+});
+```
+
+Import `DIGEST_SEND_JOB` from `@researchos/queue`. A producer rollback removes
+the delivery and its job/outbox record together. The job carries only the
+delivery reference. RES-89 owns preferences, preparation and history.
+
+## Enable demo mail
+
+Set `DIGEST_SMTP_ENABLED=true`, `DIGEST_SMTP_USER` (the demo Gmail address),
+and `DIGEST_SMTP_APP_PASSWORD` in the worker's environment or its ignored local
+`.env`. Enable Google 2-Step Verification and create an App Password on the demo
+account. The worker uses the authenticated address as the sender and requires
+STARTTLS to `smtp.gmail.com:587`. Verify outbound access from the worker host.
+`pnpm dev:worker` forwards the environment through Turbo's `dev` task.
+Leave SMTP disabled in environments where mail should remain queued. CI uses a
+provider double and supplies its own isolated Redis prefix and test database.
+
+The sender rechecks eligibility, opt-in, recipient address and visibility after
+committing the prepared snapshot. If any inputs change before submission, it
+cancels an ineligible or empty delivery and reschedules other changes within
+the attempt limit. It prunes unsupported items and uses only current released
+`OUTPUT` titles. Templates are packaged from
+`src/modules/notifications/templates/`. English is the default and fallback.
+An explicit `vi` preference selects Vietnamese.
+
+## Retry and investigation
+
+- The SQL claim lasts two minutes and increments the lifetime attempt counter
+  once. SMTP I/O runs after the claim commits. The attempt number fences
+  completion after a later worker takes the lease.
+- Known transient and unknown outcomes retry after 1, 2, 4 and 8 minutes. A
+  worker crash leaves the lease and schedules recovery after lease expiry plus
+  the corresponding delay. An expired fifth lease is finalized as failed.
+- Each digest BullMQ job is one wake-up and is removed after completion or
+  failure. The outbox republishes a missing wake-up for an eligible SQL row.
+  Published work is checked again after 30 seconds. The generic job stays
+  `PENDING` while the ledger has a scheduled retry. The probe keeps its own
+  transport retry policy.
+- `SENT` records Gmail SMTP acceptance. `provider_message_id` stores the
+  outgoing Message-ID returned by the transport. A timeout or interrupted completion
+  can leave acceptance unknown. A retry may send a duplicate demo message.
+- On terminal failure, inspect `digest_deliveries.last_error` and `attempts`,
+  then correlate `background_jobs` and the DLQ using the job ID and generation.
+  A generic retry does not reset the digest's five-attempt limit or reopen a
+  permanently rejected delivery.

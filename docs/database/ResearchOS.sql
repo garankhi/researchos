@@ -839,7 +839,7 @@ CREATE TABLE "digest_preferences" (
   "user_id" uuid PRIMARY KEY,
   "enabled" boolean NOT NULL DEFAULT false,
   "timezone" varchar(100) NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
-  "language" varchar(10) NOT NULL DEFAULT 'vi',
+  "language" varchar(10) NOT NULL DEFAULT 'en',
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
 
@@ -1111,7 +1111,7 @@ COMMENT ON COLUMN "search_index"."doc" IS 'Stored tsvector of title + abstract +
 
 COMMENT ON TABLE "research_updates" IS 'Small durable feed of meaningful sharing actions, NOT a general event bus. SQL records personal releases, accepted group revisions, opportunity opens and seminar publication in the same transaction. Project events are explicit future-module writes. No events on ordinary updated_at/sync. Typed target shape constrained in SQL.';
 
-COMMENT ON TABLE "digest_deliveries" IS 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs; DB ledger persists attempts (max 5), leases and delivery result. id is provider idempotency key. SENT is terminal; unknown provider outcome requires reconciliation, not blind resend. Transactional application responses are independent.';
+COMMENT ON TABLE "digest_deliveries" IS 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs. The ledger records up to five attempts, leases and delivery results. SENT and CANCELLED are terminal. The Gmail SMTP demo retries unknown outcomes within the attempt cap and may send duplicates. Transactional application responses are independent.';
 
 COMMENT ON TABLE "digest_items" IS 'SQL derives subject type/ID from event_id. A work matched by multiple follows/group events remains one item. Worker chooses latest relevant event, merges reasons, and renders authorized released content; snapshot records content selected for delivery. Recheck/prune before send. Event FK traces the selected event; no draft payloads.';
 
@@ -1898,7 +1898,8 @@ BEGIN
      RAISE EXCEPTION 'Each processing lease increments attempts' USING ERRCODE='23514'; END IF;
  END IF;
  IF NEW.status='PROCESSING' AND (NEW.locked_until IS NULL OR NEW.locked_until<=clock_timestamp()) THEN RAISE EXCEPTION 'Processing requires a future lease' USING ERRCODE='23514'; END IF;
- IF NEW.status IN ('PROCESSING','SENT') THEN
+ -- Eligibility gates attempts. SENT records acceptance of an earlier submission.
+ IF NEW.status='PROCESSING' THEN
    IF NOT is_researcher(NEW.user_id) OR NOT EXISTS (SELECT 1 FROM digest_preferences WHERE user_id=NEW.user_id AND enabled)
    OR NOT EXISTS (SELECT 1 FROM digest_items WHERE delivery_id=NEW.id) THEN
      RAISE EXCEPTION 'Dispatch requires eligible opted-in researcher and nonempty items' USING ERRCODE='23514'; END IF;
