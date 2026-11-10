@@ -230,6 +230,40 @@ describe('OpenAlexClient', () => {
     expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
   });
 
+  it('searches authors by name with affiliations', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        expect(String(url)).toContain('search=Nguyen');
+        return jsonResponse({
+          results: [
+            {
+              id: 'https://openalex.org/A1',
+              display_name: 'Nguyen Van An',
+              last_known_institutions: [{ display_name: 'FPT University' }],
+              works_count: 5,
+            },
+          ],
+        });
+      }),
+    );
+    const authors = await makeClient().searchAuthors('Nguyen Van An');
+    expect(authors).toHaveLength(1);
+    expect(authors[0]).toMatchObject({
+      shortId: 'A1',
+      displayName: 'Nguyen Van An',
+      worksCount: 5,
+    });
+    expect(authors[0].affiliations).toEqual(['FPT University']);
+  });
+
+  it('returns an empty list for a blank author search', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ results: [] }));
+    vi.stubGlobal('fetch', fetch);
+    await expect(makeClient().searchAuthors('   ')).resolves.toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('retries a rate limit then succeeds', async () => {
     const fetch = vi.fn(async () => jsonResponse({ results: [] }));
     fetch

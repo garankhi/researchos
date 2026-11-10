@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { OpenAlexLookupService } from './openalex-lookup.service.js';
 import { OpenAlexClient } from './openalex.client.js';
 
 /**
@@ -9,7 +10,7 @@ import { OpenAlexClient } from './openalex.client.js';
  * No controller: nothing here is an HTTP endpoint of our own.
  */
 @Module({
-  providers: [OpenAlexClient],
-  exports: [OpenAlexClient],
+  providers: [OpenAlexClient, OpenAlexLookupService],
+  exports: [OpenAlexClient, OpenAlexLookupService],
 })
 export class OpenAlexModule {}

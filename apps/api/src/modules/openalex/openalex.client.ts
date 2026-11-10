@@ -141,6 +141,36 @@ export function mapOutputType(rawType: unknown): string {
   return OPENALEX_TYPE_MAP[rawType] ?? 'PAPER';
 }
 
+/** Display names of the institutions OpenAlex last saw the author at. */
+export function extractAffiliations(raw: RawAuthor): string[] {
+  const out: string[] = [];
+  const push = (value: unknown) => {
+    if (typeof value === 'string' && value.trim() !== '') {
+      const name = value.trim();
+      if (!out.includes(name)) {
+        out.push(name);
+      }
+    }
+  };
+  const institutions = raw.last_known_institutions;
+  if (Array.isArray(institutions)) {
+    for (const entry of institutions) {
+      push((entry as { display_name?: unknown })?.display_name);
+    }
+  }
+  const affiliations = raw.affiliations;
+  if (Array.isArray(affiliations)) {
+    for (const entry of affiliations) {
+      const record = entry as {
+        institution?: { display_name?: unknown };
+        display_name?: unknown;
+      };
+      push(record?.institution?.display_name ?? record?.display_name);
+    }
+  }
+  return out;
+}
+
 type RawAuthorship = {
   author?: { id?: unknown; display_name?: unknown; orcid?: unknown };
   raw_author_name?: unknown;
@@ -165,6 +195,8 @@ type RawAuthor = {
   display_name?: unknown;
   orcid?: unknown;
   works_count?: unknown;
+  last_known_institutions?: unknown;
+  affiliations?: unknown;
 };
 
 /**
@@ -219,6 +251,29 @@ export class OpenAlexClient {
       );
     }
     return this.toAuthor(raw);
+  }
+
+  /**
+   * Searches OpenAlex authors by name.
+   *
+   * `GET /authors?search:<name>`. The fallback when the researcher has no
+   * ORCID (RES-134): the result is only a candidate list, never
+   * authoritative — the researcher still ticks what is theirs.
+   */
+  async searchAuthors(
+    query: string,
+    options: { perPage?: number } = {},
+  ): Promise<OpenAlexAuthor[]> {
+    const cleaned = query.trim();
+    if (cleaned === '') {
+      return [];
+    }
+    const perPage = Math.min(Math.max(options.perPage ?? 10, 1), MAX_PER_PAGE);
+    const url = new URL(`${this.baseUrl}/authors`);
+    url.searchParams.set('search', cleaned);
+    url.searchParams.set('per-page', String(perPage));
+    const body = await this.getJson<{ results?: RawAuthor[] }>(url);
+    return (body.results ?? []).map((raw) => this.toAuthor(raw));
   }
 
   /**
@@ -297,6 +352,7 @@ export class OpenAlexClient {
       displayName,
       orcid: typeof raw.orcid === 'string' ? raw.orcid : null,
       worksCount: typeof raw.works_count === 'number' ? raw.works_count : null,
+      affiliations: extractAffiliations(raw),
     };
   }
 

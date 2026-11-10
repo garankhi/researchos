@@ -19,6 +19,8 @@ export interface OpenAlexAuthor {
   orcid: string | null;
   /** Total works OpenAlex reports, when present. */
   worksCount: number | null;
+  /** Institution display names from the last known affiliations. */
+  affiliations: string[];
 }
 
 /** One author of a work, in platform order. */
