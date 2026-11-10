@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { OpportunityStatus, Prisma, PrismaService } from '@researchos/database';
 import type { ResearchOpportunity } from '@researchos/database';
+import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto.js';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto.js';
 import { ListOpportunitiesQueryDto } from './dto/list-opportunities-query.dto.js';
@@ -29,6 +30,12 @@ import {
 function normalizeUuid(value: string | null | undefined): string | null {
   return value ? value.toLowerCase() : null;
 }
+
+const STATUS_ACTIONS = {
+  open: { from: OpportunityStatus.DRAFT, to: OpportunityStatus.OPEN },
+  fill: { from: OpportunityStatus.OPEN, to: OpportunityStatus.FILLED },
+  close: { from: OpportunityStatus.FILLED, to: OpportunityStatus.CLOSED },
+} as const;
 
 @Injectable()
 export class OpportunitiesService {
@@ -157,6 +164,10 @@ export class OpportunitiesService {
     try {
       return await operation();
     } catch (error) {
+      // PostgreSQL trigger/check failures can surface through the driver adapter
+      // rather than Prisma's legacy P2004 code (including a deadline race).
+      if (readDatabaseFailure(error)?.sqlState === '23514')
+        throw new BadRequestException('validation_failed');
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003')
           throw new BadRequestException(
@@ -171,6 +182,47 @@ export class OpportunitiesService {
       }
       throw error;
     }
+  }
+
+  private async expireOverdueInTransaction(
+    tx: Prisma.TransactionClient,
+    id?: string,
+  ) {
+    const expired = await tx.research_opportunities.updateManyAndReturn({
+      where: {
+        ...(id ? { id } : {}),
+        status: OpportunityStatus.OPEN,
+        application_deadline: { lte: new Date() },
+      },
+      data: { status: OpportunityStatus.EXPIRED },
+      select: { id: true },
+    });
+    if (expired.length) {
+      await tx.auditLog.createMany({
+        data: expired.map((record) => ({
+          actorId: null,
+          action: 'OPPORTUNITY_STATUS_CHANGED',
+          entity: 'research_opportunities',
+          entityId: record.id,
+          payload: {
+            fromStatus: OpportunityStatus.OPEN,
+            toStatus: OpportunityStatus.EXPIRED,
+            reason: 'APPLICATION_DEADLINE_REACHED',
+          },
+        })),
+      });
+    }
+    return expired;
+  }
+
+  private async expireOverdue(id?: string): Promise<void> {
+    // Persist expiry before the read transaction so filters, counts and payloads
+    // agree. Conditional updates serialize with fill/close and audit only winners.
+    await this.write(() =>
+      this.prisma.$transaction(async (tx) => {
+        await this.expireOverdueInTransaction(tx, id);
+      }),
+    );
   }
 
   async create(
@@ -258,6 +310,7 @@ export class OpportunitiesService {
     actorId: string,
     query: ListOpportunitiesQueryDto,
   ): Promise<OpportunityPageDto> {
+    await this.expireOverdue();
     const conditions = Prisma.sql`${this.visibility(actorId)}
       ${query.groupId ? Prisma.sql`AND o.group_id = ${query.groupId}::uuid` : Prisma.empty}
       ${query.projectId ? Prisma.sql`AND o.project_id = ${query.projectId}::uuid` : Prisma.empty}
@@ -287,6 +340,7 @@ export class OpportunitiesService {
   }
 
   async findOne(actorId: string, id: string): Promise<OpportunityResponseDto> {
+    await this.expireOverdue(id);
     return this.prisma.$transaction(
       async (tx) => {
         const [visible] = await tx.$queryRaw<{ id: string }[]>`
@@ -308,6 +362,7 @@ export class OpportunitiesService {
     id: string,
     dto: UpdateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
+    await this.expireOverdue(id);
     return this.write(() =>
       this.prisma.$transaction(async (tx) => {
         await this.requireResearcher(tx, actorId);
@@ -329,10 +384,88 @@ export class OpportunitiesService {
           Object.entries(dto).filter(([, value]) => value !== undefined),
         );
         this.validateRecord(Object.assign({}, this.response(current), changed));
+        const updated = await tx.research_opportunities.update({
+          where: { id },
+          data,
+        });
+        // PATCH can move an OPEN record's deadline into the past. Apply expiry
+        // in the same transaction instead of returning a stale OPEN response.
+        const expired = await this.expireOverdueInTransaction(tx, id);
         return this.response(
-          await tx.research_opportunities.update({ where: { id }, data }),
+          expired.length
+            ? { ...updated, status: OpportunityStatus.EXPIRED }
+            : updated,
         );
       }),
     );
+  }
+
+  async transitionStatus(
+    actorId: string,
+    id: string,
+    action: keyof typeof STATUS_ACTIONS,
+  ): Promise<OpportunityResponseDto> {
+    const transition = STATUS_ACTIONS[action];
+    const result = await this.write(() =>
+      this.prisma.$transaction(async (tx) => {
+        await this.requireResearcher(tx, actorId);
+        // Serialize status actions with PATCH and other status actions. A retry
+        // sees the committed status and fails before writing another audit row.
+        const [record] = await tx.$queryRaw<{ allowed: boolean }[]>`
+          SELECT ${this.management(actorId)} AS allowed FROM research_opportunities o
+          WHERE o.id = ${id}::uuid FOR UPDATE OF o
+        `;
+        if (!record) throw new NotFoundException();
+        if (!record.allowed) throw new ForbiddenException();
+
+        const current = await tx.research_opportunities.findUniqueOrThrow({
+          where: { id },
+        });
+        if (
+          current.status === OpportunityStatus.OPEN &&
+          current.application_deadline &&
+          current.application_deadline.getTime() <= Date.now()
+        ) {
+          await this.expireOverdueInTransaction(tx, id);
+          // Commit automatic expiry before reporting that the requested manual
+          // action conflicts. Throwing inside this transaction would undo it.
+          return null;
+        }
+        if (current.status !== transition.from || current.archived_at !== null)
+          throw new ConflictException();
+
+        if (action === 'open') {
+          if (
+            !current.title.trim() ||
+            !current.description?.trim() ||
+            !current.application_deadline ||
+            current.application_deadline.getTime() <= Date.now()
+          )
+            throw new BadRequestException('validation_failed');
+        }
+
+        // normalize_opportunity stamps published_at on opening and rechecks the
+        // deadline against PostgreSQL's clock. Existing timestamps are preserved.
+        const updated = await tx.research_opportunities.update({
+          where: { id },
+          data: { status: transition.to },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            action: 'OPPORTUNITY_STATUS_CHANGED',
+            entity: 'research_opportunities',
+            entityId: current.id,
+            payload: {
+              fromStatus: current.status,
+              toStatus: updated.status,
+            },
+          },
+        });
+        return this.response(updated);
+      }),
+    );
+    if (result === null) throw new ConflictException();
+    return result;
   }
 }

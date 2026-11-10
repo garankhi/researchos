@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -10,9 +12,13 @@ import {
   Query,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiHeader,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -58,6 +64,8 @@ export class OpportunitiesController {
   @ApiOperation({
     summary:
       'Lists published opportunities and opportunities managed by the caller',
+    description:
+      'Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.',
   })
   @ApiOkResponse({
     description: 'Visible opportunities and pagination information.',
@@ -71,7 +79,11 @@ export class OpportunitiesController {
   }
 
   @Get(':opportunityId')
-  @ApiOperation({ summary: 'Returns a visible research opportunity' })
+  @ApiOperation({
+    summary: 'Returns a visible research opportunity',
+    description:
+      'An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.',
+  })
   @ApiParam({
     name: 'opportunityId',
     description: 'Opportunity UUID.',
@@ -91,6 +103,8 @@ export class OpportunitiesController {
   @Patch(':opportunityId')
   @ApiOperation({
     summary: 'Updates a research opportunity managed by the caller',
+    description:
+      'Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.',
   })
   @ApiParam({
     name: 'opportunityId',
@@ -98,7 +112,7 @@ export class OpportunitiesController {
     format: 'uuid',
   })
   @ApiOkResponse({
-    description: 'Updated opportunity details; lifecycle status is unchanged.',
+    description: 'Updated opportunity details, including automatic deadline expiry.',
     type: OpportunityResponseDto,
   })
   update(
@@ -107,5 +121,93 @@ export class OpportunitiesController {
     @Body() dto: UpdateOpportunityDto,
   ) {
     return this.opportunities.update(actorId, id, dto);
+  }
+
+  @Post(':opportunityId/open')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Opens a draft opportunity for applications' })
+  @ApiParam({
+    name: 'opportunityId',
+    description: 'UUID of the opportunity to open.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description:
+      'Opened opportunity with a server-owned publication timestamp.',
+    type: OpportunityResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid UUID, missing publication details or deadline not in the future.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Caller is not an active researcher with opportunity management permission.',
+  })
+  @ApiNotFoundResponse({ description: 'Opportunity does not exist.' })
+  @ApiConflictResponse({
+    description: 'Opportunity is archived or is not DRAFT.',
+  })
+  open(
+    @CurrentUserId() actorId: string,
+    @Param('opportunityId', new ParseUUIDPipe()) id: string,
+  ): Promise<OpportunityResponseDto> {
+    return this.opportunities.transitionStatus(actorId, id, 'open');
+  }
+
+  @Post(':opportunityId/fill')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Marks an open opportunity as filled' })
+  @ApiParam({
+    name: 'opportunityId',
+    description: 'UUID of the opportunity to fill.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Filled opportunity; its publication timestamp is preserved.',
+    type: OpportunityResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid opportunity UUID.' })
+  @ApiForbiddenResponse({
+    description:
+      'Caller is not an active researcher with opportunity management permission.',
+  })
+  @ApiNotFoundResponse({ description: 'Opportunity does not exist.' })
+  @ApiConflictResponse({
+    description: 'Opportunity is archived or is not OPEN.',
+  })
+  fill(
+    @CurrentUserId() actorId: string,
+    @Param('opportunityId', new ParseUUIDPipe()) id: string,
+  ): Promise<OpportunityResponseDto> {
+    return this.opportunities.transitionStatus(actorId, id, 'fill');
+  }
+
+  @Post(':opportunityId/close')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Closes a filled opportunity' })
+  @ApiParam({
+    name: 'opportunityId',
+    description: 'UUID of the opportunity to close.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Closed opportunity; its publication timestamp is preserved.',
+    type: OpportunityResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid opportunity UUID.' })
+  @ApiForbiddenResponse({
+    description:
+      'Caller is not an active researcher with opportunity management permission.',
+  })
+  @ApiNotFoundResponse({ description: 'Opportunity does not exist.' })
+  @ApiConflictResponse({
+    description: 'Opportunity is archived or is not FILLED.',
+  })
+  close(
+    @CurrentUserId() actorId: string,
+    @Param('opportunityId', new ParseUUIDPipe()) id: string,
+  ): Promise<OpportunityResponseDto> {
+    return this.opportunities.transitionStatus(actorId, id, 'close');
   }
 }
