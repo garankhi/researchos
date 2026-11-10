@@ -15,6 +15,7 @@ export {
   group_member_role as GroupMemberRole,
   opportunity_kind as OpportunityKind,
   opportunity_status as OpportunityStatus,
+  search_entity_type as SearchEntityType,
   target_audience as TargetAudience,
   data_provenance_type as DataProvenanceType,
   PublicationStatus,
