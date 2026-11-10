@@ -4,6 +4,7 @@ export * from './groups/groups';
 export * from './health/health';
 export * from './identity/identity';
 export * from './jobs/jobs';
+export * from './openalex/openalex';
 export * from './opportunities/opportunities';
 export * from './output-files/output-files';
 export * from './profiles/profiles';
