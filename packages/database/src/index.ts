@@ -16,12 +16,14 @@ export {
   opportunity_kind as OpportunityKind,
   opportunity_status as OpportunityStatus,
   target_audience as TargetAudience,
+  data_provenance_type as DataProvenanceType,
   PublicationStatus,
   SourceKind,
   VerificationStatus,
   Visibility,
   visibility_level as OutputFileVisibility,
 } from './generated/prisma/client.js';
+export type { data_provenance_type as DataProvenance } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';
 export type { research_opportunities as ResearchOpportunity } from './generated/prisma/client.js';

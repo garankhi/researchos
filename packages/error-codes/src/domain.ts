@@ -89,6 +89,12 @@ export const domainErrorCodes = {
   profiles: {
     profileNotFound: 'profile_not_found',
   },
+  provenance: {
+    fieldLocked: 'provenance_field_locked',
+    humanSourceNotAllowed: 'provenance_human_source_not_allowed',
+    unkCannotVerify: 'provenance_unk_cannot_verify',
+    autoVerifyNotAllowed: 'provenance_auto_verify_not_allowed',
+  },
   taxonomy: {
     fieldNotFound: 'field_not_found',
     topicNotFound: 'topic_not_found',
