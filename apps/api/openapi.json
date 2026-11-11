@@ -3300,6 +3300,295 @@
         ]
       }
     },
+    "/interests": {
+      "get": {
+        "operationId": "InterestsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All interests belonging to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestsControllerListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all of the caller's interests, including suggestions and rejections",
+        "tags": [
+          "interests"
+        ]
+      },
+      "post": {
+        "operationId": "InterestsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInterestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Declared interest created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or inactive topic.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An interest for this topic already exists, in any status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declare an active research interest",
+        "tags": [
+          "interests"
+        ]
+      }
+    },
+    "/interests/{id}": {
+      "patch": {
+        "operationId": "InterestsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of an interest owned by the caller.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInterestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Interest review decision saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or activating an inactive topic.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Interest is missing or belongs to another user, or topic is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept, restore, or reject an owned interest while preserving its source and evidence",
+        "tags": [
+          "interests"
+        ]
+      },
+      "delete": {
+        "operationId": "InterestsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of an interest owned by the caller.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Interest retained with REJECTED status."
+          },
+          "400": {
+            "description": "Invalid interest UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Interest is missing or belongs to another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an owned interest, retaining the row as feedback",
+        "tags": [
+          "interests"
+        ]
+      }
+    },
     "/outputs/{outputId}/file-uploads": {
       "post": {
         "description": "Issues a presigned PUT URL and confirmation token to a user who can manage the output.",
@@ -6057,6 +6346,112 @@
           }
         }
       },
+      "InterestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique interest identifier."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Researcher who owns this interest."
+          },
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Research topic referenced by this interest."
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DECLARED",
+              "INFERRED"
+            ],
+            "description": "Whether the interest was declared or inferred; preserved on review."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Current suggestion or researcher review state."
+          },
+          "provenanceTag": {
+            "type": "string",
+            "enum": [
+              "PAPER",
+              "AI_TRACE",
+              "AI_INF",
+              "HUMAN",
+              "EXT",
+              "UNK"
+            ],
+            "description": "Origin of the evidence supporting the interest."
+          },
+          "evidenceNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "System-recorded supporting evidence, when available."
+          },
+          "declaredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the interest was first recorded."
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Time of the latest researcher decision, or null before review."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "topicId",
+          "sourceType",
+          "status",
+          "provenanceTag",
+          "evidenceNote",
+          "declaredAt",
+          "reviewedAt"
+        ]
+      },
+      "CreateInterestDto": {
+        "type": "object",
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Active research topic to declare."
+          }
+        },
+        "required": [
+          "topicId"
+        ]
+      },
+      "UpdateInterestDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Review decision: ACTIVE to accept/restore, REJECTED to reject. SUGGESTED is system-managed."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "OutputFileVisibility": {
         "type": "string",
         "enum": [
@@ -7338,6 +7733,57 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "InterestsControllerListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterestResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "InterestResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/InterestResponseDto"
           },
           "message": {
             "type": "string",

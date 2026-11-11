@@ -3,6 +3,9 @@ docs/*
 !docs/*.md
 !docs/adr/
 !docs/adr/*.md
+!docs/res/
+docs/res/*
+!docs/res/RES-101-research-interest-endpoints.md
 !docs/database/
 !docs/database/*.md
 !docs/database/*.dbml

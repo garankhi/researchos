@@ -16,6 +16,8 @@ export {
 // them for DTOs and query filters.
 export {
   claim_status as ClaimStatus,
+  interest_source,
+  interest_status,
   entity_types as FollowEntityType,
   group_member_role as GroupMemberRole,
   opportunity_kind as OpportunityKind,
