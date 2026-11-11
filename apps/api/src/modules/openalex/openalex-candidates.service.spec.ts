@@ -1,5 +1,8 @@
+import { HttpStatus } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrismaService } from '@researchos/database';
+import { OutputImportState, PrismaService } from '@researchos/database';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { ListCandidateWorksQueryDto } from './dto/list-candidate-works.query.dto.js';
 import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
 import { OPENALEX_SOURCE } from './openalex-ingest.service.js';
@@ -220,5 +223,319 @@ describe('OpenAlexCandidatesService', () => {
     );
 
     expect(result.items[0].authors).toEqual(['Unknown author']);
+  });
+});
+
+function makeDecisionService(options: {
+  output?: {
+    id: string;
+    import_state: OutputImportState;
+    owner_id: string | null;
+  } | null;
+  researcher?: boolean;
+  view?: boolean;
+  claim?: { author_id: string | null; status: string } | null;
+  linkedAuthor?: { id: string } | null;
+  profile?: { orcid_id: string | null } | null;
+  revision?: { authors_snapshot: unknown } | null;
+  authorRow?: { id: string; user_id: string | null } | null;
+}) {
+  const tx = {
+    $queryRaw: vi.fn(async (parts: TemplateStringsArray) => {
+      const sql = parts.join(' ');
+      if (sql.includes('FROM research_outputs')) {
+        return options.output ? [options.output] : [];
+      }
+      if (sql.includes('is_researcher')) {
+        return [{ allowed: options.researcher ?? true }];
+      }
+      if (sql.includes('can_view_candidate')) {
+        return [{ allowed: options.view ?? true }];
+      }
+      return [];
+    }),
+    publication_claims: {
+      findUnique: vi.fn(async () => options.claim ?? null),
+      update: vi.fn(async () => ({})),
+      create: vi.fn(async () => ({})),
+    },
+    output_authors: {
+      findFirst: vi.fn(async () => options.linkedAuthor ?? null),
+      findUnique: vi.fn(async () => options.authorRow ?? null),
+      update: vi.fn(async () => ({})),
+    },
+    researcher_profiles: {
+      findUnique: vi.fn(async () => options.profile ?? null),
+    },
+    output_revisions: {
+      findFirst: vi.fn(async () => options.revision ?? null),
+    },
+    research_outputs: {
+      update: vi.fn(
+        async (args: {
+          data: { import_state: OutputImportState; owner_id: string };
+        }) => ({
+          id: OUT_1,
+          import_state: args.data.import_state,
+          owner_id: args.data.owner_id,
+        }),
+      ),
+    },
+  };
+  const prisma = {
+    $transaction: vi.fn(async (run: (client: unknown) => unknown) => run(tx)),
+  } as unknown as PrismaService;
+  const service = new OpenAlexCandidatesService(prisma);
+  return { service, tx };
+}
+
+const CANDIDATE = {
+  id: OUT_1,
+  import_state: OutputImportState.CANDIDATE,
+  owner_id: null,
+};
+
+const ORCID_SNAPSHOT = [
+  {
+    name: 'Nguyen Van An',
+    order: 1,
+    orcid: 'https://orcid.org/0000-0002-1825-0097',
+  },
+  { name: 'Tran Thi B', order: 2, orcid: null },
+];
+
+describe('OpenAlexCandidatesService decisions', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('accepts a candidate: confirms the claim and takes ownership', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: { id: 'author-1' },
+    });
+
+    const result = await service.accept(USER_ID, OUT_1);
+
+    expect(result).toEqual({
+      id: OUT_1,
+      importState: OutputImportState.ACCEPTED,
+      claimStatus: 'CONFIRMED',
+      ownerId: USER_ID,
+    });
+    expect(tx.publication_claims.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'CONFIRMED',
+          author_id: 'author-1',
+        }),
+      }),
+    );
+    expect(tx.research_outputs.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          import_state: OutputImportState.ACCEPTED,
+          owner_id: USER_ID,
+        },
+      }),
+    );
+  });
+
+  it('accepts by matching the profile ORCID against the draft snapshot', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: null,
+      profile: { orcid_id: '0000-0002-1825-0097' },
+      revision: { authors_snapshot: ORCID_SNAPSHOT },
+      authorRow: { id: 'author-1', user_id: null },
+    });
+
+    const result = await service.accept(USER_ID, OUT_1);
+
+    expect(result.claimStatus).toBe('CONFIRMED');
+    expect(tx.output_authors.update).toHaveBeenCalledOnce();
+    expect(tx.publication_claims.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ author_id: 'author-1' }),
+      }),
+    );
+  });
+
+  it('refuses an accept with no linkable authorship position', async () => {
+    const { service } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: null,
+      profile: { orcid_id: null },
+    });
+
+    const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(CodedHttpException);
+    expect((err as CodedHttpException).message).toBe(
+      'openalex_author_not_found',
+    );
+    expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
+  });
+
+  it('refuses an accept when the authorship position belongs to someone else', async () => {
+    const { service } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: null,
+      profile: { orcid_id: '0000-0002-1825-0097' },
+      revision: { authors_snapshot: ORCID_SNAPSHOT },
+      authorRow: { id: 'author-1', user_id: 'other-user' },
+    });
+
+    const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ConflictException);
+  });
+
+  it('repeating an accept returns the current state without writing', async () => {
+    const { service, tx } = makeDecisionService({
+      output: {
+        ...CANDIDATE,
+        import_state: OutputImportState.ACCEPTED,
+        owner_id: USER_ID,
+      },
+      claim: { author_id: 'author-1', status: 'CONFIRMED' },
+    });
+
+    const result = await service.accept(USER_ID, OUT_1);
+
+    expect(result).toMatchObject({
+      claimStatus: 'CONFIRMED',
+      ownerId: USER_ID,
+    });
+    expect(tx.publication_claims.update).not.toHaveBeenCalled();
+    expect(tx.research_outputs.update).not.toHaveBeenCalled();
+  });
+
+  it('a co-author accepting an already-accepted work attaches without taking ownership', async () => {
+    const { service, tx } = makeDecisionService({
+      output: {
+        id: OUT_1,
+        import_state: OutputImportState.ACCEPTED,
+        owner_id: 'first-claimer',
+      },
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: { id: 'author-2' },
+    });
+
+    const result = await service.accept(USER_ID, OUT_1);
+
+    expect(result).toMatchObject({
+      importState: OutputImportState.ACCEPTED,
+      ownerId: 'first-claimer',
+      claimStatus: 'CONFIRMED',
+    });
+    expect(tx.research_outputs.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a candidate without touching the work', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+    });
+
+    const result = await service.reject(USER_ID, OUT_1);
+
+    expect(result).toEqual({
+      id: OUT_1,
+      importState: OutputImportState.CANDIDATE,
+      claimStatus: 'REJECTED',
+      ownerId: null,
+    });
+    expect(tx.publication_claims.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'REJECTED' }),
+      }),
+    );
+    expect(tx.research_outputs.update).not.toHaveBeenCalled();
+  });
+
+  it('repeating a reject returns the current state without writing', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'REJECTED' },
+    });
+
+    const result = await service.reject(USER_ID, OUT_1);
+
+    expect(result.claimStatus).toBe('REJECTED');
+    expect(tx.publication_claims.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses an owner reject of an accepted work', async () => {
+    const { service } = makeDecisionService({
+      output: {
+        ...CANDIDATE,
+        import_state: OutputImportState.ACCEPTED,
+        owner_id: USER_ID,
+      },
+      claim: { author_id: 'author-1', status: 'CONFIRMED' },
+    });
+
+    const err = await service.reject(USER_ID, OUT_1).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ConflictException);
+  });
+
+  it('accepts after a rejection by confirming the same claim row', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'REJECTED' },
+      linkedAuthor: { id: 'author-1' },
+    });
+
+    const result = await service.accept(USER_ID, OUT_1);
+
+    expect(result.claimStatus).toBe('CONFIRMED');
+    expect(tx.publication_claims.create).not.toHaveBeenCalled();
+    expect(tx.publication_claims.update).toHaveBeenCalledOnce();
+  });
+
+  it('returns 404 when the work does not exist', async () => {
+    const { service } = makeDecisionService({ output: null });
+
+    for (const action of ['accept', 'reject'] as const) {
+      const err = await service[action](USER_ID, OUT_1).catch(
+        (e: unknown) => e,
+      );
+      expect(err).toBeInstanceOf(CodedHttpException);
+      expect((err as CodedHttpException).message).toBe(
+        'openalex_work_not_found',
+      );
+      expect((err as CodedHttpException).getStatus()).toBe(
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  });
+
+  it('returns 404 when the candidate is not visible to the caller', async () => {
+    const { service } = makeDecisionService({
+      output: CANDIDATE,
+      view: false,
+    });
+
+    const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(CodedHttpException);
+    expect((err as CodedHttpException).message).toBe('openalex_work_not_found');
+  });
+
+  it('refuses a decision from a caller without researcher access', async () => {
+    const { service } = makeDecisionService({
+      output: CANDIDATE,
+      researcher: false,
+    });
+
+    const err = await service.reject(USER_ID, OUT_1).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ForbiddenException);
   });
 });

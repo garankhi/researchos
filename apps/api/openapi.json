@@ -1917,6 +1917,182 @@
         ]
       }
     },
+    "/external/openalex/works/{outputId}/accept": {
+      "post": {
+        "operationId": "OpenAlexCandidatesController_accept",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the stored candidate to accept.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The accepted work: import state ACCEPTED with the caller as owner, unless a co-author already accepted it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDecisionDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid candidate UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Candidate does not exist, is not visible to the caller, or has no linkable authorship.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The authorship position is held by another researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Accepts a stored OpenAlex candidate as the caller's work",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
+    "/external/openalex/works/{outputId}/reject": {
+      "post": {
+        "operationId": "OpenAlexCandidatesController_reject",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the stored candidate to reject.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rejected claim: the work stays CANDIDATE so a co-author still gets it and the caller can accept it later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateDecisionDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid candidate UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Candidate does not exist or is not visible to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The caller owns the accepted work and cannot reject it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Rejects a stored OpenAlex candidate for the caller only",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
     "/opportunities": {
       "post": {
         "operationId": "OpportunitiesController_create",
@@ -4620,6 +4796,46 @@
           "count"
         ]
       },
+      "CandidateDecisionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the decided candidate work.",
+            "format": "uuid"
+          },
+          "importState": {
+            "type": "string",
+            "description": "Import state of the work after the decision. Accept moves a candidate to ACCEPTED; reject leaves it CANDIDATE.",
+            "enum": [
+              "NONE",
+              "CANDIDATE",
+              "ACCEPTED"
+            ]
+          },
+          "claimStatus": {
+            "type": "string",
+            "description": "Claim status of the caller after the decision: CONFIRMED for accept, REJECTED for reject.",
+            "enum": [
+              "SUGGESTED",
+              "CONFIRMED",
+              "REJECTED"
+            ]
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Owner of the work after the decision, or null when the work is still a candidate nobody owns.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "importState",
+          "claimStatus",
+          "ownerId"
+        ]
+      },
       "CreateOpportunityDto": {
         "type": "object",
         "properties": {
@@ -6496,6 +6712,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/CandidateWorksCountDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "CandidateDecisionDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CandidateDecisionDto"
           },
           "message": {
             "type": "string",

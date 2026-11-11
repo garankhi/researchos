@@ -38,6 +38,16 @@ export const OPENALEX_TYPE_MAP: Record<string, string> = {
 /** Maximum works per page OpenAlex allows. */
 const MAX_PER_PAGE = 200;
 
+/**
+ * Hard-coded affiliation fallback for the name-based works search.
+ *
+ * OpenAlex author ids are not always present (unlinked authorships, name
+ * fallback path), so the works fetch falls back to matching the byline
+ * name plus this affiliation text. Hard-coded on purpose: every
+ * researcher in scope belongs to FPT University.
+ */
+export const FPT_UNIVERSITY_AFFILIATION = 'FPT University';
+
 const FETCH_ATTEMPTS = 3;
 const FETCH_RETRY_BASE_MS = 1000;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -139,6 +149,19 @@ export function mapOutputType(rawType: unknown): string {
     return 'PAPER';
   }
   return OPENALEX_TYPE_MAP[rawType] ?? 'PAPER';
+}
+
+/** Normalises paging options shared by the works list methods. */
+function normalizePaging(options: { page?: number; perPage?: number }): {
+  page: number;
+  perPage: number;
+} {
+  const page =
+    Number.isInteger(options.page) && (options.page as number) >= 1
+      ? (options.page as number)
+      : 1;
+  const perPage = Math.min(Math.max(options.perPage ?? 25, 1), MAX_PER_PAGE);
+  return { page, perPage };
 }
 
 /** Display names of the institutions OpenAlex last saw the author at. */
@@ -293,19 +316,53 @@ export class OpenAlexClient {
         HttpStatus.NOT_FOUND,
       );
     }
-    const page =
-      Number.isInteger(options.page) && (options.page as number) >= 1
-        ? (options.page as number)
-        : 1;
-    const perPage = Math.min(Math.max(options.perPage ?? 25, 1), MAX_PER_PAGE);
-    if (!Number.isInteger(perPage) || perPage < 1) {
+    const { page, perPage } = normalizePaging(options);
+    const url = new URL(`${this.baseUrl}/works`);
+    url.searchParams.set('filter', `author.id:${short}`);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per-page', String(perPage));
+    const body = await this.getJson<{
+      meta?: { count?: number };
+      results?: RawWork[];
+    }>(url);
+    const works = (body.results ?? []).map((raw) => this.toWork(raw));
+    const total =
+      typeof body.meta?.count === 'number' ? body.meta.count : works.length;
+    return { total, works };
+  }
+
+  /**
+   * Lists works by author byline name plus affiliation.
+   *
+   * `GET /works?filter=raw_author_name.search:"<name>",raw_affiliation_strings.search:<affiliation>`,
+   * paged. The fallback when no OpenAlex author id is present: an author
+   * id is not always available (unlinked authorships, name-only path), so
+   * the lookup matches the name as published plus the affiliation text.
+   * The name is quoted so it matches one byline, not tokens scattered
+   * across co-authors; the affiliation defaults to `FPT_UNIVERSITY_AFFILIATION`.
+   */
+  async searchWorksByAuthorName(
+    authorName: string,
+    options: { affiliation?: string; page?: number; perPage?: number } = {},
+  ): Promise<OpenAlexWorksPage> {
+    const cleaned = authorName.trim().replace(/"/g, ' ').trim();
+    if (cleaned === '') {
       throw new CodedHttpException(
         domainErrorCodes.openalex.authorNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
+    const affiliation = (options.affiliation ?? FPT_UNIVERSITY_AFFILIATION)
+      .trim()
+      .replace(/"/g, ' ')
+      .trim();
+    const { page, perPage } = normalizePaging(options);
     const url = new URL(`${this.baseUrl}/works`);
-    url.searchParams.set('filter', `author.id:${short}`);
+    const filter =
+      affiliation === ''
+        ? `raw_author_name.search:"${cleaned}"`
+        : `raw_author_name.search:"${cleaned}",raw_affiliation_strings.search:${affiliation}`;
+    url.searchParams.set('filter', filter);
     url.searchParams.set('page', String(page));
     url.searchParams.set('per-page', String(perPage));
     const body = await this.getJson<{

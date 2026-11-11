@@ -5,21 +5,25 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
 
 import type {
   ApiErrorResponseDto,
+  CandidateDecisionDtoEnvelope,
   CandidateWorksCountDtoEnvelope,
   OpenAlexCandidatesControllerFindAllParams,
   PaginatedCandidateWorksResponseDtoEnvelope,
@@ -368,3 +372,198 @@ export function useOpenAlexCandidatesControllerCount<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * @summary Accepts a stored OpenAlex candidate as the caller's work
+ */
+export const openAlexCandidatesControllerAccept = (
+  outputId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<CandidateDecisionDtoEnvelope>(
+    {
+      url: `/external/openalex/works/${outputId}/accept`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOpenAlexCandidatesControllerAcceptMutationKey = () =>
+  ['openAlexCandidatesControllerAccept'] as const;
+
+export const getOpenAlexCandidatesControllerAcceptMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+    TError,
+    OpenAlexCandidatesControllerAcceptMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+  TError,
+  OpenAlexCandidatesControllerAcceptMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpenAlexCandidatesControllerAcceptMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+    OpenAlexCandidatesControllerAcceptMutationVariables
+  > = (props) => {
+    const { outputId } = props ?? {};
+
+    return openAlexCandidatesControllerAccept(outputId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpenAlexCandidatesControllerAcceptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>
+>;
+
+export type OpenAlexCandidatesControllerAcceptMutationError =
+  ApiErrorResponseDto;
+export type OpenAlexCandidatesControllerAcceptMutationVariables = {
+  outputId: string;
+};
+
+/**
+ * @summary Accepts a stored OpenAlex candidate as the caller's work
+ */
+export const useOpenAlexCandidatesControllerAccept = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+      TError,
+      OpenAlexCandidatesControllerAcceptMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+  TError,
+  OpenAlexCandidatesControllerAcceptMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpenAlexCandidatesControllerAcceptMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Rejects a stored OpenAlex candidate for the caller only
+ */
+export const openAlexCandidatesControllerReject = (
+  outputId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<CandidateDecisionDtoEnvelope>(
+    {
+      url: `/external/openalex/works/${outputId}/reject`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOpenAlexCandidatesControllerRejectMutationKey = () =>
+  ['openAlexCandidatesControllerReject'] as const;
+
+export const getOpenAlexCandidatesControllerRejectMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+    TError,
+    OpenAlexCandidatesControllerRejectMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+  TError,
+  OpenAlexCandidatesControllerRejectMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpenAlexCandidatesControllerRejectMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+    OpenAlexCandidatesControllerRejectMutationVariables
+  > = (props) => {
+    const { outputId } = props ?? {};
+
+    return openAlexCandidatesControllerReject(outputId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpenAlexCandidatesControllerRejectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>
+>;
+
+export type OpenAlexCandidatesControllerRejectMutationError =
+  ApiErrorResponseDto;
+export type OpenAlexCandidatesControllerRejectMutationVariables = {
+  outputId: string;
+};
+
+/**
+ * @summary Rejects a stored OpenAlex candidate for the caller only
+ */
+export const useOpenAlexCandidatesControllerReject = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+      TError,
+      OpenAlexCandidatesControllerRejectMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+  TError,
+  OpenAlexCandidatesControllerRejectMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpenAlexCandidatesControllerRejectMutationOptions(options),
+    queryClient,
+  );
+};
