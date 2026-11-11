@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { resolveEnvFilePaths } from '@researchos/config';
 import { PrismaModule } from '@researchos/database';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { FollowModule } from './modules/follow/follow.module.js';
 import { GroupsModule } from './modules/groups/groups.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
@@ -57,6 +58,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     ]),
 
     DemoModule,
+    FollowModule,
     GroupsModule,
     HealthModule,
     IdentityModule,

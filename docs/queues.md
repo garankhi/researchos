@@ -70,6 +70,15 @@ của worker trước khi submit. Handler tự kiểm tra payload và xử lý j
 Tác vụ gọi dịch vụ ngoài phải truyền business idempotency key cho nhà cung cấp;
 transaction SQL không đảm bảo exactly-once cho email hay HTTP side effect.
 
+Trigger RES-113 ghi job `research-update`, outbox và payload vào PostgreSQL
+trong cùng transaction nghiệp vụ. Prisma truyền `QUEUE_PREFIX` vào kết nối
+PostgreSQL. Khi ghi SQL trực tiếp với prefix tùy chỉnh, đặt
+`SET LOCAL researchos.queue_prefix = 'prefix-cua-worker'` trong transaction.
+Worker chuyển payload sang `research_updates` sau commit, giữ timestamp gốc
+và dùng `event_key` để xử lý replay.
+Khi rollout, thay toàn bộ worker dùng cùng prefix bằng phiên bản có handler
+`research-update` trước khi áp dụng migration bật trigger enqueue.
+
 Outbox/job/DLQ được giữ để phục vụ idempotency và điều tra; chưa có chính sách
 prune tự động. Khi bổ sung retention cần quyết định rõ thời hạn idempotency,
 không chỉ xóa theo retention của BullMQ.
@@ -104,7 +113,8 @@ pnpm test:queue
 
 Lệnh tự build API/worker/package dùng chung và khởi động worker ở process
 riêng. Test dùng một prefix Redis ngẫu nhiên, không cần Redis/database thứ
-hai. API và worker kết nối database hiện có nhưng không ghi dữ liệu
+hai được cấu hình thủ công. Suite research update tạo database tạm trên cùng
+PostgreSQL server và xóa sau khi chạy. Suite probe kết nối database hiện có nhưng không ghi dữ liệu
 nghiệp vụ cho probe cũ. Bộ durable-job tạo user/session/job fixture riêng, dọn
 chúng sau test và chỉ dùng queue prefix UUID của lần chạy. Test bao gồm:
 

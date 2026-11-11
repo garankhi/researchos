@@ -25,6 +25,7 @@ type BackgroundJobHandler = (
 
 const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
   [DURABLE_PROBE_JOB, runDiagnosticProbe],
+  ['research-update', publishResearchUpdate],
 ]);
 
 function unsupportedJob(): BackgroundJobOutcome {
@@ -54,6 +55,44 @@ function runDiagnosticProbe({
   }
 
   return { result: { processedAt: new Date().toISOString() } };
+}
+
+async function publishResearchUpdate({
+  job,
+  tx,
+}: BackgroundJobContext): Promise<BackgroundJobOutcome> {
+  const payload = job.payload as { eventKey?: unknown } | null;
+  if (
+    typeof payload?.eventKey !== 'string' ||
+    payload.eventKey !== job.idempotency_key
+  ) {
+    return unsupportedJob();
+  }
+
+  const [published] = await tx.$queryRaw<Array<{ event_key: string }>>`
+    WITH pending AS (
+      DELETE FROM pending_research_updates
+      WHERE job_id = ${job.id}::uuid AND event_key = ${payload.eventKey}
+      RETURNING *
+    )
+    INSERT INTO research_updates (
+      event_key, event_type, actor_id, output_id, revision_id,
+      group_id, opportunity_id, seminar_id, occurred_at
+    )
+    SELECT event_key, event_type, actor_id, output_id, revision_id,
+      group_id, opportunity_id, seminar_id, occurred_at FROM pending
+    ON CONFLICT (event_key) DO NOTHING
+    RETURNING event_key
+  `;
+
+  if (!published) {
+    const existing = await tx.research_updates.findUnique({
+      where: { event_key: payload.eventKey },
+      select: { event_key: true },
+    });
+    if (!existing) return unsupportedJob();
+  }
+  return { result: { eventKey: payload.eventKey } };
 }
 
 @Processor(BACKGROUND_QUEUE, { concurrency: 2 })

@@ -874,6 +874,19 @@ CREATE TABLE "research_updates" (
   "occurred_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
 
+CREATE TABLE "pending_research_updates" (
+  "event_key" varchar(255) PRIMARY KEY,
+  "job_id" uuid UNIQUE NOT NULL,
+  "event_type" research_update_type NOT NULL,
+  "actor_id" uuid NOT NULL,
+  "output_id" uuid,
+  "revision_id" uuid,
+  "group_id" uuid,
+  "opportunity_id" uuid,
+  "seminar_id" uuid,
+  "occurred_at" timestamptz NOT NULL
+);
+
 CREATE TABLE "digest_deliveries" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "user_id" uuid NOT NULL,
@@ -1109,7 +1122,7 @@ COMMENT ON COLUMN "search_index"."authors_text" IS 'Author names joined for sear
 
 COMMENT ON COLUMN "search_index"."doc" IS 'Stored tsvector of title + abstract + author names, built with to_tsvector(''simple'', ...). Query with websearch_to_tsquery and rank with ts_rank. Never use a user-supplied string directly in to_tsquery.';
 
-COMMENT ON TABLE "research_updates" IS 'Small durable feed of meaningful sharing actions, NOT a general event bus. SQL records personal releases, accepted group revisions, opportunity opens and seminar publication in the same transaction. Project events are explicit future-module writes. No events on ordinary updated_at/sync. Typed target shape constrained in SQL.';
+COMMENT ON TABLE "research_updates" IS 'Small durable feed of meaningful sharing actions. The worker records committed personal releases, accepted group revisions, opportunity opens and seminar publications through the transactional outbox. Project events are future-module writes. Typed target shape constrained in SQL.';
 
 COMMENT ON TABLE "digest_deliveries" IS 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs; DB ledger persists attempts (max 5), leases and delivery result. id is provider idempotency key. SENT is terminal; unknown provider outcome requires reconciliation, not blind resend. Transactional application responses are independent.';
 
@@ -1308,6 +1321,20 @@ ALTER TABLE "research_updates" ADD FOREIGN KEY ("opportunity_id") REFERENCES "re
 ALTER TABLE "research_updates" ADD FOREIGN KEY ("seminar_id") REFERENCES "research_seminars" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "research_updates" ADD FOREIGN KEY ("project_id") REFERENCES "research_projects" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("job_id") REFERENCES "background_jobs" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("actor_id") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("output_id") REFERENCES "research_outputs" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("output_id", "revision_id") REFERENCES "output_revisions" ("output_id", "id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("group_id") REFERENCES "research_groups" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("opportunity_id") REFERENCES "research_opportunities" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "pending_research_updates" ADD FOREIGN KEY ("seminar_id") REFERENCES "research_seminars" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "digest_deliveries" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -1833,6 +1860,51 @@ ALTER TABLE research_updates ADD CONSTRAINT ck_update_target CHECK (
  (event_type='SEMINAR_PUBLISHED' AND seminar_id IS NOT NULL AND output_id IS NULL AND revision_id IS NULL AND group_id IS NULL AND opportunity_id IS NULL AND project_id IS NULL) OR
  (event_type='PROJECT_UPDATED' AND project_id IS NOT NULL AND output_id IS NULL AND revision_id IS NULL AND group_id IS NULL AND opportunity_id IS NULL AND seminar_id IS NULL)
 );
+ALTER TABLE pending_research_updates
+  ALTER CONSTRAINT pending_research_updates_job_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE pending_research_updates ADD CONSTRAINT ck_pending_research_update_target CHECK (
+  (event_type IN ('OUTPUT_SHARED', 'OUTPUT_REVISION_RELEASED') AND output_id IS NOT NULL AND revision_id IS NOT NULL AND group_id IS NULL AND opportunity_id IS NULL AND seminar_id IS NULL) OR
+  (event_type = 'OUTPUT_LINKED_TO_GROUP' AND output_id IS NOT NULL AND revision_id IS NOT NULL AND group_id IS NOT NULL AND opportunity_id IS NULL AND seminar_id IS NULL) OR
+  (event_type = 'OPPORTUNITY_OPENED' AND opportunity_id IS NOT NULL AND output_id IS NULL AND revision_id IS NULL AND group_id IS NULL AND seminar_id IS NULL) OR
+  (event_type = 'SEMINAR_PUBLISHED' AND seminar_id IS NOT NULL AND output_id IS NULL AND revision_id IS NULL AND group_id IS NULL AND opportunity_id IS NULL)
+);
+
+CREATE FUNCTION enqueue_research_update(
+  p_key text, p_type research_update_type, p_actor uuid,
+  p_output uuid DEFAULT NULL, p_revision uuid DEFAULT NULL,
+  p_group uuid DEFAULT NULL, p_opportunity uuid DEFAULT NULL,
+  p_seminar uuid DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  new_job_id uuid := gen_random_uuid();
+  queue_prefix text := COALESCE(NULLIF(current_setting('researchos.queue_prefix', true), ''), 'researchos');
+BEGIN
+  IF EXISTS (SELECT 1 FROM research_updates WHERE event_key = p_key) THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO pending_research_updates (
+    event_key, job_id, event_type, actor_id, output_id, revision_id,
+    group_id, opportunity_id, seminar_id, occurred_at
+  ) VALUES (
+    p_key, new_job_id, p_type, p_actor, p_output, p_revision,
+    p_group, p_opportunity, p_seminar, CURRENT_TIMESTAMP
+  ) ON CONFLICT (event_key) DO NOTHING;
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
+  -- The worker can publish and remove a previous pending row while this insert waits.
+  IF EXISTS (SELECT 1 FROM research_updates WHERE event_key = p_key) THEN
+    DELETE FROM pending_research_updates WHERE job_id = new_job_id;
+    RETURN;
+  END IF;
+
+  INSERT INTO background_jobs (id, owner_id, kind, idempotency_key, payload, queue_prefix)
+  VALUES (new_job_id, p_actor, 'research-update', p_key, jsonb_build_object('eventKey', p_key), queue_prefix);
+  INSERT INTO outbox (job_id, generation) VALUES (new_job_id, 0);
+END $$;
+
 CREATE FUNCTION emit_research_update() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE kind research_update_type; actor uuid;
 BEGIN
@@ -1840,23 +1912,20 @@ BEGIN
    IF NEW.sharing_status='SHARED' AND (TG_OP='INSERT' OR OLD.first_shared_at IS NULL OR NEW.current_release_id IS DISTINCT FROM OLD.current_release_id) THEN
      kind=CASE WHEN TG_OP='INSERT' OR OLD.first_shared_at IS NULL THEN 'OUTPUT_SHARED'::research_update_type ELSE 'OUTPUT_REVISION_RELEASED'::research_update_type END;
      SELECT released_by INTO actor FROM output_revisions WHERE id=NEW.current_release_id;
-     INSERT INTO research_updates(event_key,event_type,actor_id,output_id,revision_id)
-     VALUES ('output:'||NEW.id||':'||NEW.current_release_id,kind,actor,NEW.id,NEW.current_release_id) ON CONFLICT(event_key) DO NOTHING;
+     PERFORM enqueue_research_update('output:'||NEW.id||':'||NEW.current_release_id, kind, actor, NEW.id, NEW.current_release_id);
    END IF;
  ELSIF TG_TABLE_NAME='group_output_links' THEN
    IF NEW.accepted_revision_id IS NOT NULL AND (TG_OP='INSERT' OR NEW.accepted_revision_id IS DISTINCT FROM OLD.accepted_revision_id) THEN
-     INSERT INTO research_updates(event_key,event_type,actor_id,output_id,revision_id,group_id)
-     VALUES ('group:'||NEW.group_id||':'||NEW.output_id||':'||NEW.accepted_revision_id,'OUTPUT_LINKED_TO_GROUP',NEW.accepted_by,NEW.output_id,NEW.accepted_revision_id,NEW.group_id) ON CONFLICT(event_key) DO NOTHING;
+     PERFORM enqueue_research_update('group:'||NEW.group_id||':'||NEW.output_id||':'||NEW.accepted_revision_id,
+       'OUTPUT_LINKED_TO_GROUP', NEW.accepted_by, NEW.output_id, NEW.accepted_revision_id, NEW.group_id);
    END IF;
  ELSIF TG_TABLE_NAME='research_opportunities' THEN
    IF NEW.status='OPEN' AND (TG_OP='INSERT' OR OLD.published_at IS NULL) THEN
-     INSERT INTO research_updates(event_key,event_type,actor_id,opportunity_id)
-     VALUES ('opportunity:'||NEW.id,'OPPORTUNITY_OPENED',NEW.creator_id,NEW.id) ON CONFLICT(event_key) DO NOTHING;
+     PERFORM enqueue_research_update('opportunity:'||NEW.id, 'OPPORTUNITY_OPENED', NEW.creator_id, p_opportunity => NEW.id);
    END IF;
  ELSIF TG_TABLE_NAME='research_seminars' THEN
    IF NEW.published_at IS NOT NULL AND (TG_OP='INSERT' OR OLD.published_at IS NULL) THEN
-     INSERT INTO research_updates(event_key,event_type,actor_id,seminar_id)
-     VALUES ('seminar:'||NEW.id,'SEMINAR_PUBLISHED',NEW.organizer_id,NEW.id) ON CONFLICT(event_key) DO NOTHING;
+     PERFORM enqueue_research_update('seminar:'||NEW.id, 'SEMINAR_PUBLISHED', NEW.organizer_id, p_seminar => NEW.id);
    END IF;
  END IF;
  RETURN NEW;

@@ -1,5 +1,6 @@
 export * from './auth/auth';
 export * from './demo/demo';
+export * from './follows/follows';
 export * from './groups/groups';
 export * from './health/health';
 export * from './identity/identity';

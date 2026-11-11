@@ -63,6 +63,9 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     app.useGlobalInterceptors(new ApiResponseInterceptor());
     await app.listen(0, '127.0.0.1');
     prisma = app.get(PrismaService);
+    expect(
+      await prisma.$queryRaw`SELECT current_setting('researchos.queue_prefix') AS prefix`,
+    ).toEqual([{ prefix }]);
     jobs = app.get(BackgroundJobsService);
     config = app.get(ConfigService);
     const options = createQueueOptions(
@@ -172,6 +175,127 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     }
     worker = undefined;
   }
+
+  it('creates, lists, and removes follows with real authorization and target visibility', async () => {
+    const [callerId, targetId] = owners as [string, string, string];
+    const groupId = randomUUID();
+    const fieldId = randomUUID();
+    const subfieldId = randomUUID();
+    const topicId = randomUUID();
+    const post = (entityType: string, entityId: string, owner = 0) =>
+      request(app.getHttpServer())
+        .post('/follows')
+        .set('Cookie', cookie(owner))
+        .send({ entityType, entityId });
+    const list = (owner = 0) =>
+      request(app.getHttpServer())
+        .get('/follows?limit=1')
+        .set('Cookie', cookie(owner));
+    const remove = (entityType: string, entityId: string) =>
+      request(app.getHttpServer())
+        .delete(`/follows/${entityType}/${entityId}`)
+        .set('Cookie', cookie());
+
+    try {
+      await prisma.user_role_assignments.createMany({
+        data: [callerId, targetId].map((user_id) => ({
+          user_id,
+          role: 'RESEARCHER' as const,
+          grant_source: 'SYSTEM' as const,
+        })),
+      });
+      await prisma.researcher_profiles.create({ data: { user_id: targetId } });
+      await prisma.research_groups.create({
+        data: {
+          id: groupId,
+          code: groupId,
+          name: 'Follow fixture',
+          lead_id: targetId,
+        },
+      });
+      await prisma.research_fields.create({
+        data: { id: fieldId, name: fieldId, external_id: fieldId },
+      });
+      await prisma.research_subfields.create({
+        data: {
+          id: subfieldId,
+          field_id: fieldId,
+          name: subfieldId,
+          external_id: subfieldId,
+        },
+      });
+      await prisma.research_topics.create({
+        data: {
+          id: topicId,
+          subfield_id: subfieldId,
+          name: 'Follow topic',
+          created_by: targetId,
+        },
+      });
+
+      await request(app.getHttpServer()).get('/follows').expect(401);
+      await post('GROUP', groupId, 2).expect(403);
+      await post('GROUP', 'invalid').expect(400);
+      await post('OUTPUT', randomUUID()).expect(400);
+      await post('RESEARCHER', callerId.toUpperCase()).expect(400);
+      await post('RESEARCHER', targetId).expect(404);
+      await post('GROUP', randomUUID()).expect(404);
+      await prisma.researcher_profiles.update({
+        where: { user_id: targetId },
+        data: { profile_confirmed_at: new Date() },
+      });
+      await post('RESEARCHER', targetId).expect(201);
+      await post('TOPIC', topicId).expect(201);
+      const concurrent = await Promise.all([
+        post('GROUP', groupId),
+        post('GROUP', groupId),
+      ]);
+      expect(
+        concurrent.map(({ status }) => status).sort((a, b) => a - b),
+      ).toEqual([201, 409]);
+      expect((await list().expect(200)).body.data.meta.total).toBe(3);
+      expect((await list(1).expect(200)).body.data.meta.total).toBe(0);
+
+      await prisma.research_groups.update({
+        where: { id: groupId },
+        data: { is_active: false, archived_at: new Date() },
+      });
+      await prisma.researcher_profiles.update({
+        where: { user_id: targetId },
+        data: { profile_confirmed_at: null },
+      });
+      const page = (await list().expect(200)).body.data;
+      expect(page.meta.total).toBe(1);
+      expect(page.items).toMatchObject([
+        {
+          entityType: 'TOPIC',
+          entityId: topicId,
+          displayName: 'Follow topic',
+          state: 'ACTIVE',
+        },
+      ]);
+      await remove('UNKNOWN', groupId).expect(400);
+      await remove('GROUP', groupId).expect(204);
+      await remove('GROUP', groupId).expect(204);
+      await remove('RESEARCHER', targetId).expect(204);
+      await remove('TOPIC', topicId).expect(204);
+      expect((await list().expect(200)).body.data.meta.total).toBe(0);
+    } finally {
+      await prisma.user_follows.deleteMany({
+        where: { follower_id: callerId },
+      });
+      await prisma.research_topics.deleteMany({ where: { id: topicId } });
+      await prisma.research_subfields.deleteMany({ where: { id: subfieldId } });
+      await prisma.research_fields.deleteMany({ where: { id: fieldId } });
+      await prisma.research_groups.deleteMany({ where: { id: groupId } });
+      await prisma.researcher_profiles.deleteMany({
+        where: { user_id: targetId },
+      });
+      await prisma.user_role_assignments.deleteMany({
+        where: { user_id: { in: [callerId, targetId] }, role: 'RESEARCHER' },
+      });
+    }
+  });
 
   it('enforces real session, role, input validation and owner isolation', async () => {
     await request(app.getHttpServer())
