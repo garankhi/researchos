@@ -8,11 +8,11 @@ import { SYSTEM_QUEUE, createQueueOptions } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import { hash, verify } from '@node-rs/argon2';
 import cookieParser from 'cookie-parser';
-import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../dist/app.module.js';
 import { HttpExceptionFilter } from '../dist/common/filters/http-exception.filter.js';
 import { ApiResponseInterceptor } from '../dist/common/interceptors/api-response.interceptor.js';
+import { createHttpTestClient } from './http-test-client.js';
 
 describe('mandatory password change with real sessions and credential triggers', () => {
   const previousPrefix = process.env.QUEUE_PREFIX;
@@ -26,6 +26,7 @@ describe('mandatory password change with real sessions and credential triggers',
   let app: INestApplication;
   let prisma: PrismaService;
   let systemQueue: Queue | undefined;
+  const { request, close } = createHttpTestClient();
 
   beforeAll(async () => {
     process.env.QUEUE_PREFIX = prefix;
@@ -229,6 +230,7 @@ describe('mandatory password change with real sessions and credential triggers',
   });
 
   afterAll(async () => {
+    close();
     try {
       if (prisma) {
         await prisma.background_jobs.deleteMany({

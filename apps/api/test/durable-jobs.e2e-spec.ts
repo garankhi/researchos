@@ -3,7 +3,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
-import { Agent } from 'node:http';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,13 +16,13 @@ import {
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
-import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Exercise the same compiled Nest metadata and providers as the deployed apps.
 import { AppModule } from '../dist/app.module.js';
 import { HttpExceptionFilter } from '../dist/common/filters/http-exception.filter.js';
 import { ApiResponseInterceptor } from '../dist/common/interceptors/api-response.interceptor.js';
 import { OutboxService } from '../../worker/dist/modules/jobs/outbox.service.js';
+import { createHttpTestClient } from './http-test-client.js';
 
 describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone worker', () => {
   const previousPrefix = process.env.QUEUE_PREFIX;
@@ -39,13 +38,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
   let dlq: Queue;
   let worker: ChildProcess | undefined;
   let workerOutput = '';
-  // Own the client socket lifecycle across long Redis/worker waits. Retire
-  // idle sockets before the HTTP server's default 5-second keep-alive cutoff.
-  const httpAgent = new Agent({ keepAlive: true, timeout: 2_000 });
-  const request = (server: Parameters<typeof supertest>[0]) =>
-    supertest.agent(server).use((req) => {
-      req.agent(httpAgent);
-    });
+  const { request, close } = createHttpTestClient();
 
   beforeAll(async () => {
     process.env.QUEUE_PREFIX = prefix;
@@ -63,9 +56,6 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     app.useGlobalInterceptors(new ApiResponseInterceptor());
     await app.listen(0, '127.0.0.1');
     prisma = app.get(PrismaService);
-    expect(
-      await prisma.$queryRaw`SELECT current_setting('researchos.queue_prefix') AS prefix`,
-    ).toEqual([{ prefix }]);
     jobs = app.get(BackgroundJobsService);
     config = app.get(ConfigService);
     const options = createQueueOptions(
@@ -235,7 +225,13 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
 
       await request(app.getHttpServer()).get('/follows').expect(401);
       await post('GROUP', groupId, 2).expect(403);
-      await post('GROUP', 'invalid').expect(400);
+      const invalid = await post('UNKNOWN', 'invalid').expect(400);
+      expect(invalid.body.errors).toEqual(
+        expect.arrayContaining([
+          { field: 'entityType', messages: ['entity_type_invalid'] },
+          { field: 'entityId', messages: ['entity_id_uuid'] },
+        ]),
+      );
       await post('OUTPUT', randomUUID()).expect(400);
       await post('RESEARCHER', callerId.toUpperCase()).expect(400);
       await post('RESEARCHER', targetId).expect(404);
@@ -640,7 +636,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       await queue?.close();
       await dlq?.close();
       await app?.close();
-      httpAgent.destroy();
+      close();
       if (previousPrefix === undefined) delete process.env.QUEUE_PREFIX;
       else process.env.QUEUE_PREFIX = previousPrefix;
     }

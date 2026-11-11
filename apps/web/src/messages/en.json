@@ -90,6 +90,8 @@
         "password_invalid": "Password must be text.",
         "new_password_too_short": "The new password must contain at least 12 characters.",
         "id_uuid": "A valid UUID is required.",
+        "entity_type_invalid": "Select a valid target type.",
+        "entity_id_uuid": "The target ID must be a valid UUID.",
         "failures_before_success_integer": "The diagnostic failure count must be an integer.",
         "failures_before_success_min": "The diagnostic failure count must be at least 0.",
         "failures_before_success_max": "The diagnostic failure count must be at most 3.",

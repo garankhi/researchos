@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter.js';
+import { createHttpTestClient } from './http-test-client.js';
 
 describe('App (e2e)', () => {
   let app: INestApplication<App>;
+  const { request, close } = createHttpTestClient();
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -15,7 +16,7 @@ describe('App (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.useGlobalFilters(new HttpExceptionFilter());
-    await app.init();
+    await app.listen(0, '127.0.0.1');
   });
 
   it('/health (GET)', () => {
@@ -49,6 +50,7 @@ describe('App (e2e)', () => {
   });
 
   afterEach(async () => {
+    close();
     await app.close();
   });
 });

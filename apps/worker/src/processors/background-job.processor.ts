@@ -1,14 +1,20 @@
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { PrismaService, type Prisma } from '@researchos/database';
+import {
+  PrismaService,
+  RESEARCH_UPDATE_JOB,
+  type Prisma,
+} from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DURABLE_PROBE_JOB,
   JOB_ATTEMPTS,
+  RESEARCH_UPDATES_QUEUE,
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
+import { researchUpdateScope } from '../modules/jobs/research-update-scope.js';
 
 type BackgroundJobOutcome =
   { result: Prisma.InputJsonValue } | { error: Error };
@@ -25,7 +31,7 @@ type BackgroundJobHandler = (
 
 const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
   [DURABLE_PROBE_JOB, runDiagnosticProbe],
-  ['research-update', publishResearchUpdate],
+  [RESEARCH_UPDATE_JOB, publishResearchUpdate],
 ]);
 
 function unsupportedJob(): BackgroundJobOutcome {
@@ -95,17 +101,11 @@ async function publishResearchUpdate({
   return { result: { eventKey: payload.eventKey } };
 }
 
-@Processor(BACKGROUND_QUEUE, { concurrency: 2 })
-export class BackgroundProbeProcessor extends WorkerHost {
-  private readonly logger = new Logger(BackgroundProbeProcessor.name);
-  constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(ConfigService) private readonly config: ConfigService,
-  ) {
-    super();
-  }
+@Injectable()
+export class BackgroundJobRunner {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async process(job: Job<BackgroundJobPayload>): Promise<void> {
+  async process(job: Job<BackgroundJobPayload>, scope: string): Promise<void> {
     if (
       !/^[0-9a-f-]{36}$/i.test(job.data?.jobId ?? '') ||
       !Number.isSafeInteger(job.data?.generation) ||
@@ -124,8 +124,7 @@ export class BackgroundProbeProcessor extends WorkerHost {
       // A duplicate, stale generation, or redelivery after Redis retention is
       // harmless even if BullMQ no longer remembers the original transport ID.
       if (
-        stored.queue_prefix !==
-          (this.config.get<string>('QUEUE_PREFIX') ?? 'researchos') ||
+        stored.queue_prefix !== scope ||
         stored.generation !== job.data.generation ||
         stored.status !== 'PENDING'
       )
@@ -166,9 +165,47 @@ export class BackgroundProbeProcessor extends WorkerHost {
     // Throw only after persisting the failed attempt/DLQ transaction.
     if (failure) throw failure;
   }
+}
+
+abstract class ScopedBackgroundProcessor extends WorkerHost {
+  private readonly logger = new Logger(this.constructor.name);
+
+  constructor(
+    private readonly runner: BackgroundJobRunner,
+    private readonly scope: string,
+  ) {
+    super();
+  }
+
+  process(job: Job<BackgroundJobPayload>): Promise<void> {
+    return this.runner.process(job, this.scope);
+  }
 
   @OnWorkerEvent('error')
   onError(error: Error): void {
     this.logger.error(error.message);
+  }
+}
+
+@Processor(BACKGROUND_QUEUE, { concurrency: 2 })
+export class BackgroundJobProcessor extends ScopedBackgroundProcessor {
+  constructor(
+    @Inject(BackgroundJobRunner) runner: BackgroundJobRunner,
+    @Inject(ConfigService) config: ConfigService,
+  ) {
+    super(runner, config.get<string>('QUEUE_PREFIX') ?? 'researchos');
+  }
+}
+
+@Processor(RESEARCH_UPDATES_QUEUE, { concurrency: 2 })
+export class ResearchUpdateProcessor extends ScopedBackgroundProcessor {
+  constructor(
+    @Inject(BackgroundJobRunner) runner: BackgroundJobRunner,
+    @Inject(ConfigService) config: ConfigService,
+  ) {
+    super(
+      runner,
+      researchUpdateScope(config.get<string>('QUEUE_PREFIX') ?? 'researchos'),
+    );
   }
 }

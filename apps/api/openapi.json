@@ -1835,7 +1835,7 @@
             }
           },
           "404": {
-            "description": "Job is missing or belongs to another user.",
+            "description": "Job is missing or inaccessible to the caller.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1850,7 +1850,7 @@
             "bearer": []
           }
         ],
-        "summary": "Returns the requesting user’s durable job status",
+        "summary": "Returns the status of an accessible durable job",
         "tags": [
           "jobs"
         ]
@@ -1902,7 +1902,7 @@
             }
           },
           "403": {
-            "description": "Requires ADMIN; ownership is still required.",
+            "description": "Requires ADMIN. Research update jobs can be retried across owners.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1912,7 +1912,7 @@
             }
           },
           "404": {
-            "description": "Job is missing or belongs to another user.",
+            "description": "Job is missing or inaccessible to the caller.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1937,7 +1937,7 @@
             "bearer": []
           }
         ],
-        "summary": "Reprocesses an owned failed job in a new bounded generation",
+        "summary": "Reprocesses a failed job in a new bounded generation",
         "tags": [
           "jobs"
         ]

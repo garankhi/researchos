@@ -18,12 +18,12 @@ export class JobStatusService {
     );
   }
 
-  async findOwned(ownerId: string, id: string): Promise<JobDto> {
-    return this.toDto(await this.jobs.findOwned(ownerId, id));
+  async findAccessible(callerId: string, id: string): Promise<JobDto> {
+    return this.toDto(await this.jobs.findAccessible(callerId, id));
   }
 
-  async retryOwned(ownerId: string, id: string): Promise<JobDto> {
-    return this.toDto(await this.jobs.retryOwned(ownerId, id));
+  async retryAccessible(callerId: string, id: string): Promise<JobDto> {
+    return this.toDto(await this.jobs.retryAccessible(callerId, id));
   }
 
   private toDto(job: { id: string; status: string; attempts: number }): JobDto {

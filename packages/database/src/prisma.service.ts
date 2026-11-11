@@ -26,20 +26,7 @@ export class PrismaService
       );
     }
 
-    // SQL event producers need the same prefix as application-submitted jobs.
-    const url = new URL(connectionString);
-    const queuePrefix = (process.env.QUEUE_PREFIX ?? 'researchos').replace(
-      /[\\\s]/g,
-      '\\$&',
-    );
-    const options = url.searchParams.get('options');
-    url.searchParams.set(
-      'options',
-      [options, `-c researchos.queue_prefix=${queuePrefix}`]
-        .filter(Boolean)
-        .join(' '),
-    );
-    super({ adapter: new PrismaPg({ connectionString: url.toString() }) });
+    super({ adapter: new PrismaPg({ connectionString }) });
   }
 
   async onModuleInit(): Promise<void> {

@@ -1877,7 +1877,6 @@ CREATE FUNCTION enqueue_research_update(
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   new_job_id uuid := gen_random_uuid();
-  queue_prefix text := COALESCE(NULLIF(current_setting('researchos.queue_prefix', true), ''), 'researchos');
 BEGIN
   IF EXISTS (SELECT 1 FROM research_updates WHERE event_key = p_key) THEN
     RETURN;
@@ -1901,7 +1900,7 @@ BEGIN
   END IF;
 
   INSERT INTO background_jobs (id, owner_id, kind, idempotency_key, payload, queue_prefix)
-  VALUES (new_job_id, p_actor, 'research-update', p_key, jsonb_build_object('eventKey', p_key), queue_prefix);
+  VALUES (new_job_id, p_actor, 'research-update', p_key, jsonb_build_object('eventKey', p_key), '@research-updates');
   INSERT INTO outbox (job_id, generation) VALUES (new_job_id, 0);
 END $$;
 

@@ -1,17 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FollowEntityType } from '@researchos/database';
 import { IsEnum, IsUUID } from 'class-validator';
 import { PaginatedResultDto } from '../../common/dto/pagination.dto.js';
 
-export enum FollowEntityType {
-  RESEARCHER = 'RESEARCHER',
-  GROUP = 'GROUP',
-  PROJECT = 'PROJECT',
-  TOPIC = 'TOPIC',
-  OUTPUT = 'OUTPUT',
-}
+export { FollowEntityType };
 
 export class FollowTargetDto {
-  @IsEnum(FollowEntityType)
+  @IsEnum(FollowEntityType, { message: 'entity_type_invalid' })
   @ApiProperty({
     enum: FollowEntityType,
     enumName: 'FollowEntityType',
@@ -20,7 +15,7 @@ export class FollowTargetDto {
   entityType!: FollowEntityType;
 
   @ApiProperty({ format: 'uuid', description: 'ID of the target entity.' })
-  @IsUUID()
+  @IsUUID(undefined, { message: 'entity_id_uuid' })
   entityId!: string;
 }
 
