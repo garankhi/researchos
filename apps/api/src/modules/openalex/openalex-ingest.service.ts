@@ -49,15 +49,16 @@ function normalizeOrcid(value: unknown): string | null {
 }
 
 /**
- * The work upsert half of the pull (RES-137).
+ * The work upsert half of the pull (RES-137) plus the claim write (RES-155).
  *
  * Turns a shaped OpenAlex work into a persisted candidate:
  * `research_outputs` (`import_state = 'CANDIDATE'`, `sharing_status =
  * 'DRAFT'`, `visibility = 'PRIVATE'`, `owner_id = NULL`), one draft
  * `output_revisions` row (`revision_no = 1`, `publisher = NULL` —
- * OpenAlex has no publisher, that null is correct), the authorship rows
- * and the `output_external_ids` link. Provenance rows land in the same
- * transaction through `ProvenanceService`.
+ * OpenAlex has no publisher, that null is correct), the authorship rows,
+ * the `output_external_ids` link, and the `SUGGESTED` claim that makes
+ * the work visible to the requesting researcher. Provenance rows land in
+ * the same transaction through `ProvenanceService`.
  *
  * Two paths, one transaction:
  *
@@ -66,11 +67,18 @@ function normalizeOrcid(value: unknown): string | null {
  * - *Attach*: the work already exists (same external id = re-import, or
  *   same DOI = a second author accepts it). The service never inserts a
  *   second `research_outputs` row and never touches `owner_id`; it links
- *   the requesting researcher to their authorship row and records the
- *   second external id when the DOI matched first.
+ *   the requesting researcher to their authorship row, records the
+ *   second external id when the DOI matched first, and ensures the
+ *   researcher's `SUGGESTED` claim so the work reaches their review
+ *   queue.
  *
- * Idempotent: re-importing the same work returns the same `outputId`
- * with `created = false` and only bumps `synced_at`.
+ * The claim and the work land together or not at all: the upsert writes
+ * a `SUGGESTED` claim with `reviewed_at = NULL` and `author_id = NULL`
+ * for `(output_id, user_id)`, and leaves an existing `CONFIRMED` or
+ * `REJECTED` decision alone — a re-pull never resurrects a decision the
+ * researcher already made. Idempotent: re-importing the same work
+ * returns the same `outputId` with `created = false` and only bumps
+ * `synced_at`.
  */
 @Injectable()
 export class OpenAlexIngestService {
@@ -131,6 +139,12 @@ export class OpenAlexIngestService {
           userId,
           work,
         );
+        await this.ensureSuggestedClaim(
+          tx,
+          linked.output_id,
+          userId,
+          sourceRef,
+        );
         await this.recordWorkProvenance(
           tx,
           linked.output_id,
@@ -169,6 +183,7 @@ export class OpenAlexIngestService {
             userId,
             work,
           );
+          await this.ensureSuggestedClaim(tx, existing.id, userId, sourceRef);
           await this.recordWorkProvenance(
             tx,
             existing.id,
@@ -255,8 +270,40 @@ export class OpenAlexIngestService {
         });
       }
 
+      await this.ensureSuggestedClaim(tx, output.id, userId, sourceRef);
       await this.recordWorkProvenance(tx, output.id, work, sourceRef, now);
       return { outputId: output.id, created: true, authorOrder: matchedOrder };
+    });
+  }
+
+  /**
+   * Writes the `SUGGESTED` claim that makes a candidate visible (RES-155).
+   *
+   * One row per `(output_id, user_id)` with `status = 'SUGGESTED'`,
+   * `reviewed_at = NULL` and `author_id = NULL` — the checks
+   * `ck_claim_review` and `ck_confirmed_claim_author` require exactly
+   * that shape. The write is an upsert with a no-op update: a work with
+   * no claim gains one, and an existing `CONFIRMED` or `REJECTED` decision
+   * is left alone so a re-pull never resurrects it. Runs inside the
+   * ingest transaction, so the work and its claim land together.
+   */
+  private async ensureSuggestedClaim(
+    tx: Prisma.TransactionClient,
+    outputId: string,
+    userId: string,
+    matchSource: string,
+  ): Promise<void> {
+    await tx.publication_claims.upsert({
+      where: { output_id_user_id: { output_id: outputId, user_id: userId } },
+      create: {
+        output_id: outputId,
+        user_id: userId,
+        status: 'SUGGESTED',
+        match_source: matchSource,
+        author_id: null,
+        reviewed_at: null,
+      },
+      update: {},
     });
   }
 

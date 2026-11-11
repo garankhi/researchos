@@ -71,6 +71,9 @@ function makeTx(overrides: Record<string, unknown> = {}) {
       create: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
     },
+    publication_claims: {
+      upsert: vi.fn(async () => ({})),
+    },
     ...overrides,
   };
 }
@@ -128,6 +131,80 @@ describe('OpenAlexIngestService', () => {
       (provenance.recordProvenance as ReturnType<typeof vi.fn>).mock.calls
         .length,
     ).toBeGreaterThanOrEqual(5);
+  });
+
+  it('writes a SUGGESTED claim on insert, inside the same transaction', async () => {
+    const tx = makeTx();
+    const { service } = makeService(tx);
+
+    await service.upsertWork(USER_ID, makeWork('W1'));
+
+    const upsert = tx.publication_claims.upsert as ReturnType<typeof vi.fn>;
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(upsert.mock.calls[0][0]).toMatchObject({
+      where: {
+        output_id_user_id: { output_id: OUTPUT_ID, user_id: USER_ID },
+      },
+      create: {
+        output_id: OUTPUT_ID,
+        user_id: USER_ID,
+        status: 'SUGGESTED',
+        match_source: 'OPENALEX:W1',
+        author_id: null,
+        reviewed_at: null,
+      },
+      // No-op update: a re-pull never resurrects a CONFIRMED/REJECTED
+      // decision the researcher already made.
+      update: {},
+    });
+  });
+
+  it('ensures the claim on re-import without touching an existing decision', async () => {
+    const tx = makeTx({
+      output_external_ids: {
+        findUnique: vi.fn(async () => ({ output_id: OUTPUT_ID })),
+        upsert: vi.fn(async () => ({})),
+        create: vi.fn(async () => ({})),
+      },
+    });
+    const { service } = makeService(tx);
+
+    const result = await service.upsertWork(USER_ID, makeWork('W1'));
+
+    expect(result).toMatchObject({ outputId: OUTPUT_ID, created: false });
+    const upsert = tx.publication_claims.upsert as ReturnType<typeof vi.fn>;
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(upsert.mock.calls[0][0].update).toEqual({});
+    expect(upsert.mock.calls[0][0].create.status).toBe('SUGGESTED');
+  });
+
+  it('ensures the claim on the DOI attach path for the second researcher', async () => {
+    const tx = makeTx({
+      research_outputs: {
+        findUnique: vi.fn(async () => ({ id: OUTPUT_ID })),
+        create: vi.fn(async () => ({ id: OUTPUT_ID })),
+      },
+    });
+    const { service } = makeService(tx);
+
+    const result = await service.upsertWork(
+      USER_ID,
+      makeWork('W2', { doi: '10.1234/dup' }),
+    );
+
+    expect(result).toMatchObject({ outputId: OUTPUT_ID, created: false });
+    const upsert = tx.publication_claims.upsert as ReturnType<typeof vi.fn>;
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(upsert.mock.calls[0][0]).toMatchObject({
+      where: {
+        output_id_user_id: { output_id: OUTPUT_ID, user_id: USER_ID },
+      },
+      create: expect.objectContaining({
+        status: 'SUGGESTED',
+        match_source: 'OPENALEX:W2',
+      }),
+      update: {},
+    });
   });
 
   it('re-importing the same work is a no-op returning the same output', async () => {
