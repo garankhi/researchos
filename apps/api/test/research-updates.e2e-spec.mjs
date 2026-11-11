@@ -12,11 +12,13 @@ import {
   DEAD_LETTER_QUEUE,
   DURABLE_PROBE_JOB,
   RESEARCH_UPDATES_QUEUE,
+  SYSTEM_QUEUE,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
+import { Redis } from 'ioredis';
 import { expect, it } from 'vitest';
 import { createHttpTestClient } from './http-test-client.js';
 
@@ -39,14 +41,13 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
   const producer = new Client({ connectionString: database.href });
   const observer = new Client({ connectionString: database.href });
   const queueOptions = createQueueOptions(process.env.REDIS_URL, prefix);
-  const legacyQueue = new Queue(BACKGROUND_QUEUE, queueOptions);
-  const queue = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
-  const deadLetterQueue = new Queue(DEAD_LETTER_QUEUE, queueOptions);
+  const redis = new Redis(queueOptions.connection);
+  const mainQueues = { ...queueOptions, connection: redis };
+  const legacyQueue = new Queue(BACKGROUND_QUEUE, mainQueues);
+  const queue = new Queue(RESEARCH_UPDATES_QUEUE, mainQueues);
+  const deadLetterQueue = new Queue(DEAD_LETTER_QUEUE, mainQueues);
   const otherPrefix = `${prefix}-other`;
-  const otherQueueOptions = createQueueOptions(
-    process.env.REDIS_URL,
-    otherPrefix,
-  );
+  const otherQueueOptions = { ...mainQueues, prefix: otherPrefix };
   const otherResearchQueue = new Queue(
     RESEARCH_UPDATES_QUEUE,
     otherQueueOptions,
@@ -60,6 +61,8 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
     otherResearchQueue,
     otherBackgroundQueue,
     otherDeadLetterQueue,
+    new Queue(SYSTEM_QUEUE, mainQueues),
+    new Queue(SYSTEM_QUEUE, otherQueueOptions),
   ];
   const originalDatabaseUrl = process.env.DATABASE_URL;
   const originalQueuePrefix = process.env.QUEUE_PREFIX;
@@ -163,6 +166,7 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
       );
 
     await producer.query('BEGIN');
+    await producer.query('SET CONSTRAINTS ALL IMMEDIATE');
     await producer.query(
       `
       INSERT INTO users(id, user_type, email, full_name, department_unit)
@@ -445,13 +449,17 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
         queues.map((testQueue) => testQueue.obliterate({ force: true })),
       );
     } finally {
-      await Promise.all([
-        producer.end(),
-        observer.end(),
-        ...queues.map((testQueue) => testQueue.close()),
-      ]);
-      if (databaseCreated) await admin.query(`DROP DATABASE "${databaseName}"`);
-      await admin.end();
+      // The fixture owns the shared Redis connection and can disconnect it
+      // without waiting for several independent QUIT commands.
+      redis.disconnect();
+      try {
+        await Promise.all([producer.end(), observer.end()]);
+        if (databaseCreated)
+          await admin.query(`DROP DATABASE "${databaseName}"`);
+      } finally {
+        await admin.end();
+        await Promise.all(queues.map((testQueue) => testQueue.close()));
+      }
     }
   }
 }, 45_000);

@@ -2,10 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
   type PaginationQueryDto,
@@ -47,15 +50,19 @@ export class FollowService {
       entityType === FollowEntityType.PROJECT ||
       entityType === FollowEntityType.OUTPUT
     ) {
-      throw new BadRequestException(
-        'This target type is not enabled for follows',
+      throw new CodedHttpException(
+        domainErrorCodes.follows.targetTypeUnsupported,
+        HttpStatus.BAD_REQUEST,
       );
     }
     if (
       entityType === FollowEntityType.RESEARCHER &&
       entityId === callerId.toLowerCase()
     ) {
-      throw new BadRequestException('A researcher cannot follow themselves');
+      throw new CodedHttpException(
+        domainErrorCodes.follows.selfFollow,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const [result] = await this.prisma.$queryRaw<

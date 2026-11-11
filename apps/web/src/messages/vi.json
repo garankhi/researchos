@@ -103,6 +103,8 @@
         "archived_at_invalid": "Thời điểm lưu trữ phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00."
       },
       "domain": {
+        "follow_self": "Bạn không thể tự theo dõi mình.",
+        "follow_target_type_unsupported": "Loại đối tượng này chưa hỗ trợ theo dõi.",
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",
         "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",

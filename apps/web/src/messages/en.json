@@ -103,6 +103,8 @@
         "archived_at_invalid": "The archive timestamp must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00."
       },
       "domain": {
+        "follow_self": "You cannot follow yourself.",
+        "follow_target_type_unsupported": "This type of target cannot be followed yet.",
         "invalid_credentials": "The email or password is incorrect.",
         "account_inactive": "This account has been deactivated. Please contact an administrator.",
         "must_change_password": "You need to change your password before continuing.",

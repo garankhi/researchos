@@ -66,20 +66,22 @@ describe('mandatory password change with real sessions and credential triggers',
         },
       },
     });
-    await prisma.user_role_assignments.create({
-      data: { user_id: userId, role: 'ADMIN', grant_source: 'SYSTEM' },
-    });
-    for (const token of tokens)
-      await prisma.user_sessions.create({
-        data: {
-          user_id: userId,
-          auth_method: 'LOCAL',
-          session_token_hash: createHash('sha256').update(token).digest('hex'),
-          authenticated_at: new Date(),
-          expires_at: new Date(Date.now() + 3_600_000),
-          idle_expires_at: new Date(Date.now() + 1_800_000),
-        },
-      });
+    await prisma.$executeRaw`
+      INSERT INTO user_role_assignments (user_id, role, grant_source)
+      VALUES (${userId}::uuid, 'ADMIN', 'SYSTEM')
+    `;
+    for (const token of tokens) {
+      const tokenHash = createHash('sha256').update(token).digest('hex');
+      await prisma.$executeRaw`
+        INSERT INTO user_sessions (
+          user_id, auth_method, session_token_hash, authenticated_at,
+          expires_at, idle_expires_at
+        ) VALUES (
+          ${userId}::uuid, 'LOCAL', ${tokenHash}, CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP + interval '1 hour', CURRENT_TIMESTAMP + interval '30 minutes'
+        )
+      `;
+    }
   });
 
   it('refuses protected ADMIN and owner APIs with the password-change code', async () => {

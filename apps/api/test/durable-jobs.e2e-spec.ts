@@ -29,6 +29,8 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
   const prefix = `durable-e2e-${randomUUID()}`;
   const owners = [randomUUID(), randomUUID(), randomUUID()];
   const tokens = owners.map(() => randomUUID());
+  // These fixture grants should already be effective on the PostgreSQL clock.
+  const grantedAt = new Date(0);
   const cookie = (index = 0) => `researchos_session=${tokens[index]}`;
   let app: INestApplication;
   let prisma: PrismaService;
@@ -86,20 +88,21 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
             user_id: owners[index]!,
             role: 'ADMIN',
             grant_source: 'SYSTEM',
+            granted_at: grantedAt,
           },
         });
-      await prisma.user_sessions.create({
-        data: {
-          user_id: owners[index]!,
-          auth_method: 'LOCAL',
-          session_token_hash: createHash('sha256')
-            .update(tokens[index]!)
-            .digest('hex'),
-          authenticated_at: new Date(),
-          expires_at: new Date(Date.now() + 3_600_000),
-          idle_expires_at: new Date(Date.now() + 1_800_000),
-        },
-      });
+      const tokenHash = createHash('sha256')
+        .update(tokens[index]!)
+        .digest('hex');
+      await prisma.$executeRaw`
+        INSERT INTO user_sessions (
+          user_id, auth_method, session_token_hash, authenticated_at,
+          expires_at, idle_expires_at
+        ) VALUES (
+          ${owners[index]}::uuid, 'LOCAL', ${tokenHash}, CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP + interval '1 hour', CURRENT_TIMESTAMP + interval '30 minutes'
+        )
+      `;
     }
   });
 
@@ -192,6 +195,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
           user_id,
           role: 'RESEARCHER' as const,
           grant_source: 'SYSTEM' as const,
+          granted_at: grantedAt,
         })),
       });
       await prisma.researcher_profiles.create({ data: { user_id: targetId } });
@@ -232,8 +236,13 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
           { field: 'entityId', messages: ['entity_id_uuid'] },
         ]),
       );
-      await post('OUTPUT', randomUUID()).expect(400);
-      await post('RESEARCHER', callerId.toUpperCase()).expect(400);
+      const unsupported = await post('OUTPUT', randomUUID()).expect(400);
+      expect(unsupported.body.message).toBe('follow_target_type_unsupported');
+      const selfFollow = await post(
+        'RESEARCHER',
+        callerId.toUpperCase(),
+      ).expect(400);
+      expect(selfFollow.body.message).toBe('follow_self');
       await post('RESEARCHER', targetId).expect(404);
       await post('GROUP', randomUUID()).expect(404);
       await prisma.researcher_profiles.update({

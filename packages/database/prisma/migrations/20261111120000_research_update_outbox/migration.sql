@@ -21,8 +21,6 @@ ALTER TABLE pending_research_updates ADD FOREIGN KEY (group_id) REFERENCES resea
 ALTER TABLE pending_research_updates ADD FOREIGN KEY (opportunity_id) REFERENCES research_opportunities (id) ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 ALTER TABLE pending_research_updates ADD FOREIGN KEY (seminar_id) REFERENCES research_seminars (id) ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
-ALTER TABLE pending_research_updates
-  ALTER CONSTRAINT pending_research_updates_job_id_fkey DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE pending_research_updates ADD CONSTRAINT ck_pending_research_update_target CHECK (
   (event_type IN ('OUTPUT_SHARED', 'OUTPUT_REVISION_RELEASED') AND output_id IS NOT NULL AND revision_id IS NOT NULL AND group_id IS NULL AND opportunity_id IS NULL AND seminar_id IS NULL) OR
   (event_type = 'OUTPUT_LINKED_TO_GROUP' AND output_id IS NOT NULL AND revision_id IS NOT NULL AND group_id IS NOT NULL AND opportunity_id IS NULL AND seminar_id IS NULL) OR
@@ -37,13 +35,25 @@ CREATE FUNCTION enqueue_research_update(
   p_seminar uuid DEFAULT NULL
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
-  new_job_id uuid := gen_random_uuid();
+  new_job_id uuid;
   queue_prefix text := COALESCE(
     NULLIF(current_setting('researchos.research_updates_queue_prefix', true), ''),
     'researchos'
   );
 BEGIN
   IF EXISTS (SELECT 1 FROM research_updates WHERE event_key = p_key) THEN
+    RETURN;
+  END IF;
+
+  -- Keep the scope encoding aligned with researchUpdateScope in the worker.
+  INSERT INTO background_jobs (owner_id, kind, idempotency_key, payload, queue_prefix)
+  VALUES (
+    p_actor, 'research-update', p_key, jsonb_build_object('eventKey', p_key),
+    '@research-updates:' || encode(sha256(convert_to(queue_prefix, 'UTF8')), 'hex')
+  )
+  ON CONFLICT (owner_id, kind, idempotency_key) DO NOTHING
+  RETURNING id INTO new_job_id;
+  IF NOT FOUND THEN
     RETURN;
   END IF;
 
@@ -55,21 +65,18 @@ BEGIN
     p_group, p_opportunity, p_seminar, CURRENT_TIMESTAMP
   ) ON CONFLICT (event_key) DO NOTHING;
   IF NOT FOUND THEN
+    -- The same event key may already be pending under a different actor.
+    DELETE FROM background_jobs WHERE id = new_job_id;
     RETURN;
   END IF;
 
-  -- The worker can publish and remove a previous pending row while this insert waits.
+  -- A worker may publish a previous pending row while this insert waits.
   IF EXISTS (SELECT 1 FROM research_updates WHERE event_key = p_key) THEN
     DELETE FROM pending_research_updates WHERE job_id = new_job_id;
+    DELETE FROM background_jobs WHERE id = new_job_id;
     RETURN;
   END IF;
 
-  -- Keep the scope encoding aligned with researchUpdateScope in the worker.
-  INSERT INTO background_jobs (id, owner_id, kind, idempotency_key, payload, queue_prefix)
-  VALUES (
-    new_job_id, p_actor, 'research-update', p_key, jsonb_build_object('eventKey', p_key),
-    '@research-updates:' || encode(sha256(convert_to(queue_prefix, 'UTF8')), 'hex')
-  );
   INSERT INTO outbox (job_id, generation) VALUES (new_job_id, 0);
 END $$;
 
