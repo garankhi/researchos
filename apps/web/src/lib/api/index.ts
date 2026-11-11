@@ -6,5 +6,6 @@ export * from './identity/identity';
 export * from './jobs/jobs';
 export * from './opportunities/opportunities';
 export * from './output-files/output-files';
+export * from './outputs/outputs';
 export * from './profiles/profiles';
 export * from './taxonomy/taxonomy';

@@ -1911,6 +1911,349 @@
         ]
       }
     },
+    "/outputs": {
+      "get": {
+        "description": "Returns a paginated list of research outputs visible to the caller (shared community works, member group works, or the caller own working copy draft works).",
+        "operationId": "OutputsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter outputs owned by a specific researcher user (UUID).",
+            "schema": {
+              "format": "uuid",
+              "example": "11111111-1111-4111-8111-111111111111",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "required": false,
+            "in": "query",
+            "description": "Filter outputs linked to a specific research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "example": "22222222-2222-4222-8222-222222222222",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of visible research outputs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedOutputsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or sort expression.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List visible research outputs",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}": {
+      "get": {
+        "description": "Returns metadata of the specified research output including its pinned release revision, author list, and linked research topics. Returns 404 if missing, or 403 if unauthorized.",
+        "operationId": "OutputsController_findOne",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research output details retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to view this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get details of a research output",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/revisions": {
+      "get": {
+        "description": "Returns the list of revisions belonging to the specified research output, ordered by revision number descending.",
+        "operationId": "OutputsController_findRevisions",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of revisions retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputsControllerFindRevisionsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to view this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List revisions of a research output",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/files": {
+      "get": {
+        "description": "Returns the list of files attached to the specified research output that the caller is authorized to view.",
+        "operationId": "OutputsController_findFiles",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of authorized files retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputsControllerFindFilesEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to view this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List authorized files of a research output",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/profiles/me": {
       "get": {
         "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
@@ -3884,6 +4227,390 @@
           }
         }
       },
+      "OutputRevisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the output revision.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "outputId": {
+            "type": "string",
+            "description": "Output identifier this revision belongs to.",
+            "format": "uuid",
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "revisionNo": {
+            "type": "number",
+            "description": "Monotonically increasing revision number.",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the research publication.",
+            "example": "Deep Learning for Medical Image Classification"
+          },
+          "abstract": {
+            "type": "object",
+            "description": "Abstract or summary of the publication.",
+            "nullable": true,
+            "example": "In this paper, we propose a novel deep convolutional network..."
+          },
+          "venue": {
+            "type": "object",
+            "description": "Publication venue or journal name.",
+            "nullable": true,
+            "example": "IEEE Transactions on Medical Imaging"
+          },
+          "publisher": {
+            "type": "object",
+            "description": "Publisher organization or house.",
+            "nullable": true,
+            "example": "IEEE"
+          },
+          "publicationYear": {
+            "type": "object",
+            "description": "Calendar year of publication.",
+            "nullable": true,
+            "example": 2026
+          },
+          "publicationStatus": {
+            "type": "string",
+            "description": "Publication status of the work (`UNPUBLISHED` or `PUBLISHED`).",
+            "enum": [
+              "UNPUBLISHED",
+              "PUBLISHED"
+            ],
+            "example": "PUBLISHED"
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Type classification of the output (e.g. PAPER, DATASET).",
+            "example": "PAPER"
+          },
+          "externalUrl": {
+            "type": "object",
+            "description": "External URL pointing to the publication source.",
+            "nullable": true,
+            "example": "https://doi.org/10.1109/TMI.2026.1234567"
+          },
+          "releasedAt": {
+            "type": "object",
+            "description": "Timestamp when this revision was officially released / pinned.",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-11T00:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when this revision record was created.",
+            "format": "date-time",
+            "example": "2026-11-10T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "outputId",
+          "revisionNo",
+          "title",
+          "abstract",
+          "venue",
+          "publisher",
+          "publicationYear",
+          "publicationStatus",
+          "outputType",
+          "externalUrl",
+          "releasedAt",
+          "createdAt"
+        ]
+      },
+      "OutputAuthorResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the author record.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "outputId": {
+            "type": "string",
+            "description": "Research output identifier.",
+            "format": "uuid",
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "userId": {
+            "type": "object",
+            "description": "User ID of the internal researcher if linked to an account; null otherwise.",
+            "format": "uuid",
+            "nullable": true,
+            "example": "33333333-3333-4333-8333-333333333333"
+          },
+          "authorNameString": {
+            "type": "string",
+            "description": "Display name string of the author.",
+            "example": "Nguyen Van A"
+          },
+          "authorOrder": {
+            "type": "number",
+            "description": "1-based authorship order.",
+            "example": 1
+          },
+          "isCorrespondingAuthor": {
+            "type": "boolean",
+            "description": "Whether this author is a corresponding author.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "outputId",
+          "userId",
+          "authorNameString",
+          "authorOrder",
+          "isCorrespondingAuthor"
+        ]
+      },
+      "OutputTopicResponseDto": {
+        "type": "object",
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "description": "Identifier of the linked research topic.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "topicName": {
+            "type": "string",
+            "description": "Name of the research topic.",
+            "example": "Machine Learning"
+          },
+          "subfieldId": {
+            "type": "string",
+            "description": "Identifier of the parent subfield.",
+            "format": "uuid",
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "subfieldName": {
+            "type": "string",
+            "description": "Name of the parent subfield.",
+            "example": "Artificial Intelligence"
+          },
+          "fieldId": {
+            "type": "string",
+            "description": "Identifier of the top-level field.",
+            "format": "uuid",
+            "example": "33333333-3333-4333-8333-333333333333"
+          },
+          "fieldName": {
+            "type": "string",
+            "description": "Name of the top-level field.",
+            "example": "Computer Science"
+          }
+        },
+        "required": [
+          "topicId",
+          "topicName",
+          "subfieldId",
+          "subfieldName",
+          "fieldId",
+          "fieldName"
+        ]
+      },
+      "OutputResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research output.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "doi": {
+            "type": "object",
+            "description": "Digital Object Identifier (DOI) normalized without URL prefixes.",
+            "nullable": true,
+            "example": "10.1109/tmi.2026.1234567"
+          },
+          "ownerId": {
+            "type": "object",
+            "description": "Owner researcher user ID.",
+            "format": "uuid",
+            "nullable": true,
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "sharingStatus": {
+            "type": "string",
+            "description": "Internal sharing status (`DRAFT`, `SHARED`, or `ARCHIVED`).",
+            "enum": [
+              "DRAFT",
+              "SHARED",
+              "ARCHIVED"
+            ],
+            "example": "SHARED"
+          },
+          "visibility": {
+            "type": "string",
+            "description": "Visibility scope (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).",
+            "enum": [
+              "PRIVATE",
+              "RESEARCH_GROUP",
+              "FPTU_COMMUNITY"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "object",
+            "description": "Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.",
+            "format": "uuid",
+            "nullable": true,
+            "example": null
+          },
+          "importState": {
+            "type": "string",
+            "description": "Import lifecycle state (`NONE`, `CANDIDATE`, or `ACCEPTED`).",
+            "enum": [
+              "NONE",
+              "CANDIDATE",
+              "ACCEPTED"
+            ],
+            "example": "NONE"
+          },
+          "currentReleaseId": {
+            "type": "object",
+            "description": "UUID of the currently pinned / released revision (`output_revisions.id`).",
+            "format": "uuid",
+            "nullable": true,
+            "example": "33333333-3333-4333-8333-333333333333"
+          },
+          "firstSharedAt": {
+            "type": "object",
+            "description": "Timestamp when the output was first shared publicly.",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-11T00:00:00.000Z"
+          },
+          "currentRevision": {
+            "description": "Currently pinned revision metadata (or the owner working copy draft if unpublished).",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputRevisionResponseDto"
+              }
+            ]
+          },
+          "authors": {
+            "description": "Ordered list of authors associated with this research output.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputAuthorResponseDto"
+            }
+          },
+          "topics": {
+            "description": "Hierarchical research taxonomy topics linked to this research output.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputTopicResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "doi",
+          "ownerId",
+          "sharingStatus",
+          "visibility",
+          "accessGroupId",
+          "importState",
+          "currentReleaseId",
+          "firstSharedAt",
+          "currentRevision",
+          "authors",
+          "topics"
+        ]
+      },
+      "PaginatedOutputsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "List of research outputs on this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "OutputFileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the confirmed file.",
+            "format": "uuid"
+          },
+          "outputId": {
+            "type": "string",
+            "description": "Identifier of the parent output.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Content-Type stored on the uploaded object."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Verified size in bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Verified SHA-256 as a hex digest."
+          },
+          "visibility": {
+            "description": "File visibility.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputFileVisibility"
+              }
+            ]
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "Group allowed by the file visibility, if applicable.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "outputId",
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "sha256",
+          "visibility",
+          "accessGroupId"
+        ]
+      },
       "ProfileResponseDto": {
         "type": "object",
         "properties": {
@@ -4126,61 +4853,6 @@
         },
         "required": [
           "uploadToken"
-        ]
-      },
-      "OutputFileResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Identifier of the confirmed file.",
-            "format": "uuid"
-          },
-          "outputId": {
-            "type": "string",
-            "description": "Identifier of the parent output.",
-            "format": "uuid"
-          },
-          "fileName": {
-            "type": "string",
-            "description": "Original file name."
-          },
-          "mimeType": {
-            "type": "string",
-            "description": "Content-Type stored on the uploaded object."
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "description": "Verified size in bytes."
-          },
-          "sha256": {
-            "type": "string",
-            "description": "Verified SHA-256 as a hex digest."
-          },
-          "visibility": {
-            "description": "File visibility.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OutputFileVisibility"
-              }
-            ]
-          },
-          "accessGroupId": {
-            "type": "string",
-            "description": "Group allowed by the file visibility, if applicable.",
-            "format": "uuid",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "outputId",
-          "fileName",
-          "mimeType",
-          "sizeBytes",
-          "sha256",
-          "visibility",
-          "accessGroupId"
         ]
       },
       "TaxonomyTreeTopicDto": {
@@ -5102,6 +5774,108 @@
           },
           "data": {
             "$ref": "#/components/schemas/OpportunityResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedOutputsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedOutputsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputsControllerFindRevisionsEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRevisionResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputsControllerFindFilesEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputFileResponseDto"
+            }
           },
           "message": {
             "type": "string",

@@ -10,6 +10,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module.js';
+import { OutputsModule } from './modules/outputs/outputs.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { ProvenanceModule } from './modules/provenance/provenance.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
@@ -62,6 +63,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     IdentityModule,
     JobsModule,
     OpportunitiesModule,
+    OutputsModule,
     ProfilesModule,
     ProvenanceModule,
     StorageModule,
