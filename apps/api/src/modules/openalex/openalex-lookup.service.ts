@@ -2,8 +2,15 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
-import { OpenAlexClient } from './openalex.client.js';
-import type { OpenAlexAuthor, OpenAlexWork } from './openalex.types.js';
+import {
+  FPT_UNIVERSITY_AFFILIATION,
+  OpenAlexClient,
+} from './openalex.client.js';
+import type {
+  OpenAlexAuthor,
+  OpenAlexWork,
+  OpenAlexWorksPage,
+} from './openalex.types.js';
 
 /**
  * One candidate work with its preview metadata.
@@ -127,9 +134,38 @@ export class OpenAlexLookupService {
    * The researcher ticks their author from the candidate list; this pages
    * that author's works. Every preview stays unconfirmed — a name-only
    * search is never authoritative.
+   *
+   * Fallback when the id is missing: an OpenAlex author id is not always
+   * present (unlinked authorships, name-only path), so a caller may pass
+   * the researcher's byline name instead. The fetch then matches
+   * `raw_author_name` plus the affiliation text (default
+   * `FPT_UNIVERSITY_AFFILIATION`). A blank id with a blank name still
+   * raises `openalex_author_not_found` (404).
    */
-  async findWorksForAuthor(authorId: string): Promise<CandidateWorkPreview[]> {
-    const works = await this.listAllWorks(authorId);
+  async findWorksForAuthor(
+    authorId: string,
+    options: { authorName?: string; affiliation?: string } = {},
+  ): Promise<CandidateWorkPreview[]> {
+    const works = await this.listAllWorksWithFallback(
+      authorId,
+      options.authorName,
+      options.affiliation,
+    );
+    return works.map((work) => toPreview(work, false));
+  }
+
+  /**
+   * Lists works by author byline name plus affiliation, without an id.
+   *
+   * Direct fallback entry point: same `raw_author_name` + affiliation
+   * match as the `findWorksForAuthor` fallback, paged and de-duplicated.
+   * Every preview stays unconfirmed.
+   */
+  async findWorksByAuthorName(
+    authorName: string,
+    affiliation: string = FPT_UNIVERSITY_AFFILIATION,
+  ): Promise<CandidateWorkPreview[]> {
+    const works = await this.listAllWorksByName(authorName, affiliation);
     return works.map((work) => toPreview(work, false));
   }
 
@@ -141,6 +177,48 @@ export class OpenAlexLookupService {
    * is always kept.
    */
   private async listAllWorks(authorId: string): Promise<OpenAlexWork[]> {
+    return this.collectAllPages((page, perPage) =>
+      this.client.getWorksByAuthor(authorId, { page, perPage }),
+    );
+  }
+
+  /**
+   * Pages through works by id, falling back to name + affiliation.
+   *
+   * When `authorId` is blank the fetch uses `authorName` plus the
+   * affiliation text instead. Both paths de-dupe the same way. A blank id
+   * with a blank name raises through the client as
+   * `openalex_author_not_found` (404).
+   */
+  private async listAllWorksWithFallback(
+    authorId: string,
+    authorName?: string,
+    affiliation?: string,
+  ): Promise<OpenAlexWork[]> {
+    if (authorId.trim() !== '') {
+      return this.listAllWorks(authorId);
+    }
+    return this.listAllWorksByName(authorName ?? '', affiliation);
+  }
+
+  /** Pages through every work page for a byline name, de-duplicated. */
+  private async listAllWorksByName(
+    authorName: string,
+    affiliation?: string,
+  ): Promise<OpenAlexWork[]> {
+    return this.collectAllPages((page, perPage) =>
+      this.client.searchWorksByAuthorName(authorName, {
+        affiliation,
+        page,
+        perPage,
+      }),
+    );
+  }
+
+  /** Pages a works fetch to completion with id-then-DOI de-duplication. */
+  private async collectAllPages(
+    fetchPage: (page: number, perPage: number) => Promise<OpenAlexWorksPage>,
+  ): Promise<OpenAlexWork[]> {
     const seenIds = new Set<string>();
     const seenDois = new Set<string>();
     const out: OpenAlexWork[] = [];
@@ -148,10 +226,7 @@ export class OpenAlexLookupService {
     let page = 1;
     const perPage = 100;
     for (;;) {
-      const { total, works } = await this.client.getWorksByAuthor(authorId, {
-        page,
-        perPage,
-      });
+      const { total, works } = await fetchPage(page, perPage);
 
       for (const work of works) {
         const idKey = work.shortId || work.id;

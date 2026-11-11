@@ -264,6 +264,47 @@ describe('OpenAlexClient', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('searches works by byline name plus the FPT affiliation fallback', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        const text = String(url);
+        expect(text).toContain('/works?');
+        expect(text).toContain('raw_author_name.search');
+        expect(text).toContain('raw_affiliation_strings.search');
+        expect(text).toContain('FPT+University');
+        return jsonResponse({
+          meta: { count: 1 },
+          results: [
+            {
+              id: 'https://openalex.org/W9',
+              title: 'Fallback work',
+              type: 'article',
+              authorships: [],
+            },
+          ],
+        });
+      }),
+    );
+    const page = await makeClient().searchWorksByAuthorName('Nguyen Van An');
+    expect(page.total).toBe(1);
+    expect(page.works[0]).toMatchObject({ shortId: 'W9' });
+  });
+
+  it('rejects a blank byline name without calling OpenAlex', async () => {
+    const fetch = vi.fn(async () => jsonResponse({ results: [] }));
+    vi.stubGlobal('fetch', fetch);
+    const err = await makeClient()
+      .searchWorksByAuthorName('   ')
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CodedHttpException);
+    expect((err as CodedHttpException).message).toBe(
+      'openalex_author_not_found',
+    );
+    expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('retries a rate limit then succeeds', async () => {
     const fetch = vi.fn(async () => jsonResponse({ results: [] }));
     fetch

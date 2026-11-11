@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
 import { OpenAlexClient } from './openalex.client.js';
@@ -46,6 +47,7 @@ function makeService(deps: {
   author?: OpenAlexAuthor;
   pages?: OpenAlexWork[][];
   searched?: OpenAlexAuthor[];
+  namePages?: OpenAlexWork[][];
 }): { service: OpenAlexLookupService; client: OpenAlexClient } {
   const prisma = {
     researcher_profiles: {
@@ -67,6 +69,21 @@ function makeService(deps: {
       const page = options?.page ?? 1;
       const works = pages[page - 1] ?? [];
       const total = pages.flat().length;
+      return { total, works };
+    },
+  );
+  const namePages = deps.namePages ?? [];
+  vi.spyOn(client, 'searchWorksByAuthorName').mockImplementation(
+    async (name: string, options?: { page?: number }) => {
+      if (name.trim() === '') {
+        throw new CodedHttpException(
+          domainErrorCodes.openalex.authorNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      const page = options?.page ?? 1;
+      const works = namePages[page - 1] ?? [];
+      const total = namePages.flat().length;
       return { total, works };
     },
   );
@@ -161,5 +178,51 @@ describe('OpenAlexLookupService', () => {
     const works = await service.findWorksForAuthor('https://openalex.org/A2');
     expect(works).toHaveLength(1);
     expect(works[0]).toMatchObject({ shortId: 'W9', confirmed: false });
+  });
+
+  it('falls back to name + FPT affiliation when the author id is blank', async () => {
+    const { service, client } = makeService({
+      profile: profileWith(null),
+      namePages: [[makeWork('W7')]],
+    });
+    const search = vi.spyOn(client, 'searchWorksByAuthorName');
+    const idFetch = vi.spyOn(client, 'getWorksByAuthor');
+    const works = await service.findWorksForAuthor('   ', {
+      authorName: 'Nguyen Van An',
+    });
+    expect(works).toHaveLength(1);
+    expect(works[0]).toMatchObject({ shortId: 'W7', confirmed: false });
+    expect(idFetch).not.toHaveBeenCalled();
+    expect(search).toHaveBeenCalledOnce();
+    expect(search.mock.calls[0][0]).toBe('Nguyen Van An');
+    expect(search.mock.calls[0][1]).toMatchObject({
+      affiliation: undefined,
+      page: 1,
+      perPage: 100,
+    });
+  });
+
+  it('lists works by author name with the FPT affiliation default', async () => {
+    const { service, client } = makeService({
+      profile: profileWith(null),
+      namePages: [[makeWork('W8')]],
+    });
+    const search = vi.spyOn(client, 'searchWorksByAuthorName');
+    const works = await service.findWorksByAuthorName('Nguyen Van An');
+    expect(works).toHaveLength(1);
+    expect(works[0]).toMatchObject({ shortId: 'W8', confirmed: false });
+    expect(search).toHaveBeenCalledOnce();
+  });
+
+  it('rejects the name fallback when both id and name are blank', async () => {
+    const { service } = makeService({ profile: profileWith(null) });
+    const err = await service
+      .findWorksForAuthor('   ', { authorName: '   ' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CodedHttpException);
+    expect((err as CodedHttpException).message).toBe(
+      'openalex_author_not_found',
+    );
+    expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
   });
 });
