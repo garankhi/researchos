@@ -1,9 +1,13 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -12,6 +16,7 @@ import {
   CandidateWorksCountDto,
   PaginatedCandidateWorksResponseDto,
 } from './dto/candidate-work-response.dto.js';
+import { CandidateDecisionDto } from './dto/candidate-decision-response.dto.js';
 import { ListCandidateWorksQueryDto } from './dto/list-candidate-works.query.dto.js';
 import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
 
@@ -60,5 +65,63 @@ export class OpenAlexCandidatesController {
   @Get('works/count')
   count(@CurrentUserId() userId: string): Promise<CandidateWorksCountDto> {
     return this.candidates.count(userId);
+  }
+
+  @Post('works/:outputId/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Accepts a stored OpenAlex candidate as the caller's work" })
+  @ApiParam({
+    name: 'outputId',
+    description: 'UUID of the stored candidate to accept.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description:
+      'The accepted work: import state ACCEPTED with the caller as owner, unless a co-author already accepted it.',
+    type: CandidateDecisionDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid candidate UUID.' })
+  @ApiForbiddenResponse({
+    description: 'Caller is not an active researcher.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Candidate does not exist, is not visible to the caller, or has no linkable authorship.',
+  })
+  @ApiConflictResponse({
+    description: 'The authorship position is held by another researcher.',
+  })
+  accept(
+    @CurrentUserId() userId: string,
+    @Param('outputId', new ParseUUIDPipe()) outputId: string,
+  ): Promise<CandidateDecisionDto> {
+    return this.candidates.accept(userId, outputId);
+  }
+
+  @Post('works/:outputId/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Rejects a stored OpenAlex candidate for the caller only" })
+  @ApiParam({
+    name: 'outputId',
+    description: 'UUID of the stored candidate to reject.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description:
+      'The rejected claim: the work stays CANDIDATE so a co-author still gets it and the caller can accept it later.',
+    type: CandidateDecisionDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid candidate UUID.' })
+  @ApiForbiddenResponse({
+    description: 'Caller is not an active researcher.',
+  })
+  @ApiNotFoundResponse({ description: 'Candidate does not exist or is not visible to the caller.' })
+  @ApiConflictResponse({
+    description: 'The caller owns the accepted work and cannot reject it.',
+  })
+  reject(
+    @CurrentUserId() userId: string,
+    @Param('outputId', new ParseUUIDPipe()) outputId: string,
+  ): Promise<CandidateDecisionDto> {
+    return this.candidates.reject(userId, outputId);
   }
 }
