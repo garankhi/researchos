@@ -112,7 +112,8 @@ export class OpportunitiesController {
     format: 'uuid',
   })
   @ApiOkResponse({
-    description: 'Updated opportunity details, including automatic deadline expiry.',
+    description:
+      'Updated opportunity details, including automatic deadline expiry.',
     type: OpportunityResponseDto,
   })
   update(
