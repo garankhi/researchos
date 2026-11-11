@@ -19,6 +19,8 @@ export {
   output_import_state as OutputImportState,
   target_audience as TargetAudience,
   data_provenance_type as DataProvenanceType,
+  output_sharing_status as OutputSharingStatus,
+  publication_status as PublicationStatusEnum,
   PublicationStatus,
   SourceKind,
   VerificationStatus,
@@ -28,4 +30,10 @@ export {
 export type { data_provenance_type as DataProvenance } from './generated/prisma/client.js';
 
 export { Prisma } from './generated/prisma/client.js';
-export type { research_opportunities as ResearchOpportunity } from './generated/prisma/client.js';
+export type {
+  research_opportunities as ResearchOpportunity,
+  research_outputs as ResearchOutput,
+  output_revisions as OutputRevision,
+  output_authors as OutputAuthor,
+  output_files as OutputFile,
+} from './generated/prisma/client.js';
