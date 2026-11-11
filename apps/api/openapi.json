@@ -78,6 +78,118 @@
         ]
       }
     },
+    "/search": {
+      "get": {
+        "description": "Queries the requested tab slice (`research`, `people`, `group`, or `opportunity`) of `search_index` through `visible_search_index(actor)` using PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram matching (`ILIKE`), ranked strictly by text relevance (`ts_rank`).",
+        "operationId": "DiscoveryController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tab",
+            "required": true,
+            "in": "query",
+            "description": "Search tab selecting which slice of the index to query (`research`, `people`, `group`, or `opportunity`).",
+            "schema": {
+              "example": "research",
+              "type": "string",
+              "enum": [
+                "research",
+                "people",
+                "group",
+                "opportunity"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query text matched via PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram (`ILIKE`). Must be between 2 and 200 characters after trimming.",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 200,
+              "example": "machine learning",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated search results for the selected tab.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedSearchResultsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid search tab, query term length outside [2, 200], or invalid pagination/sort parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search across research outputs, people, groups, and opportunities by tab",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/research-groups": {
       "post": {
         "description": "Creates a new research group. When leadId is omitted, the authenticated researcher becomes the group leader.",
@@ -3407,6 +3519,167 @@
       }
     },
     "schemas": {
+      "SearchResultItemDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity category of the indexed record (`OUTPUT`, `RESEARCHER`, `GROUP`, or `OPPORTUNITY`).",
+            "enum": [
+              "OUTPUT",
+              "RESEARCHER",
+              "GROUP",
+              "OPPORTUNITY"
+            ],
+            "example": "OUTPUT"
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Primary key UUID of the source entity.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "revisionId": {
+            "type": "object",
+            "description": "Current released revision UUID when `entityType` is `OUTPUT`; `null` for other entity types.",
+            "format": "uuid",
+            "nullable": true,
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "ownerId": {
+            "type": "object",
+            "description": "Owner UUID of the indexed record (output owner, researcher user ID, group lead ID, or opportunity creator ID).",
+            "format": "uuid",
+            "nullable": true,
+            "example": "33333333-3333-4333-8333-333333333333"
+          },
+          "visibility": {
+            "type": "string",
+            "description": "Visibility scope of the indexed record (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).",
+            "enum": [
+              "PRIVATE",
+              "RESEARCH_GROUP",
+              "FPTU_COMMUNITY"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "object",
+            "description": "Research group UUID scoping access when `visibility` is `RESEARCH_GROUP`; `null` otherwise.",
+            "format": "uuid",
+            "nullable": true,
+            "example": null
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title of the matched entity.",
+            "example": "Deep Learning for Medical Imaging"
+          },
+          "body": {
+            "type": "object",
+            "description": "Secondary text of the matched entity (abstract, researcher bio, group description, or opportunity description).",
+            "nullable": true,
+            "example": "A survey of convolutional and transformer architectures..."
+          },
+          "authorsText": {
+            "type": "object",
+            "description": "Formatted author names, researcher full name, group leader name, or opportunity creator name.",
+            "nullable": true,
+            "example": "Nguyen Van A, Tran Thi B"
+          },
+          "rank": {
+            "type": "number",
+            "description": "Text relevance score computed strictly from `ts_rank` on the full-text vector (`BR-11`, `S-33`).",
+            "example": 0.0607927
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the search index entry was last updated.",
+            "format": "date-time",
+            "example": "2026-11-10T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId",
+          "revisionId",
+          "ownerId",
+          "visibility",
+          "accessGroupId",
+          "title",
+          "body",
+          "authorsText",
+          "rank",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "The page that was returned, 1-based.",
+            "example": 1
+          },
+          "limit": {
+            "type": "number",
+            "description": "How many records one page holds.",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records the query matched in total.",
+            "example": 137
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "How many pages the result is split into.",
+            "example": 7
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether a next page exists.",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether a previous page exists.",
+            "example": false
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages",
+          "hasNextPage",
+          "hasPreviousPage"
+        ]
+      },
+      "PaginatedSearchResultsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The search result items belonging to this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResultItemDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
       "CreateResearchGroupDto": {
         "type": "object",
         "properties": {
@@ -3501,49 +3774,6 @@
           "archivedAt",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "PaginationMetaDto": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "number",
-            "description": "The page that was returned, 1-based.",
-            "example": 1
-          },
-          "limit": {
-            "type": "number",
-            "description": "How many records one page holds.",
-            "example": 20
-          },
-          "total": {
-            "type": "number",
-            "description": "How many records the query matched in total.",
-            "example": 137
-          },
-          "totalPages": {
-            "type": "number",
-            "description": "How many pages the result is split into.",
-            "example": 7
-          },
-          "hasNextPage": {
-            "type": "boolean",
-            "description": "Whether a next page exists.",
-            "example": true
-          },
-          "hasPreviousPage": {
-            "type": "boolean",
-            "description": "Whether a previous page exists.",
-            "example": false
-          }
-        },
-        "required": [
-          "page",
-          "limit",
-          "total",
-          "totalPages",
-          "hasNextPage",
-          "hasPreviousPage"
         ]
       },
       "PaginatedResearchGroupsResponseDto": {
@@ -5906,6 +6136,30 @@
           },
           "data": {
             "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedSearchResultsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedSearchResultsResponseDto"
           },
           "message": {
             "type": "string",

@@ -17,6 +17,7 @@ export {
   opportunity_kind as OpportunityKind,
   opportunity_status as OpportunityStatus,
   output_import_state as OutputImportState,
+  search_entity_type as SearchEntityType,
   target_audience as TargetAudience,
   data_provenance_type as DataProvenanceType,
   output_sharing_status as OutputSharingStatus,
