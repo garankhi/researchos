@@ -9,6 +9,7 @@ import { GroupsModule } from './modules/groups/groups.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
+import { OpenAlexModule } from './modules/openalex/openalex.module.js';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module.js';
 import { OutputsModule } from './modules/outputs/outputs.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
@@ -62,6 +63,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     HealthModule,
     IdentityModule,
     JobsModule,
+    OpenAlexModule,
     OpportunitiesModule,
     OutputsModule,
     ProfilesModule,

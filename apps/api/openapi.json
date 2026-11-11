@@ -1695,6 +1695,116 @@
         ]
       }
     },
+    "/external/openalex/works": {
+      "get": {
+        "operationId": "OpenAlexCandidatesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored candidates awaiting a decision, newest pull first, with pagination information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCandidateWorksResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The pagination parameters are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists the caller's stored OpenAlex candidates",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
+    "/external/openalex/works/count": {
+      "get": {
+        "operationId": "OpenAlexCandidatesController_count",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The number of stored candidates left, excluding works the caller already accepted or rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateWorksCountDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Counts the caller's remaining OpenAlex candidates",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
     "/opportunities": {
       "post": {
         "operationId": "OpportunitiesController_create",
@@ -1742,6 +1852,7 @@
         ]
       },
       "get": {
+        "description": "Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.",
         "operationId": "OpportunitiesController_findAll",
         "parameters": [
           {
@@ -1829,6 +1940,7 @@
     },
     "/opportunities/{opportunityId}": {
       "get": {
+        "description": "An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.",
         "operationId": "OpportunitiesController_findOne",
         "parameters": [
           {
@@ -1865,6 +1977,7 @@
         ]
       },
       "patch": {
+        "description": "Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.",
         "operationId": "OpportunitiesController_update",
         "parameters": [
           {
@@ -1890,7 +2003,7 @@
         },
         "responses": {
           "200": {
-            "description": "Updated opportunity details; lifecycle status is unchanged.",
+            "description": "Updated opportunity details, including automatic deadline expiry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1906,6 +2019,240 @@
           }
         ],
         "summary": "Updates a research opportunity managed by the caller",
+        "tags": [
+          "opportunities"
+        ]
+      }
+    },
+    "/opportunities/{opportunityId}/open": {
+      "post": {
+        "operationId": "OpportunitiesController_open",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the opportunity to open.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opened opportunity with a server-owned publication timestamp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, missing publication details or deadline not in the future.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher with opportunity management permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Opportunity is archived or is not DRAFT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Opens a draft opportunity for applications",
+        "tags": [
+          "opportunities"
+        ]
+      }
+    },
+    "/opportunities/{opportunityId}/fill": {
+      "post": {
+        "operationId": "OpportunitiesController_fill",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the opportunity to fill.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filled opportunity; its publication timestamp is preserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid opportunity UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher with opportunity management permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Opportunity is archived or is not OPEN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Marks an open opportunity as filled",
+        "tags": [
+          "opportunities"
+        ]
+      }
+    },
+    "/opportunities/{opportunityId}/close": {
+      "post": {
+        "operationId": "OpportunitiesController_close",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the opportunity to close.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Closed opportunity; its publication timestamp is preserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid opportunity UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher with opportunity management permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Opportunity is archived or is not FILLED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Closes a filled opportunity",
         "tags": [
           "opportunities"
         ]
@@ -3922,6 +4269,127 @@
           "statusUrl"
         ]
       },
+      "CandidateWorkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the stored candidate work.",
+            "format": "uuid"
+          },
+          "openalexId": {
+            "type": "string",
+            "description": "Canonical OpenAlex id of the candidate, or null when the external-id link is missing.",
+            "nullable": true
+          },
+          "doi": {
+            "type": "string",
+            "description": "Normalised DOI of the candidate, or null when it has none.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the candidate work."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Abstract of the candidate work, or null when it has none.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Venue of the candidate work, or null when it has none.",
+            "nullable": true
+          },
+          "publicationYear": {
+            "type": "number",
+            "description": "Publication year of the candidate work, or null when it has none.",
+            "nullable": true
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Platform output-type vocabulary of the candidate work."
+          },
+          "url": {
+            "type": "string",
+            "description": "Landing page URL of the candidate work, or null when OpenAlex provided none.",
+            "nullable": true
+          },
+          "authors": {
+            "description": "Author display names of the candidate work, in order.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "claimStatus": {
+            "type": "string",
+            "description": "Claim status of the caller on this candidate, or null when the caller pulled it without a claim.",
+            "enum": [
+              "SUGGESTED",
+              "CONFIRMED",
+              "REJECTED"
+            ],
+            "nullable": true
+          },
+          "matchSource": {
+            "type": "string",
+            "description": "How the work was matched to the researcher, or null when there is no claim.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "openalexId",
+          "doi",
+          "title",
+          "abstract",
+          "venue",
+          "publicationYear",
+          "outputType",
+          "url",
+          "authors",
+          "claimStatus",
+          "matchSource"
+        ]
+      },
+      "PaginatedCandidateWorksResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The stored candidates of this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CandidateWorkDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CandidateWorksCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of stored candidates left for the caller, excluding works the caller already accepted or rejected.",
+            "example": 3
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
       "CreateOpportunityDto": {
         "type": "object",
         "properties": {
@@ -5726,6 +6194,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/JobDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedCandidateWorksResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedCandidateWorksResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "CandidateWorksCountDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CandidateWorksCountDto"
           },
           "message": {
             "type": "string",
