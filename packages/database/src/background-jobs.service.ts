@@ -8,7 +8,6 @@ import { Prisma } from './generated/prisma/client.js';
 import { PrismaService } from './prisma.service.js';
 
 export const RESEARCH_UPDATE_JOB = 'research-update';
-export const UNASSIGNED_RESEARCH_UPDATE_SCOPE = '@research-updates';
 
 // Admins can operate research updates because these jobs represent shared
 // publication history. Other job kinds remain private to their owners.

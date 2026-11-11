@@ -71,10 +71,21 @@ Tác vụ gọi dịch vụ ngoài phải truyền business idempotency key cho 
 transaction SQL không đảm bảo exactly-once cho email hay HTTP side effect.
 
 Trigger RES-113 ghi job `research-update`, outbox và payload vào PostgreSQL
-trong cùng transaction nghiệp vụ. Dispatcher có hỗ trợ research update gán
-job cho namespace Redis của nó trước khi phát vào queue `research-updates`.
-Điều này áp dụng cả cho SQL trực tiếp. Worker chuyển payload sang
-`research_updates` sau commit, giữ timestamp gốc và dùng `event_key` để xử lý replay.
+trong cùng transaction nghiệp vụ. PostgreSQL gán namespace khi tạo job. Chỉ
+dispatcher có `QUEUE_PREFIX` tương ứng mới phát job vào queue `research-updates`.
+Worker chuyển payload sang `research_updates` sau commit, giữ timestamp gốc
+và dùng `event_key` để xử lý replay.
+
+Với `QUEUE_PREFIX` tùy chỉnh, đặt cùng giá trị cho database trước khi bật
+luồng research update, rồi mở lại các kết nối ghi đang dùng thiết lập cũ.
+Thiết lập áp dụng cả cho API và SQL trực tiếp.
+
+```sql
+ALTER DATABASE researchos SET researchos.research_updates_queue_prefix = 'my-prefix';
+```
+
+Khi đổi prefix, giữ worker ở prefix cũ cho đến khi các research update đã
+gán vào prefix đó hoàn tất, kể cả các job cần reprocess.
 
 Rollout RES-113 theo thứ tự migration trước, worker sau. Job research update
 chờ trong PostgreSQL cho tới khi dispatcher mới nhận. Worker cũ tiếp tục xử lý

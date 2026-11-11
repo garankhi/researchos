@@ -7,10 +7,10 @@ import { resolve } from 'node:path';
 import { ConfigModule } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { resolveEnvFilePaths } from '@researchos/config';
-import { UNASSIGNED_RESEARCH_UPDATE_SCOPE } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  DURABLE_PROBE_JOB,
   RESEARCH_UPDATES_QUEUE,
   backgroundTransportId,
   createQueueOptions,
@@ -42,10 +42,29 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
   const legacyQueue = new Queue(BACKGROUND_QUEUE, queueOptions);
   const queue = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
   const deadLetterQueue = new Queue(DEAD_LETTER_QUEUE, queueOptions);
+  const otherPrefix = `${prefix}-other`;
+  const otherQueueOptions = createQueueOptions(
+    process.env.REDIS_URL,
+    otherPrefix,
+  );
+  const otherResearchQueue = new Queue(
+    RESEARCH_UPDATES_QUEUE,
+    otherQueueOptions,
+  );
+  const otherBackgroundQueue = new Queue(BACKGROUND_QUEUE, otherQueueOptions);
+  const otherDeadLetterQueue = new Queue(DEAD_LETTER_QUEUE, otherQueueOptions);
+  const queues = [
+    legacyQueue,
+    queue,
+    deadLetterQueue,
+    otherResearchQueue,
+    otherBackgroundQueue,
+    otherDeadLetterQueue,
+  ];
   const originalDatabaseUrl = process.env.DATABASE_URL;
   const originalQueuePrefix = process.env.QUEUE_PREFIX;
   let app;
-  let worker;
+  const workers = [];
   let workerOutput = '';
   let databaseCreated = false;
   const { request, close } = createHttpTestClient();
@@ -58,8 +77,8 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
   const acceptEventWrites = () =>
     observer.query('DROP TRIGGER fail_event_write ON research_updates');
 
-  async function startWorker() {
-    worker = spawn(
+  async function startWorker(workerPrefix, workerQueue) {
+    const worker = spawn(
       process.execPath,
       [resolve(import.meta.dirname, '../../worker/dist/main.js')],
       {
@@ -68,11 +87,12 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
         env: {
           ...process.env,
           DATABASE_URL: database.href,
-          QUEUE_PREFIX: prefix,
+          QUEUE_PREFIX: workerPrefix,
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
+    workers.push(worker);
     worker.stdout.on('data', (chunk) => {
       workerOutput += chunk.toString();
     });
@@ -80,7 +100,7 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
       workerOutput += chunk.toString();
     });
     await expect
-      .poll(() => queue.getWorkersCount(), { timeout: 10_000 })
+      .poll(() => workerQueue.getWorkersCount(), { timeout: 10_000 })
       .toBeGreaterThan(0);
   }
 
@@ -105,6 +125,10 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
     // All identifiers are generated here and all fixtures are confined to this database.
     await admin.query(`CREATE DATABASE "${databaseName}"`);
     databaseCreated = true;
+    await admin.query(
+      `ALTER DATABASE "${databaseName}"
+       SET researchos.research_updates_queue_prefix = '${prefix}'`,
+    );
     await producer.connect();
     await observer.connect();
     await producer.query(
@@ -202,8 +226,9 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
       'OUTPUT_SHARED',
       'SEMINAR_PUBLISHED',
     ]);
-    expect(pending.map(({ queue_prefix }) => queue_prefix)).toEqual(
-      Array(5).fill(UNASSIGNED_RESEARCH_UPDATE_SCOPE),
+    const configuredScope = `@research-updates:${createHash('sha256').update(prefix).digest('hex')}`;
+    expect(new Set(pending.map(({ queue_prefix }) => queue_prefix))).toEqual(
+      new Set([configuredScope]),
     );
     expect((await observer.query('SELECT 1 FROM outbox')).rowCount).toBe(0);
     expect(
@@ -244,7 +269,43 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
     expect(
       (await observer.query('SELECT 1 FROM research_updates')).rowCount,
     ).toBe(0);
-    await startWorker();
+    // Let the other namespace dispatch and process one job before the owner
+    // worker starts. The probe completion proves the dispatcher has swept the outbox.
+    const probeId = randomUUID();
+    await observer.query(
+      `INSERT INTO background_jobs (id, owner_id, kind, idempotency_key, payload, queue_prefix)
+       VALUES ($1::uuid, $2, $3, ($1::uuid)::text, '{"failuresBeforeSuccess":0}', $4)`,
+      [probeId, actor, DURABLE_PROBE_JOB, otherPrefix],
+    );
+    await observer.query(
+      'INSERT INTO outbox(job_id, generation) VALUES ($1, 0)',
+      [probeId],
+    );
+    await startWorker(otherPrefix, otherBackgroundQueue);
+    await expect
+      .poll(
+        async () => {
+          const probe = await otherBackgroundQueue.getJob(
+            backgroundTransportId(probeId, 0),
+          );
+          return probe?.getState();
+        },
+        { timeout: 8_000 },
+      )
+      .toBe('completed');
+    const { rows: untouched } = await observer.query(`
+      SELECT j.queue_prefix, o.dispatched_at
+      FROM background_jobs j JOIN outbox o ON o.job_id = j.id
+      WHERE j.kind = 'research-update'
+    `);
+    expect(untouched).toEqual(
+      Array(5).fill({
+        queue_prefix: configuredScope,
+        dispatched_at: null,
+      }),
+    );
+    expect(await otherResearchQueue.count()).toBe(0);
+    await startWorker(prefix, queue);
 
     await expect
       .poll(
@@ -263,7 +324,7 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
         async () =>
           (
             await observer.query(
-              "SELECT 1 FROM background_jobs WHERE status = 'COMPLETED'",
+              "SELECT 1 FROM background_jobs WHERE kind = 'research-update' AND status = 'COMPLETED'",
             )
           ).rowCount,
         { timeout: 10_000, message: workerOutput },
@@ -371,25 +432,26 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
     process.env.DATABASE_URL = originalDatabaseUrl;
     if (originalQueuePrefix === undefined) delete process.env.QUEUE_PREFIX;
     else process.env.QUEUE_PREFIX = originalQueuePrefix;
-    if (worker && worker.exitCode === null && worker.signalCode === null) {
-      const exited = once(worker, 'exit');
-      worker.kill('SIGTERM');
-      await exited;
-    }
+    await Promise.all(
+      workers.map(async (worker) => {
+        if (worker.exitCode !== null || worker.signalCode !== null) return;
+        const exited = once(worker, 'exit');
+        worker.kill('SIGTERM');
+        await exited;
+      }),
+    );
     try {
-      await queue.obliterate({ force: true });
-      await legacyQueue.obliterate({ force: true });
-      await deadLetterQueue.obliterate({ force: true });
+      await Promise.all(
+        queues.map((testQueue) => testQueue.obliterate({ force: true })),
+      );
     } finally {
       await Promise.all([
         producer.end(),
         observer.end(),
-        queue.close(),
-        legacyQueue.close(),
-        deadLetterQueue.close(),
+        ...queues.map((testQueue) => testQueue.close()),
       ]);
       if (databaseCreated) await admin.query(`DROP DATABASE "${databaseName}"`);
       await admin.end();
     }
   }
-}, 35_000);
+}, 45_000);

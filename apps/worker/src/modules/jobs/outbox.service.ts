@@ -6,11 +6,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  PrismaService,
-  RESEARCH_UPDATE_JOB,
-  UNASSIGNED_RESEARCH_UPDATE_SCOPE,
-} from '@researchos/database';
+import { PrismaService } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
@@ -97,7 +93,6 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     } finally {
       clearTimeout(timeout);
     }
-    await this.assignResearchUpdates();
     // Publication uses fail-fast producer connections, never an unbounded
     // worker connection while holding a database transaction open.
     await this.prisma.$transaction(
@@ -184,23 +179,6 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       },
       { timeout: 15_000 },
     );
-  }
-
-  private async assignResearchUpdates(): Promise<void> {
-    // Commit routing before publishing to Redis so a worker can safely handle
-    // a transport job even if dispatch crashes before marking it published.
-    await this.prisma.$executeRaw`
-      WITH unassigned AS (
-        SELECT j.id FROM outbox o JOIN background_jobs j ON j.id = o.job_id
-        WHERE o.dispatched_at IS NULL AND o.destination = 'WORK'
-          AND o.available_at <= now() AND o.generation = j.generation
-          AND j.kind = ${RESEARCH_UPDATE_JOB}
-          AND j.queue_prefix = ${UNASSIGNED_RESEARCH_UPDATE_SCOPE}
-        ORDER BY o.available_at, o.id LIMIT 10 FOR UPDATE OF j SKIP LOCKED
-      )
-      UPDATE background_jobs j SET queue_prefix = ${this.researchScope}
-      FROM unassigned WHERE j.id = unassigned.id
-    `;
   }
 
   async onModuleDestroy(): Promise<void> {
