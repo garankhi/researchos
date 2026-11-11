@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -69,7 +78,9 @@ export class OpenAlexCandidatesController {
 
   @Post('works/:outputId/accept')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Accepts a stored OpenAlex candidate as the caller's work" })
+  @ApiOperation({
+    summary: "Accepts a stored OpenAlex candidate as the caller's work",
+  })
   @ApiParam({
     name: 'outputId',
     description: 'UUID of the stored candidate to accept.',
@@ -85,7 +96,8 @@ export class OpenAlexCandidatesController {
     description: 'Caller is not an active researcher.',
   })
   @ApiNotFoundResponse({
-    description: 'Candidate does not exist, is not visible to the caller, or has no linkable authorship.',
+    description:
+      'Candidate does not exist, is not visible to the caller, or has no linkable authorship.',
   })
   @ApiConflictResponse({
     description: 'The authorship position is held by another researcher.',
@@ -99,7 +111,9 @@ export class OpenAlexCandidatesController {
 
   @Post('works/:outputId/reject')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Rejects a stored OpenAlex candidate for the caller only" })
+  @ApiOperation({
+    summary: 'Rejects a stored OpenAlex candidate for the caller only',
+  })
   @ApiParam({
     name: 'outputId',
     description: 'UUID of the stored candidate to reject.',
@@ -114,7 +128,9 @@ export class OpenAlexCandidatesController {
   @ApiForbiddenResponse({
     description: 'Caller is not an active researcher.',
   })
-  @ApiNotFoundResponse({ description: 'Candidate does not exist or is not visible to the caller.' })
+  @ApiNotFoundResponse({
+    description: 'Candidate does not exist or is not visible to the caller.',
+  })
   @ApiConflictResponse({
     description: 'The caller owns the accepted work and cannot reject it.',
   })

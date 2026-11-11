@@ -112,7 +112,10 @@ function toOrder(value: unknown): number {
  * has no ORCID, the snapshot has no ORCID match, or the matched entry has
  * no usable order.
  */
-function toSnapshotOrder(snapshot: unknown, needle: string | null): number | null {
+function toSnapshotOrder(
+  snapshot: unknown,
+  needle: string | null,
+): number | null {
   if (!needle || !Array.isArray(snapshot)) {
     return null;
   }
@@ -253,7 +256,10 @@ export class OpenAlexCandidatesService {
    * Reversible in one direction: accepting after a rejection confirms the
    * same claim row. Repeating an accept returns the current state.
    */
-  async accept(userId: string, outputId: string): Promise<CandidateDecisionDto> {
+  async accept(
+    userId: string,
+    outputId: string,
+  ): Promise<CandidateDecisionDto> {
     return this.prisma.$transaction(async (tx) => {
       const output = await this.lockOutput(tx, outputId);
       await this.requireResearcher(tx, userId);
@@ -318,7 +324,10 @@ export class OpenAlexCandidatesService {
    * accepted work the caller owns is refused: ownership is not undone by
    * a claim transition.
    */
-  async reject(userId: string, outputId: string): Promise<CandidateDecisionDto> {
+  async reject(
+    userId: string,
+    outputId: string,
+  ): Promise<CandidateDecisionDto> {
     return this.prisma.$transaction(async (tx) => {
       const output = await this.lockOutput(tx, outputId);
       await this.requireResearcher(tx, userId);
@@ -392,9 +401,7 @@ export class OpenAlexCandidatesService {
       SELECT is_researcher(${userId}::uuid) AS allowed
     `;
     if (!result?.allowed) {
-      throw new ForbiddenException(
-        'An active researcher account is required',
-      );
+      throw new ForbiddenException('An active researcher account is required');
     }
   }
 
@@ -495,7 +502,9 @@ export class OpenAlexCandidatesService {
     }
 
     const row = await tx.output_authors.findUnique({
-      where: { output_id_author_order: { output_id: outputId, author_order: order } },
+      where: {
+        output_id_author_order: { output_id: outputId, author_order: order },
+      },
       select: { id: true, user_id: true },
     });
     if (!row || (row.user_id !== null && row.user_id !== userId)) {
@@ -505,7 +514,9 @@ export class OpenAlexCandidatesService {
     }
     if (row.user_id === null) {
       await tx.output_authors.update({
-        where: { output_id_author_order: { output_id: outputId, author_order: order } },
+        where: {
+          output_id_author_order: { output_id: outputId, author_order: order },
+        },
         data: { user_id: userId },
       });
     }

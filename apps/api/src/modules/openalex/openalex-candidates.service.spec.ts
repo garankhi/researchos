@@ -1,8 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import {
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OutputImportState, PrismaService } from '@researchos/database';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
@@ -230,7 +227,11 @@ describe('OpenAlexCandidatesService', () => {
 });
 
 function makeDecisionService(options: {
-  output?: { id: string; import_state: OutputImportState; owner_id: string | null } | null;
+  output?: {
+    id: string;
+    import_state: OutputImportState;
+    owner_id: string | null;
+  } | null;
   researcher?: boolean;
   view?: boolean;
   claim?: { author_id: string | null; status: string } | null;
@@ -295,7 +296,11 @@ const CANDIDATE = {
 };
 
 const ORCID_SNAPSHOT = [
-  { name: 'Nguyen Van An', order: 1, orcid: 'https://orcid.org/0000-0002-1825-0097' },
+  {
+    name: 'Nguyen Van An',
+    order: 1,
+    orcid: 'https://orcid.org/0000-0002-1825-0097',
+  },
   { name: 'Tran Thi B', order: 2, orcid: null },
 ];
 
@@ -369,7 +374,9 @@ describe('OpenAlexCandidatesService decisions', () => {
     const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(CodedHttpException);
-    expect((err as CodedHttpException).message).toBe('openalex_author_not_found');
+    expect((err as CodedHttpException).message).toBe(
+      'openalex_author_not_found',
+    );
     expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
   });
 
@@ -390,13 +397,20 @@ describe('OpenAlexCandidatesService decisions', () => {
 
   it('repeating an accept returns the current state without writing', async () => {
     const { service, tx } = makeDecisionService({
-      output: { ...CANDIDATE, import_state: OutputImportState.ACCEPTED, owner_id: USER_ID },
+      output: {
+        ...CANDIDATE,
+        import_state: OutputImportState.ACCEPTED,
+        owner_id: USER_ID,
+      },
       claim: { author_id: 'author-1', status: 'CONFIRMED' },
     });
 
     const result = await service.accept(USER_ID, OUT_1);
 
-    expect(result).toMatchObject({ claimStatus: 'CONFIRMED', ownerId: USER_ID });
+    expect(result).toMatchObject({
+      claimStatus: 'CONFIRMED',
+      ownerId: USER_ID,
+    });
     expect(tx.publication_claims.update).not.toHaveBeenCalled();
     expect(tx.research_outputs.update).not.toHaveBeenCalled();
   });
@@ -458,7 +472,11 @@ describe('OpenAlexCandidatesService decisions', () => {
 
   it('refuses an owner reject of an accepted work', async () => {
     const { service } = makeDecisionService({
-      output: { ...CANDIDATE, import_state: OutputImportState.ACCEPTED, owner_id: USER_ID },
+      output: {
+        ...CANDIDATE,
+        import_state: OutputImportState.ACCEPTED,
+        owner_id: USER_ID,
+      },
       claim: { author_id: 'author-1', status: 'CONFIRMED' },
     });
 
@@ -489,8 +507,12 @@ describe('OpenAlexCandidatesService decisions', () => {
         (e: unknown) => e,
       );
       expect(err).toBeInstanceOf(CodedHttpException);
-      expect((err as CodedHttpException).message).toBe('openalex_work_not_found');
-      expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
+      expect((err as CodedHttpException).message).toBe(
+        'openalex_work_not_found',
+      );
+      expect((err as CodedHttpException).getStatus()).toBe(
+        HttpStatus.NOT_FOUND,
+      );
     }
   });
 
