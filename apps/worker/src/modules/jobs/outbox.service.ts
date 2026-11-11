@@ -10,10 +10,13 @@ import { PrismaService } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  RESEARCH_UPDATES_QUEUE,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
+import { Redis } from 'ioredis';
+import { researchUpdateScope } from './research-update-scope.js';
 
 /** DB row locks coordinate dispatchers. A crash after add but before commit
  * republishes the same transport ID; the processor also deduplicates in SQL. */
@@ -23,9 +26,12 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setTimeout>;
   private active?: Promise<void>;
   private stopping = false;
+  private readonly connection: Redis;
   private readonly work: Queue;
+  private readonly researchUpdates: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
+  private readonly researchScope: string;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -36,9 +42,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       config.get<string>('QUEUE_PREFIX') ?? 'researchos',
     );
     this.prefix = options.prefix!;
-    this.work = new Queue(BACKGROUND_QUEUE, options);
-    this.deadLetters = new Queue(DEAD_LETTER_QUEUE, options);
-    for (const queue of [this.work, this.deadLetters]) {
+    this.researchScope = researchUpdateScope(this.prefix);
+    this.connection = new Redis(options.connection);
+    const queueOptions = { ...options, connection: this.connection };
+    this.work = new Queue(BACKGROUND_QUEUE, queueOptions);
+    this.researchUpdates = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
+    this.deadLetters = new Queue(DEAD_LETTER_QUEUE, queueOptions);
+    for (const queue of [this.work, this.researchUpdates, this.deadLetters]) {
       queue.on('error', (error: Error) => this.logger.error(error.message));
     }
   }
@@ -69,6 +79,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       await Promise.race([
         Promise.all([
           this.work.waitUntilReady(),
+          this.researchUpdates.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
         ]),
         new Promise<never>((_, reject) => {
@@ -93,10 +104,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
             generation: number;
             destination: string;
             dispatched_at: Date | null;
+            queue_prefix: string;
           }[]
         >`
-        SELECT o.* FROM outbox o JOIN background_jobs j ON j.id = o.job_id
-        WHERE j.queue_prefix = ${this.prefix} AND o.available_at <= now() AND (
+        SELECT o.*, j.queue_prefix
+        FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+        WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope})
+          AND o.available_at <= now() AND (
           o.dispatched_at IS NULL OR (
             o.destination = 'WORK' AND j.status = 'PENDING'
             AND o.generation = j.generation
@@ -105,8 +119,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         ) ORDER BY o.available_at LIMIT 10 FOR UPDATE OF o SKIP LOCKED
       `;
         for (const row of rows) {
-          const queue =
-            row.destination === 'DLQ' ? this.deadLetters : this.work;
+          const work =
+            row.queue_prefix === this.researchScope
+              ? this.researchUpdates
+              : this.work;
+          const queue = row.destination === 'DLQ' ? this.deadLetters : work;
           const transportId = backgroundTransportId(row.job_id, row.generation);
           const existing = await queue.getJob(transportId);
           if (
@@ -168,6 +185,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     this.stopping = true;
     clearTimeout(this.timer);
     await this.active;
-    await Promise.all([this.work.close(), this.deadLetters.close()]);
+    this.connection.disconnect();
+    await Promise.all([
+      this.work.close(),
+      this.researchUpdates.close(),
+      this.deadLetters.close(),
+    ]);
   }
 }

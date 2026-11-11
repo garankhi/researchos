@@ -80,6 +80,8 @@
       "not_implemented": "Tính năng này chưa được hỗ trợ.",
       "service_unavailable": "Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.",
       "fields": {
+        "entity_type_invalid": "Hãy chọn một loại đối tượng hợp lệ.",
+        "entity_id_uuid": "ID đối tượng phải là UUID hợp lệ.",
         "title_required": "Tiêu đề là bắt buộc.",
         "title_invalid": "Tiêu đề phải là chuỗi ký tự.",
         "title_too_long": "Tiêu đề không được vượt quá 200 ký tự.",
@@ -101,6 +103,8 @@
         "archived_at_invalid": "Thời điểm lưu trữ phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00."
       },
       "domain": {
+        "follow_self": "Bạn không thể tự theo dõi mình.",
+        "follow_target_type_unsupported": "Loại đối tượng này chưa hỗ trợ theo dõi.",
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",
         "account_inactive": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên.",
         "must_change_password": "Bạn cần đổi mật khẩu trước khi tiếp tục.",

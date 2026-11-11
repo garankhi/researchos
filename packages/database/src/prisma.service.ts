@@ -26,9 +26,7 @@ export class PrismaService
       );
     }
 
-    super({
-      adapter: new PrismaPg({ connectionString }),
-    });
+    super({ adapter: new PrismaPg({ connectionString }) });
   }
 
   async onModuleInit(): Promise<void> {

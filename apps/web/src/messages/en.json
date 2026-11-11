@@ -90,6 +90,8 @@
         "password_invalid": "Password must be text.",
         "new_password_too_short": "The new password must contain at least 12 characters.",
         "id_uuid": "A valid UUID is required.",
+        "entity_type_invalid": "Select a valid target type.",
+        "entity_id_uuid": "The target ID must be a valid UUID.",
         "failures_before_success_integer": "The diagnostic failure count must be an integer.",
         "failures_before_success_min": "The diagnostic failure count must be at least 0.",
         "failures_before_success_max": "The diagnostic failure count must be at most 3.",
@@ -101,6 +103,8 @@
         "archived_at_invalid": "The archive timestamp must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00."
       },
       "domain": {
+        "follow_self": "You cannot follow yourself.",
+        "follow_target_type_unsupported": "This type of target cannot be followed yet.",
         "invalid_credentials": "The email or password is incorrect.",
         "account_inactive": "This account has been deactivated. Please contact an administrator.",
         "must_change_password": "You need to change your password before continuing.",

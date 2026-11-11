@@ -23,12 +23,12 @@ Các endpoint đều dùng session cookie và envelope tiêu chuẩn:
 | Endpoint | Quyền | Kết quả |
 | --- | --- | --- |
 | `POST /jobs/probes` | ADMIN | `202`, `{ id, status, attempts, statusUrl }` |
-| `GET /jobs/:id` | Chủ job | `200`, trạng thái lưu trong PostgreSQL |
-| `POST /jobs/:id/retry` | ADMIN và chủ job | `202`, tạo generation mới cho job FAILED |
+| `GET /jobs/:id` | Chủ job hoặc ADMIN với research update | `200`, trạng thái lưu trong PostgreSQL |
+| `POST /jobs/:id/retry` | ADMIN, giới hạn theo chủ job trừ research update | `202`, tạo generation mới cho job FAILED |
 
 Body submit: `{ "idempotencyKey": "<UUID-v4>", "failuresBeforeSuccess": 0 }`.
 Owner lấy từ session, không nhận trong body. Cùng owner/type/key và input trả
-lại cùng job; input khác trả `409`. Người khác đọc/retry trả `404`, kể cả admin.
+lại cùng job; input khác trả `409`. Truy cập job ngoài phạm vi cho phép trả `404`.
 Chưa đăng nhập trả `401`; probe/retry thiếu ADMIN trả `403`.
 
 `status` là `PENDING` (gồm đang chờ, đang xử lý, đang retry), `COMPLETED` hoặc
@@ -60,7 +60,7 @@ Probe generation 0 cho phép mô phỏng 0–3 lỗi; generation sau thành côn
 luồng recovery. Đây là hành vi riêng của diagnostic, không phải policy retry
 của các job nghiệp vụ.
 
-Feature ghi DB rồi phát job phải gọi helper dùng chung
+Feature ghi DB từ application code rồi phát job dùng helper chung
 `BackgroundJobsService.submitInTransaction(tx, ownerId, kind, key, payload)`
 trong chính transaction ghi nghiệp vụ. Helper không enqueue Redis. Worker chỉ
 thấy outbox sau commit; rollback xóa cả thay đổi nghiệp vụ lẫn job/outbox.
@@ -69,6 +69,28 @@ thấy outbox sau commit; rollback xóa cả thay đổi nghiệp vụ lẫn job
 của worker trước khi submit. Handler tự kiểm tra payload và xử lý job của mình.
 Tác vụ gọi dịch vụ ngoài phải truyền business idempotency key cho nhà cung cấp;
 transaction SQL không đảm bảo exactly-once cho email hay HTTP side effect.
+
+Trigger RES-113 ghi job `research-update`, outbox và payload vào PostgreSQL
+trong cùng transaction nghiệp vụ. PostgreSQL gán namespace khi tạo job. Chỉ
+dispatcher có `QUEUE_PREFIX` tương ứng mới phát job vào queue `research-updates`.
+Worker chuyển payload sang `research_updates` sau commit, giữ timestamp gốc
+và dùng `event_key` để xử lý replay.
+
+Với `QUEUE_PREFIX` tùy chỉnh, đặt cùng giá trị cho database trước khi bật
+luồng research update, rồi mở lại các kết nối ghi đang dùng thiết lập cũ.
+Thiết lập áp dụng cả cho API và SQL trực tiếp.
+
+```sql
+ALTER DATABASE researchos SET researchos.research_updates_queue_prefix = 'my-prefix';
+```
+
+Khi đổi prefix, giữ worker ở prefix cũ cho đến khi các research update đã
+gán vào prefix đó hoàn tất, kể cả các job cần reprocess.
+
+Rollout RES-113 theo thứ tự migration trước, worker sau. Job research update
+chờ trong PostgreSQL cho tới khi dispatcher mới nhận. Worker cũ tiếp tục xử lý
+queue `background-jobs`. Khi job research update vào DLQ, admin có thể lấy ID
+từ mục DLQ và dùng `POST /jobs/:id/retry` để tạo generation mới.
 
 Outbox/job/DLQ được giữ để phục vụ idempotency và điều tra; chưa có chính sách
 prune tự động. Khi bổ sung retention cần quyết định rõ thời hạn idempotency,
@@ -104,7 +126,8 @@ pnpm test:queue
 
 Lệnh tự build API/worker/package dùng chung và khởi động worker ở process
 riêng. Test dùng một prefix Redis ngẫu nhiên, không cần Redis/database thứ
-hai. API và worker kết nối database hiện có nhưng không ghi dữ liệu
+hai được cấu hình thủ công. Suite research update tạo database tạm trên cùng
+PostgreSQL server và xóa sau khi chạy. Suite probe kết nối database hiện có nhưng không ghi dữ liệu
 nghiệp vụ cho probe cũ. Bộ durable-job tạo user/session/job fixture riêng, dọn
 chúng sau test và chỉ dùng queue prefix UUID của lần chạy. Test bao gồm:
 
@@ -121,8 +144,8 @@ chúng sau test và chỉ dùng queue prefix UUID của lần chạy. Test bao g
 11. Redelivery sau khi Redis dọn job không thay đổi kết quả đã commit.
 
 Test dừng worker thử và chỉ xóa queue có prefix UUID của chính lần chạy.
-`pnpm test` vẫn chạy unit test không cần Redis; `test:queue` là lệnh riêng
-để CI hiện tại không phải thêm service bắt buộc.
+`pnpm test` chạy unit test. `pnpm test:queue` chạy riêng các suite queue,
+và CI chạy các suite này qua `pnpm test:e2e`.
 
 ## Cấu hình và giới hạn
 

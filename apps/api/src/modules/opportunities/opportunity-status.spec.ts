@@ -16,7 +16,7 @@ import {
   TargetAudience,
 } from '@researchos/database';
 import cookieParser from 'cookie-parser';
-import request from 'supertest';
+import { createHttpTestClient } from '../../../test/http-test-client.js';
 import { SESSION_RESOLVER } from '../../common/auth/session-resolver.js';
 import { SessionGuard } from '../../common/guards/session.guard.js';
 import { OpportunitiesController } from './opportunities.controller.js';
@@ -378,6 +378,7 @@ describe('Deadline-based opportunity expiry', () => {
 describe('Opportunity status HTTP contract', () => {
   let app: INestApplication;
   let fixture: ReturnType<typeof setup>;
+  const { request, close } = createHttpTestClient();
 
   beforeAll(async () => {
     fixture = setup();
@@ -412,10 +413,11 @@ describe('Opportunity status HTTP contract', () => {
         forbidNonWhitelisted: true,
       }),
     );
-    await app.init();
+    await app.listen(0, '127.0.0.1');
   });
 
   afterAll(async () => {
+    close();
     await app?.close();
   });
 

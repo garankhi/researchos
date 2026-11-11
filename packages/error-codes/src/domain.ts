@@ -64,6 +64,10 @@ export type DomainCodeMap = Record<string, Record<string, string>>;
  * exists to prevent.
  */
 export const domainErrorCodes = {
+  follows: {
+    selfFollow: 'follow_self',
+    targetTypeUnsupported: 'follow_target_type_unsupported',
+  },
   groups: {
     groupNotFound: 'group_not_found',
     groupCodeAlreadyExists: 'group_code_already_exists',
