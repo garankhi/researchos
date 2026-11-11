@@ -22,6 +22,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiErrorResponseDto,
   CreateOpportunityDto,
   OpportunitiesControllerFindAllParams,
   OpportunityPageDtoEnvelope,
@@ -150,6 +151,7 @@ export const useOpportunitiesControllerCreate = <
   );
 };
 /**
+ * Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.
  * @summary Lists published opportunities and opportunities managed by the caller
  */
 export const opportunitiesControllerFindAll = (
@@ -317,6 +319,7 @@ export function useOpportunitiesControllerFindAll<
 }
 
 /**
+ * An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.
  * @summary Returns a visible research opportunity
  */
 export const opportunitiesControllerFindOne = (
@@ -490,6 +493,7 @@ export function useOpportunitiesControllerFindOne<
 }
 
 /**
+ * Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.
  * @summary Updates a research opportunity managed by the caller
  */
 export const opportunitiesControllerUpdate = (
@@ -586,6 +590,282 @@ export const useOpportunitiesControllerUpdate = <
 > => {
   return useMutation(
     getOpportunitiesControllerUpdateMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Opens a draft opportunity for applications
+ */
+export const opportunitiesControllerOpen = (
+  opportunityId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpportunityResponseDtoEnvelope>(
+    { url: `/opportunities/${opportunityId}/open`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getOpportunitiesControllerOpenMutationKey = () =>
+  ['opportunitiesControllerOpen'] as const;
+
+export const getOpportunitiesControllerOpenMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof opportunitiesControllerOpen>>,
+    TError,
+    OpportunitiesControllerOpenMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof opportunitiesControllerOpen>>,
+  TError,
+  OpportunitiesControllerOpenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpportunitiesControllerOpenMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof opportunitiesControllerOpen>>,
+    OpportunitiesControllerOpenMutationVariables
+  > = (props) => {
+    const { opportunityId } = props ?? {};
+
+    return opportunitiesControllerOpen(opportunityId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpportunitiesControllerOpenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof opportunitiesControllerOpen>>
+>;
+
+export type OpportunitiesControllerOpenMutationError = ApiErrorResponseDto;
+export type OpportunitiesControllerOpenMutationVariables = {
+  opportunityId: string;
+};
+
+/**
+ * @summary Opens a draft opportunity for applications
+ */
+export const useOpportunitiesControllerOpen = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof opportunitiesControllerOpen>>,
+      TError,
+      OpportunitiesControllerOpenMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof opportunitiesControllerOpen>>,
+  TError,
+  OpportunitiesControllerOpenMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpportunitiesControllerOpenMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Marks an open opportunity as filled
+ */
+export const opportunitiesControllerFill = (
+  opportunityId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpportunityResponseDtoEnvelope>(
+    { url: `/opportunities/${opportunityId}/fill`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getOpportunitiesControllerFillMutationKey = () =>
+  ['opportunitiesControllerFill'] as const;
+
+export const getOpportunitiesControllerFillMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof opportunitiesControllerFill>>,
+    TError,
+    OpportunitiesControllerFillMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof opportunitiesControllerFill>>,
+  TError,
+  OpportunitiesControllerFillMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpportunitiesControllerFillMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof opportunitiesControllerFill>>,
+    OpportunitiesControllerFillMutationVariables
+  > = (props) => {
+    const { opportunityId } = props ?? {};
+
+    return opportunitiesControllerFill(opportunityId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpportunitiesControllerFillMutationResult = NonNullable<
+  Awaited<ReturnType<typeof opportunitiesControllerFill>>
+>;
+
+export type OpportunitiesControllerFillMutationError = ApiErrorResponseDto;
+export type OpportunitiesControllerFillMutationVariables = {
+  opportunityId: string;
+};
+
+/**
+ * @summary Marks an open opportunity as filled
+ */
+export const useOpportunitiesControllerFill = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof opportunitiesControllerFill>>,
+      TError,
+      OpportunitiesControllerFillMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof opportunitiesControllerFill>>,
+  TError,
+  OpportunitiesControllerFillMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpportunitiesControllerFillMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Closes a filled opportunity
+ */
+export const opportunitiesControllerClose = (
+  opportunityId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpportunityResponseDtoEnvelope>(
+    { url: `/opportunities/${opportunityId}/close`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getOpportunitiesControllerCloseMutationKey = () =>
+  ['opportunitiesControllerClose'] as const;
+
+export const getOpportunitiesControllerCloseMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof opportunitiesControllerClose>>,
+    TError,
+    OpportunitiesControllerCloseMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof opportunitiesControllerClose>>,
+  TError,
+  OpportunitiesControllerCloseMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpportunitiesControllerCloseMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof opportunitiesControllerClose>>,
+    OpportunitiesControllerCloseMutationVariables
+  > = (props) => {
+    const { opportunityId } = props ?? {};
+
+    return opportunitiesControllerClose(opportunityId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpportunitiesControllerCloseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof opportunitiesControllerClose>>
+>;
+
+export type OpportunitiesControllerCloseMutationError = ApiErrorResponseDto;
+export type OpportunitiesControllerCloseMutationVariables = {
+  opportunityId: string;
+};
+
+/**
+ * @summary Closes a filled opportunity
+ */
+export const useOpportunitiesControllerClose = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof opportunitiesControllerClose>>,
+      TError,
+      OpportunitiesControllerCloseMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof opportunitiesControllerClose>>,
+  TError,
+  OpportunitiesControllerCloseMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpportunitiesControllerCloseMutationOptions(options),
     queryClient,
   );
 };

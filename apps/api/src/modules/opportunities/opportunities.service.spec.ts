@@ -44,12 +44,14 @@ describe('OpportunitiesService', () => {
   const tx = {
     $queryRaw: vi.fn(),
     research_opportunities: {
+      updateManyAndReturn: vi.fn(),
       create: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
     },
+    auditLog: { createMany: vi.fn() },
   };
 
   beforeEach(() => {
@@ -58,6 +60,7 @@ describe('OpportunitiesService', () => {
       $transaction: vi.fn((callback) => callback(tx)),
     } as unknown as PrismaService);
     tx.$queryRaw.mockResolvedValue([{ allowed: true }]);
+    tx.research_opportunities.updateManyAndReturn.mockResolvedValue([]);
     tx.research_opportunities.create.mockResolvedValue(row);
     tx.research_opportunities.findUniqueOrThrow.mockResolvedValue(row);
     tx.research_opportunities.update.mockResolvedValue(row);

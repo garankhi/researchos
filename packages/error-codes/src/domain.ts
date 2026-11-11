@@ -99,6 +99,11 @@ export const domainErrorCodes = {
     unkCannotVerify: 'provenance_unk_cannot_verify',
     autoVerifyNotAllowed: 'provenance_auto_verify_not_allowed',
   },
+  openalex: {
+    authorNotFound: 'openalex_author_not_found',
+    workNotFound: 'openalex_work_not_found',
+    serviceUnavailable: 'openalex_unavailable',
+  },
   taxonomy: {
     fieldNotFound: 'field_not_found',
     topicNotFound: 'topic_not_found',

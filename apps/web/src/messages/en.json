@@ -127,7 +127,10 @@
         "provenance_field_locked": "This field was confirmed by a person and cannot be overwritten by an automated sync.",
         "provenance_human_source_not_allowed": "User-typed fields are human by definition and carry no provenance row.",
         "provenance_unk_cannot_verify": "A field with untraceable origin cannot be marked as verified without human adjudication.",
-        "provenance_auto_verify_not_allowed": "An AI-inferred value without a replayable trace cannot be automatically verified."
+        "provenance_auto_verify_not_allowed": "An AI-inferred value without a replayable trace cannot be automatically verified.",
+        "openalex_author_not_found": "No OpenAlex author matches this researcher.",
+        "openalex_work_not_found": "No OpenAlex work matches this identifier.",
+        "openalex_unavailable": "OpenAlex is temporarily unavailable. Please try again later."
       }
     }
   },

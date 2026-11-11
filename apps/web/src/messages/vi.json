@@ -127,7 +127,10 @@
         "provenance_field_locked": "Trường này đã được con người xác nhận nên job đồng bộ không được ghi đè.",
         "provenance_human_source_not_allowed": "Trường do người dùng nhập là HUMAN theo định nghĩa nên không có dòng provenance.",
         "provenance_unk_cannot_verify": "Trường không truy được nguồn gốc không thể đánh dấu đã xác minh nếu chưa có người phân xử.",
-        "provenance_auto_verify_not_allowed": "Giá trị do AI suy luận không có trace phát lại không thể tự động xác minh."
+        "provenance_auto_verify_not_allowed": "Giá trị do AI suy luận không có trace phát lại không thể tự động xác minh.",
+        "openalex_author_not_found": "Không tìm thấy tác giả OpenAlex khớp với nghiên cứu viên này.",
+        "openalex_work_not_found": "Không tìm thấy công trình OpenAlex khớp với mã này.",
+        "openalex_unavailable": "OpenAlex tạm thời không khả dụng. Vui lòng thử lại sau."
       }
     }
   },
