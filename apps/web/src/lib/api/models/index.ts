@@ -170,6 +170,8 @@ export * from './publishOutputDto';
 export * from './publishOutputDtoVisibility';
 export * from './researchGroupResponseDto';
 export * from './researchGroupResponseDtoEnvelope';
+export * from './respondApplicationDto';
+export * from './respondApplicationDtoDecision';
 export * from './revokeRoleDto';
 export * from './roleAssignmentResponseDto';
 export * from './roleAssignmentResponseDtoEnvelope';

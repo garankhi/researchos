@@ -61,6 +61,7 @@ describe('Applications HTTP contract', () => {
       create: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
+      updateManyAndReturn: vi.fn(),
     },
   };
   const prisma = { $transaction: vi.fn() };
@@ -104,16 +105,19 @@ describe('Applications HTTP contract', () => {
       isResearcher: true,
       isAdmin: false,
     });
-    tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) =>
-      sql.join('').includes('clock_timestamp')
-        ? [{ now }]
-        : [{ allowed: true }],
-    );
+    tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+      const text = sql.join('');
+      if (text.includes('clock_timestamp')) return [{ now }];
+      if (text.includes('can_manage_opportunity')) return [{ allowed: true }];
+      if (text.includes('FROM opportunity_applications')) return [row];
+      return [];
+    });
     tx.research_opportunities.findUnique.mockResolvedValue(opportunity);
     tx.opportunity_applications.findFirst.mockResolvedValue(null);
     tx.opportunity_applications.create.mockResolvedValue(row);
     tx.opportunity_applications.findMany.mockResolvedValue([row]);
     tx.opportunity_applications.count.mockResolvedValue(1);
+    tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([row]);
   });
   afterAll(async () => {
     client.close();
@@ -343,5 +347,342 @@ describe('Applications HTTP contract', () => {
         .set('Cookie', cookie)
         .expect(400);
     expect(tx.opportunity_applications.create).not.toHaveBeenCalled();
+  });
+
+  describe('respond', () => {
+    const respondUrl = `/applications/${id}/respond`;
+
+    it('requires authentication and researcher access', async () => {
+      await request().post(respondUrl).expect(401);
+      resolver.effectiveRoles.mockResolvedValue({
+        isResearcher: false,
+        isAdmin: true,
+      });
+      await request().post(respondUrl).set('Cookie', cookie).expect(403);
+    });
+
+    it('answers a pending application as the owner and stops its countdown', async () => {
+      const answered = {
+        ...row,
+        status: 'INVITED_TO_DISCUSS',
+        response_note: 'Let us meet next week.',
+        responded_by: actorId,
+        responded_at: now,
+      };
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
+        answered,
+      ]);
+      const response = await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({
+          decision: 'INVITED_TO_DISCUSS',
+          responseNote: '  Let us meet next week.  ',
+        })
+        .expect(200);
+      expect(response.body).toMatchObject({
+        id,
+        status: 'INVITED_TO_DISCUSS',
+        responseNote: 'Let us meet next week.',
+        respondedBy: actorId,
+        respondedAt: now.toISOString(),
+        remainingSeconds: null,
+        isOverdue: false,
+      });
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: 'INVITED_TO_DISCUSS',
+          response_note: 'Let us meet next week.',
+          responded_by: actorId,
+        },
+      });
+    });
+
+    it('declines a pending application and leaves the responder unset otherwise', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
+        {
+          ...row,
+          status: 'DECLINED',
+          responded_by: actorId,
+          responded_at: now,
+        },
+      ]);
+      await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(200);
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: 'DECLINED',
+          response_note: null,
+          responded_by: actorId,
+        },
+      });
+    });
+
+    it('stores a blank note as no note at all', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
+        {
+          ...row,
+          status: 'DECLINED',
+          responded_by: actorId,
+          responded_at: now,
+        },
+      ]);
+      await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED', responseNote: '   ' })
+        .expect(200);
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: 'DECLINED',
+          response_note: null,
+          responded_by: actorId,
+        },
+      });
+    });
+
+    it('returns 404 for an application that does not exist', async () => {
+      tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+        const text = sql.join('');
+        if (text.includes('FROM opportunity_applications')) return [];
+        return [{ allowed: true }];
+      });
+      const response = await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(404);
+      expect(response.body.message).toBe('application_not_found');
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the caller cannot manage the opportunity', async () => {
+      tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+        const text = sql.join('');
+        if (text.includes('can_manage_opportunity'))
+          return [{ allowed: false }];
+        if (text.includes('FROM opportunity_applications')) return [row];
+        return [{ now }];
+      });
+      const response = await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(403);
+      expect(response.body.message).toBe('application_access_denied');
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 for an application that was already answered or withdrawn', async () => {
+      for (const [status, code] of [
+        ['INVITED_TO_DISCUSS', 'application_already_answered'],
+        ['DECLINED', 'application_already_answered'],
+        ['WITHDRAWN', 'application_already_withdrawn'],
+      ] as const) {
+        tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+          const text = sql.join('');
+          if (text.includes('FROM opportunity_applications'))
+            return [{ ...row, status }];
+          return [{ allowed: true }];
+        });
+        const response = await request()
+          .post(respondUrl)
+          .set('Cookie', cookie)
+          .send({ decision: 'DECLINED' })
+          .expect(409);
+        expect(response.body.message).toBe(code);
+      }
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when another transaction answered the application first', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([]);
+      const response = await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(409);
+      expect(response.body.message).toBe('application_already_answered');
+    });
+
+    it('maps a trigger refusal to 409 on an invalid state', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          'Only pending application can transition once',
+          {
+            code: 'P2039',
+            clientVersion: 'test',
+            meta: {
+              driverAdapterError: {
+                cause: {
+                  originalCode: '23514',
+                  originalMessage:
+                    'new row for relation "opportunity_applications" violates check constraint "ck_application_response"',
+                },
+              },
+            },
+          },
+        ),
+      );
+      const response = await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(409);
+      expect(response.body.message).toBe('application_invalid_state');
+    });
+
+    it('rejects a malformed answer', async () => {
+      for (const body of [
+        {},
+        { decision: 'PENDING' },
+        { decision: 'WITHDRAWN' },
+        { decision: 'INVITED_TO_DISCUSS', responseNote: 'x'.repeat(10001) },
+        { decision: 'INVITED_TO_DISCUSS', status: 'DECLINED' },
+      ]) {
+        await request()
+          .post(respondUrl)
+          .set('Cookie', cookie)
+          .send(body)
+          .expect(400);
+      }
+      await request()
+        .post('/applications/not-a-uuid/respond')
+        .set('Cookie', cookie)
+        .send({ decision: 'DECLINED' })
+        .expect(400);
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('withdraw', () => {
+    const withdrawUrl = `/applications/${id}/withdraw`;
+
+    it('requires authentication and researcher access', async () => {
+      await request().post(withdrawUrl).expect(401);
+      resolver.effectiveRoles.mockResolvedValue({
+        isResearcher: false,
+        isAdmin: true,
+      });
+      await request().post(withdrawUrl).set('Cookie', cookie).expect(403);
+    });
+
+    it('withdraws the caller own pending application and keeps the row', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
+        { ...row, status: 'WITHDRAWN', withdrawn_at: now },
+      ]);
+      const response = await request()
+        .post(withdrawUrl)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(response.body).toMatchObject({
+        id,
+        status: 'WITHDRAWN',
+        withdrawnAt: now.toISOString(),
+        remainingSeconds: null,
+        isOverdue: false,
+      });
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
+        where: { id, status: 'PENDING' },
+        data: { status: 'WITHDRAWN' },
+      });
+    });
+
+    it('returns 404 for an application that does not exist', async () => {
+      tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+        const text = sql.join('');
+        if (text.includes('FROM opportunity_applications')) return [];
+        return [{ now }];
+      });
+      const response = await request()
+        .post(withdrawUrl)
+        .set('Cookie', cookie)
+        .expect(404);
+      expect(response.body.message).toBe('application_not_found');
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the application belongs to another researcher', async () => {
+      tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+        const text = sql.join('');
+        if (text.includes('FROM opportunity_applications'))
+          return [{ ...row, applicant_id: otherId }];
+        return [{ now }];
+      });
+      const response = await request()
+        .post(withdrawUrl)
+        .set('Cookie', cookie)
+        .expect(403);
+      expect(response.body.message).toBe('application_access_denied');
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when the application was already withdrawn or answered', async () => {
+      for (const [status, code] of [
+        ['WITHDRAWN', 'application_already_withdrawn'],
+        ['INVITED_TO_DISCUSS', 'application_already_answered'],
+        ['DECLINED', 'application_already_answered'],
+      ] as const) {
+        tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+          const text = sql.join('');
+          if (text.includes('FROM opportunity_applications'))
+            return [{ ...row, status }];
+          return [{ now }];
+        });
+        const response = await request()
+          .post(withdrawUrl)
+          .set('Cookie', cookie)
+          .expect(409);
+        expect(response.body.message).toBe(code);
+      }
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when another transaction withdrew the application first', async () => {
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([]);
+      const response = await request()
+        .post(withdrawUrl)
+        .set('Cookie', cookie)
+        .expect(409);
+      expect(response.body.message).toBe('application_already_withdrawn');
+    });
+
+    it('rejects an invalid application id', async () => {
+      await request()
+        .post('/applications/not-a-uuid/withdraw')
+        .set('Cookie', cookie)
+        .expect(400);
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

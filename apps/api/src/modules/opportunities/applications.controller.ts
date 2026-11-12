@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -29,6 +31,7 @@ import {
   CreateApplicationDto,
 } from './dto/application.dto.js';
 import { GroupApplicationPageDto } from './dto/group-application.dto.js';
+import { RespondApplicationDto } from './dto/respond-application.dto.js';
 import { ApplicationsService } from './applications.service.js';
 
 @ApiTags('applications')
@@ -135,5 +138,73 @@ export class ApplicationsController {
     @Query() query: PaginationQueryDto,
   ): Promise<GroupApplicationPageDto> {
     return this.applications.forGroup(groupId, actorId, query);
+  }
+
+  @Post('applications/:applicationId/respond')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'applicationId',
+    description: 'Application to answer.',
+    format: 'uuid',
+  })
+  @ApiOperation({
+    summary: "Answer a pending application as the opportunity's owner",
+    description:
+      'Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.',
+  })
+  @ApiOkResponse({
+    description:
+      'The answered application with its decision, response note, responder and response timestamp.',
+    type: ApplicationResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid UUID, decision or response note.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Caller may not manage the opportunity this application belongs to.',
+  })
+  @ApiNotFoundResponse({ description: 'Application does not exist.' })
+  @ApiConflictResponse({
+    description: 'The application has already been answered or withdrawn.',
+  })
+  respond(
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @CurrentUserId() actorId: string,
+    @Body() dto: RespondApplicationDto,
+  ): Promise<ApplicationResponseDto> {
+    return this.applications.respond(applicationId, actorId, dto);
+  }
+
+  @Post('applications/:applicationId/withdraw')
+  @HttpCode(HttpStatus.OK)
+  @ApiParam({
+    name: 'applicationId',
+    description: 'Application to withdraw.',
+    format: 'uuid',
+  })
+  @ApiOperation({
+    summary: "Withdraw one of the caller's own pending applications",
+    description:
+      'Only the applicant may withdraw, and only while the application is pending. The application keeps its row and its history.',
+  })
+  @ApiOkResponse({
+    description:
+      'The withdrawn application with its withdrawal timestamp and no countdown.',
+    type: ApplicationResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid application UUID.' })
+  @ApiForbiddenResponse({
+    description: 'The application belongs to another researcher.',
+  })
+  @ApiNotFoundResponse({ description: 'Application does not exist.' })
+  @ApiConflictResponse({
+    description: 'The application has already been withdrawn or answered.',
+  })
+  withdraw(
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @CurrentUserId() actorId: string,
+  ): Promise<ApplicationResponseDto> {
+    return this.applications.withdraw(applicationId, actorId);
   }
 }

@@ -106,6 +106,13 @@ export const domainErrorCodes = {
     idempotencyKeyInvalid: 'opportunity_idempotency_key_invalid',
     idempotencyKeyConflict: 'opportunity_idempotency_key_conflict',
   },
+  applications: {
+    notFound: 'application_not_found',
+    accessDenied: 'application_access_denied',
+    alreadyAnswered: 'application_already_answered',
+    alreadyWithdrawn: 'application_already_withdrawn',
+    invalidState: 'application_invalid_state',
+  },
   outputs: {
     outputNotFound: 'output_not_found',
     outputAccessDenied: 'output_access_denied',
