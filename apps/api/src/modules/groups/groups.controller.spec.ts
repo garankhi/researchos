@@ -224,7 +224,11 @@ describe('GroupsController', () => {
 
       const controller = await setupController(prismaMock);
       await controller.findAll(
-        { page: 1, limit: 20, memberId: outsiderId } as ListResearchGroupsQueryDto,
+        {
+          page: 1,
+          limit: 20,
+          memberId: outsiderId,
+        } as ListResearchGroupsQueryDto,
         memberId,
       );
 

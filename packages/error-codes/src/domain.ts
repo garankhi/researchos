@@ -78,6 +78,11 @@ export const domainErrorCodes = {
     memberNotFound: 'group_member_not_found',
     memberAlreadyExists: 'group_member_already_exists',
     leadRemovalDenied: 'group_lead_removal_denied',
+    outputLinkNotFound: 'group_output_link_not_found',
+    outputLinkExists: 'group_output_link_already_exists',
+    outputLinkConflict: 'group_output_link_conflict',
+    outputLinkInvalid: 'group_output_link_invalid',
+    outputNotShared: 'group_output_not_shared',
   },
   identity: {
     invalidCredentials: 'invalid_credentials',

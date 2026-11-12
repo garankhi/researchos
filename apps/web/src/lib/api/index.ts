@@ -4,6 +4,7 @@ export * from './demo/demo';
 export * from './discovery/discovery';
 export * from './follows/follows';
 export * from './group-directions/group-directions';
+export * from './group-outputs/group-outputs';
 export * from './groups/groups';
 export * from './health/health';
 export * from './identity/identity';

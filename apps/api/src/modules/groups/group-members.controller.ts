@@ -56,7 +56,11 @@ export class GroupMembersController {
   constructor(private readonly members: GroupMembersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List group members (lead and members only)' })
+  @ApiOperation({
+    summary: 'List group members',
+    description:
+      'The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.',
+  })
   @ApiOkResponse({
     description: 'Paginated group member list.',
     type: GroupMemberPageDto,

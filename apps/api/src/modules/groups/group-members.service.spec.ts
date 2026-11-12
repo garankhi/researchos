@@ -234,8 +234,32 @@ describe('Group membership policies', () => {
     },
   );
 
-  it('denies an outsider the member list', async () => {
+  it('lets any signed-in researcher read the roster of an active group', async () => {
     const { service, tx } = setup();
+    const result = await service.findAll(
+      groupId,
+      new PaginationQueryDto(),
+      callerId,
+    );
+    expect(result.items).toHaveLength(1);
+    expect(tx.group_members.findMany).toHaveBeenCalled();
+  });
+
+  it('denies an outsider the roster of an archived group', async () => {
+    const { service, tx, group } = setup();
+    group.archived_at = new Date('2026-11-09T00:00:00Z');
+    await expect(
+      service.findAll(groupId, new PaginationQueryDto(), callerId),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
+    expect(tx.group_members.findMany).not.toHaveBeenCalled();
+  });
+
+  it('denies an outsider the roster of an inactive group', async () => {
+    const { service, tx, group } = setup();
+    group.is_active = false;
     await expect(
       service.findAll(groupId, new PaginationQueryDto(), callerId),
     ).rejects.toMatchObject({

@@ -2,24 +2,38 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import {
   buildPaginationMeta,
   PaginationQueryDto,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type {
   ApplicationResponseDto,
   CreateApplicationDto,
 } from './dto/application.dto.js';
+import type { GroupApplicationPageDto } from './dto/group-application.dto.js';
 
 type ApplicationRow = Prisma.opportunity_applicationsGetPayload<
   Record<string, never>
 >;
+
+/**
+ * The sort keys the group application list accepts.
+ *
+ * They mirror the per-opportunity list, so the two tabs sort the same way.
+ */
+const GROUP_APPLICATION_SORT_FIELDS = {
+  appliedAt: 'applied_at',
+  responseDueAt: 'response_due_at',
+} as const;
 
 @Injectable()
 export class ApplicationsService {
@@ -116,6 +130,98 @@ export class ApplicationsService {
 
   async mine(actorId: string, query: PaginationQueryDto) {
     return this.run((tx) => this.page(tx, { applicant_id: actorId }, query));
+  }
+
+  /**
+   * Lists the applications on every opportunity scoped to a group.
+   *
+   * The scope matches `GET /opportunities?groupId=`: the opportunities whose
+   * `group_id` is the group. Which of them the caller may read is decided per
+   * opportunity by the canonical `can_manage_opportunity` policy — the same
+   * rule the per-opportunity received list uses — so the group tab never
+   * widens what the caller could already read.
+   */
+  async forGroup(
+    groupId: string,
+    actorId: string,
+    query: PaginationQueryDto,
+  ): Promise<GroupApplicationPageDto> {
+    return this.run(async (tx) => {
+      const group = await tx.research_groups.findUnique({
+        where: { id: groupId },
+        select: { id: true },
+      });
+      if (!group)
+        throw new CodedHttpException(
+          domainErrorCodes.groups.groupNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+
+      const [scope] = await tx.$queryRaw<
+        { group_total: bigint; manageable: bigint }[]
+      >`
+        SELECT
+          (SELECT count(*) FROM research_opportunities o
+            WHERE o.group_id = ${groupId}::uuid) AS group_total,
+          (SELECT count(*) FROM research_opportunities o
+            WHERE o.group_id = ${groupId}::uuid
+              AND can_manage_opportunity(${actorId}::uuid, o.id)) AS manageable
+      `;
+
+      // A group with no opportunity has nothing to refuse. A group that has
+      // opportunities the caller may not manage is a private list, and an
+      // empty page would read as "no applications" rather than "not allowed".
+      if (
+        Number(scope?.group_total ?? 0n) > 0 &&
+        Number(scope?.manageable ?? 0n) === 0
+      )
+        throw new CodedHttpException(
+          domainErrorCodes.opportunities.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+
+      const opportunities = await tx.$queryRaw<{ id: string }[]>`
+        SELECT o.id FROM research_opportunities o
+        WHERE o.group_id = ${groupId}::uuid
+          AND can_manage_opportunity(${actorId}::uuid, o.id)
+      `;
+      const opportunityIds = opportunities.map((row) => row.id);
+
+      if (opportunityIds.length === 0)
+        return {
+          items: [],
+          meta: buildPaginationMeta(query, 0, 0),
+        };
+
+      const orderBy = parseSortParam(
+        query.sort,
+        GROUP_APPLICATION_SORT_FIELDS,
+        { applied_at: 'desc' },
+      );
+      if (!orderBy) throw new BadRequestException('validation_failed');
+
+      const where: Prisma.opportunity_applicationsWhereInput = {
+        opportunity_id: { in: opportunityIds },
+      };
+      const rows = await tx.opportunity_applications.findMany({
+        where,
+        include: {
+          research_opportunities: { select: { title: true } },
+        },
+        orderBy: [orderBy, { id: 'asc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      });
+      const total = await tx.opportunity_applications.count({ where });
+      const now = await this.now(tx);
+      return {
+        items: rows.map((row) => ({
+          ...this.response(row, now),
+          opportunityTitle: row.research_opportunities.title,
+        })),
+        meta: buildPaginationMeta(query, rows.length, total),
+      };
+    });
   }
 
   private async page(

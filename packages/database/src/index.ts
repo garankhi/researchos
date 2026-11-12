@@ -21,6 +21,7 @@ export {
   opportunity_application_status as OpportunityApplicationStatus,
   entity_types as FollowEntityType,
   group_member_role as GroupMemberRole,
+  group_output_status as GroupOutputStatus,
   opportunity_kind as OpportunityKind,
   opportunity_status as OpportunityStatus,
   output_import_state as OutputImportState,
