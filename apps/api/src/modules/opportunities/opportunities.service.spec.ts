@@ -67,6 +67,32 @@ describe('OpportunitiesService', () => {
     tx.research_opportunities.findUnique.mockResolvedValue(null);
   });
 
+  /**
+   * Reads the `ORDER BY` clause out of the paged id query.
+   *
+   * `$queryRaw` is a tagged template, so the call arguments are the static
+   * string chunks and the interpolated values. Rebuilding the statement
+   * from both gives the SQL the service actually sent, including the
+   * interpolated `ORDER BY` clause.
+   */
+  function pagedOrderBy(): string {
+    const [strings, ...values] = tx.$queryRaw.mock.calls[0] as unknown as [
+      TemplateStringsArray,
+      ...unknown[],
+    ];
+    return strings.reduce((statement, chunk, index) => {
+      const value = values[index];
+      const rendered =
+        typeof value === 'object' &&
+        value !== null &&
+        'text' in value &&
+        typeof (value as { text: unknown }).text === 'string'
+          ? (value as { text: string }).text
+          : '';
+      return statement + rendered + (chunk ?? '');
+    }, '');
+  }
+
   it('sets creator from the session and lets the database supply the SLA default', async () => {
     const result = await service.create(actor, draft);
     expect(result).toMatchObject({
@@ -317,7 +343,83 @@ describe('OpportunitiesService', () => {
     tx.research_opportunities.findMany.mockResolvedValue([row]);
     expect(
       await service.findAll(actor, new ListOpportunitiesQueryDto()),
-    ).toMatchObject({ page: 1, pageSize: 20, total: 1, items: [{ id }] });
+    ).toMatchObject({
+      items: [{ id }],
+      meta: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    });
+  });
+
+  it('restores the SQL ordering of the paged ids', async () => {
+    const second = { ...row, id: 'second-id', title: 'Second' };
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: second.id }, { id: row.id }])
+      .mockResolvedValueOnce([{ total: 2n }]);
+    // The rows come back in a different order than the paged query listed.
+    tx.research_opportunities.findMany.mockResolvedValue([row, second]);
+
+    const result = await service.findAll(
+      actor,
+      new ListOpportunitiesQueryDto(),
+    );
+
+    expect(result.items.map((item) => item.id)).toEqual([second.id, row.id]);
+  });
+
+  it('rejects an unknown sort key', async () => {
+    const query = new ListOpportunitiesQueryDto();
+    query.sort = 'invalidField';
+
+    await expect(service.findAll(actor, query)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('orders by the requested sort key and falls back to a tiebreaker', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+
+    const query = new ListOpportunitiesQueryDto();
+    query.sort = '-applicationDeadline';
+    await service.findAll(actor, query);
+
+    expect(pagedOrderBy()).toContain(
+      'application_deadline DESC NULLS LAST, o.created_at DESC, o.id DESC',
+    );
+  });
+
+  it('sorts the nullable deadline column with the nulls last', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+
+    const query = new ListOpportunitiesQueryDto();
+    query.sort = 'applicationDeadline';
+    await service.findAll(actor, query);
+
+    expect(pagedOrderBy()).toContain(
+      'application_deadline ASC NULLS LAST, o.created_at DESC, o.id DESC',
+    );
+  });
+
+  it('sorts by creation time by default', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+
+    await service.findAll(actor, new ListOpportunitiesQueryDto());
+
+    expect(pagedOrderBy()).toContain('o.created_at DESC, o.id DESC');
   });
 
   it('filters by creator without dropping the visibility predicate', async () => {

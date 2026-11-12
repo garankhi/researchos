@@ -8,6 +8,10 @@ import {
 import { OpportunityStatus, Prisma, PrismaService } from '@researchos/database';
 import type { ResearchOpportunity } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
+import {
+  buildPaginationMeta,
+  parseSortParam,
+} from '../../common/dto/pagination.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto.js';
@@ -20,6 +24,60 @@ import {
 
 // DTOs use camelCase; dev's introspected Prisma domain models use snake_case.
 // Policy queries use bound parameters and the canonical PostgreSQL functions.
+
+/**
+ * The sort keys the opportunity list accepts.
+ *
+ * They mirror the columns the list already orders by, so a client can ask
+ * for the same ordering the default uses or reverse it.
+ */
+const OPPORTUNITY_SORT_FIELDS = {
+  createdAt: 'created_at',
+  created_at: 'created_at',
+  updatedAt: 'updated_at',
+  updated_at: 'updated_at',
+  applicationDeadline: 'application_deadline',
+  application_deadline: 'application_deadline',
+  publishedAt: 'published_at',
+  published_at: 'published_at',
+} as const;
+
+type OpportunitySortColumn =
+  (typeof OPPORTUNITY_SORT_FIELDS)[keyof typeof OPPORTUNITY_SORT_FIELDS];
+
+/**
+ * Builds the `ORDER BY` clause of the opportunity list.
+ *
+ * The list selects a page of ids in SQL, because the visibility predicate
+ * is a raw SQL fragment, so the sort has to be expressed in SQL too.
+ *
+ * Two details are deliberate:
+ *
+ * - The nullable date columns sort `NULLS LAST`. PostgreSQL puts nulls
+ *   first for `ASC` and last for `DESC`, and an opportunity without a
+ *   deadline does not belong at the top of a list ordered by deadline.
+ * - Every ordering ends with `id`. `created_at` is not unique, so without a
+ *   tiebreaker two records sharing a timestamp could land on two pages in
+ *   a different order, and the client would show one twice and miss the
+ *   other.
+ */
+function opportunityOrderBy(
+  column: OpportunitySortColumn,
+  direction: 'asc' | 'desc',
+): Prisma.Sql {
+  const asc = direction === 'asc';
+
+  switch (column) {
+    case 'application_deadline':
+      return Prisma.sql`o.application_deadline ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`} NULLS LAST, o.created_at DESC, o.id DESC`;
+    case 'published_at':
+      return Prisma.sql`o.published_at ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`} NULLS LAST, o.created_at DESC, o.id DESC`;
+    case 'updated_at':
+      return Prisma.sql`o.updated_at ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`}, o.id ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`}`;
+    default:
+      return Prisma.sql`o.created_at ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`}, o.id ${asc ? Prisma.sql`ASC` : Prisma.sql`DESC`}`;
+  }
+}
 
 /**
  * Normalizes a UUID for comparison.
@@ -318,29 +376,52 @@ export class OpportunitiesService {
     query: ListOpportunitiesQueryDto,
   ): Promise<OpportunityPageDto> {
     await this.expireOverdue();
+
+    const orderBy = parseSortParam<OpportunitySortColumn>(
+      query.sort,
+      OPPORTUNITY_SORT_FIELDS,
+      { created_at: 'desc' },
+    );
+    if (!orderBy) {
+      throw new BadRequestException('validation_failed');
+    }
+
+    const sortColumn = Object.keys(orderBy)[0] as OpportunitySortColumn;
+    const sortDir = orderBy[sortColumn] ?? 'desc';
+    const orderBySql = opportunityOrderBy(sortColumn, sortDir);
+
     const conditions = Prisma.sql`${this.visibility(actorId)}
       ${query.groupId ? Prisma.sql`AND o.group_id = ${query.groupId}::uuid` : Prisma.empty}
       ${query.projectId ? Prisma.sql`AND o.project_id = ${query.projectId}::uuid` : Prisma.empty}
       ${query.status ? Prisma.sql`AND o.status = ${query.status}::opportunity_status` : Prisma.empty}
       ${query.creatorId ? Prisma.sql`AND o.creator_id = ${query.creatorId}::uuid` : Prisma.empty}`;
+
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+
     return this.prisma.$transaction(
       async (tx) => {
         const ids = await tx.$queryRaw<{ id: string }[]>`
         SELECT o.id FROM research_opportunities o WHERE ${conditions}
-        ORDER BY o.created_at DESC, o.id DESC LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}
+        ORDER BY ${orderBySql} LIMIT ${limit} OFFSET ${(page - 1) * limit}
       `;
         const [count] = await tx.$queryRaw<
           { total: bigint }[]
         >`SELECT count(*) AS total FROM research_opportunities o WHERE ${conditions}`;
         const rows = await tx.research_opportunities.findMany({
           where: { id: { in: ids.map(({ id }) => id) } },
-          orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
         });
+        const total = Number(count.total);
+        // The rows come back unordered, so the SQL order is restored from
+        // the id list the paged query produced.
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        const items = ids
+          .map(({ id }) => byId.get(id))
+          .filter((row): row is ResearchOpportunity => Boolean(row))
+          .map((row) => this.response(row));
         return {
-          items: rows.map((row) => this.response(row)),
-          page: query.page,
-          pageSize: query.pageSize,
-          total: Number(count.total),
+          items,
+          meta: buildPaginationMeta({ page, limit }, items.length, total),
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },

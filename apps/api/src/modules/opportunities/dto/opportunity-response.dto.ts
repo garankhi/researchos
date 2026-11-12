@@ -4,6 +4,7 @@ import {
   OpportunityStatus,
   TargetAudience,
 } from '@researchos/database';
+import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
 
 export class OpportunityResponseDto {
   @ApiProperty({ description: 'Opportunity identifier.', format: 'uuid' })
@@ -87,19 +88,17 @@ export class OpportunityResponseDto {
   archivedAt: string | null;
 }
 
-export class OpportunityPageDto {
+/**
+ * One page of opportunities.
+ *
+ * Extends the shared `PaginatedResultDto`, so the payload carries the same
+ * `items` + `meta` shape as every other list endpoint and the frontend's
+ * `usePagination()` hook works with it unchanged.
+ */
+export class OpportunityPageDto extends PaginatedResultDto<OpportunityResponseDto> {
   @ApiProperty({
     description: 'Visible opportunities on this page.',
     type: [OpportunityResponseDto],
   })
-  items: OpportunityResponseDto[];
-  @ApiProperty({ description: 'Current one-based page number.' })
-  page: number;
-  @ApiProperty({ description: 'Maximum number of items per page.' })
-  pageSize: number;
-  @ApiProperty({
-    description:
-      'Total opportunities matching the filters and caller visibility.',
-  })
-  total: number;
+  declare items: OpportunityResponseDto[];
 }

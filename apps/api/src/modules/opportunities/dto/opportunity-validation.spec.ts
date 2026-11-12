@@ -154,13 +154,13 @@ describe('Opportunity request validation', () => {
   it('converts and bounds pagination query values', async () => {
     await expect(
       pipe.transform(
-        { page: '2', pageSize: '10' },
+        { page: '2', limit: '10' },
         { type: 'query', metatype: ListOpportunitiesQueryDto },
       ),
-    ).resolves.toMatchObject({ page: 2, pageSize: 10 });
+    ).resolves.toMatchObject({ page: 2, limit: 10 });
     await expect(
       pipe.transform(
-        { pageSize: '101' },
+        { limit: '101' },
         { type: 'query', metatype: ListOpportunitiesQueryDto },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);

@@ -3309,25 +3309,37 @@
         "parameters": [
           {
             "name": "page",
-            "required": false,
+            "required": true,
             "in": "query",
-            "description": "One-based page number.",
+            "description": "Page number, 1-based.",
             "schema": {
               "minimum": 1,
               "default": 1,
+              "example": 1,
               "type": "number"
             }
           },
           {
-            "name": "pageSize",
-            "required": false,
+            "name": "limit",
+            "required": true,
             "in": "query",
-            "description": "Maximum records per page.",
+            "description": "How many records one page holds.",
             "schema": {
               "minimum": 1,
               "maximum": 100,
               "default": 20,
+              "example": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
             }
           },
           {
@@ -7804,24 +7816,18 @@
               "$ref": "#/components/schemas/OpportunityResponseDto"
             }
           },
-          "page": {
-            "type": "number",
-            "description": "Current one-based page number."
-          },
-          "pageSize": {
-            "type": "number",
-            "description": "Maximum number of items per page."
-          },
-          "total": {
-            "type": "number",
-            "description": "Total opportunities matching the filters and caller visibility."
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
           }
         },
         "required": [
           "items",
-          "page",
-          "pageSize",
-          "total"
+          "meta"
         ]
       },
       "UpdateOpportunityDto": {
