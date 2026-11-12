@@ -15,6 +15,7 @@ import { OpenAlexModule } from './modules/openalex/openalex.module.js';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module.js';
 import { OutputsModule } from './modules/outputs/outputs.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
+import { InterestsModule } from './modules/interests/interests.module.js';
 import { ProvenanceModule } from './modules/provenance/provenance.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
@@ -71,6 +72,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     OpportunitiesModule,
     OutputsModule,
     ProfilesModule,
+    InterestsModule,
     ProvenanceModule,
     StorageModule,
     TaxonomyModule,

@@ -1131,6 +1131,422 @@
         ]
       }
     },
+    "/research-groups/{groupId}/directions": {
+      "get": {
+        "operationId": "GroupDirectionsController_list",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated directions visible to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDirectionPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List published group directions with taxonomy paths",
+        "tags": [
+          "group-directions"
+        ]
+      },
+      "post": {
+        "operationId": "GroupDirectionsController_create",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDirectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Direction published immediately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDirectionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a direction as the group lead or a core member",
+        "tags": [
+          "group-directions"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/directions/{directionId}": {
+      "patch": {
+        "operationId": "GroupDirectionsController_update",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": true,
+            "in": "path",
+            "description": "Direction belonging to this group.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupDirectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direction updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDirectionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit a direction as the group lead",
+        "tags": [
+          "group-directions"
+        ]
+      },
+      "delete": {
+        "operationId": "GroupDirectionsController_remove",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": true,
+            "in": "path",
+            "description": "Direction belonging to this group.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Direction deleted."
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an unused direction as the group lead",
+        "tags": [
+          "group-directions"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -2814,6 +3230,308 @@
         ]
       }
     },
+    "/opportunities/{opportunityId}/applications": {
+      "post": {
+        "operationId": "ApplicationsController_apply",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "description": "Opportunity to apply to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application recorded with database-calculated deadline and server countdown.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, application note, or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required; cannot apply to your own opportunity or read another owner's received applications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Opportunity is not open/unexpired, an application already exists, or eligibility changed concurrently.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply to an open opportunity with a note and snapshot its SLA",
+        "tags": [
+          "applications"
+        ]
+      },
+      "get": {
+        "operationId": "ApplicationsController_received",
+        "parameters": [
+          {
+            "name": "opportunityId",
+            "required": true,
+            "in": "path",
+            "description": "Opportunity whose received applications are requested.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated received applications with server-calculated SLA countdowns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, application note, or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required; cannot apply to your own opportunity or read another owner's received applications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List received interests as an opportunity owner",
+        "tags": [
+          "applications"
+        ]
+      }
+    },
+    "/my/applications": {
+      "get": {
+        "operationId": "ApplicationsController_mine",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated applications submitted by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, application note, or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required; cannot apply to your own opportunity or read another owner's received applications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the caller's own applications and SLA countdowns",
+        "tags": [
+          "applications"
+        ]
+      }
+    },
     "/outputs": {
       "get": {
         "description": "Returns a paginated list of research outputs visible to the caller (shared community works, member group works, or the caller own working copy draft works).",
@@ -3297,6 +4015,295 @@
         "summary": "Get researcher profile by user ID",
         "tags": [
           "profiles"
+        ]
+      }
+    },
+    "/interests": {
+      "get": {
+        "operationId": "InterestsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All interests belonging to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestsControllerListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all of the caller's interests, including suggestions and rejections",
+        "tags": [
+          "interests"
+        ]
+      },
+      "post": {
+        "operationId": "InterestsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInterestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Declared interest created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or inactive topic.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An interest for this topic already exists, in any status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Declare an active research interest",
+        "tags": [
+          "interests"
+        ]
+      }
+    },
+    "/interests/{id}": {
+      "patch": {
+        "operationId": "InterestsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of an interest owned by the caller.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInterestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Interest review decision saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or activating an inactive topic.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Interest is missing or belongs to another user, or topic is missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept, restore, or reject an owned interest while preserving its source and evidence",
+        "tags": [
+          "interests"
+        ]
+      },
+      "delete": {
+        "operationId": "InterestsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Identifier of an interest owned by the caller.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Interest retained with REJECTED status."
+          },
+          "400": {
+            "description": "Invalid interest UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Researcher access required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Interest is missing or belongs to another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject an owned interest, retaining the row as feedback",
+        "tags": [
+          "interests"
         ]
       }
     },
@@ -4489,6 +5496,183 @@
           "role"
         ]
       },
+      "DirectionTaxonomyNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Taxonomy node identifier.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Taxonomy node display name."
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "DirectionTopicPathDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "description": "Root research field.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTaxonomyNodeDto"
+              }
+            ]
+          },
+          "subfield": {
+            "description": "Parent research subfield.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTaxonomyNodeDto"
+              }
+            ]
+          },
+          "topic": {
+            "description": "Linked research topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTaxonomyNodeDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "subfield",
+          "topic"
+        ]
+      },
+      "GroupDirectionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Research direction identifier.",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Group publishing the direction.",
+            "format": "uuid"
+          },
+          "topicId": {
+            "type": "string",
+            "description": "Linked taxonomy topic, if selected.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "Published direction title."
+          },
+          "description": {
+            "type": "string",
+            "description": "Published direction details.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation/publication timestamp.",
+            "format": "date-time"
+          },
+          "topicPath": {
+            "description": "Full taxonomy context, or null for an unlinked direction.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTopicPathDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "groupId",
+          "topicId",
+          "title",
+          "description",
+          "createdAt",
+          "topicPath"
+        ]
+      },
+      "GroupDirectionPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Published directions in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupDirectionResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CreateGroupDirectionDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Published research direction title.",
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "description": "Research direction details; null clears the description.",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "topicId": {
+            "type": "string",
+            "description": "Optional active taxonomy topic; null clears the topic link.",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateGroupDirectionDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Published research direction title.",
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "description": "Research direction details; null clears the description.",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "topicId": {
+            "type": "string",
+            "description": "Optional active taxonomy topic; null clears the topic link.",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -5521,6 +6705,140 @@
           }
         }
       },
+      "CreateApplicationDto": {
+        "type": "object",
+        "properties": {
+          "applicantNote": {
+            "type": "string",
+            "description": "Researcher application note explaining their interest.",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "applicantNote"
+        ]
+      },
+      "ApplicationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Application identifier.",
+            "format": "uuid"
+          },
+          "opportunityId": {
+            "type": "string",
+            "description": "Opportunity receiving the application.",
+            "format": "uuid"
+          },
+          "applicantId": {
+            "type": "string",
+            "description": "Researcher submitting the application.",
+            "format": "uuid"
+          },
+          "applicantNote": {
+            "type": "string",
+            "description": "Researcher application note."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current application state.",
+            "enum": [
+              "PENDING",
+              "INVITED_TO_DISCUSS",
+              "DECLINED",
+              "WITHDRAWN"
+            ]
+          },
+          "responseNote": {
+            "type": "string",
+            "description": "Opportunity owner response note.",
+            "nullable": true
+          },
+          "respondedBy": {
+            "type": "string",
+            "description": "Researcher who responded, if any.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "appliedAt": {
+            "type": "string",
+            "description": "Submission timestamp set by PostgreSQL.",
+            "format": "date-time"
+          },
+          "responseDueAt": {
+            "type": "string",
+            "description": "Response deadline snapshotted from the SLA at submission.",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": "string",
+            "description": "Response timestamp, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "description": "Withdrawal timestamp, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "countdownAsOf": {
+            "type": "string",
+            "description": "Database time used for this server-calculated countdown.",
+            "format": "date-time"
+          },
+          "remainingSeconds": {
+            "type": "number",
+            "description": "Nonnegative seconds remaining while pending; null after response or withdrawal.",
+            "nullable": true
+          },
+          "isOverdue": {
+            "type": "boolean",
+            "description": "Whether this pending application has reached its response deadline."
+          }
+        },
+        "required": [
+          "id",
+          "opportunityId",
+          "applicantId",
+          "applicantNote",
+          "status",
+          "responseNote",
+          "respondedBy",
+          "appliedAt",
+          "responseDueAt",
+          "respondedAt",
+          "withdrawnAt",
+          "countdownAsOf",
+          "remainingSeconds",
+          "isOverdue"
+        ]
+      },
+      "ApplicationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Applications in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
       "OutputRevisionResponseDto": {
         "type": "object",
         "properties": {
@@ -6056,6 +7374,112 @@
             "example": "57193294821"
           }
         }
+      },
+      "InterestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique interest identifier."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Researcher who owns this interest."
+          },
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Research topic referenced by this interest."
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DECLARED",
+              "INFERRED"
+            ],
+            "description": "Whether the interest was declared or inferred; preserved on review."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Current suggestion or researcher review state."
+          },
+          "provenanceTag": {
+            "type": "string",
+            "enum": [
+              "PAPER",
+              "AI_TRACE",
+              "AI_INF",
+              "HUMAN",
+              "EXT",
+              "UNK"
+            ],
+            "description": "Origin of the evidence supporting the interest."
+          },
+          "evidenceNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "System-recorded supporting evidence, when available."
+          },
+          "declaredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Time the interest was first recorded."
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Time of the latest researcher decision, or null before review."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "topicId",
+          "sourceType",
+          "status",
+          "provenanceTag",
+          "evidenceNote",
+          "declaredAt",
+          "reviewedAt"
+        ]
+      },
+      "CreateInterestDto": {
+        "type": "object",
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Active research topic to declare."
+          }
+        },
+        "required": [
+          "topicId"
+        ]
+      },
+      "UpdateInterestDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Review decision: ACTIVE to accept/restore, REJECTED to reject. SUGGESTED is system-managed."
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "OutputFileVisibility": {
         "type": "string",
@@ -6912,6 +8336,54 @@
           "message"
         ]
       },
+      "GroupDirectionPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupDirectionPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "GroupDirectionResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupDirectionResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "MeDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -7224,6 +8696,54 @@
           "message"
         ]
       },
+      "ApplicationPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ApplicationPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ApplicationResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ApplicationResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "PaginatedOutputsResponseDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -7338,6 +8858,57 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "InterestsControllerListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InterestResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "InterestResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/InterestResponseDto"
           },
           "message": {
             "type": "string",
