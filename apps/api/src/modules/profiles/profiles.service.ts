@@ -60,11 +60,12 @@ export class ProfilesService {
       );
     }
 
-    // Unconfirmed profiles are hidden from non-owners (returning 404 rather than 403)
+    // Unconfirmed profiles are visible to the owner only; non-owners are
+    // refused with 403 rather than a 404 that would hide the denial.
     if (targetUserId !== callerId && profile.profile_confirmed_at === null) {
       throw new CodedHttpException(
-        domainErrorCodes.profiles.profileNotFound,
-        HttpStatus.NOT_FOUND,
+        domainErrorCodes.profiles.profileAccessDenied,
+        HttpStatus.FORBIDDEN,
       );
     }
 

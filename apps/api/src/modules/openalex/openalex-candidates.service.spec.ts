@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OutputImportState, PrismaService } from '@researchos/database';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
@@ -392,7 +392,10 @@ describe('OpenAlexCandidatesService decisions', () => {
 
     const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(ConflictException);
+    expect(err).toMatchObject({
+      status: HttpStatus.CONFLICT,
+      code: domainErrorCodes.openalex.authorConflict,
+    });
   });
 
   it('repeating an accept returns the current state without writing', async () => {
@@ -482,7 +485,10 @@ describe('OpenAlexCandidatesService decisions', () => {
 
     const err = await service.reject(USER_ID, OUT_1).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(ConflictException);
+    expect(err).toMatchObject({
+      status: HttpStatus.CONFLICT,
+      code: domainErrorCodes.openalex.decisionDenied,
+    });
   });
 
   it('accepts after a rejection by confirming the same claim row', async () => {
@@ -536,6 +542,9 @@ describe('OpenAlexCandidatesService decisions', () => {
 
     const err = await service.reject(USER_ID, OUT_1).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(ForbiddenException);
+    expect(err).toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.identity.researcherRequired,
+    });
   });
 });

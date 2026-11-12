@@ -1,8 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
-  ConflictException,
-  ForbiddenException,
+  HttpStatus,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -12,7 +11,9 @@ import {
   Prisma,
   PrismaService,
 } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import type { StorageAdapter } from '@researchos/storage';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type {
   CreateOutputUploadDto,
   OutputFileResponseDto,
@@ -47,7 +48,7 @@ export class OutputUploadService {
       (visibility === OutputFileVisibility.RESEARCH_GROUP) !==
       Boolean(accessGroupId)
     ) {
-      throw new BadRequestException();
+      throw new BadRequestException('validation_failed');
     }
     await this.assertCanManage(userId, outputId, accessGroupId);
 
@@ -80,9 +81,20 @@ export class OutputUploadService {
     outputId: string,
     uploadToken: string,
   ): Promise<OutputFileResponseDto> {
-    const intent = readUploadIntent(uploadToken);
+    let intent: UploadIntent;
+    try {
+      intent = readUploadIntent(uploadToken);
+    } catch {
+      throw new CodedHttpException(
+        domainErrorCodes.storage.uploadIntentInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     if (intent.userId !== userId || intent.outputId !== outputId) {
-      throw new ForbiddenException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
     await this.assertCanManage(userId, outputId);
 
@@ -93,7 +105,10 @@ export class OutputUploadService {
       return this.toResponse(existing);
     }
     if (intent.expiresAt <= Date.now()) {
-      throw new BadRequestException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.uploadIntentInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     await this.verifyObject(intent);
@@ -125,7 +140,10 @@ export class OutputUploadService {
       where: { storage_key: intent.key },
     });
     if (!file) {
-      throw new ConflictException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
     }
     return this.toResponse(file);
   }
@@ -139,7 +157,10 @@ export class OutputUploadService {
       metadata.sizeBytes !== intent.sizeBytes ||
       metadata.contentType !== intent.mimeType
     ) {
-      throw new ConflictException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
     }
     const sha256 =
       metadata.sha256 ??
@@ -161,7 +182,10 @@ export class OutputUploadService {
         }
       }));
     if (sha256 !== intent.sha256) {
-      throw new ConflictException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
     }
   }
 
@@ -179,10 +203,13 @@ export class OutputUploadService {
              ) AS group_exists
     `;
     if (!access?.can_manage) {
-      throw new ForbiddenException();
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
     if (!access.group_exists) {
-      throw new BadRequestException();
+      throw new BadRequestException('validation_failed');
     }
   }
 

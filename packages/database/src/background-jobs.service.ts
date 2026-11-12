@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -75,8 +76,13 @@ export class BackgroundJobsService {
     >`
       SELECT * FROM background_jobs WHERE id = ${id}::uuid AND ${jobAccess(callerId)}
     `;
-    if (!job) throw new NotFoundException();
-    return job;
+    if (job) return job;
+    const exists = await this.prisma.background_jobs.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException();
+    throw new ForbiddenException();
   }
 
   async retryAccessible(callerId: string, id: string) {
@@ -89,20 +95,27 @@ export class BackgroundJobsService {
         WHERE id = ${id}::uuid AND ${jobAccess(callerId)}
         FOR UPDATE
       `;
-      if (!job) throw new NotFoundException();
-      if (job.status !== 'FAILED') throw new ConflictException();
-      return tx.background_jobs.update({
+      if (job) {
+        if (job.status !== 'FAILED') throw new ConflictException();
+        return tx.background_jobs.update({
+          where: { id },
+          data: {
+            status: 'PENDING',
+            generation: { increment: 1 },
+            attempts: 0,
+            error_code: null,
+            result: Prisma.DbNull,
+            updated_at: new Date(),
+            outbox: { create: { generation: job.generation + 1 } },
+          },
+        });
+      }
+      const exists = await tx.background_jobs.findUnique({
         where: { id },
-        data: {
-          status: 'PENDING',
-          generation: { increment: 1 },
-          attempts: 0,
-          error_code: null,
-          result: Prisma.DbNull,
-          updated_at: new Date(),
-          outbox: { create: { generation: job.generation + 1 } },
-        },
+        select: { id: true },
       });
+      if (!exists) throw new NotFoundException();
+      throw new ForbiddenException();
     });
   }
 }

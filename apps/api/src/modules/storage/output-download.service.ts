@@ -6,14 +6,15 @@ import { join } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import {
-  ConflictException,
+  HttpStatus,
   Injectable,
   Logger,
-  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { StorageObjectNotFoundError } from '@researchos/storage';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { ObjectStorageService } from './object-storage.service.js';
 
 const maxStagedBytes = 5n * 1024n ** 3n;
@@ -49,14 +50,25 @@ export class OutputDownloadService {
     fileId: string,
     signal: AbortSignal,
   ): Promise<VerifiedDownload> {
-    const [file] = await this.prisma.$queryRaw<DownloadMetadata[]>`
-      SELECT storage_key, file_name, size_bytes, sha256
+    const [file] = await this.prisma.$queryRaw<
+      Array<DownloadMetadata & { allowed: boolean }>
+    >`
+      SELECT storage_key, file_name, size_bytes, sha256,
+             can_view_output_file(${userId}::uuid, id) AS allowed
       FROM output_files
       WHERE id = ${fileId}::uuid
-        AND can_view_output_file(${userId}::uuid, id)
     `;
     if (!file) {
-      throw new NotFoundException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (!file.allowed) {
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
     signal.throwIfAborted();
 
@@ -110,7 +122,10 @@ export class OutputDownloadService {
         SELECT can_view_output_file(${userId}::uuid, ${fileId}::uuid) AS allowed
       `;
       if (!access?.allowed) {
-        throw new NotFoundException();
+        throw new CodedHttpException(
+          domainErrorCodes.storage.fileAccessDenied,
+          HttpStatus.FORBIDDEN,
+        );
       }
       signal.throwIfAborted();
 
@@ -137,7 +152,12 @@ export class OutputDownloadService {
       transform(chunk: Buffer, _encoding, callback) {
         size += BigInt(chunk.length);
         if (size > file.size_bytes) {
-          callback(new ConflictException());
+          callback(
+            new CodedHttpException(
+              domainErrorCodes.storage.fileConflict,
+              HttpStatus.CONFLICT,
+            ),
+          );
           return;
         }
         hash.update(chunk);
@@ -155,11 +175,14 @@ export class OutputDownloadService {
         signal,
       });
     } catch (error) {
-      if (signal.aborted || error instanceof ConflictException) {
+      if (signal.aborted || error instanceof CodedHttpException) {
         throw error;
       }
       if (error instanceof StorageObjectNotFoundError) {
-        throw new NotFoundException();
+        throw new CodedHttpException(
+          domainErrorCodes.storage.fileNotFound,
+          HttpStatus.NOT_FOUND,
+        );
       }
       this.logger.warn(
         `Could not verify stored file: ${error instanceof Error ? error.name : 'unknown error'}`,
@@ -171,7 +194,10 @@ export class OutputDownloadService {
       size !== file.size_bytes ||
       hash.digest('hex') !== file.sha256.toLowerCase()
     ) {
-      throw new ConflictException();
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
     }
   }
 }

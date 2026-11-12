@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { Test } from '@nestjs/testing';
 import {
   OutputFileVisibility,
@@ -229,7 +226,10 @@ describe('OutputsController & OutputsService', () => {
 
       await expect(
         controller.findOne('00000000-0000-0000-0000-000000000000', callerId),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        code: domainErrorCodes.outputs.outputNotFound,
+      });
     });
 
     it('returns 403 when output exists but caller has no view permission', async () => {
@@ -241,9 +241,12 @@ describe('OutputsController & OutputsService', () => {
 
       const { controller } = await setupController(prismaMock);
 
-      await expect(controller.findOne(outputId, callerId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        controller.findOne(outputId, callerId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.outputs.outputAccessDenied,
+      });
     });
 
     it('returns 200 with pinned revision when caller is authorized', async () => {
@@ -307,7 +310,10 @@ describe('OutputsController & OutputsService', () => {
           '00000000-0000-0000-0000-000000000000',
           callerId,
         ),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        code: domainErrorCodes.outputs.outputNotFound,
+      });
     });
 
     it('returns 403 when caller is not allowed', async () => {
@@ -321,7 +327,10 @@ describe('OutputsController & OutputsService', () => {
 
       await expect(
         controller.findRevisions(outputId, callerId),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.outputs.outputAccessDenied,
+      });
     });
 
     it('returns revisions ordered by revision number descending', async () => {

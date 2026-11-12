@@ -1,9 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
-  NotFoundException,
+  HttpStatus,
 } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
 import {
   OpportunityKind,
   OpportunityStatus,
@@ -95,16 +95,20 @@ describe('OpportunitiesService', () => {
           description: 'Details',
           applicationDeadline: '2099-01-01T00:00:00Z',
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        code: domainErrorCodes.opportunities.invalidState,
+      });
       expect(tx.research_opportunities.create).not.toHaveBeenCalled();
     },
   );
 
   it('rejects non-researchers before writing', async () => {
     tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
-    await expect(service.create(actor, draft)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.create(actor, draft)).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.identity.researcherRequired,
+    });
     expect(tx.research_opportunities.create).not.toHaveBeenCalled();
   });
 
@@ -114,7 +118,10 @@ describe('OpportunitiesService', () => {
       .mockResolvedValueOnce([{ allowed: false }]);
     await expect(
       service.create(actor, { ...draft, groupId: id }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.opportunities.accessDenied,
+    });
   });
 
   it('rejects a project scoped to a different group', async () => {
@@ -191,7 +198,10 @@ describe('OpportunitiesService', () => {
     );
     await expect(
       service.create(actor, { ...draft, title: 'Different' }, 'retry-1'),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      code: domainErrorCodes.opportunities.idempotencyKeyConflict,
+    });
     expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
   });
 
@@ -223,9 +233,10 @@ describe('OpportunitiesService', () => {
   it.each(['', ' ', 'x'.repeat(201)])(
     'rejects invalid idempotency keys',
     async (key) => {
-      await expect(service.create(actor, draft, key)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.create(actor, draft, key)).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        code: domainErrorCodes.opportunities.idempotencyKeyInvalid,
+      });
     },
   );
 
@@ -235,7 +246,10 @@ describe('OpportunitiesService', () => {
       .mockResolvedValueOnce([{ allowed: false }]);
     await expect(
       service.update(actor, id, { title: 'Changed' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.opportunities.accessDenied,
+    });
     expect(tx.research_opportunities.update).not.toHaveBeenCalled();
   });
 
@@ -243,9 +257,10 @@ describe('OpportunitiesService', () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ allowed: true }])
       .mockResolvedValueOnce([]);
-    await expect(service.update(actor, id, {})).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.update(actor, id, {})).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: domainErrorCodes.opportunities.notFound,
+    });
   });
 
   it('validates publication against the merged record and allows partial edits', async () => {
@@ -271,16 +286,28 @@ describe('OpportunitiesService', () => {
     });
     await expect(
       service.update(actor, id, { description: null }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.BAD_REQUEST,
+      code: domainErrorCodes.opportunities.invalidState,
+    });
     expect(tx.research_opportunities.update).not.toHaveBeenCalled();
   });
 
-  it('conceals an invisible detail as 404', async () => {
+  it('returns 404 for a missing detail', async () => {
+    tx.research_opportunities.findUnique.mockResolvedValue(null);
+    await expect(service.findOne(actor, id)).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: domainErrorCodes.opportunities.notFound,
+    });
+  });
+
+  it('denies an invisible detail as 403', async () => {
+    tx.research_opportunities.findUnique.mockResolvedValue(row);
     tx.$queryRaw.mockResolvedValue([]);
-    await expect(service.findOne(actor, id)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect(tx.research_opportunities.findUnique).not.toHaveBeenCalled();
+    await expect(service.findOne(actor, id)).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.opportunities.accessDenied,
+    });
   });
 
   it('returns bounded pagination metadata with a safe numeric count', async () => {

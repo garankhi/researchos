@@ -365,18 +365,20 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       .get(statusUrl)
       .set('Cookie', cookie())
       .expect(200);
+    // The job exists, so another caller is denied access rather than told
+    // the job is missing: 404 is reserved for a job that does not exist.
     await request(app.getHttpServer())
       .get(statusUrl)
       .set('Cookie', cookie(1))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .get(statusUrl)
       .set('Cookie', cookie(2))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .post(`${statusUrl}/retry`)
       .set('Cookie', cookie(1))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .post(`${statusUrl}/retry`)
       .set('Cookie', cookie(2))

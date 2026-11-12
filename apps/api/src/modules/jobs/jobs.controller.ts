@@ -70,12 +70,10 @@ export class JobsController {
   @ApiOkResponse({ description: 'Current durable status.', type: JobDto })
   @ApiForbiddenResponse({
     description:
-      'The LOCAL session must change its password before accessing jobs.',
+      'Job belongs to another owner, or the LOCAL session must change its password before accessing jobs.',
   })
   @ApiBadRequestResponse({ description: 'Invalid job UUID.' })
-  @ApiNotFoundResponse({
-    description: 'Job is missing or inaccessible to the caller.',
-  })
+  @ApiNotFoundResponse({ description: 'Job does not exist.' })
   find(
     @CurrentUserId() userId: string,
     @Param('id', uuidPipe) id: string,
@@ -99,9 +97,7 @@ export class JobsController {
     description:
       'Requires ADMIN. Research update jobs can be retried across owners.',
   })
-  @ApiNotFoundResponse({
-    description: 'Job is missing or inaccessible to the caller.',
-  })
+  @ApiNotFoundResponse({ description: 'Job does not exist.' })
   @ApiConflictResponse({ description: 'Only failed jobs can be reprocessed.' })
   retry(
     @CurrentUserId() userId: string,

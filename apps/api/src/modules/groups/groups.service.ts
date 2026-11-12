@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -198,7 +193,10 @@ export class GroupsService {
       });
 
       if (!membership) {
-        throw new ForbiddenException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
       }
     }
 
@@ -236,7 +234,10 @@ export class GroupsService {
       (callerAccess.isResearcher && existing.lead_id === callerId);
 
     if (!canManage) {
-      throw new ForbiddenException();
+      throw new CodedHttpException(
+        domainErrorCodes.groups.accessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const data: Prisma.research_groupsUpdateInput = {};

@@ -93,6 +93,10 @@ export class OpportunitiesController {
     description: 'The visible opportunity.',
     type: OpportunityResponseDto,
   })
+  @ApiForbiddenResponse({
+    description: 'Caller is not allowed to view this opportunity.',
+  })
+  @ApiNotFoundResponse({ description: 'Opportunity does not exist.' })
   findOne(
     @CurrentUserId() actorId: string,
     @Param('opportunityId', new ParseUUIDPipe()) id: string,

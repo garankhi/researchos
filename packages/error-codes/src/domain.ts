@@ -67,17 +67,24 @@ export const domainErrorCodes = {
   follows: {
     selfFollow: 'follow_self',
     targetTypeUnsupported: 'follow_target_type_unsupported',
+    targetNotFound: 'follow_target_not_found',
+    alreadyFollowing: 'already_following',
   },
   groups: {
     groupNotFound: 'group_not_found',
     groupCodeAlreadyExists: 'group_code_already_exists',
     groupLeaderIneligible: 'group_leader_ineligible',
+    accessDenied: 'group_access_denied',
+    memberNotFound: 'group_member_not_found',
+    memberAlreadyExists: 'group_member_already_exists',
+    leadRemovalDenied: 'group_lead_removal_denied',
   },
   identity: {
     invalidCredentials: 'invalid_credentials',
     accountInactive: 'account_inactive',
     mustChangePassword: 'must_change_password',
     passwordUnchanged: 'password_unchanged',
+    researcherRequired: 'researcher_required',
     userNotFound: 'user_not_found',
     userAlreadyExists: 'user_already_exists',
     emailAlreadyRegistered: 'email_already_registered',
@@ -89,9 +96,24 @@ export const domainErrorCodes = {
   },
   opportunities: {
     notFound: 'opportunity_not_found',
+    accessDenied: 'opportunity_access_denied',
+    invalidState: 'opportunity_invalid_state',
+    idempotencyKeyInvalid: 'opportunity_idempotency_key_invalid',
+    idempotencyKeyConflict: 'opportunity_idempotency_key_conflict',
+  },
+  outputs: {
+    outputNotFound: 'output_not_found',
+    outputAccessDenied: 'output_access_denied',
+  },
+  storage: {
+    fileNotFound: 'output_file_not_found',
+    fileAccessDenied: 'output_file_access_denied',
+    fileConflict: 'output_file_conflict',
+    uploadIntentInvalid: 'output_upload_intent_invalid',
   },
   profiles: {
     profileNotFound: 'profile_not_found',
+    profileAccessDenied: 'profile_access_denied',
   },
   provenance: {
     fieldLocked: 'provenance_field_locked',
@@ -103,6 +125,8 @@ export const domainErrorCodes = {
     authorNotFound: 'openalex_author_not_found',
     workNotFound: 'openalex_work_not_found',
     serviceUnavailable: 'openalex_unavailable',
+    decisionDenied: 'openalex_decision_denied',
+    authorConflict: 'openalex_author_conflict',
   },
   taxonomy: {
     fieldNotFound: 'field_not_found',

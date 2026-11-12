@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
+  HttpStatus,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { OpportunityStatus, Prisma, PrismaService } from '@researchos/database';
 import type { ResearchOpportunity } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto.js';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto.js';
 import { ListOpportunitiesQueryDto } from './dto/list-opportunities-query.dto.js';
@@ -57,7 +58,10 @@ export class OpportunitiesService {
       SELECT is_researcher(${actorId}::uuid) AS allowed
     `;
     if (!result?.allowed)
-      throw new ForbiddenException('An active researcher account is required');
+      throw new CodedHttpException(
+        domainErrorCodes.identity.researcherRequired,
+        HttpStatus.FORBIDDEN,
+      );
   }
 
   private async checkScope(
@@ -69,12 +73,15 @@ export class OpportunitiesService {
       const [group] = await tx.$queryRaw<{ allowed: boolean }[]>`
         SELECT (g.lead_id = ${actorId}::uuid OR EXISTS (
           SELECT 1 FROM group_members m WHERE m.group_id = g.id
-          AND m.user_id = ${actorId}::uuid AND m.role = 'CORE_MEMBER'
+          AND m.user_id = ${actorId}::uuid AND m.role = 'GROUP_LEADER'
         )) AS allowed FROM research_groups g
         WHERE g.id = ${dto.groupId}::uuid AND g.is_active AND g.archived_at IS NULL
       `;
       if (!group?.allowed)
-        throw new ForbiddenException('Group management permission is required');
+        throw new CodedHttpException(
+          domainErrorCodes.opportunities.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
     }
     if (dto.projectId) {
       const [project] = await tx.$queryRaw<
@@ -84,14 +91,15 @@ export class OpportunitiesService {
         WHERE id = ${dto.projectId}::uuid AND archived_at IS NULL
       `;
       if (!project || project.leadId !== actorId)
-        throw new ForbiddenException(
-          'Project management permission is required',
+        throw new CodedHttpException(
+          domainErrorCodes.opportunities.accessDenied,
+          HttpStatus.FORBIDDEN,
         );
       // PostgreSQL returns a UUID in lower case, while the caller may send
       // the same UUID in upper case. The ids are equal, so they are
       // compared in a single case rather than rejected as a mismatch.
       if (normalizeUuid(project.groupId) !== normalizeUuid(dto.groupId))
-        throw new BadRequestException('Project and group scopes must match');
+        throw new BadRequestException('validation_failed');
     }
   }
 
@@ -109,8 +117,9 @@ export class OpportunitiesService {
         !record.applicationDeadline ||
         !record.publishedAt)
     ) {
-      throw new BadRequestException(
-        'A non-draft opportunity requires a non-empty title and description, applicationDeadline and publishedAt',
+      throw new CodedHttpException(
+        domainErrorCodes.opportunities.invalidState,
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -169,16 +178,10 @@ export class OpportunitiesService {
       if (readDatabaseFailure(error)?.sqlState === '23514')
         throw new BadRequestException('validation_failed');
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2003')
-          throw new BadRequestException(
-            'A referenced resource no longer exists',
-          );
-        if (error.code === 'P2004')
-          throw new BadRequestException(
-            'Opportunity constraints were not satisfied',
-          );
+        if (error.code === 'P2003' || error.code === 'P2004')
+          throw new BadRequestException('validation_failed');
         if (error.code === 'P2002' || error.code === 'P2034')
-          throw new ConflictException('Concurrent change; retry the request');
+          throw new ConflictException();
       }
       throw error;
     }
@@ -231,12 +234,14 @@ export class OpportunitiesService {
     key?: string,
   ): Promise<OpportunityResponseDto> {
     if (key !== undefined && (!key.trim() || key.length > 200))
-      throw new BadRequestException(
-        'Idempotency-Key must contain 1 to 200 characters',
+      throw new CodedHttpException(
+        domainErrorCodes.opportunities.idempotencyKeyInvalid,
+        HttpStatus.BAD_REQUEST,
       );
     if (dto.status !== undefined && dto.status !== OpportunityStatus.DRAFT)
-      throw new BadRequestException(
-        'Create the opportunity as DRAFT, then publish it using a status action',
+      throw new CodedHttpException(
+        domainErrorCodes.opportunities.invalidState,
+        HttpStatus.BAD_REQUEST,
       );
     // Sort properties so equivalent JSON objects with different key order replay.
     const hash = createHash('sha256')
@@ -267,12 +272,14 @@ export class OpportunitiesService {
           });
           if (previous) {
             if (previous.create_request_hash !== hash)
-              throw new ConflictException(
-                'Idempotency-Key was already used with a different payload',
+              throw new CodedHttpException(
+                domainErrorCodes.opportunities.idempotencyKeyConflict,
+                HttpStatus.CONFLICT,
               );
             if (!previous.create_response)
-              throw new ConflictException(
-                'The original create response is unavailable',
+              throw new CodedHttpException(
+                domainErrorCodes.opportunities.idempotencyKeyConflict,
+                HttpStatus.CONFLICT,
               );
             return previous.create_response as unknown as OpportunityResponseDto;
           }
@@ -343,14 +350,22 @@ export class OpportunitiesService {
     await this.expireOverdue(id);
     return this.prisma.$transaction(
       async (tx) => {
-        const [visible] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT o.id FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
-      `;
-        if (!visible) throw new NotFoundException('Opportunity not found');
         const row = await tx.research_opportunities.findUnique({
           where: { id },
         });
-        if (!row) throw new NotFoundException('Opportunity not found');
+        if (!row)
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.notFound,
+            HttpStatus.NOT_FOUND,
+          );
+        const [visible] = await tx.$queryRaw<{ id: string }[]>`
+        SELECT o.id FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
+      `;
+        if (!visible)
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.accessDenied,
+            HttpStatus.FORBIDDEN,
+          );
         return this.response(row);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
@@ -370,10 +385,15 @@ export class OpportunitiesService {
         SELECT ${this.management(actorId)} AS allowed FROM research_opportunities o
         WHERE o.id = ${id}::uuid FOR UPDATE OF o
       `;
-        if (!record) throw new NotFoundException('Opportunity not found');
+        if (!record)
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.notFound,
+            HttpStatus.NOT_FOUND,
+          );
         if (!record.allowed)
-          throw new ForbiddenException(
-            'Only the creator, group lead or core members can edit an opportunity',
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.accessDenied,
+            HttpStatus.FORBIDDEN,
           );
         const current = await tx.research_opportunities.findUniqueOrThrow({
           where: { id },
@@ -415,8 +435,16 @@ export class OpportunitiesService {
           SELECT ${this.management(actorId)} AS allowed FROM research_opportunities o
           WHERE o.id = ${id}::uuid FOR UPDATE OF o
         `;
-        if (!record) throw new NotFoundException();
-        if (!record.allowed) throw new ForbiddenException();
+        if (!record)
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.notFound,
+            HttpStatus.NOT_FOUND,
+          );
+        if (!record.allowed)
+          throw new CodedHttpException(
+            domainErrorCodes.opportunities.accessDenied,
+            HttpStatus.FORBIDDEN,
+          );
 
         const current = await tx.research_opportunities.findUniqueOrThrow({
           where: { id },

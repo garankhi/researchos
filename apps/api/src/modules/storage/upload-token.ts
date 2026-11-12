@@ -1,8 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import {
-  BadRequestException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type { OutputFileVisibility } from '@researchos/database';
 
 export interface UploadIntent {
@@ -26,7 +25,10 @@ export function signUploadIntent(intent: UploadIntent): string {
 export function readUploadIntent(token: string): UploadIntent {
   const [payload, signature, extra] = token.split('.');
   if (!payload || !signature || extra !== undefined) {
-    throw new BadRequestException();
+    throw new CodedHttpException(
+      domainErrorCodes.storage.uploadIntentInvalid,
+      HttpStatus.BAD_REQUEST,
+    );
   }
   const expected = Buffer.from(sign(payload).toString('base64url'));
   const received = Buffer.from(signature);
@@ -34,7 +36,10 @@ export function readUploadIntent(token: string): UploadIntent {
     expected.length !== received.length ||
     !timingSafeEqual(expected, received)
   ) {
-    throw new BadRequestException();
+    throw new CodedHttpException(
+      domainErrorCodes.storage.uploadIntentInvalid,
+      HttpStatus.BAD_REQUEST,
+    );
   }
   return JSON.parse(
     Buffer.from(payload, 'base64url').toString('utf8'),

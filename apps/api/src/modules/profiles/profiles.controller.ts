@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -24,7 +25,7 @@ import { ProfilesService } from './profiles.service.js';
  *
  * All routes require authentication. Visibility of third-party profiles is
  * derived from the confirmation state: confirmed profiles are public to the
- * university, whereas unconfirmed profiles return 404 to non-owners.
+ * university, whereas unconfirmed profiles return 403 to non-owners.
  */
 @ApiTags('profiles')
 @ApiBearerAuth()
@@ -66,8 +67,10 @@ export class ProfilesController {
     type: ProfileResponseDto,
   })
   @ApiNotFoundResponse({
-    description:
-      'The requested researcher profile was not found or is unconfirmed.',
+    description: 'The requested researcher profile was not found.',
+  })
+  @ApiForbiddenResponse({
+    description: 'The profile is unconfirmed and the caller is not the owner.',
   })
   @Get(':userId')
   async getProfileById(

@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   HttpStatus,
   ValidationPipe,
 } from '@nestjs/common';
@@ -270,15 +269,18 @@ describe('GroupsController', () => {
       prismaMock.group_members.findUnique.mockResolvedValueOnce({
         group_id: groupId,
         user_id: memberId,
-        role: 'COLLABORATOR',
+        role: 'MEMBER',
       });
       const memberView = await controller.findOne(groupId, memberId);
       expect(memberView.id).toBe(groupId);
 
       prismaMock.group_members.findUnique.mockResolvedValueOnce(null);
-      await expect(controller.findOne(groupId, outsiderId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        controller.findOne(groupId, outsiderId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
     });
 
     it('throws 404 group_not_found when group does not exist', async () => {
@@ -333,7 +335,10 @@ describe('GroupsController', () => {
 
       await expect(
         controller.update(groupId, { name: 'Unauthorized Edit' }, outsiderId),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
     });
 
     it('rejects explicit null for non-nullable fields (code, name, leadId, isActive) with 400', async () => {

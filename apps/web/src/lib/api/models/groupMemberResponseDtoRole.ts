@@ -13,7 +13,6 @@ export type GroupMemberResponseDtoRole =
   (typeof GroupMemberResponseDtoRole)[keyof typeof GroupMemberResponseDtoRole];
 
 export const GroupMemberResponseDtoRole = {
-  CORE_MEMBER: 'CORE_MEMBER',
-  COLLABORATOR: 'COLLABORATOR',
-  STUDENT_MEMBER: 'STUDENT_MEMBER',
+  MEMBER: 'MEMBER',
+  GROUP_LEADER: 'GROUP_LEADER',
 } as const;

@@ -1,11 +1,7 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
   PaginationQueryDto,
@@ -64,12 +60,19 @@ export class GroupMembersService {
     return this.write(async (tx) => {
       await this.authorize(tx, groupId, callerId, true);
       if (dto.userId.toLowerCase() === callerId.toLowerCase())
-        throw new ForbiddenException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
       const user = await tx.users.findUnique({
         where: { id: dto.userId },
         select: { id: true },
       });
-      if (!user) throw new NotFoundException();
+      if (!user)
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberNotFound,
+          HttpStatus.NOT_FOUND,
+        );
       const row = await tx.group_members.create({
         data: { group_id: groupId, user_id: dto.userId, role: dto.role },
       });
@@ -101,7 +104,10 @@ export class GroupMembersService {
     await this.write(async (tx) => {
       const group = await this.authorize(tx, groupId, callerId, true);
       if (group.is_active && group.lead_id === userId.toLowerCase())
-        throw new ConflictException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.leadRemovalDenied,
+          HttpStatus.FORBIDDEN,
+        );
       await tx.group_members.delete({
         where: { group_id_user_id: { group_id: groupId, user_id: userId } },
       });
@@ -122,13 +128,20 @@ export class GroupMembersService {
     const group = await tx.research_groups.findUnique({
       where: { id: groupId },
     });
-    if (!group) throw new NotFoundException();
+    if (!group)
+      throw new CodedHttpException(
+        domainErrorCodes.groups.groupNotFound,
+        HttpStatus.NOT_FOUND,
+      );
     if (group.lead_id === callerId.toLowerCase()) return group;
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (!member || (write && member.role !== GroupMemberRole.CORE_MEMBER))
-      throw new ForbiddenException();
+    if (!member || (write && member.role !== GroupMemberRole.GROUP_LEADER))
+      throw new CodedHttpException(
+        domainErrorCodes.groups.accessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     return group;
   }
 
@@ -140,13 +153,19 @@ export class GroupMembersService {
     } catch (error) {
       const failure = readDatabaseFailure(error);
       if (failure?.prismaCode === 'P2002' || failure?.sqlState === '23505')
-        throw new ConflictException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberAlreadyExists,
+          HttpStatus.CONFLICT,
+        );
       if (
         failure?.prismaCode === 'P2025' ||
         failure?.prismaCode === 'P2003' ||
         failure?.sqlState === '23503'
       )
-        throw new NotFoundException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberNotFound,
+          HttpStatus.NOT_FOUND,
+        );
       throw error;
     }
   }
