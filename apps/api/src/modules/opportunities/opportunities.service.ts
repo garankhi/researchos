@@ -321,7 +321,8 @@ export class OpportunitiesService {
     const conditions = Prisma.sql`${this.visibility(actorId)}
       ${query.groupId ? Prisma.sql`AND o.group_id = ${query.groupId}::uuid` : Prisma.empty}
       ${query.projectId ? Prisma.sql`AND o.project_id = ${query.projectId}::uuid` : Prisma.empty}
-      ${query.status ? Prisma.sql`AND o.status = ${query.status}::opportunity_status` : Prisma.empty}`;
+      ${query.status ? Prisma.sql`AND o.status = ${query.status}::opportunity_status` : Prisma.empty}
+      ${query.creatorId ? Prisma.sql`AND o.creator_id = ${query.creatorId}::uuid` : Prisma.empty}`;
     return this.prisma.$transaction(
       async (tx) => {
         const ids = await tx.$queryRaw<{ id: string }[]>`

@@ -319,4 +319,38 @@ describe('OpportunitiesService', () => {
       await service.findAll(actor, new ListOpportunitiesQueryDto()),
     ).toMatchObject({ page: 1, pageSize: 20, total: 1, items: [{ id }] });
   });
+
+  it('filters by creator without dropping the visibility predicate', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+
+    const query = new ListOpportunitiesQueryDto();
+    query.creatorId = '00000000-0000-4000-8000-000000000009';
+
+    await service.findAll(actor, query);
+
+    const sql = JSON.stringify(tx.$queryRaw.mock.calls[0][1]);
+    // The creator filter narrows the result set; the visibility predicate
+    // still decides which rows the caller may see at all.
+    expect(sql).toContain('o.creator_id = ');
+    expect(sql).toContain('can_manage_opportunity');
+    expect(tx.$queryRaw.mock.calls[0][1].values).toContain(
+      '00000000-0000-4000-8000-000000000009',
+    );
+  });
+
+  it('omits the creator condition when the filter is absent', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+
+    await service.findAll(actor, new ListOpportunitiesQueryDto());
+
+    expect(JSON.stringify(tx.$queryRaw.mock.calls[0][1])).not.toContain(
+      'o.creator_id',
+    );
+  });
 });

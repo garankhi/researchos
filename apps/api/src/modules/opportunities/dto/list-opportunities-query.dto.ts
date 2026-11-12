@@ -50,4 +50,13 @@ export class ListOpportunitiesQueryDto {
   @IsOptional()
   @IsEnum(OpportunityStatus)
   status?: OpportunityStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by the researcher who created the opportunity, without widening visibility.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  creatorId?: string;
 }

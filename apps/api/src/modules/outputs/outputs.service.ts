@@ -51,7 +51,7 @@ export class OutputsService {
    * Enforces that:
    * - A caller only sees outputs where `can_view_output(callerId, o.id)` is true.
    * - A DRAFT output is only returned if `o.owner_id = callerId`.
-   * - Filtering by `userId` or `groupId` narrows the result set.
+   * - Filtering by `userId`, `groupId` or `authorId` narrows the result set.
    */
   async findAll(
     callerId: string,
@@ -99,6 +99,18 @@ export class OutputsService {
           SELECT 1 FROM group_output_links gol
           WHERE gol.output_id = o.id AND gol.group_id = ${query.groupId}::uuid AND gol.status = 'ACCEPTED'
         ))`,
+      );
+    }
+
+    if (query.authorId) {
+      // `userId` filters the owner; this one finds the co-authored works
+      // whose `owner_id` belongs to somebody else. `output_authors.user_id`
+      // is indexed, so the lookup stays index-backed.
+      conditions.push(
+        Prisma.sql`EXISTS (
+          SELECT 1 FROM output_authors oa
+          WHERE oa.output_id = o.id AND oa.user_id = ${query.authorId}::uuid
+        )`,
       );
     }
 

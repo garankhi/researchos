@@ -23,4 +23,14 @@ export class ListOutputsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   groupId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter outputs a specific researcher is an author of (UUID), including co-authored works they do not own.',
+    example: '33333333-3333-4333-8333-333333333333',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  authorId?: string;
 }

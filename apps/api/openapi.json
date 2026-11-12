@@ -637,6 +637,17 @@
             }
           },
           {
+            "name": "memberId",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups a specific researcher belongs to (UUID), whether or not they lead the group.",
+            "schema": {
+              "format": "uuid",
+              "example": "2f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e12",
+              "type": "string"
+            }
+          },
+          {
             "name": "isActive",
             "required": false,
             "in": "query",
@@ -2926,6 +2937,16 @@
                 "EXPIRED"
               ]
             }
+          },
+          {
+            "name": "creatorId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by the researcher who created the opportunity, without widening visibility.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3654,6 +3675,17 @@
               "example": "22222222-2222-4222-8222-222222222222",
               "type": "string"
             }
+          },
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "description": "Filter outputs a specific researcher is an author of (UUID), including co-authored works they do not own.",
+            "schema": {
+              "format": "uuid",
+              "example": "33333333-3333-4333-8333-333333333333",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3974,7 +4006,7 @@
         ]
       },
       "patch": {
-        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).",
+        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId) and of their account (fullName, departmentUnit, academicTitle, academicDegree). orcidId, email and userType are not editable here.",
         "operationId": "ProfilesController_updateMyProfile",
         "parameters": [],
         "requestBody": {
@@ -4074,6 +4106,65 @@
           }
         ],
         "summary": "Get researcher profile by user ID",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/{userId}/interests": {
+      "get": {
+        "description": "Returns the interests of the target researcher, each with the taxonomy path of its topic and its review status.",
+        "operationId": "ProfilesController_getInterestsByUserId",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the target user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interests of the target researcher, newest declaration first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilesControllerGetInterestsByUserIdEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The profile is unconfirmed and the caller is not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the research interests of a researcher",
         "tags": [
           "profiles"
         ]
@@ -7435,9 +7526,120 @@
           "onboardingCompletedAt"
         ]
       },
+      "ProfileInterestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the interest.",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Researcher who owns this interest.",
+            "format": "uuid"
+          },
+          "topicId": {
+            "type": "string",
+            "description": "Research topic referenced by this interest.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Current state of the interest: active, suggested by the platform, or rejected."
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DECLARED",
+              "INFERRED"
+            ],
+            "description": "Whether the interest was declared or inferred; preserved on review."
+          },
+          "provenanceTag": {
+            "type": "string",
+            "enum": [
+              "PAPER",
+              "AI_TRACE",
+              "AI_INF",
+              "HUMAN",
+              "EXT",
+              "UNK"
+            ],
+            "description": "Origin of the evidence supporting the interest."
+          },
+          "evidenceNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "System-recorded supporting evidence, when available."
+          },
+          "declaredAt": {
+            "type": "string",
+            "description": "Time the interest was first recorded.",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Time of the latest researcher decision, or null before review."
+          },
+          "topicPath": {
+            "description": "Full taxonomy context of the interest topic: field, subfield and topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTopicPathDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "topicId",
+          "status",
+          "sourceType",
+          "provenanceTag",
+          "evidenceNote",
+          "declaredAt",
+          "reviewedAt",
+          "topicPath"
+        ]
+      },
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher. Required to be non-blank when sent.",
+            "example": "PGS. TS. Nguyễn Văn A",
+            "maxLength": 255
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit. Required to be non-blank when sent.",
+            "example": "Software Engineering",
+            "maxLength": 255
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title; null clears the stored title.",
+            "example": "PGS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree; null clears the stored degree.",
+            "example": "TS",
+            "nullable": true,
+            "maxLength": 100
+          },
           "bio": {
             "type": "string",
             "description": "Biographical summary and research statement.",
@@ -8974,6 +9176,33 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ProfilesControllerGetInterestsByUserIdEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileInterestResponseDto"
+            }
           },
           "message": {
             "type": "string",

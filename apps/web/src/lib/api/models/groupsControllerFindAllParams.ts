@@ -31,6 +31,10 @@ export type GroupsControllerFindAllParams = {
    */
   leadId?: string;
   /**
+   * Filter groups a specific researcher belongs to (UUID), whether or not they lead the group.
+   */
+  memberId?: string;
+  /**
    * Filter groups by active status.
    */
   isActive?: boolean;

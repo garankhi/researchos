@@ -31,4 +31,8 @@ export type OpportunitiesControllerFindAllParams = {
    * Filter by lifecycle status without widening visibility.
    */
   status?: OpportunitiesControllerFindAllStatus;
+  /**
+   * Filter by the researcher who created the opportunity, without widening visibility.
+   */
+  creatorId?: string;
 };

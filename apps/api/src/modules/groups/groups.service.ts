@@ -135,6 +135,16 @@ export class GroupsService {
       andConditions.push({ lead_id: query.leadId });
     }
 
+    if (query.memberId) {
+      // Prisma renders this as the same `EXISTS (SELECT 1 FROM group_members
+      // WHERE group_id = ... AND user_id = ...)` the plan describes. It is a
+      // filter, not a visibility grant: the public/lead/member clause above
+      // still decides which groups the caller may see at all.
+      andConditions.push({
+        group_members: { some: { user_id: query.memberId } },
+      });
+    }
+
     if (query.isActive !== undefined) {
       andConditions.push({ is_active: query.isActive });
     }

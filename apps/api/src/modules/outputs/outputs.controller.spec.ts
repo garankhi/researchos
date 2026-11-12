@@ -9,6 +9,7 @@ import {
   PublicationStatusEnum,
 } from '@researchos/database';
 import { describe, expect, it, vi } from 'vitest';
+import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputsController } from './outputs.controller.js';
 import { OutputsService } from './outputs.service.js';
 
@@ -214,6 +215,43 @@ describe('OutputsController & OutputsService', () => {
       await expect(
         controller.findAll(callerId, { sort: 'invalidSort' }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('filters by author without dropping the visibility predicate', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 0n }])
+        .mockResolvedValueOnce([]);
+
+      const { controller } = await setupController(prismaMock);
+      await controller.findAll(callerId, {
+        page: 1,
+        limit: 20,
+        authorId: callerId,
+      } as ListOutputsQueryDto);
+
+      const sql = JSON.stringify(prismaMock.tx.$queryRaw.mock.calls[0][0]);
+      // The author filter finds co-authored works the caller does not own;
+      // `can_view_output` still decides which rows are visible at all.
+      expect(sql).toContain('output_authors oa');
+      expect(sql).toContain('can_view_output');
+      expect(prismaMock.tx.$queryRaw.mock.calls[0][0].values).toContain(
+        callerId,
+      );
+    });
+
+    it('omits the author condition when the filter is absent', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 0n }])
+        .mockResolvedValueOnce([]);
+
+      const { controller } = await setupController(prismaMock);
+      await controller.findAll(callerId, { page: 1, limit: 20 });
+
+      expect(
+        JSON.stringify(prismaMock.tx.$queryRaw.mock.calls[0][0]),
+      ).not.toContain('output_authors');
     });
   });
 

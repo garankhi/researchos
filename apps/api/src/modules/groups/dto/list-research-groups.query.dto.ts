@@ -28,6 +28,16 @@ export class ListResearchGroupsQueryDto extends PaginationQueryDto {
   leadId?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Filter groups a specific researcher belongs to (UUID), whether or not they lead the group.',
+    example: '2f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e12',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  memberId?: string;
+
+  @ApiPropertyOptional({
     description: 'Filter groups by active status.',
     example: true,
   })

@@ -101,7 +101,17 @@
         "email_already_registered": "This email is already registered.",
         "status_required": "Status is required.",
         "application_deadline_invalid": "The application deadline must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
-        "archived_at_invalid": "The archive timestamp must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00."
+        "archived_at_invalid": "The archive timestamp must be an RFC 3339 date-time with a timezone offset, e.g. 2026-11-07T10:00:00+07:00.",
+        "full_name_required": "Full name is required.",
+        "full_name_invalid": "Full name must be text.",
+        "full_name_too_long": "Full name must not exceed 255 characters.",
+        "department_unit_required": "Department unit is required.",
+        "department_unit_invalid": "Department unit must be text.",
+        "department_unit_too_long": "Department unit must not exceed 255 characters.",
+        "academic_title_invalid": "Academic title must be text.",
+        "academic_title_too_long": "Academic title must not exceed 100 characters.",
+        "academic_degree_invalid": "Academic degree must be text.",
+        "academic_degree_too_long": "Academic degree must not exceed 100 characters."
       },
       "domain": {
         "follow_self": "You cannot follow yourself.",

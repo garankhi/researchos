@@ -101,7 +101,17 @@
         "email_already_registered": "Email này đã được đăng ký.",
         "status_required": "Trạng thái là bắt buộc.",
         "application_deadline_invalid": "Hạn nhận phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00.",
-        "archived_at_invalid": "Thời điểm lưu trữ phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00."
+        "archived_at_invalid": "Thời điểm lưu trữ phải là date-time RFC 3339 kèm múi giờ, ví dụ 2026-11-07T10:00:00+07:00.",
+        "full_name_required": "Họ và tên là bắt buộc.",
+        "full_name_invalid": "Họ và tên phải là chuỗi ký tự.",
+        "full_name_too_long": "Họ và tên không được vượt quá 255 ký tự.",
+        "department_unit_required": "Đơn vị phòng ban là bắt buộc.",
+        "department_unit_invalid": "Đơn vị phòng ban phải là chuỗi ký tự.",
+        "department_unit_too_long": "Đơn vị phòng ban không được vượt quá 255 ký tự.",
+        "academic_title_invalid": "Chức danh học thuật phải là chuỗi ký tự.",
+        "academic_title_too_long": "Chức danh học thuật không được vượt quá 100 ký tự.",
+        "academic_degree_invalid": "Học vị phải là chuỗi ký tự.",
+        "academic_degree_too_long": "Học vị không được vượt quá 100 ký tự."
       },
       "domain": {
         "follow_self": "Bạn không thể tự theo dõi mình.",
