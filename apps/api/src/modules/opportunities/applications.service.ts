@@ -196,7 +196,10 @@ export class ApplicationsService {
           HttpStatus.CONFLICT,
         );
       const answered = await tx.opportunity_applications.updateManyAndReturn({
-        where: { id: applicationId, status: OpportunityApplicationStatus.PENDING },
+        where: {
+          id: applicationId,
+          status: OpportunityApplicationStatus.PENDING,
+        },
         data: {
           status: dto.decision,
           // A blank note is no note: it is stored as null so the API does not
@@ -250,7 +253,10 @@ export class ApplicationsService {
           HttpStatus.CONFLICT,
         );
       const withdrawn = await tx.opportunity_applications.updateManyAndReturn({
-        where: { id: applicationId, status: OpportunityApplicationStatus.PENDING },
+        where: {
+          id: applicationId,
+          status: OpportunityApplicationStatus.PENDING,
+        },
         data: { status: OpportunityApplicationStatus.WITHDRAWN },
       });
       if (!withdrawn.length)

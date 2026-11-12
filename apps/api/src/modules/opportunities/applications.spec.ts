@@ -375,7 +375,10 @@ describe('Applications HTTP contract', () => {
       const response = await request()
         .post(respondUrl)
         .set('Cookie', cookie)
-        .send({ decision: 'INVITED_TO_DISCUSS', responseNote: '  Let us meet next week.  ' })
+        .send({
+          decision: 'INVITED_TO_DISCUSS',
+          responseNote: '  Let us meet next week.  ',
+        })
         .expect(200);
       expect(response.body).toMatchObject({
         id,
@@ -386,7 +389,9 @@ describe('Applications HTTP contract', () => {
         remainingSeconds: null,
         isOverdue: false,
       });
-      expect(tx.opportunity_applications.updateManyAndReturn).toHaveBeenCalledWith({
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
         data: {
           status: 'INVITED_TO_DISCUSS',
@@ -398,31 +403,53 @@ describe('Applications HTTP contract', () => {
 
     it('declines a pending application and leaves the responder unset otherwise', async () => {
       tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
-        { ...row, status: 'DECLINED', responded_by: actorId, responded_at: now },
+        {
+          ...row,
+          status: 'DECLINED',
+          responded_by: actorId,
+          responded_at: now,
+        },
       ]);
       await request()
         .post(respondUrl)
         .set('Cookie', cookie)
         .send({ decision: 'DECLINED' })
         .expect(200);
-      expect(tx.opportunity_applications.updateManyAndReturn).toHaveBeenCalledWith({
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
-        data: { status: 'DECLINED', response_note: null, responded_by: actorId },
+        data: {
+          status: 'DECLINED',
+          response_note: null,
+          responded_by: actorId,
+        },
       });
     });
 
     it('stores a blank note as no note at all', async () => {
       tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
-        { ...row, status: 'DECLINED', responded_by: actorId, responded_at: now },
+        {
+          ...row,
+          status: 'DECLINED',
+          responded_by: actorId,
+          responded_at: now,
+        },
       ]);
       await request()
         .post(respondUrl)
         .set('Cookie', cookie)
         .send({ decision: 'DECLINED', responseNote: '   ' })
         .expect(200);
-      expect(tx.opportunity_applications.updateManyAndReturn).toHaveBeenCalledWith({
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
-        data: { status: 'DECLINED', response_note: null, responded_by: actorId },
+        data: {
+          status: 'DECLINED',
+          response_note: null,
+          responded_by: actorId,
+        },
       });
     });
 
@@ -438,13 +465,16 @@ describe('Applications HTTP contract', () => {
         .send({ decision: 'DECLINED' })
         .expect(404);
       expect(response.body.message).toBe('application_not_found');
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 403 when the caller cannot manage the opportunity', async () => {
       tx.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
         const text = sql.join('');
-        if (text.includes('can_manage_opportunity')) return [{ allowed: false }];
+        if (text.includes('can_manage_opportunity'))
+          return [{ allowed: false }];
         if (text.includes('FROM opportunity_applications')) return [row];
         return [{ now }];
       });
@@ -454,7 +484,9 @@ describe('Applications HTTP contract', () => {
         .send({ decision: 'DECLINED' })
         .expect(403);
       expect(response.body.message).toBe('application_access_denied');
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 409 for an application that was already answered or withdrawn', async () => {
@@ -476,7 +508,9 @@ describe('Applications HTTP contract', () => {
           .expect(409);
         expect(response.body.message).toBe(code);
       }
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 409 when another transaction answered the application first', async () => {
@@ -491,19 +525,22 @@ describe('Applications HTTP contract', () => {
 
     it('maps a trigger refusal to 409 on an invalid state', async () => {
       tx.opportunity_applications.updateManyAndReturn.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Only pending application can transition once', {
-          code: 'P2039',
-          clientVersion: 'test',
-          meta: {
-            driverAdapterError: {
-              cause: {
-                originalCode: '23514',
-                originalMessage:
-                  'new row for relation "opportunity_applications" violates check constraint "ck_application_response"',
+        new Prisma.PrismaClientKnownRequestError(
+          'Only pending application can transition once',
+          {
+            code: 'P2039',
+            clientVersion: 'test',
+            meta: {
+              driverAdapterError: {
+                cause: {
+                  originalCode: '23514',
+                  originalMessage:
+                    'new row for relation "opportunity_applications" violates check constraint "ck_application_response"',
+                },
               },
             },
           },
-        }),
+        ),
       );
       const response = await request()
         .post(respondUrl)
@@ -521,14 +558,20 @@ describe('Applications HTTP contract', () => {
         { decision: 'INVITED_TO_DISCUSS', responseNote: 'x'.repeat(10001) },
         { decision: 'INVITED_TO_DISCUSS', status: 'DECLINED' },
       ]) {
-        await request().post(respondUrl).set('Cookie', cookie).send(body).expect(400);
+        await request()
+          .post(respondUrl)
+          .set('Cookie', cookie)
+          .send(body)
+          .expect(400);
       }
       await request()
         .post('/applications/not-a-uuid/respond')
         .set('Cookie', cookie)
         .send({ decision: 'DECLINED' })
         .expect(400);
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -559,7 +602,9 @@ describe('Applications HTTP contract', () => {
         remainingSeconds: null,
         isOverdue: false,
       });
-      expect(tx.opportunity_applications.updateManyAndReturn).toHaveBeenCalledWith({
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
         data: { status: 'WITHDRAWN' },
       });
@@ -576,7 +621,9 @@ describe('Applications HTTP contract', () => {
         .set('Cookie', cookie)
         .expect(404);
       expect(response.body.message).toBe('application_not_found');
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 403 when the application belongs to another researcher', async () => {
@@ -591,7 +638,9 @@ describe('Applications HTTP contract', () => {
         .set('Cookie', cookie)
         .expect(403);
       expect(response.body.message).toBe('application_access_denied');
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 409 when the application was already withdrawn or answered', async () => {
@@ -612,7 +661,9 @@ describe('Applications HTTP contract', () => {
           .expect(409);
         expect(response.body.message).toBe(code);
       }
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns 409 when another transaction withdrew the application first', async () => {
@@ -629,7 +680,9 @@ describe('Applications HTTP contract', () => {
         .post('/applications/not-a-uuid/withdraw')
         .set('Cookie', cookie)
         .expect(400);
-      expect(tx.opportunity_applications.updateManyAndReturn).not.toHaveBeenCalled();
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).not.toHaveBeenCalled();
     });
   });
 });
