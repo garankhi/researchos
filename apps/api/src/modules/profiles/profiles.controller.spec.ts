@@ -84,8 +84,8 @@ describe('ProfilesController', () => {
     // The service writes the profile and the account in one transaction, so
     // the mock hands the same client to the callback the way Prisma does.
     return Object.assign(prismaMock, {
-      $transaction: vi.fn(
-        async (run: (client: unknown) => unknown) => run(prismaMock),
+      $transaction: vi.fn(async (run: (client: unknown) => unknown) =>
+        run(prismaMock),
       ),
     });
   };
@@ -337,12 +337,13 @@ describe('ProfilesController', () => {
         user_id: otherUserId,
         profile_confirmed_at: new Date('2026-11-01T09:00:00.000Z'),
       });
-      prismaMock.research_interests.findMany.mockResolvedValue([
-        mockInterest,
-      ]);
+      prismaMock.research_interests.findMany.mockResolvedValue([mockInterest]);
 
       const controller = await setupController(prismaMock);
-      const result = await controller.getInterestsByUserId(otherUserId, callerId);
+      const result = await controller.getInterestsByUserId(
+        otherUserId,
+        callerId,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
@@ -352,7 +353,10 @@ describe('ProfilesController', () => {
         status: 'ACTIVE',
         sourceType: 'DECLARED',
         topicPath: {
-          topic: { id: 't0000000-0000-0000-0000-000000000001', name: 'Deep Learning' },
+          topic: {
+            id: 't0000000-0000-0000-0000-000000000001',
+            name: 'Deep Learning',
+          },
           subfield: {
             id: 's0000000-0000-0000-0000-000000000001',
             name: 'Artificial Intelligence',
