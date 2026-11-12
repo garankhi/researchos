@@ -138,7 +138,7 @@ CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean 
  AND (o.creator_id=actor OR EXISTS (
    SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
    AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
-     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='CORE_MEMBER')))));
+     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER')))));
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$

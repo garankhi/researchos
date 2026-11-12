@@ -13,7 +13,6 @@ export type AddGroupMemberDtoRole =
   (typeof AddGroupMemberDtoRole)[keyof typeof AddGroupMemberDtoRole];
 
 export const AddGroupMemberDtoRole = {
-  CORE_MEMBER: 'CORE_MEMBER',
-  COLLABORATOR: 'COLLABORATOR',
-  STUDENT_MEMBER: 'STUDENT_MEMBER',
+  MEMBER: 'MEMBER',
+  GROUP_LEADER: 'GROUP_LEADER',
 } as const;

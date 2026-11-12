@@ -328,7 +328,7 @@ Owner chuyển P1 sang ARCHIVED và ghi `archived_at`. Bài ẩn khỏi Discover
 | Bảng | Dùng để làm gì? |
 |---|---|
 | `research_groups` | Thông tin group, `lead_id` xác định Leader |
-| `group_members` | Các thành viên và vai trò như CORE_MEMBER, COLLABORATOR, STUDENT_MEMBER |
+| `group_members` | Các thành viên và vai trò như MEMBER, GROUP_LEADER |
 | `group_directions` | Hướng nghiên cứu có tiêu đề/mô tả riêng, có thể tham chiếu Topic |
 
 Ví dụ G1 có hướng “Xây dựng công cụ hỗ trợ giảng dạy tại FPTU”. Đây là kế hoạch/hướng hoạt động của group, có thể gắn một Topic AI trong taxonomy; không phải cứ tạo direction là tạo Topic mới.

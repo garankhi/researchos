@@ -137,7 +137,7 @@ export class GroupMembersService {
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (!member || (write && member.role !== GroupMemberRole.CORE_MEMBER))
+    if (!member || (write && member.role !== GroupMemberRole.GROUP_LEADER))
       throw new CodedHttpException(
         domainErrorCodes.groups.accessDenied,
         HttpStatus.FORBIDDEN,

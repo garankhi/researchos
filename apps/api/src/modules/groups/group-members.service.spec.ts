@@ -31,7 +31,7 @@ function setup() {
   const row = {
     group_id: groupId,
     user_id: userId,
-    role: GroupMemberRole.COLLABORATOR,
+    role: GroupMemberRole.MEMBER,
     joined_at: joinedAt,
   };
   const tx = {
@@ -43,7 +43,7 @@ function setup() {
       create: vi.fn().mockResolvedValue(row),
       update: vi
         .fn()
-        .mockResolvedValue({ ...row, role: GroupMemberRole.CORE_MEMBER }),
+        .mockResolvedValue({ ...row, role: GroupMemberRole.GROUP_LEADER }),
       delete: vi.fn().mockResolvedValue(row),
       findMany: vi.fn().mockResolvedValue([row]),
       count: vi.fn().mockResolvedValue(1),
@@ -59,7 +59,7 @@ function setup() {
 }
 
 describe('Group membership policies', () => {
-  const dto = { userId, role: GroupMemberRole.COLLABORATOR };
+  const dto = { userId, role: GroupMemberRole.MEMBER };
 
   it('allows the lead to add a member and returns the join timestamp', async () => {
     const { service, tx } = setup();
@@ -75,29 +75,28 @@ describe('Group membership policies', () => {
     expect(tx.$queryRaw).toHaveBeenCalledBefore(tx.group_members.create);
   });
 
-  it('allows a core member to change another member role', async () => {
+  it('allows a group leader to change another member role', async () => {
     const { service, tx } = setup();
     tx.group_members.findUnique.mockResolvedValue({
-      role: GroupMemberRole.CORE_MEMBER,
+      role: GroupMemberRole.GROUP_LEADER,
     });
     await expect(
       service.update(
         groupId,
         userId,
-        { role: GroupMemberRole.CORE_MEMBER },
+        { role: GroupMemberRole.GROUP_LEADER },
         callerId,
       ),
-    ).resolves.toMatchObject({ role: GroupMemberRole.CORE_MEMBER });
+    ).resolves.toMatchObject({ role: GroupMemberRole.GROUP_LEADER });
     expect(tx.group_members.update).toHaveBeenCalledWith({
       where: { group_id_user_id: { group_id: groupId, user_id: userId } },
-      data: { role: GroupMemberRole.CORE_MEMBER },
+      data: { role: GroupMemberRole.GROUP_LEADER },
     });
   });
 
   it.each([
     null,
-    { role: GroupMemberRole.COLLABORATOR },
-    { role: GroupMemberRole.STUDENT_MEMBER },
+    { role: GroupMemberRole.MEMBER },
   ])('rejects membership writes by a non-manager: %j', async (membership) => {
     const { service, tx } = setup();
     tx.group_members.findUnique.mockResolvedValue(membership);
@@ -274,7 +273,7 @@ describe('Group membership policies', () => {
     forbidNonWhitelisted: true,
   });
   it.each([
-    { userId: 'invalid', role: 'CORE_MEMBER' },
+    { userId: 'invalid', role: 'GROUP_LEADER' },
     { userId, role: 'ADMIN' },
     { userId },
     { userId, role: null },

@@ -73,9 +73,8 @@ CREATE TYPE "availability_status_type" AS ENUM (
 );
 
 CREATE TYPE "group_member_role" AS ENUM (
-  'CORE_MEMBER',
-  'COLLABORATOR',
-  'STUDENT_MEMBER'
+  'MEMBER',
+  'GROUP_LEADER'
 );
 
 CREATE TYPE "post_type" AS ENUM (
@@ -469,7 +468,7 @@ CREATE TABLE "research_groups" (
 CREATE TABLE "group_members" (
   "group_id" uuid NOT NULL,
   "user_id" uuid NOT NULL,
-  "role" group_member_role NOT NULL DEFAULT 'COLLABORATOR',
+  "role" group_member_role NOT NULL DEFAULT 'MEMBER',
   "joined_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   PRIMARY KEY ("group_id", "user_id")
 );
@@ -1088,7 +1087,7 @@ COMMENT ON TABLE "output_revision_files" IS 'Reuse one immutable stored file in 
 
 COMMENT ON TABLE "group_output_links" IS 'Group curation only. Leader may directly insert ACCEPTED for an owned released work; no self-application. Pending/rejected new request preserves previous accepted pin. Removal clears ONLY this group pin. New released revision needs separate acceptance to replace group content. Root visibility always applies. No minimum group size.';
 
-COMMENT ON TABLE "research_opportunities" IS 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.';
+COMMENT ON TABLE "research_opportunities" IS 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or GROUP_LEADER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.';
 
 COMMENT ON TABLE "opportunity_applications" IS 'SQL partial UNIQUE(opportunity_id,applicant_id) WHERE status <> WITHDRAWN. Resubmission inserts new ID only after previous withdrawal. Terminal rows are immutable; transition only from PENDING. SQL locks parent when inserting, checks OPEN/deadline/archive and researcher eligibility. Backend authenticates withdrawal actor and response handler; conditional updates prevent response/withdraw races. Closing does not decline old applications.';
 
@@ -1486,7 +1485,7 @@ CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean 
  AND (o.creator_id=actor OR EXISTS (
    SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
    AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
-     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='CORE_MEMBER')))));
+     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER')))));
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$

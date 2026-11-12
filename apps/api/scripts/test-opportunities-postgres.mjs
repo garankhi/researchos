@@ -138,7 +138,7 @@ try {
     [groupId, ids.lead],
   );
   await db.query(
-    "INSERT INTO group_members(group_id,user_id,role) VALUES($1,$2,'CORE_MEMBER'),($1,$3,'COLLABORATOR')",
+    "INSERT INTO group_members(group_id,user_id,role) VALUES($1,$2,'GROUP_LEADER'),($1,$3,'MEMBER')",
     [groupId, ids.core, ids.collaborator],
   );
 

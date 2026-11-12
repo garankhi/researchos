@@ -67,9 +67,8 @@ Enum availability_status_type {
   NOT_AVAILABLE
 }
 Enum group_member_role {
-  CORE_MEMBER
-  COLLABORATOR
-  STUDENT_MEMBER
+  MEMBER
+  GROUP_LEADER
 }
 Enum post_type {
   GENERAL_NEWS
@@ -503,7 +502,7 @@ Table research_groups {
 Table group_members {
   group_id uuid [not null]
   user_id uuid [not null]
-  role group_member_role [not null, default: 'COLLABORATOR']
+  role group_member_role [not null, default: 'MEMBER']
   joined_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   indexes {
     (group_id, user_id) [pk]
@@ -763,7 +762,7 @@ Table research_opportunities {
     project_id
     (status, application_deadline)
   }
-  Note: 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or CORE_MEMBER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
+  Note: 'Personal opportunities allow NULL group/project. Creation in group/project scope requires management rights. Active researchers may manage existing opportunities as creator, active group leader or GROUP_LEADER; project leadership alone grants no edit access. An opportunity is a public job posting: a group publishes it to attract people from outside the group, so the scope never narrows who may read it. Kind, target audience and free-text role are independent and grant no access. SLA is calendar days including weekends/holidays. Deadline is the exact application cutoff.'
 }
 
 Table opportunity_applications {

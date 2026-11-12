@@ -269,7 +269,7 @@ describe('GroupsController', () => {
       prismaMock.group_members.findUnique.mockResolvedValueOnce({
         group_id: groupId,
         user_id: memberId,
-        role: 'COLLABORATOR',
+        role: 'MEMBER',
       });
       const memberView = await controller.findOne(groupId, memberId);
       expect(memberView.id).toBe(groupId);

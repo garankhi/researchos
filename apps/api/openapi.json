@@ -4410,9 +4410,8 @@
             "type": "string",
             "description": "Role of the member within the group.",
             "enum": [
-              "CORE_MEMBER",
-              "COLLABORATOR",
-              "STUDENT_MEMBER"
+              "MEMBER",
+              "GROUP_LEADER"
             ]
           },
           "joinedAt": {
@@ -4459,9 +4458,8 @@
             "type": "string",
             "description": "Role of the member within the group.",
             "enum": [
-              "CORE_MEMBER",
-              "COLLABORATOR",
-              "STUDENT_MEMBER"
+              "MEMBER",
+              "GROUP_LEADER"
             ]
           },
           "userId": {
@@ -4482,9 +4480,8 @@
             "type": "string",
             "description": "Role of the member within the group.",
             "enum": [
-              "CORE_MEMBER",
-              "COLLABORATOR",
-              "STUDENT_MEMBER"
+              "MEMBER",
+              "GROUP_LEADER"
             ]
           }
         },

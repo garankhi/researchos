@@ -73,7 +73,7 @@ export class OpportunitiesService {
       const [group] = await tx.$queryRaw<{ allowed: boolean }[]>`
         SELECT (g.lead_id = ${actorId}::uuid OR EXISTS (
           SELECT 1 FROM group_members m WHERE m.group_id = g.id
-          AND m.user_id = ${actorId}::uuid AND m.role = 'CORE_MEMBER'
+          AND m.user_id = ${actorId}::uuid AND m.role = 'GROUP_LEADER'
         )) AS allowed FROM research_groups g
         WHERE g.id = ${dto.groupId}::uuid AND g.is_active AND g.archived_at IS NULL
       `;
