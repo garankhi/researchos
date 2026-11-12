@@ -2,11 +2,7 @@ import 'reflect-metadata';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import {
-  GroupMemberRole,
-  Prisma,
-  PrismaService,
-} from '@researchos/database';
+import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
 import cookieParser from 'cookie-parser';
 import {
   afterAll,
