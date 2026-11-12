@@ -94,32 +94,32 @@ describe('Group membership policies', () => {
     });
   });
 
-  it.each([
-    null,
-    { role: GroupMemberRole.MEMBER },
-  ])('rejects membership writes by a non-manager: %j', async (membership) => {
-    const { service, tx } = setup();
-    tx.group_members.findUnique.mockResolvedValue(membership);
-    await expect(service.add(groupId, dto, callerId)).rejects.toMatchObject({
-      status: HttpStatus.FORBIDDEN,
-      code: domainErrorCodes.groups.accessDenied,
-    });
-    await expect(
-      service.update(groupId, userId, dto, callerId),
-    ).rejects.toMatchObject({
-      status: HttpStatus.FORBIDDEN,
-      code: domainErrorCodes.groups.accessDenied,
-    });
-    await expect(
-      service.remove(groupId, userId, callerId),
-    ).rejects.toMatchObject({
-      status: HttpStatus.FORBIDDEN,
-      code: domainErrorCodes.groups.accessDenied,
-    });
-    expect(tx.group_members.create).not.toHaveBeenCalled();
-    expect(tx.group_members.update).not.toHaveBeenCalled();
-    expect(tx.group_members.delete).not.toHaveBeenCalled();
-  });
+  it.each([null, { role: GroupMemberRole.MEMBER }])(
+    'rejects membership writes by a non-manager: %j',
+    async (membership) => {
+      const { service, tx } = setup();
+      tx.group_members.findUnique.mockResolvedValue(membership);
+      await expect(service.add(groupId, dto, callerId)).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
+      await expect(
+        service.update(groupId, userId, dto, callerId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
+      await expect(
+        service.remove(groupId, userId, callerId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
+      expect(tx.group_members.create).not.toHaveBeenCalled();
+      expect(tx.group_members.update).not.toHaveBeenCalled();
+      expect(tx.group_members.delete).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects self-addition even with uppercase UUIDs', async () => {
     const { service, tx } = setup();
