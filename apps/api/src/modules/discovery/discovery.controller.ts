@@ -9,17 +9,44 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { DiscoveryService } from './discovery.service.js';
+import { SearchCountsQueryDto } from './dto/search-counts-query.dto.js';
+import { SearchCountsResponseDto } from './dto/search-counts-response.dto.js';
 import { SearchQueryDto } from './dto/search-query.dto.js';
 import { PaginatedSearchResultsResponseDto } from './dto/search-result-response.dto.js';
 
 /**
- * Controller exposing the permission-filtered tabbed search endpoint (`GET /search`).
+ * Controller exposing the permission-filtered tabbed search endpoints
+ * (`GET /search` and `GET /search/counts`).
  */
 @ApiTags('discovery')
 @ApiBearerAuth()
 @Controller('search')
 export class DiscoveryController {
   constructor(private readonly discoveryService: DiscoveryService) {}
+
+  @ApiOperation({
+    summary: 'Count the matching results of one search term per tab',
+    description:
+      'Returns one permission-filtered total per search tab (`research`, `people`, `group`, `opportunity`) for the given term, using the same matching expression as `GET /search`. The totals are the source for the tab badges, so a tab nobody has opened yet still has a count.',
+  })
+  @ApiOkResponse({
+    description: 'The number of matching records per search tab.',
+    type: SearchCountsResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Query term length outside [2, 200] characters after trimming.',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Caller is not authenticated.',
+  })
+  @Get('counts')
+  async counts(
+    @CurrentUserId() actorId: string,
+    @Query() query: SearchCountsQueryDto,
+  ): Promise<SearchCountsResponseDto> {
+    return this.discoveryService.counts(actorId, query);
+  }
 
   @ApiOperation({
     summary:

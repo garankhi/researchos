@@ -78,6 +78,67 @@
         ]
       }
     },
+    "/search/counts": {
+      "get": {
+        "description": "Returns one permission-filtered total per search tab (`research`, `people`, `group`, `opportunity`) for the given term, using the same matching expression as `GET /search`. The totals are the source for the tab badges, so a tab nobody has opened yet still has a count.",
+        "operationId": "DiscoveryController_counts",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query text matched via PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram (`ILIKE`). Must be between 2 and 200 characters after trimming.",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 200,
+              "example": "machine learning",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The number of matching records per search tab.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCountsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query term length outside [2, 200] characters after trimming.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count the matching results of one search term per tab",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/search": {
       "get": {
         "description": "Queries the requested tab slice (`research`, `people`, `group`, or `opportunity`) of `search_index` through `visible_search_index(actor)` using PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram matching (`ILIKE`), ranked strictly by text relevance (`ts_rank`).",
@@ -4990,6 +5051,37 @@
       }
     },
     "schemas": {
+      "SearchCountsResponseDto": {
+        "type": "object",
+        "properties": {
+          "research": {
+            "type": "number",
+            "description": "Number of matching research outputs visible to the caller (the `research` tab).",
+            "example": 12
+          },
+          "people": {
+            "type": "number",
+            "description": "Number of matching researcher profiles visible to the caller (the `people` tab).",
+            "example": 3
+          },
+          "group": {
+            "type": "number",
+            "description": "Number of matching research groups visible to the caller (the `group` tab).",
+            "example": 2
+          },
+          "opportunity": {
+            "type": "number",
+            "description": "Number of matching opportunities visible to the caller (the `opportunity` tab).",
+            "example": 7
+          }
+        },
+        "required": [
+          "research",
+          "people",
+          "group",
+          "opportunity"
+        ]
+      },
       "SearchResultItemDto": {
         "type": "object",
         "properties": {
@@ -8156,6 +8248,30 @@
           },
           "data": {
             "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "SearchCountsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/SearchCountsResponseDto"
           },
           "message": {
             "type": "string",

@@ -12,6 +12,7 @@ import {
   escapeLikePattern,
   SEARCH_STATEMENT_TIMEOUT_MS,
 } from './discovery.service.js';
+import { SearchCountsQueryDto } from './dto/search-counts-query.dto.js';
 import { SearchQueryDto, SearchTab } from './dto/search-query.dto.js';
 
 describe('DiscoveryController & DiscoveryService', () => {
@@ -299,6 +300,80 @@ describe('DiscoveryController & DiscoveryService', () => {
     });
   });
 
+  describe('per-tab counts', () => {
+    it('returns one permission-filtered total per tab for the term', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([
+        {
+          research: 12n,
+          people: 3n,
+          group_count: 2n,
+          opportunity: 7n,
+        },
+      ]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.counts(actorId, {
+        q: 'machine learning',
+      });
+
+      expect(prismaMock.tx.$executeRawUnsafe).toHaveBeenCalledWith(
+        `SET LOCAL statement_timeout = '${SEARCH_STATEMENT_TIMEOUT_MS}ms'`,
+      );
+      expect(prismaMock.tx.$queryRaw).toHaveBeenCalledTimes(1);
+
+      const countSql = prismaMock.tx.$queryRaw.mock.calls[0][0];
+      expect(countSql.strings.join(' ')).toContain('visible_search_index(');
+      expect(countSql.strings.join(' ')).toContain('websearch_to_tsquery(');
+      expect(countSql.strings.join(' ')).toContain('COUNT(*) FILTER');
+      expect(countSql.values).toContain(actorId);
+      expect(countSql.values).toContain('machine learning');
+      expect(countSql.values).toContain('%machine learning%');
+
+      expect(result).toEqual({
+        research: 12,
+        people: 3,
+        group: 2,
+        opportunity: 7,
+      });
+    });
+
+    it('returns zero for every tab when nothing matches', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([
+        {
+          research: 0n,
+          people: 0n,
+          group_count: 0n,
+          opportunity: 0n,
+        },
+      ]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.counts(actorId, { q: 'nonexistentterm' });
+
+      expect(result).toEqual({
+        research: 0,
+        people: 0,
+        group: 0,
+        opportunity: 0,
+      });
+    });
+
+    it('rejects a term outside the [2, 200] length bounds', async () => {
+      const prismaMock = createPrismaMock();
+      const { controller } = await setupController(prismaMock);
+
+      await expect(controller.counts(actorId, { q: ' a ' })).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        controller.counts(actorId, { q: 'x'.repeat(201) }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.tx.$queryRaw).not.toHaveBeenCalled();
+    });
+  });
+
   describe('SearchQueryDto validation', () => {
     const pipe = new ValidationPipe({
       transform: true,
@@ -355,6 +430,41 @@ describe('DiscoveryController & DiscoveryService', () => {
         pipe.transform(
           { tab: 'opportunity', q: 'grant', limit: '101' },
           { type: 'query', metatype: SearchQueryDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('SearchCountsQueryDto validation', () => {
+    const pipe = new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    it('trims the query string q', async () => {
+      const transformed = (await pipe.transform(
+        { q: '  deep learning  ' },
+        { type: 'query', metatype: SearchCountsQueryDto },
+      )) as SearchCountsQueryDto;
+
+      expect(transformed.q).toBe('deep learning');
+    });
+
+    it('rejects query terms shorter than 2 characters after trimming', async () => {
+      await expect(
+        pipe.transform(
+          { q: ' a ' },
+          { type: 'query', metatype: SearchCountsQueryDto },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects query terms exceeding 200 characters', async () => {
+      await expect(
+        pipe.transform(
+          { q: 'x'.repeat(201) },
+          { type: 'query', metatype: SearchCountsQueryDto },
         ),
       ).rejects.toThrow(BadRequestException);
     });

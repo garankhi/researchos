@@ -20,8 +20,10 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  DiscoveryControllerCountsParams,
   DiscoveryControllerSearchParams,
   PaginatedSearchResultsResponseDtoEnvelope,
+  SearchCountsResponseDtoEnvelope,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -45,6 +47,173 @@ const withQueryKey = <T extends object, K>(
   }
   return result;
 };
+
+/**
+ * Returns one permission-filtered total per search tab (`research`, `people`, `group`, `opportunity`) for the given term, using the same matching expression as `GET /search`. The totals are the source for the tab badges, so a tab nobody has opened yet still has a count.
+ * @summary Count the matching results of one search term per tab
+ */
+export const discoveryControllerCounts = (
+  params: DiscoveryControllerCountsParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<SearchCountsResponseDtoEnvelope>(
+    { url: `/search/counts`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getDiscoveryControllerCountsQueryKey = (
+  params?: DiscoveryControllerCountsParams,
+) => {
+  return [`/search/counts`, ...(params ? [params] : [])] as const;
+};
+
+export const getDiscoveryControllerCountsQueryOptions = <
+  TData = Awaited<ReturnType<typeof discoveryControllerCounts>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: DiscoveryControllerCountsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof discoveryControllerCounts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getDiscoveryControllerCountsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof discoveryControllerCounts>>
+  > = ({ signal }) => discoveryControllerCounts(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof discoveryControllerCounts>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type DiscoveryControllerCountsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof discoveryControllerCounts>>
+>;
+export type DiscoveryControllerCountsQueryError = ApiErrorResponseDto;
+
+export function useDiscoveryControllerCounts<
+  TData = Awaited<ReturnType<typeof discoveryControllerCounts>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: DiscoveryControllerCountsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof discoveryControllerCounts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof discoveryControllerCounts>>,
+          TError,
+          Awaited<ReturnType<typeof discoveryControllerCounts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useDiscoveryControllerCounts<
+  TData = Awaited<ReturnType<typeof discoveryControllerCounts>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: DiscoveryControllerCountsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof discoveryControllerCounts>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof discoveryControllerCounts>>,
+          TError,
+          Awaited<ReturnType<typeof discoveryControllerCounts>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useDiscoveryControllerCounts<
+  TData = Awaited<ReturnType<typeof discoveryControllerCounts>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: DiscoveryControllerCountsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof discoveryControllerCounts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Count the matching results of one search term per tab
+ */
+
+export function useDiscoveryControllerCounts<
+  TData = Awaited<ReturnType<typeof discoveryControllerCounts>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: DiscoveryControllerCountsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof discoveryControllerCounts>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getDiscoveryControllerCountsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 /**
  * Queries the requested tab slice (`research`, `people`, `group`, or `opportunity`) of `search_index` through `visible_search_index(actor)` using PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram matching (`ILIKE`), ranked strictly by text relevance (`ts_rank`).
