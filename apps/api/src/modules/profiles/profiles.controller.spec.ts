@@ -154,7 +154,7 @@ describe('ProfilesController', () => {
       expect(result.profileConfirmedAt).toBeNull();
     });
 
-    it('throws 404 when non-owner requests unconfirmed profile', async () => {
+    it('throws 403 when non-owner requests unconfirmed profile', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.researcher_profiles.findUnique.mockResolvedValue(
         mockUnconfirmedProfile,
@@ -165,10 +165,7 @@ describe('ProfilesController', () => {
       await expect(
         controller.getProfileById(otherUserId, callerId),
       ).rejects.toThrow(
-        expect.objectContaining({
-          status: HttpStatus.NOT_FOUND,
-          code: domainErrorCodes.profiles.profileNotFound,
-        }),
+        expect.objectContaining({ status: HttpStatus.FORBIDDEN }),
       );
     });
 

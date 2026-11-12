@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   OutputImportState,
   Prisma,
@@ -344,8 +339,9 @@ export class OpenAlexCandidatesService {
         claim?.status === 'CONFIRMED' &&
         output.owner_id === userId
       ) {
-        throw new ConflictException(
-          'An accepted work cannot be rejected by its owner',
+        throw new CodedHttpException(
+          domainErrorCodes.openalex.decisionDenied,
+          HttpStatus.CONFLICT,
         );
       }
 
@@ -401,7 +397,10 @@ export class OpenAlexCandidatesService {
       SELECT is_researcher(${userId}::uuid) AS allowed
     `;
     if (!result?.allowed) {
-      throw new ForbiddenException('An active researcher account is required');
+      throw new CodedHttpException(
+        domainErrorCodes.identity.researcherRequired,
+        HttpStatus.FORBIDDEN,
+      );
     }
   }
 
@@ -508,8 +507,9 @@ export class OpenAlexCandidatesService {
       select: { id: true, user_id: true },
     });
     if (!row || (row.user_id !== null && row.user_id !== userId)) {
-      throw new ConflictException(
-        'The authorship position is held by another researcher',
+      throw new CodedHttpException(
+        domainErrorCodes.openalex.authorConflict,
+        HttpStatus.CONFLICT,
       );
     }
     if (row.user_id === null) {

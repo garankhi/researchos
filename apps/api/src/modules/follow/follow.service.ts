@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
@@ -93,15 +86,25 @@ export class FollowService {
         target.display_name AS "displayName", target.state
       FROM caller LEFT JOIN target ON true LEFT JOIN inserted ON true
     `;
-    if (!result.allowed) throw new ForbiddenException();
+    if (!result.allowed)
+      throw new CodedHttpException(
+        domainErrorCodes.identity.researcherRequired,
+        HttpStatus.FORBIDDEN,
+      );
     if (!result.targetExists)
-      throw new NotFoundException('Follow target not found');
+      throw new CodedHttpException(
+        domainErrorCodes.follows.targetNotFound,
+        HttpStatus.NOT_FOUND,
+      );
     if (
       !result.followedAt ||
       result.displayName === null ||
       result.state === null
     ) {
-      throw new ConflictException('Already following this target');
+      throw new CodedHttpException(
+        domainErrorCodes.follows.alreadyFollowing,
+        HttpStatus.CONFLICT,
+      );
     }
     return {
       entityType,
@@ -121,7 +124,7 @@ export class FollowService {
       { followedAt: 'followed_at' },
       { followed_at: 'desc' },
     );
-    if (!sort) throw new BadRequestException('Only followedAt can be sorted');
+    if (!sort) throw new BadRequestException('validation_failed');
     const direction =
       sort.followed_at === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
     const order = Prisma.sql`"followedAt" ${direction}, "entityType", "entityId"`;

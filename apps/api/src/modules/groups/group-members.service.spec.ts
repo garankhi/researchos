@@ -1,13 +1,13 @@
 import 'reflect-metadata';
 import {
   BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
+  HttpStatus,
   ValidationPipe,
 } from '@nestjs/common';
 import { GroupMemberRole, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { describe, expect, it, vi } from 'vitest';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
 import {
   AddGroupMemberDto,
@@ -101,15 +101,22 @@ describe('Group membership policies', () => {
   ])('rejects membership writes by a non-manager: %j', async (membership) => {
     const { service, tx } = setup();
     tx.group_members.findUnique.mockResolvedValue(membership);
-    await expect(service.add(groupId, dto, callerId)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.add(groupId, dto, callerId)).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
     await expect(
       service.update(groupId, userId, dto, callerId),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
     await expect(
       service.remove(groupId, userId, callerId),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
     expect(tx.group_members.create).not.toHaveBeenCalled();
     expect(tx.group_members.update).not.toHaveBeenCalled();
     expect(tx.group_members.delete).not.toHaveBeenCalled();
@@ -123,7 +130,10 @@ describe('Group membership policies', () => {
         { ...dto, userId: leadId.toUpperCase() },
         leadId.toUpperCase(),
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
     expect(tx.group_members.create).not.toHaveBeenCalled();
   });
 
@@ -131,7 +141,10 @@ describe('Group membership policies', () => {
     const { service, tx } = setup();
     await expect(
       service.remove(groupId, leadId.toUpperCase(), leadId),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.leadRemovalDenied,
+    });
     expect(tx.group_members.delete).not.toHaveBeenCalled();
   });
 
@@ -155,18 +168,20 @@ describe('Group membership policies', () => {
   it('returns 404 for a missing group without reading its members', async () => {
     const { service, tx } = setup();
     tx.research_groups.findUnique.mockResolvedValue(null);
-    await expect(service.add(groupId, dto, leadId)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.add(groupId, dto, leadId)).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: domainErrorCodes.groups.groupNotFound,
+    });
     expect(tx.group_members.create).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the target user does not exist', async () => {
     const { service, tx } = setup();
     tx.users.findUnique.mockResolvedValue(null);
-    await expect(service.add(groupId, dto, leadId)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.add(groupId, dto, leadId)).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: domainErrorCodes.groups.memberNotFound,
+    });
     expect(tx.group_members.create).not.toHaveBeenCalled();
   });
 
@@ -176,9 +191,10 @@ describe('Group membership policies', () => {
       code: 'P2002',
       message: 'Unique constraint failed',
     });
-    await expect(service.add(groupId, dto, leadId)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(service.add(groupId, dto, leadId)).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      code: domainErrorCodes.groups.memberAlreadyExists,
+    });
   });
 
   it.each(['update', 'remove'] as const)(
@@ -197,7 +213,10 @@ describe('Group membership policies', () => {
         operation === 'update'
           ? service.update(groupId, userId, dto, leadId)
           : service.remove(groupId, userId, leadId);
-      await expect(result).rejects.toBeInstanceOf(NotFoundException);
+      await expect(result).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        code: domainErrorCodes.groups.memberNotFound,
+      });
     },
   );
 
@@ -220,7 +239,10 @@ describe('Group membership policies', () => {
     const { service, tx } = setup();
     await expect(
       service.findAll(groupId, new PaginationQueryDto(), callerId),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
     expect(tx.group_members.findMany).not.toHaveBeenCalled();
   });
 

@@ -341,7 +341,7 @@ export const getOpportunitiesControllerFindOneQueryKey = (
 
 export const getOpportunitiesControllerFindOneQueryOptions = <
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindOne>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   opportunityId: string,
   options?: {
@@ -381,11 +381,11 @@ export const getOpportunitiesControllerFindOneQueryOptions = <
 export type OpportunitiesControllerFindOneQueryResult = NonNullable<
   Awaited<ReturnType<typeof opportunitiesControllerFindOne>>
 >;
-export type OpportunitiesControllerFindOneQueryError = unknown;
+export type OpportunitiesControllerFindOneQueryError = ApiErrorResponseDto;
 
 export function useOpportunitiesControllerFindOne<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindOne>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   opportunityId: string,
   options: {
@@ -412,7 +412,7 @@ export function useOpportunitiesControllerFindOne<
 };
 export function useOpportunitiesControllerFindOne<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindOne>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   opportunityId: string,
   options?: {
@@ -439,7 +439,7 @@ export function useOpportunitiesControllerFindOne<
 };
 export function useOpportunitiesControllerFindOne<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindOne>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   opportunityId: string,
   options?: {
@@ -462,7 +462,7 @@ export function useOpportunitiesControllerFindOne<
 
 export function useOpportunitiesControllerFindOne<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindOne>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   opportunityId: string,
   options?: {

@@ -1,10 +1,7 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
   MAX_PAGE_SIZE,
@@ -258,7 +255,10 @@ export class OutputsService {
     });
 
     if (!exists) {
-      throw new NotFoundException('Output not found');
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotFound,
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     const [allowed] = await this.prisma.$queryRaw<{ allowed: boolean }[]>`
@@ -266,7 +266,10 @@ export class OutputsService {
     `;
 
     if (!allowed?.allowed) {
-      throw new ForbiddenException('Access denied to this research output');
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     let revision = exists.current_release_id
@@ -375,7 +378,10 @@ export class OutputsService {
     });
 
     if (!exists) {
-      throw new NotFoundException('Output not found');
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotFound,
+        HttpStatus.NOT_FOUND,
+      );
     }
 
     const [allowed] = await this.prisma.$queryRaw<{ allowed: boolean }[]>`
@@ -383,7 +389,10 @@ export class OutputsService {
     `;
 
     if (!allowed?.allowed) {
-      throw new ForbiddenException('Access denied to this research output');
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     }
   }
 

@@ -2,10 +2,10 @@ import 'reflect-metadata';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
-  NotFoundException,
+  HttpStatus,
   ValidationPipe,
 } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
 import type { INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -178,7 +178,9 @@ describe('Opportunity status actions', () => {
       tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
       await expect(
         service.transitionStatus(actorId, id, action),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+      });
       expect(tx.research_opportunities.update).not.toHaveBeenCalled();
       expect(tx.auditLog.create).not.toHaveBeenCalled();
     },
@@ -193,7 +195,9 @@ describe('Opportunity status actions', () => {
         .mockResolvedValueOnce([{ allowed: false }]);
       await expect(
         service.transitionStatus(actorId, id, action),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+      });
       expect(tx.research_opportunities.update).not.toHaveBeenCalled();
     },
   );
@@ -205,7 +209,10 @@ describe('Opportunity status actions', () => {
       .mockResolvedValueOnce([]);
     await expect(
       service.transitionStatus(actorId, id, 'open'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.NOT_FOUND,
+      code: domainErrorCodes.opportunities.notFound,
+    });
     expect(tx.research_opportunities.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 

@@ -1937,7 +1937,7 @@
             }
           },
           "403": {
-            "description": "The LOCAL session must change its password before accessing jobs.",
+            "description": "Job belongs to another owner, or the LOCAL session must change its password before accessing jobs.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1947,7 +1947,7 @@
             }
           },
           "404": {
-            "description": "Job is missing or inaccessible to the caller.",
+            "description": "Job does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2024,7 +2024,7 @@
             }
           },
           "404": {
-            "description": "Job is missing or inaccessible to the caller.",
+            "description": "Job does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2497,6 +2497,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpportunityResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to view this opportunity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Opportunity does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -3248,8 +3268,18 @@
               }
             }
           },
+          "403": {
+            "description": "The profile is unconfirmed and the caller is not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "The requested researcher profile was not found or is unconfirmed.",
+            "description": "The requested researcher profile was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3541,8 +3571,18 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is not allowed to view this file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "The file is missing or unavailable to the caller.",
+            "description": "The file does not exist.",
             "content": {
               "application/json": {
                 "schema": {

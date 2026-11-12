@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCookieAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -67,7 +68,10 @@ export class OutputDownloadController {
     description: 'A valid session cookie is required.',
   })
   @ApiNotFoundResponse({
-    description: 'The file is missing or unavailable to the caller.',
+    description: 'The file does not exist.',
+  })
+  @ApiForbiddenResponse({
+    description: 'The caller is not allowed to view this file.',
   })
   @ApiConflictResponse({
     description: 'The stored object does not match the recorded file.',
