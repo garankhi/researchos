@@ -1,14 +1,14 @@
 # RES-101: Research interest endpoints
 
 This implementation is now included with RES-130 and RES-54 on
-`feat/RES-101-RES-130-RES-54-research-endpoints`. See the companion
+`RES-101-research-interest-endpoints`. See the companion
 [directions](RES-130-group-directions.md) and [applications](RES-54-applications.md)
 documents for the additional features and final combined verification results.
 
 Ticket: [RES-101](https://researchosfptu.atlassian.net/browse/RES-101)
 
 Implemented on `RES-101-research-interest-endpoints`, rebased onto fetched
-`origin/dev` at `b66f1c8` on November 12, 2026. The rebase completed without
+`origin/dev` at `1359d4a` on November 12, 2026. The rebase completed without
 conflicts. No database migration is required: this uses the existing
 `research_interests` table, uniqueness constraint, and researcher guard trigger.
 
@@ -104,19 +104,19 @@ pnpm test
 pnpm --filter api test src/modules/interests/interests.spec.ts
 ```
 
-On this Windows machine, the global `pnpm.ps1` is blocked by execution policy,
-and the global CMD shim resolves an invalid executable. Commands were run via
-`node C:/Users/phamm/AppData/Local/pnpm/.tools/pnpm/12.15.0/node_modules/pnpm/bin/pnpm.mjs`
-with the same arguments, without changing machine policy or repository settings.
+The workspace packages must be built before the API suite runs, because the API
+imports `@researchos/database` and `@researchos/error-codes` through their
+built `dist` output. A stale `dist` fails the API suite at import time with
+errors that look like missing exports rather than a stale build.
 
 Results:
 
 | Check | Result |
 | --- | --- |
 | `pnpm codegen` | Passed; OpenAPI and Orval artifacts regenerated. |
-| `pnpm build` | Passed across all eight packages. The first sandboxed attempt failed on SWC cache permissions; rerunning with access to the existing native cache passed. |
+| `pnpm build` | Passed across all eight packages. |
 | `pnpm lint` | Passed across the workspace. API lint was rerun after final changes; remaining warnings are in existing files, with none in the interests module. |
-| `pnpm test` | Passed across the workspace: API 457 tests across 31 files; web 85 tests across eight files; shared-package tests passed. |
+| `pnpm test` | Passed across the workspace: API 480 tests across 33 files; web 85 tests across eight files; shared-package tests passed. |
 | Interests HTTP contract | All 11 tests passed, also included in the API suite above. |
 | OpenAPI freshness | `node apps/api/scripts/export-openapi.mjs --check` passed. |
 | Rebase ancestry | `git merge-base --is-ancestor origin/dev HEAD` passed. |

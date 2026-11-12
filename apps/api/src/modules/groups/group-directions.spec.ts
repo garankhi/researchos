@@ -2,7 +2,11 @@ import 'reflect-metadata';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { Prisma, PrismaService } from '@researchos/database';
+import {
+  GroupMemberRole,
+  Prisma,
+  PrismaService,
+} from '@researchos/database';
 import cookieParser from 'cookie-parser';
 import {
   afterAll,
@@ -154,12 +158,14 @@ describe('Group directions HTTP contract', () => {
     });
   });
 
-  it('allows core members to publish, but forbids their edit/delete operations', async () => {
+  it('allows group leaders to publish, but forbids their edit/delete operations', async () => {
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,
       lead_id: otherId,
     });
-    tx.group_members.findUnique.mockResolvedValue({ role: 'CORE_MEMBER' });
+    tx.group_members.findUnique.mockResolvedValue({
+      role: GroupMemberRole.GROUP_LEADER,
+    });
     await request()
       .post(base)
       .set('Cookie', cookie)
@@ -176,12 +182,12 @@ describe('Group directions HTTP contract', () => {
       .expect(403);
   });
 
-  it('forbids publishing by collaborators, outsiders and unrelated admins', async () => {
+  it('forbids publishing by plain members, outsiders and unrelated admins', async () => {
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,
       lead_id: otherId,
     });
-    for (const member of [null, { role: 'COLLABORATOR' }]) {
+    for (const member of [null, { role: GroupMemberRole.MEMBER }]) {
       tx.group_members.findUnique.mockResolvedValue(member);
       await request()
         .post(base)
@@ -234,7 +240,9 @@ describe('Group directions HTTP contract', () => {
       archived_at: new Date(),
     });
     await request().get(base).set('Cookie', cookie).expect(403);
-    tx.group_members.findUnique.mockResolvedValue({ role: 'COLLABORATOR' });
+    tx.group_members.findUnique.mockResolvedValue({
+      role: GroupMemberRole.MEMBER,
+    });
     await request().get(base).set('Cookie', cookie).expect(200);
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,

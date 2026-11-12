@@ -2,7 +2,7 @@
 
 Ticket: [RES-130](https://researchosfptu.atlassian.net/browse/RES-130).
 Included with RES-101 and RES-54 on
-`feat/RES-101-RES-130-RES-54-research-endpoints`.
+`RES-101-research-interest-endpoints`.
 
 ## Behavior
 
@@ -13,14 +13,15 @@ migration is introduced.
 
 | Method | Route | Access | Success |
 | --- | --- | --- | --- |
-| POST | `/research-groups/:groupId/directions` | Researcher who is group lead or core member | 201 |
+| POST | `/research-groups/:groupId/directions` | Researcher who is group lead or group leader | 201 |
 | GET | `/research-groups/:groupId/directions` | Any signed-in user for an active group; lead/members for an inactive or archived group | 200 |
 | PATCH | `/research-groups/:groupId/directions/:directionId` | Researcher who leads the group | 200 |
 | DELETE | `/research-groups/:groupId/directions/:directionId` | Researcher who leads the group | 204, empty body |
 
 The lead-only edit/delete rule follows the ticket's non-lead 403 rule. Publishing
-is the explicit exception for core members. Admin status alone does not bypass
-these rules. An inactive or archived group cannot publish/edit/delete directions.
+is the explicit exception for group leaders — a membership row whose role is
+`GROUP_LEADER`. Admin status alone does not bypass these rules. An inactive or
+archived group cannot publish/edit/delete directions.
 
 POST accepts:
 
@@ -76,8 +77,8 @@ except DELETE's empty 204 response.
   session/role guards and a mocked Prisma boundary.
 - `apps/api/openapi.json` and generated web client: refreshed with `pnpm codegen`.
 
-The tests cover authentication, researcher access, lead/core/collaborator rules,
-publication without a topic, taxonomy paths, private archived-group reads,
+The tests cover authentication, researcher access, lead/group-leader/plain-member
+rules, publication without a topic, taxonomy paths, private archived-group reads,
 archived-group write conflicts, missing/inactive resources, scoped edits/deletes,
 clearing optional fields, referenced-direction conflicts, and invalid input.
 
@@ -98,7 +99,7 @@ behavior.
 
 ## Checklist
 
-- [x] Publish directions as a lead/core member; edit/delete as lead.
+- [x] Publish directions as a lead/group leader; edit/delete as lead.
 - [x] Support optional topics and full taxonomy paths.
 - [x] Enforce group scope, membership permissions and archive restrictions.
 - [x] Validate payloads and bound pagination.

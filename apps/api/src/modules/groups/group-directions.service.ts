@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, PrismaService } from '@researchos/database';
+import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
 import {
   buildPaginationMeta,
   PaginationQueryDto,
@@ -53,7 +53,10 @@ export class GroupDirectionsService {
       if (!lead && !member) throw new ForbiddenException();
       return;
     }
-    if (!lead && !(action === 'publish' && member?.role === 'CORE_MEMBER'))
+    if (
+      !lead &&
+      !(action === 'publish' && member?.role === GroupMemberRole.GROUP_LEADER)
+    )
       throw new ForbiddenException();
     if (!active)
       throw new ConflictException(

@@ -2,7 +2,7 @@
 
 Ticket: [RES-54](https://researchosfptu.atlassian.net/browse/RES-54).
 Included with RES-101 and RES-130 on
-`feat/RES-101-RES-130-RES-54-research-endpoints`.
+`RES-101-research-interest-endpoints`.
 
 ## API contract
 
@@ -26,8 +26,8 @@ status, submission time and response deadline are server-managed; clients cannot
 supply them. Applications start as `PENDING` using the database default.
 
 The received list uses the canonical PostgreSQL `can_manage_opportunity` policy:
-the creator, or an active group's lead/core members with researcher access, can
-read it. Other callers receive **403**, including applicants requesting a received
+the creator, or an active group's lead or group leaders with researcher access,
+can read it. Other callers receive **403**, including applicants requesting a received
 list they do not own. A nonexistent opportunity returns 404. `/my/applications`
 always filters by the session's caller ID and accepts no applicant filter.
 
@@ -118,10 +118,10 @@ Final combined workspace verification results:
 | OpenAPI rules | Passed in the full API suite. |
 | PostgreSQL integration | Not run; no local PostgreSQL/Docker available. |
 
-On this Windows machine commands use the installed pnpm entry point via
-`node C:/Users/phamm/AppData/Local/pnpm/.tools/pnpm/12.15.0/node_modules/pnpm/bin/pnpm.mjs`;
-the global PowerShell/CMD launchers do not work in this session. The production
-build needs access to the existing SWC native cache outside the sandbox.
+The workspace packages must be built before the API suite runs, because the API
+imports `@researchos/database` and `@researchos/error-codes` through their
+built `dist` output. A stale `dist` fails the API suite at import time with
+errors that look like missing exports rather than a stale build.
 
 ## Checklist
 
