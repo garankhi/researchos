@@ -3532,6 +3532,194 @@
         ]
       }
     },
+    "/applications/{applicationId}/respond": {
+      "post": {
+        "description": "Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.",
+        "operationId": "ApplicationsController_respond",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": true,
+            "in": "path",
+            "description": "Application to answer.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespondApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answered application with its decision, response note, responder and response timestamp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, decision or response note.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller may not manage the opportunity this application belongs to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application has already been answered or withdrawn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Answer a pending application as the opportunity's owner",
+        "tags": [
+          "applications"
+        ]
+      }
+    },
+    "/applications/{applicationId}/withdraw": {
+      "post": {
+        "description": "Only the applicant may withdraw, and only while the application is pending. The application keeps its row and its history.",
+        "operationId": "ApplicationsController_withdraw",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": true,
+            "in": "path",
+            "description": "Application to withdraw.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawn application with its withdrawal timestamp and no countdown.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid application UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The application belongs to another researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application has already been withdrawn or answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw one of the caller's own pending applications",
+        "tags": [
+          "applications"
+        ]
+      }
+    },
     "/outputs": {
       "get": {
         "description": "Returns a paginated list of research outputs visible to the caller (shared community works, member group works, or the caller own working copy draft works).",
@@ -6837,6 +7025,28 @@
         "required": [
           "items",
           "meta"
+        ]
+      },
+      "RespondApplicationDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "description": "The owner's answer: invite the applicant to a discussion, or decline.",
+            "enum": [
+              "INVITED_TO_DISCUSS",
+              "DECLINED"
+            ]
+          },
+          "responseNote": {
+            "type": "string",
+            "description": "Note the owner writes for the applicant, explaining the decision.",
+            "nullable": true,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "decision"
         ]
       },
       "OutputRevisionResponseDto": {
