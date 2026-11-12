@@ -1,5 +1,10 @@
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { Prisma, PrismaService } from '@researchos/database';
+import {
+  OutputFileVisibility,
+  OutputSharingStatus,
+  Prisma,
+  PrismaService,
+} from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -7,6 +12,7 @@ import {
   MAX_PAGE_SIZE,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
+import { ProvenanceService } from '../provenance/provenance.service.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputAuthorResponseDto } from './dto/output-author-response.dto.js';
 import { OutputFileResponseDto } from './dto/output-file-response.dto.js';
@@ -16,6 +22,8 @@ import {
 } from './dto/output-response.dto.js';
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
+import { PublishOutputDto } from './dto/publish-output.dto.js';
+import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
 
 const OUTPUT_SORT_FIELDS = {
   firstSharedAt: 'first_shared_at',
@@ -41,9 +49,34 @@ interface OutputFileRow {
   uploaded_at: Date;
 }
 
+/**
+ * The `field_provenance.entity_type` for the metadata of a work.
+ *
+ * The same value the OpenAlex ingest writes, so a human correction and a
+ * machine pull describe the same field rather than two different ones.
+ */
+const OUTPUT_ENTITY = 'OUTPUT';
+
+/**
+ * The metadata fields a human may correct on a draft revision, mapped to
+ * the `field_provenance.field_name` they are recorded under.
+ *
+ * `authors` is absent on purpose: the authorship list is not editable
+ * here, so there is no field to lock.
+ */
+const EDITABLE_PROVENANCE_FIELDS = {
+  title: 'title',
+  abstract: 'abstract',
+  venue: 'venue',
+  publicationYear: 'publication_year',
+} as const;
+
 @Injectable()
 export class OutputsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly provenance: ProvenanceService,
+  ) {}
 
   /**
    * Lists visible research outputs for the caller.
@@ -378,6 +411,373 @@ export class OutputsService {
           ? f.uploaded_at.toISOString()
           : new Date(f.uploaded_at).toISOString(),
     }));
+  }
+
+  /**
+   * Corrects the metadata of a work's editable draft revision.
+   *
+   * Only the owner may edit, and only while the revision is still a
+   * draft: a released revision is immutable, so the service refuses
+   * rather than writing a value the database would reject.
+   *
+   * Every corrected field is locked for the field-provenance writer
+   * (`confirmField`), so a later OpenAlex re-pull cannot silently
+   * overwrite a value a person stood behind. The lock is one-way:
+   * human wins over machine.
+   *
+   * The write updates the existing draft row in place. The partial
+   * unique index `uq_output_editable_draft` allows exactly one editable
+   * draft per output, so this endpoint never creates a second one.
+   */
+  async updateRevision(
+    outputId: string,
+    callerId: string,
+    dto: UpdateOutputRevisionDto,
+  ): Promise<OutputRevisionResponseDto> {
+    const output = await this.prisma.research_outputs.findUnique({
+      where: { id: outputId },
+      select: { id: true, owner_id: true },
+    });
+
+    if (!output) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (output.owner_id !== callerId) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotOwner,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const draft = await this.prisma.output_revisions.findFirst({
+      where: { output_id: outputId, released_at: null },
+    });
+
+    if (!draft) {
+      // Either the work was never published and has no draft, or it was
+      // published and its revision was frozen. Both mean there is nothing
+      // this endpoint may write.
+      const released = await this.prisma.output_revisions.findFirst({
+        where: { output_id: outputId, released_at: { not: null } },
+        select: { id: true },
+      });
+
+      throw new CodedHttpException(
+        released
+          ? domainErrorCodes.outputs.outputRevisionLocked
+          : domainErrorCodes.outputs.outputRevisionNotFound,
+        released ? HttpStatus.CONFLICT : HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (dto.title !== undefined) {
+      const title = dto.title.trim();
+      if (title === '') {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotPublishable,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      data['title'] = title;
+    }
+    if (dto.abstract !== undefined) {
+      data['abstract'] = dto.abstract === null ? null : dto.abstract.trim();
+    }
+    if (dto.venue !== undefined) {
+      data['venue'] = dto.venue === null ? null : dto.venue.trim();
+    }
+    if (dto.publicationYear !== undefined) {
+      data['publication_year'] = dto.publicationYear;
+    }
+    if (dto.externalUrl !== undefined) {
+      data['external_url'] = dto.externalUrl;
+    }
+    if (dto.outputType !== undefined) {
+      data['output_type'] = dto.outputType.trim();
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.output_revisions.update({
+        where: { id: draft.id },
+        data,
+      });
+
+      // Lock every corrected field against the next sync. The provenance
+      // writer is the only path that sets `is_locked`, so this is the only
+      // place the lock can come from.
+      for (const [key, fieldName] of Object.entries(
+        EDITABLE_PROVENANCE_FIELDS,
+      )) {
+        if (dto[key as keyof UpdateOutputRevisionDto] === undefined) {
+          continue;
+        }
+        await this.provenance.confirmField(tx, {
+          entityType: OUTPUT_ENTITY,
+          entityId: outputId,
+          fieldName,
+        });
+      }
+
+      return row;
+    });
+
+    return this.mapToRevisionResponse(updated);
+  }
+
+  /**
+   * Publishes a work: releases its draft revision and shares it.
+   *
+   * This is the single visibility action, whether the draft came from an
+   * OpenAlex pull or from a work created inside the platform. The
+   * endpoint is origin-blind on purpose — `import_state` records where
+   * the work came from, `sharing_status` records whether it is shared.
+   *
+   * The three writes happen in one transaction, because the database
+   * refuses a partial state: `ck_shared_output` requires a shared output
+   * to have an owner, a pinned release and a first-shared timestamp, and
+   * `guard_output_release` only accepts a pinned release that points at a
+   * released revision.
+   *
+   * `import_state` and `provenance_tag` are untouched, and
+   * `publication_status` is untouched too: a preprint shared internally
+   * is still unpublished in its journal.
+   *
+   * The visibility decision is the caller's, but the access group is
+   * checked: the caller has to be a member of the group it scopes the
+   * work to, so a work cannot be pointed at a group the caller does not
+   * belong to.
+   */
+  async publish(
+    outputId: string,
+    callerId: string,
+    dto: PublishOutputDto,
+  ): Promise<OutputResponseDto> {
+    const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
+
+    if (isGroupScope && !dto.accessGroupId) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputVisibilityInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!isGroupScope && dto.accessGroupId) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputVisibilityInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const output = await tx.research_outputs.findUnique({
+        where: { id: outputId },
+        select: {
+          id: true,
+          owner_id: true,
+          sharing_status: true,
+          current_release_id: true,
+        },
+      });
+
+      if (!output) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (output.owner_id !== callerId) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotOwner,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      if (output.sharing_status === OutputSharingStatus.SHARED) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputAlreadyPublished,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (isGroupScope) {
+        const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
+          SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
+        `;
+        if (!member?.allowed) {
+          throw new CodedHttpException(
+            domainErrorCodes.outputs.outputAccessGroupInvalid,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      const draft = await tx.output_revisions.findFirst({
+        where: { output_id: outputId, released_at: null },
+      });
+
+      if (!draft) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotPublishable,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const now = await this.now(tx);
+
+      // Step 1: release the draft revision. `guard_revision` refuses a
+      // release by anybody but the owner, and refuses an empty title.
+      const released = await tx.output_revisions.update({
+        where: { id: draft.id },
+        data: { released_at: now, released_by: callerId },
+      });
+
+      // Steps 2-4: pin the released revision, share the work, and set
+      // the visibility the caller chose. `guard_output_release` checks
+      // that the pinned revision is a released one, and `ck_shared_output`
+      // checks that a shared work has an owner, a pin and a first-shared
+      // timestamp — all three land in this same update.
+      await tx.research_outputs.update({
+        where: { id: outputId },
+        data: {
+          current_release_id: released.id,
+          sharing_status: OutputSharingStatus.SHARED,
+          first_shared_at: now,
+          visibility: dto.visibility,
+          access_group_id: isGroupScope ? dto.accessGroupId : null,
+        },
+      });
+
+      return this.loadResponse(tx, outputId);
+    });
+  }
+
+  /**
+   * Archives a published work, taking it out of every shared surface.
+   *
+   * Archiving is the only way to un-share: the trigger
+   * `guard_output_release` refuses to reset a shared work back to draft,
+   * because the sharing history is not erasable. The work keeps its
+   * revisions, its claims and its group links — only its visibility
+   * ends.
+   *
+   * `first_shared_at` is preserved, so the work keeps the history of
+   * when it was first shared.
+   */
+  async archive(
+    outputId: string,
+    callerId: string,
+  ): Promise<OutputResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const output = await tx.research_outputs.findUnique({
+        where: { id: outputId },
+        select: { id: true, owner_id: true, sharing_status: true },
+      });
+
+      if (!output) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (output.owner_id !== callerId) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotOwner,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      if (output.sharing_status !== OutputSharingStatus.SHARED) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotArchived,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const now = await this.now(tx);
+
+      // `ck_output_archive` ties the ARCHIVED status to the timestamp, so
+      // both land in the same update.
+      await tx.research_outputs.update({
+        where: { id: outputId },
+        data: {
+          sharing_status: OutputSharingStatus.ARCHIVED,
+          archived_at: now,
+        },
+      });
+
+      return this.loadResponse(tx, outputId);
+    });
+  }
+
+  /**
+   * Reads the response shape of an output.
+   *
+   * The caller of this helper is the owner (the mutation paths check that
+   * first), so the read needs no second permission check.
+   */
+  private async loadResponse(
+    tx: Prisma.TransactionClient,
+    outputId: string,
+  ): Promise<OutputResponseDto> {
+    const output = await tx.research_outputs.findUnique({
+      where: { id: outputId },
+      include: { output_authors: { orderBy: { author_order: 'asc' } } },
+    });
+
+    if (!output) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const revision = output.current_release_id
+      ? await tx.output_revisions.findUnique({
+          where: { id: output.current_release_id },
+        })
+      : null;
+
+    const outputTopics = await tx.output_topics.findMany({
+      where: { output_id: outputId },
+      include: {
+        research_topics: {
+          include: {
+            research_subfields: { include: { research_fields: true } },
+          },
+        },
+      },
+    });
+
+    const topics: OutputTopicResponseDto[] = outputTopics.map((ot) => ({
+      topicId: ot.research_topics.id,
+      topicName: ot.research_topics.name,
+      subfieldId: ot.research_topics.research_subfields.id,
+      subfieldName: ot.research_topics.research_subfields.name,
+      fieldId: ot.research_topics.research_subfields.research_fields.id,
+      fieldName: ot.research_topics.research_subfields.research_fields.name,
+    }));
+
+    return this.mapToOutputResponse(
+      output,
+      revision,
+      output.output_authors,
+      topics,
+    );
+  }
+
+  /** The database's own clock, so the server and the database agree. */
+  private async now(tx: Prisma.TransactionClient): Promise<Date> {
+    const [row] = await tx.$queryRaw<{ now: Date }[]>`
+      SELECT clock_timestamp() AS now
+    `;
+    return row.now;
   }
 
   private async assertCanViewOutput(

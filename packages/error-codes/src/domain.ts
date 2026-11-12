@@ -109,6 +109,14 @@ export const domainErrorCodes = {
   outputs: {
     outputNotFound: 'output_not_found',
     outputAccessDenied: 'output_access_denied',
+    outputNotOwner: 'output_not_owner',
+    outputNotPublishable: 'output_not_publishable',
+    outputAlreadyPublished: 'output_already_published',
+    outputNotArchived: 'output_not_archived',
+    outputRevisionLocked: 'output_revision_locked',
+    outputRevisionNotFound: 'output_revision_not_found',
+    outputVisibilityInvalid: 'output_visibility_invalid',
+    outputAccessGroupInvalid: 'output_access_group_invalid',
   },
   storage: {
     fileNotFound: 'output_file_not_found',

@@ -9,6 +9,7 @@ import {
   PublicationStatusEnum,
 } from '@researchos/database';
 import { describe, expect, it, vi } from 'vitest';
+import { ProvenanceService } from '../provenance/provenance.service.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputsController } from './outputs.controller.js';
 import { OutputsService } from './outputs.service.js';
@@ -124,6 +125,7 @@ describe('OutputsController & OutputsService', () => {
       providers: [
         OutputsService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: ProvenanceService, useValue: { confirmField: vi.fn() } },
       ],
     }).compile();
 

@@ -4510,6 +4510,293 @@
         ]
       }
     },
+    "/outputs/{outputId}/revision": {
+      "patch": {
+        "description": "Updates the editable draft revision of a work the caller owns. Only the fields present in the body are changed. Every corrected field is locked against later automated syncs, so a subsequent OpenAlex pull cannot overwrite a value a person stood behind. A released revision is immutable and cannot be edited.",
+        "operationId": "OutputsController_updateRevision",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOutputRevisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated draft revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputRevisionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, or a field value that fails validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output or its editable draft revision was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The revision has already been released and cannot be edited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corrects the metadata of a work draft revision",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/publish": {
+      "post": {
+        "description": "Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the visibility the caller chose. The work becomes searchable, discoverable, and linkable into a group. This is the single visibility action, whether the draft came from an OpenAlex pull or from a work created inside the platform.",
+        "operationId": "OutputsController_publish",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishOutputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The published work, now shared under the requested visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, an unsupported visibility, or a visibility that does not match the access group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is already published, or it has no editable draft revision to publish.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publishes a work and shares it with the chosen audience",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/archive": {
+      "post": {
+        "description": "Takes a published work out of every shared surface. The work keeps its revisions, its authorship claims and its group links; only its sharing ends. Archiving is the only way to un-share a work — a published work cannot be reset to draft, because the sharing history is not erasable.",
+        "operationId": "OutputsController_archive",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archived work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is not published, so it cannot be archived.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives a published work",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/profiles/me": {
       "get": {
         "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
@@ -8248,6 +8535,70 @@
           "accessGroupId"
         ]
       },
+      "UpdateOutputRevisionDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the work. Must not be blank once released.",
+            "maxLength": 500,
+            "example": "Deep Learning for Medical Image Classification"
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Abstract or summary of the work. Send null to clear the stored abstract.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Publication venue or journal name. Send null to clear the stored venue.",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "publicationYear": {
+            "type": "number",
+            "description": "Calendar year of publication. Send null to clear the stored year.",
+            "nullable": true,
+            "minimum": 1000,
+            "maximum": 9999,
+            "example": 2026
+          },
+          "externalUrl": {
+            "type": "string",
+            "description": "External URL pointing to the publication source. Send null to clear the stored link.",
+            "nullable": true
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Type classification of the work (e.g. PAPER, DATASET, PREPRINT).",
+            "maxLength": 50,
+            "example": "PAPER"
+          }
+        }
+      },
+      "PublishOutputDto": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Who may see the published work. FPTU_COMMUNITY opens it to the whole FPTU community; RESEARCH_GROUP opens it to the members of the access group.",
+            "enum": [
+              "FPTU_COMMUNITY",
+              "RESEARCH_GROUP"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "The research group that gains access. Required when visibility is RESEARCH_GROUP and rejected otherwise. The group must be one the caller is a member of.",
+            "format": "uuid",
+            "example": "55555555-5555-4555-8555-555555555555"
+          }
+        },
+        "required": [
+          "visibility"
+        ]
+      },
       "ProfileResponseDto": {
         "type": "object",
         "properties": {
@@ -10066,6 +10417,30 @@
             "items": {
               "$ref": "#/components/schemas/OutputFileResponseDto"
             }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputRevisionResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputRevisionResponseDto"
           },
           "message": {
             "type": "string",

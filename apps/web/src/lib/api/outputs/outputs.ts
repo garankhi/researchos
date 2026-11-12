@@ -5,15 +5,18 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
@@ -21,10 +24,13 @@ import type {
 import type {
   ApiErrorResponseDto,
   OutputResponseDtoEnvelope,
+  OutputRevisionResponseDtoEnvelope,
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
+  PublishOutputDto,
+  UpdateOutputRevisionDto,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -726,3 +732,298 @@ export function useOutputsControllerFindFiles<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Updates the editable draft revision of a work the caller owns. Only the fields present in the body are changed. Every corrected field is locked against later automated syncs, so a subsequent OpenAlex pull cannot overwrite a value a person stood behind. A released revision is immutable and cannot be edited.
+ * @summary Corrects the metadata of a work draft revision
+ */
+export const outputsControllerUpdateRevision = (
+  outputId: string,
+  updateOutputRevisionDto: UpdateOutputRevisionDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputRevisionResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/revision`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateOutputRevisionDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateRevisionMutationKey = () =>
+  ['outputsControllerUpdateRevision'] as const;
+
+export const getOutputsControllerUpdateRevisionMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateRevision>>,
+    TError,
+    OutputsControllerUpdateRevisionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateRevision>>,
+  TError,
+  OutputsControllerUpdateRevisionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerUpdateRevisionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateRevision>>,
+    OutputsControllerUpdateRevisionMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerUpdateRevision(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateRevisionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerUpdateRevision>>
+>;
+export type OutputsControllerUpdateRevisionMutationBody =
+  UpdateOutputRevisionDto;
+export type OutputsControllerUpdateRevisionMutationError = ApiErrorResponseDto;
+export type OutputsControllerUpdateRevisionMutationVariables = {
+  outputId: string;
+  data: UpdateOutputRevisionDto;
+};
+
+/**
+ * @summary Corrects the metadata of a work draft revision
+ */
+export const useOutputsControllerUpdateRevision = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateRevision>>,
+      TError,
+      OutputsControllerUpdateRevisionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateRevision>>,
+  TError,
+  OutputsControllerUpdateRevisionMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateRevisionMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the visibility the caller chose. The work becomes searchable, discoverable, and linkable into a group. This is the single visibility action, whether the draft came from an OpenAlex pull or from a work created inside the platform.
+ * @summary Publishes a work and shares it with the chosen audience
+ */
+export const outputsControllerPublish = (
+  outputId: string,
+  publishOutputDto: PublishOutputDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/publish`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: publishOutputDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerPublishMutationKey = () =>
+  ['outputsControllerPublish'] as const;
+
+export const getOutputsControllerPublishMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerPublish>>,
+    TError,
+    OutputsControllerPublishMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerPublish>>,
+  TError,
+  OutputsControllerPublishMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerPublishMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerPublish>>,
+    OutputsControllerPublishMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerPublish(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerPublishMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerPublish>>
+>;
+export type OutputsControllerPublishMutationBody = PublishOutputDto;
+export type OutputsControllerPublishMutationError = ApiErrorResponseDto;
+export type OutputsControllerPublishMutationVariables = {
+  outputId: string;
+  data: PublishOutputDto;
+};
+
+/**
+ * @summary Publishes a work and shares it with the chosen audience
+ */
+export const useOutputsControllerPublish = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerPublish>>,
+      TError,
+      OutputsControllerPublishMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerPublish>>,
+  TError,
+  OutputsControllerPublishMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerPublishMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Takes a published work out of every shared surface. The work keeps its revisions, its authorship claims and its group links; only its sharing ends. Archiving is the only way to un-share a work — a published work cannot be reset to draft, because the sharing history is not erasable.
+ * @summary Archives a published work
+ */
+export const outputsControllerArchive = (
+  outputId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputResponseDtoEnvelope>(
+    { url: `/outputs/${outputId}/archive`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getOutputsControllerArchiveMutationKey = () =>
+  ['outputsControllerArchive'] as const;
+
+export const getOutputsControllerArchiveMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerArchive>>,
+    TError,
+    OutputsControllerArchiveMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerArchive>>,
+  TError,
+  OutputsControllerArchiveMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerArchiveMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerArchive>>,
+    OutputsControllerArchiveMutationVariables
+  > = (props) => {
+    const { outputId } = props ?? {};
+
+    return outputsControllerArchive(outputId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerArchiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerArchive>>
+>;
+
+export type OutputsControllerArchiveMutationError = ApiErrorResponseDto;
+export type OutputsControllerArchiveMutationVariables = { outputId: string };
+
+/**
+ * @summary Archives a published work
+ */
+export const useOutputsControllerArchive = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerArchive>>,
+      TError,
+      OutputsControllerArchiveMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerArchive>>,
+  TError,
+  OutputsControllerArchiveMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerArchiveMutationOptions(options),
+    queryClient,
+  );
+};
