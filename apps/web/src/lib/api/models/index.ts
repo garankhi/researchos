@@ -147,6 +147,8 @@ export * from './profileResponseDtoAvailabilityStatus';
 export * from './profileResponseDtoEnvelope';
 export * from './researchGroupResponseDto';
 export * from './researchGroupResponseDtoEnvelope';
+export * from './respondApplicationDto';
+export * from './respondApplicationDtoDecision';
 export * from './revokeRoleDto';
 export * from './roleAssignmentResponseDto';
 export * from './roleAssignmentResponseDtoEnvelope';

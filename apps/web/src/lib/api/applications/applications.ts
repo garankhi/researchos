@@ -28,6 +28,7 @@ import type {
   ApplicationsControllerMineParams,
   ApplicationsControllerReceivedParams,
   CreateApplicationDto,
+  RespondApplicationDto,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -512,3 +513,198 @@ export function useApplicationsControllerMine<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.
+ * @summary Answer a pending application as the opportunity's owner
+ */
+export const applicationsControllerRespond = (
+  applicationId: string,
+  respondApplicationDto: RespondApplicationDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ApplicationResponseDtoEnvelope>(
+    {
+      url: `/applications/${applicationId}/respond`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: respondApplicationDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getApplicationsControllerRespondMutationKey = () =>
+  ['applicationsControllerRespond'] as const;
+
+export const getApplicationsControllerRespondMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applicationsControllerRespond>>,
+    TError,
+    ApplicationsControllerRespondMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof applicationsControllerRespond>>,
+  TError,
+  ApplicationsControllerRespondMutationVariables,
+  TContext
+> => {
+  const mutationKey = getApplicationsControllerRespondMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof applicationsControllerRespond>>,
+    ApplicationsControllerRespondMutationVariables
+  > = (props) => {
+    const { applicationId, data } = props ?? {};
+
+    return applicationsControllerRespond(applicationId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApplicationsControllerRespondMutationResult = NonNullable<
+  Awaited<ReturnType<typeof applicationsControllerRespond>>
+>;
+export type ApplicationsControllerRespondMutationBody = RespondApplicationDto;
+export type ApplicationsControllerRespondMutationError = ApiErrorResponseDto;
+export type ApplicationsControllerRespondMutationVariables = {
+  applicationId: string;
+  data: RespondApplicationDto;
+};
+
+/**
+ * @summary Answer a pending application as the opportunity's owner
+ */
+export const useApplicationsControllerRespond = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof applicationsControllerRespond>>,
+      TError,
+      ApplicationsControllerRespondMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof applicationsControllerRespond>>,
+  TError,
+  ApplicationsControllerRespondMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getApplicationsControllerRespondMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Only the applicant may withdraw, and only while the application is pending. The application keeps its row and its history.
+ * @summary Withdraw one of the caller's own pending applications
+ */
+export const applicationsControllerWithdraw = (
+  applicationId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ApplicationResponseDtoEnvelope>(
+    { url: `/applications/${applicationId}/withdraw`, method: 'POST', signal },
+    options,
+  );
+};
+
+export const getApplicationsControllerWithdrawMutationKey = () =>
+  ['applicationsControllerWithdraw'] as const;
+
+export const getApplicationsControllerWithdrawMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof applicationsControllerWithdraw>>,
+    TError,
+    ApplicationsControllerWithdrawMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof applicationsControllerWithdraw>>,
+  TError,
+  ApplicationsControllerWithdrawMutationVariables,
+  TContext
+> => {
+  const mutationKey = getApplicationsControllerWithdrawMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof applicationsControllerWithdraw>>,
+    ApplicationsControllerWithdrawMutationVariables
+  > = (props) => {
+    const { applicationId } = props ?? {};
+
+    return applicationsControllerWithdraw(applicationId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApplicationsControllerWithdrawMutationResult = NonNullable<
+  Awaited<ReturnType<typeof applicationsControllerWithdraw>>
+>;
+
+export type ApplicationsControllerWithdrawMutationError = ApiErrorResponseDto;
+export type ApplicationsControllerWithdrawMutationVariables = {
+  applicationId: string;
+};
+
+/**
+ * @summary Withdraw one of the caller's own pending applications
+ */
+export const useApplicationsControllerWithdraw = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof applicationsControllerWithdraw>>,
+      TError,
+      ApplicationsControllerWithdrawMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof applicationsControllerWithdraw>>,
+  TError,
+  ApplicationsControllerWithdrawMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getApplicationsControllerWithdrawMutationOptions(options),
+    queryClient,
+  );
+};
