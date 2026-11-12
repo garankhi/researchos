@@ -1,5 +1,10 @@
 # RES-101: Research interest endpoints
 
+This implementation is now included with RES-130 and RES-54 on
+`feat/RES-101-RES-130-RES-54-research-endpoints`. See the companion
+[directions](RES-130-group-directions.md) and [applications](RES-54-applications.md)
+documents for the additional features and final combined verification results.
+
 Ticket: [RES-101](https://researchosfptu.atlassian.net/browse/RES-101)
 
 Implemented on `RES-101-research-interest-endpoints`, rebased onto fetched

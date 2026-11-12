@@ -18,6 +18,7 @@ export {
   claim_status as ClaimStatus,
   interest_source,
   interest_status,
+  opportunity_application_status as OpportunityApplicationStatus,
   entity_types as FollowEntityType,
   group_member_role as GroupMemberRole,
   opportunity_kind as OpportunityKind,
