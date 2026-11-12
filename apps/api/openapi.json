@@ -6637,13 +6637,64 @@
             "type": "string",
             "description": "Timestamp when the user joined the group.",
             "format": "date-time"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the member.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "email": {
+            "type": "string",
+            "description": "Institutional email address of the member.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit of the member.",
+            "example": "Software Engineering"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title of the member, when the member has one.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree of the member, when the member has one.",
+            "example": "TS",
+            "nullable": true
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the member.",
+            "example": "FACULTY"
+          },
+          "avatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the member avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary of the member, when the member has a profile.",
+            "nullable": true
           }
         },
         "required": [
           "groupId",
           "userId",
           "role",
-          "joinedAt"
+          "joinedAt",
+          "fullName",
+          "email",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "userType",
+          "avatarStorageKey",
+          "bio"
         ]
       },
       "GroupMemberPageDto": {

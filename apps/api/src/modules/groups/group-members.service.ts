@@ -15,7 +15,30 @@ import type {
   UpdateGroupMemberDto,
 } from './dto/group-member.dto.js';
 
-type MemberRow = Prisma.group_membersGetPayload<Record<string, never>>;
+type MemberRow = Prisma.group_membersGetPayload<{
+  include: {
+    users: {
+      include: { researcher_profiles: true };
+    };
+  };
+}>;
+
+/**
+ * The display fields of a member, read from the joined account row.
+ *
+ * `researcher_profiles` is optional, so the profile-backed fields are
+ * nullable: a member without a profile row still appears in the roster.
+ */
+interface MemberDisplay {
+  fullName: string;
+  email: string;
+  departmentUnit: string;
+  academicTitle: string | null;
+  academicDegree: string | null;
+  userType: string;
+  avatarStorageKey: string | null;
+  bio: string | null;
+}
 
 @Injectable()
 export class GroupMembersService {
@@ -43,6 +66,9 @@ export class GroupMembersService {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: [orderBy, { user_id: 'asc' }],
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       const items = rows.map((row) => this.toResponse(row));
       return {
@@ -75,6 +101,9 @@ export class GroupMembersService {
         );
       const row = await tx.group_members.create({
         data: { group_id: groupId, user_id: dto.userId, role: dto.role },
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       return this.toResponse(row);
     });
@@ -91,6 +120,9 @@ export class GroupMembersService {
       const row = await tx.group_members.update({
         where: { group_id_user_id: { group_id: groupId, user_id: userId } },
         data: { role: dto.role },
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       return this.toResponse(row);
     });
@@ -176,11 +208,36 @@ export class GroupMembersService {
   }
 
   private toResponse(row: MemberRow): GroupMemberResponseDto {
+    const display = this.toDisplay(row);
     return {
       groupId: row.group_id,
       userId: row.user_id,
       role: row.role,
       joinedAt: row.joined_at.toISOString(),
+      ...display,
+    };
+  }
+
+  /**
+   * Reads the display fields of a member off the joined account row.
+   *
+   * The join is optional in the type, because a membership row may be
+   * read without it: the display fields then fall back to empty strings
+   * rather than throwing, so a missing join cannot break a roster.
+   */
+  private toDisplay(row: MemberRow): MemberDisplay {
+    const user = row.users;
+    const profile = user?.researcher_profiles ?? null;
+
+    return {
+      fullName: user?.full_name ?? '',
+      email: user?.email ?? '',
+      departmentUnit: user?.department_unit ?? '',
+      academicTitle: user?.academic_title ?? null,
+      academicDegree: user?.academic_degree ?? null,
+      userType: user?.user_type ?? '',
+      avatarStorageKey: profile?.avatar_storage_key ?? null,
+      bio: profile?.bio ?? null,
     };
   }
 }

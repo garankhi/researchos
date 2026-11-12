@@ -21,6 +21,37 @@ const userId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const callerId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const joinedAt = new Date('2026-11-09T00:00:00Z');
 
+/**
+ * The joined account row of a member, with the optional profile row.
+ *
+ * The roster carries the display data, so the group hub renders a member
+ * list without an N+1 walk over the profile endpoints.
+ */
+function memberUser(overrides: Record<string, unknown> = {}) {
+  return {
+    id: userId,
+    full_name: 'Nguyễn Văn A',
+    email: 'nguyenvana@fpt.edu.vn',
+    department_unit: 'Software Engineering',
+    academic_title: 'PGS',
+    academic_degree: 'TS',
+    user_type: 'FACULTY',
+    ...overrides,
+  };
+}
+
+function memberRow(overrides: Record<string, unknown> = {}) {
+  return {
+    group_id: groupId,
+    user_id: userId,
+    role: GroupMemberRole.MEMBER,
+    joined_at: joinedAt,
+    users: memberUser(),
+    researcher_profiles: null,
+    ...overrides,
+  };
+}
+
 function setup() {
   const group = {
     id: groupId,
@@ -28,12 +59,7 @@ function setup() {
     is_active: true,
     archived_at: null,
   };
-  const row = {
-    group_id: groupId,
-    user_id: userId,
-    role: GroupMemberRole.MEMBER,
-    joined_at: joinedAt,
-  };
+  const row = memberRow();
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([{ id: groupId }]),
     research_groups: { findUnique: vi.fn().mockResolvedValue(group) },
@@ -68,11 +94,100 @@ describe('Group membership policies', () => {
       userId,
       role: dto.role,
       joinedAt: joinedAt.toISOString(),
+      fullName: 'Nguyễn Văn A',
+      email: 'nguyenvana@fpt.edu.vn',
+      departmentUnit: 'Software Engineering',
+      academicTitle: 'PGS',
+      academicDegree: 'TS',
+      userType: 'FACULTY',
+      avatarStorageKey: null,
+      bio: null,
     });
     expect(tx.group_members.create).toHaveBeenCalledWith({
       data: { group_id: groupId, user_id: userId, role: dto.role },
+      include: { users: { include: { researcher_profiles: true } } },
     });
     expect(tx.$queryRaw).toHaveBeenCalledBefore(tx.group_members.create);
+  });
+
+  it('returns the member display data the group hub renders', async () => {
+    const { service, tx } = setup();
+    tx.group_members.findMany.mockResolvedValue([
+      memberRow({
+        users: memberUser({
+          full_name: 'Trần Thị B',
+          email: 'tranthib@fpt.edu.vn',
+          department_unit: 'AI Lab',
+          academic_title: null,
+          academic_degree: null,
+          user_type: 'STUDENT',
+        }),
+      }),
+    ]);
+
+    const result = await service.findAll(
+      groupId,
+      new PaginationQueryDto(),
+      callerId,
+    );
+
+    expect(result.items[0]).toMatchObject({
+      userId,
+      fullName: 'Trần Thị B',
+      email: 'tranthib@fpt.edu.vn',
+      departmentUnit: 'AI Lab',
+      academicTitle: null,
+      academicDegree: null,
+      userType: 'STUDENT',
+      avatarStorageKey: null,
+      bio: null,
+    });
+  });
+
+  it('carries the avatar and bio of a member that has a profile', async () => {
+    const { service, tx } = setup();
+    tx.group_members.findMany.mockResolvedValue([
+      memberRow({
+        users: {
+          ...memberUser(),
+          researcher_profiles: {
+            avatar_storage_key: 'avatars/abc.png',
+            bio: 'Researcher on distributed systems.',
+          },
+        },
+      }),
+    ]);
+
+    const result = await service.findAll(
+      groupId,
+      new PaginationQueryDto(),
+      callerId,
+    );
+
+    expect(result.items[0]).toMatchObject({
+      avatarStorageKey: 'avatars/abc.png',
+      bio: 'Researcher on distributed systems.',
+    });
+  });
+
+  it('lists a member without a profile row instead of failing', async () => {
+    const { service, tx } = setup();
+    tx.group_members.findMany.mockResolvedValue([
+      memberRow({ users: { ...memberUser(), researcher_profiles: null } }),
+    ]);
+
+    const result = await service.findAll(
+      groupId,
+      new PaginationQueryDto(),
+      callerId,
+    );
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      fullName: 'Nguyễn Văn A',
+      avatarStorageKey: null,
+      bio: null,
+    });
   });
 
   it('allows a group leader to change another member role', async () => {
@@ -91,6 +206,7 @@ describe('Group membership policies', () => {
     expect(tx.group_members.update).toHaveBeenCalledWith({
       where: { group_id_user_id: { group_id: groupId, user_id: userId } },
       data: { role: GroupMemberRole.GROUP_LEADER },
+      include: { users: { include: { researcher_profiles: true } } },
     });
   });
 
@@ -281,6 +397,7 @@ describe('Group membership policies', () => {
       skip: 5,
       take: 5,
       orderBy: [{ joined_at: 'desc' }, { user_id: 'asc' }],
+      include: { users: { include: { researcher_profiles: true } } },
     });
   });
 
