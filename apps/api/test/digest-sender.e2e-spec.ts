@@ -465,6 +465,43 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     expect(received).toHaveLength(index + 1);
   });
 
+  it('records SMTP acceptance after a database conflict without sending again', async () => {
+    const index = received.length;
+    const { delivery, job } = await fixture();
+    await waitMail(index);
+
+    // Sequence increments survive rollback so only the first SENT write fails.
+    await prisma.$executeRaw`CREATE SEQUENCE test_digest_sent_write`;
+    await prisma.$executeRaw`
+      CREATE FUNCTION test_digest_sent_write_conflict() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF nextval('test_digest_sent_write') = 1 THEN
+          RAISE EXCEPTION 'fixture write conflict' USING ERRCODE = '40001';
+        END IF;
+        RETURN NEW;
+      END $$
+    `;
+    await prisma.$executeRaw`
+      CREATE TRIGGER test_digest_sent_write_conflict BEFORE UPDATE ON digest_deliveries
+      FOR EACH ROW WHEN (NEW.status = 'SENT')
+      EXECUTE FUNCTION test_digest_sent_write_conflict()
+    `;
+    try {
+      respond(index, accepted);
+      expect(await waitStatus(delivery.id, 'SENT')).toMatchObject({
+        attempts: 1,
+        provider_message_id: accepted.messageId,
+      });
+      expect(await jobs.findOwned(delivery.user_id, job.id)).toMatchObject({
+        status: 'COMPLETED',
+      });
+      expect(received).toHaveLength(index + 1);
+    } finally {
+      await prisma.$executeRaw`DROP TRIGGER test_digest_sent_write_conflict ON digest_deliveries`;
+    }
+  });
+
   it('honors explicit Vietnamese and cancels when all prepared items are unauthorized', async () => {
     const index = received.length;
     const vietnamese = await fixture('vi');

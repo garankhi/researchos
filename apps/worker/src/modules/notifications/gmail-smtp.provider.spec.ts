@@ -67,6 +67,20 @@ describe('Gmail SMTP adapter', () => {
     },
   );
 
+  it('sends to a quoted mailbox as a single recipient', async () => {
+    const to = '"a,b"@example.test';
+    sendMail.mockResolvedValue({ accepted: [to], messageId: 'smtp-message' });
+    const provider = new GmailSmtpProvider(from, 'fixture-app-password');
+
+    await expect(provider.send({ ...mail, to })).resolves.toEqual({
+      accepted: true,
+      messageId: 'smtp-message',
+    });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ envelope: { from, to: [to] } }),
+    );
+  });
+
   it('rejects an address list before touching SMTP', async () => {
     const provider = new GmailSmtpProvider(from, 'fixture-app-password');
     await expect(

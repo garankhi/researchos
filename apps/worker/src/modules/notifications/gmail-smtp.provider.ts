@@ -1,3 +1,4 @@
+import { isEmail } from 'class-validator';
 import nodemailer from 'nodemailer';
 import type {
   MailMessage,
@@ -34,7 +35,7 @@ export class GmailSmtpProvider implements MailProvider {
 
   async send(message: MailMessage): Promise<MailOutcome> {
     // The ledger supplies one recipient. SMTP address-list syntax is invalid here.
-    if (!/^[^\s@(),:;<>"\\]+@[\p{L}\p{N}.-]+$/u.test(message.to)) {
+    if (!isEmail(message.to)) {
       return { accepted: false, code: 'smtp_permanent' };
     }
     try {

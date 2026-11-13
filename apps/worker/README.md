@@ -183,8 +183,10 @@ An explicit `vi` preference selects Vietnamese.
   `PENDING` while the ledger has a scheduled retry. The probe keeps its own
   transport retry policy.
 - `SENT` records Gmail SMTP acceptance. `provider_message_id` stores the
-  outgoing Message-ID returned by the transport. A timeout or interrupted completion
-  can leave acceptance unknown. A retry may send a duplicate demo message.
+  outgoing Message-ID returned by the transport. After confirmed acceptance,
+  the worker retries the database write once on a transient database error.
+  A lost SMTP response or an interruption before `SENT` is recorded can leave
+  acceptance unknown. A later delivery attempt may send a duplicate demo message.
 - On terminal failure, inspect `digest_deliveries.last_error` and `attempts`,
   then correlate `background_jobs` and the DLQ using the job ID and generation.
   A generic retry does not reset the digest's five-attempt limit or reopen a

@@ -16,6 +16,14 @@ import {
 
 const LEASE_MS = 120_000;
 const FIRST_BACKOFF_MS = 60_000;
+const RETRYABLE_DATABASE_ERRORS = new Set([
+  'P1001', // Database unreachable
+  'P1002', // Connection timed out
+  'P1008', // Operation timed out
+  'P1017', // Connection closed
+  'P2024', // Connection pool timed out
+  'P2034', // Write conflict or deadlock
+]);
 
 interface ReleasedOutput {
   output_id: string;
@@ -142,7 +150,19 @@ export class DigestSender {
     const outcome: SendOutcome = isDeepStrictEqual(current, claim.content)
       ? await this.mail.send({ to: email, ...message })
       : { contentChanged: true };
-    await this.recordOutcome(ref, prefix, claim, outcome);
+    try {
+      await this.recordOutcome(ref, prefix, claim, outcome);
+    } catch (error) {
+      if (
+        !('accepted' in outcome && outcome.accepted) ||
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        !RETRYABLE_DATABASE_ERRORS.has(error.code)
+      ) {
+        throw error;
+      }
+      // SMTP already accepted the message. Retry the fenced database write only.
+      await this.recordOutcome(ref, prefix, claim, outcome);
+    }
   }
 
   private async readAuthorizedDigest(
