@@ -1,11 +1,7 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
   PaginationQueryDto,
@@ -19,7 +15,30 @@ import type {
   UpdateGroupMemberDto,
 } from './dto/group-member.dto.js';
 
-type MemberRow = Prisma.group_membersGetPayload<Record<string, never>>;
+type MemberRow = Prisma.group_membersGetPayload<{
+  include: {
+    users: {
+      include: { researcher_profiles: true };
+    };
+  };
+}>;
+
+/**
+ * The display fields of a member, read from the joined account row.
+ *
+ * `researcher_profiles` is optional, so the profile-backed fields are
+ * nullable: a member without a profile row still appears in the roster.
+ */
+interface MemberDisplay {
+  fullName: string;
+  email: string;
+  departmentUnit: string;
+  academicTitle: string | null;
+  academicDegree: string | null;
+  userType: string;
+  avatarStorageKey: string | null;
+  bio: string | null;
+}
 
 @Injectable()
 export class GroupMembersService {
@@ -47,6 +66,9 @@ export class GroupMembersService {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: [orderBy, { user_id: 'asc' }],
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       const items = rows.map((row) => this.toResponse(row));
       return {
@@ -64,14 +86,24 @@ export class GroupMembersService {
     return this.write(async (tx) => {
       await this.authorize(tx, groupId, callerId, true);
       if (dto.userId.toLowerCase() === callerId.toLowerCase())
-        throw new ForbiddenException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
       const user = await tx.users.findUnique({
         where: { id: dto.userId },
         select: { id: true },
       });
-      if (!user) throw new NotFoundException();
+      if (!user)
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberNotFound,
+          HttpStatus.NOT_FOUND,
+        );
       const row = await tx.group_members.create({
         data: { group_id: groupId, user_id: dto.userId, role: dto.role },
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       return this.toResponse(row);
     });
@@ -88,6 +120,9 @@ export class GroupMembersService {
       const row = await tx.group_members.update({
         where: { group_id_user_id: { group_id: groupId, user_id: userId } },
         data: { role: dto.role },
+        include: {
+          users: { include: { researcher_profiles: true } },
+        },
       });
       return this.toResponse(row);
     });
@@ -101,7 +136,10 @@ export class GroupMembersService {
     await this.write(async (tx) => {
       const group = await this.authorize(tx, groupId, callerId, true);
       if (group.is_active && group.lead_id === userId.toLowerCase())
-        throw new ConflictException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.leadRemovalDenied,
+          HttpStatus.FORBIDDEN,
+        );
       await tx.group_members.delete({
         where: { group_id_user_id: { group_id: groupId, user_id: userId } },
       });
@@ -122,13 +160,25 @@ export class GroupMembersService {
     const group = await tx.research_groups.findUnique({
       where: { id: groupId },
     });
-    if (!group) throw new NotFoundException();
+    if (!group)
+      throw new CodedHttpException(
+        domainErrorCodes.groups.groupNotFound,
+        HttpStatus.NOT_FOUND,
+      );
     if (group.lead_id === callerId.toLowerCase()) return group;
+    // The roster of an active group is public to any signed-in researcher, so
+    // the group hub is not empty for an outsider. An archived or inactive
+    // group keeps its private roster: only the lead and its members read it.
+    const active = group.is_active && group.archived_at === null;
+    if (!write && active) return group;
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (!member || (write && member.role !== GroupMemberRole.CORE_MEMBER))
-      throw new ForbiddenException();
+    if (!member || (write && member.role !== GroupMemberRole.GROUP_LEADER))
+      throw new CodedHttpException(
+        domainErrorCodes.groups.accessDenied,
+        HttpStatus.FORBIDDEN,
+      );
     return group;
   }
 
@@ -140,23 +190,54 @@ export class GroupMembersService {
     } catch (error) {
       const failure = readDatabaseFailure(error);
       if (failure?.prismaCode === 'P2002' || failure?.sqlState === '23505')
-        throw new ConflictException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberAlreadyExists,
+          HttpStatus.CONFLICT,
+        );
       if (
         failure?.prismaCode === 'P2025' ||
         failure?.prismaCode === 'P2003' ||
         failure?.sqlState === '23503'
       )
-        throw new NotFoundException();
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberNotFound,
+          HttpStatus.NOT_FOUND,
+        );
       throw error;
     }
   }
 
   private toResponse(row: MemberRow): GroupMemberResponseDto {
+    const display = this.toDisplay(row);
     return {
       groupId: row.group_id,
       userId: row.user_id,
       role: row.role,
       joinedAt: row.joined_at.toISOString(),
+      ...display,
+    };
+  }
+
+  /**
+   * Reads the display fields of a member off the joined account row.
+   *
+   * The join is optional in the type, because a membership row may be
+   * read without it: the display fields then fall back to empty strings
+   * rather than throwing, so a missing join cannot break a roster.
+   */
+  private toDisplay(row: MemberRow): MemberDisplay {
+    const user = row.users;
+    const profile = user?.researcher_profiles ?? null;
+
+    return {
+      fullName: user?.full_name ?? '',
+      email: user?.email ?? '',
+      departmentUnit: user?.department_unit ?? '',
+      academicTitle: user?.academic_title ?? null,
+      academicDegree: user?.academic_degree ?? null,
+      userType: user?.user_type ?? '',
+      avatarStorageKey: profile?.avatar_storage_key ?? null,
+      bio: profile?.bio ?? null,
     };
   }
 }

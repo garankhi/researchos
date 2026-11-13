@@ -3,6 +3,7 @@ import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
+import type { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
 
@@ -60,19 +61,102 @@ export class ProfilesService {
       );
     }
 
-    // Unconfirmed profiles are hidden from non-owners (returning 404 rather than 403)
-    if (targetUserId !== callerId && profile.profile_confirmed_at === null) {
+    // Unconfirmed profiles are visible to the owner only; non-owners are
+    // refused with 403 rather than a 404 that would hide the denial.
+    this.assertProfileReadable(targetUserId, callerId, profile);
+
+    return this.mapToResponse(profile);
+  }
+
+  /**
+   * Lists a researcher's interests with the taxonomy path of each topic.
+   *
+   * Visibility mirrors the profile itself: a confirmed profile is readable
+   * by any authenticated user, an unconfirmed one only by its owner. The
+   * rule lives in `assertProfileReadable` so the profile read and this
+   * read can never drift apart.
+   */
+  async findInterestsByUserId(
+    targetUserId: string,
+    callerId: string,
+  ): Promise<ProfileInterestResponseDto[]> {
+    const profile = await this.prisma.researcher_profiles.findUnique({
+      where: { user_id: targetUserId },
+      select: { user_id: true, profile_confirmed_at: true },
+    });
+
+    if (!profile) {
       throw new CodedHttpException(
         domainErrorCodes.profiles.profileNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
 
-    return this.mapToResponse(profile);
+    this.assertProfileReadable(targetUserId, callerId, profile);
+
+    const rows = await this.prisma.research_interests.findMany({
+      where: { user_id: targetUserId },
+      include: {
+        research_topics: {
+          include: {
+            research_subfields: { include: { research_fields: true } },
+          },
+        },
+      },
+      orderBy: [{ declared_at: 'desc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => {
+      const topic = row.research_topics;
+      const subfield = topic.research_subfields;
+      const field = subfield.research_fields;
+
+      return {
+        id: row.id,
+        userId: row.user_id,
+        topicId: row.topic_id,
+        status: row.status,
+        sourceType: row.source_type,
+        provenanceTag: row.provenance_tag,
+        evidenceNote: row.evidence_note,
+        declaredAt: row.declared_at.toISOString(),
+        reviewedAt: row.reviewed_at?.toISOString() ?? null,
+        topicPath: {
+          topic: { id: topic.id, name: topic.name },
+          subfield: { id: subfield.id, name: subfield.name },
+          field: { id: field.id, name: field.name },
+        },
+      };
+    });
+  }
+
+  /**
+   * Whether the caller may read this researcher's profile.
+   *
+   * A confirmed profile is readable by any authenticated user; an
+   * unconfirmed one only by its owner. A non-owner is refused with 403
+   * rather than a 404 that would hide the denial.
+   */
+  private assertProfileReadable(
+    targetUserId: string,
+    callerId: string,
+    profile: { profile_confirmed_at: Date | null },
+  ): void {
+    if (targetUserId !== callerId && profile.profile_confirmed_at === null) {
+      throw new CodedHttpException(
+        domainErrorCodes.profiles.profileAccessDenied,
+        HttpStatus.FORBIDDEN,
+      );
+    }
   }
 
   /**
    * Updates editable attributes of the caller's own profile.
+   *
+   * The payload spans two tables: the profile fields live on
+   * `researcher_profiles`, the account fields on `users`. Both writes go
+   * through one transaction, so a caller never ends up with a renamed
+   * account and an unchanged profile — or the other way round.
    */
   async updateMyProfile(
     userId: string,
@@ -103,13 +187,49 @@ export class ProfilesService {
       data.scopus_author_id = dto.scopusAuthorId?.trim() || null;
     }
 
-    const updated = await this.prisma.researcher_profiles.update({
-      where: { user_id: userId },
-      data,
-      include: { users: true },
+    const account = this.accountData(dto);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(account).length > 0) {
+        await tx.users.update({
+          where: { id: userId },
+          data: account,
+        });
+      }
+
+      return tx.researcher_profiles.update({
+        where: { user_id: userId },
+        data,
+        include: { users: true },
+      });
     });
 
     return this.mapToResponse(updated);
+  }
+
+  /**
+   * The account columns the caller asked to change.
+   *
+   * These live on `users`, not on `researcher_profiles`, so they are a
+   * separate update rather than part of the profile record. An empty
+   * object means the payload carried no account field, and the caller
+   * skips the `users` write entirely.
+   */
+  private accountData(dto: UpdateProfileDto): Prisma.usersUpdateInput {
+    const data: Prisma.usersUpdateInput = {};
+    if (dto.fullName !== undefined) {
+      data.full_name = dto.fullName;
+    }
+    if (dto.departmentUnit !== undefined) {
+      data.department_unit = dto.departmentUnit;
+    }
+    if (dto.academicTitle !== undefined) {
+      data.academic_title = dto.academicTitle?.trim() || null;
+    }
+    if (dto.academicDegree !== undefined) {
+      data.academic_degree = dto.academicDegree?.trim() || null;
+    }
+    return data;
   }
 
   private mapToResponse(profile: ProfileWithUser): ProfileResponseDto {

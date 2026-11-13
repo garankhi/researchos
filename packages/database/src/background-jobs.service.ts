@@ -1,11 +1,24 @@
 import { isDeepStrictEqual } from 'node:util';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from './generated/prisma/client.js';
 import { PrismaService } from './prisma.service.js';
+
+export const RESEARCH_UPDATE_JOB = 'research-update';
+
+// Admins can operate research updates because these jobs represent shared
+// publication history. Other job kinds remain private to their owners.
+function jobAccess(callerId: string) {
+  return Prisma.sql`(
+    owner_id = ${callerId}::uuid OR (
+      kind = ${RESEARCH_UPDATE_JOB} AND is_admin(${callerId}::uuid)
+    )
+  )`;
+}
 
 /** Durable job identity and transactional submission, shared by API and worker. */
 @Injectable()
@@ -57,36 +70,52 @@ export class BackgroundJobsService {
     );
   }
 
-  async findOwned(ownerId: string, id: string) {
-    const job = await this.prisma.background_jobs.findFirst({
-      where: { id, owner_id: ownerId },
+  async findAccessible(callerId: string, id: string) {
+    const [job] = await this.prisma.$queryRaw<
+      Prisma.background_jobsGetPayload<undefined>[]
+    >`
+      SELECT * FROM background_jobs WHERE id = ${id}::uuid AND ${jobAccess(callerId)}
+    `;
+    if (job) return job;
+    const exists = await this.prisma.background_jobs.findUnique({
+      where: { id },
+      select: { id: true },
     });
-    if (!job) throw new NotFoundException();
-    return job;
+    if (!exists) throw new NotFoundException();
+    throw new ForbiddenException();
   }
 
-  async retryOwned(ownerId: string, id: string) {
+  async retryAccessible(callerId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
       // Lock before reading the generation; two retry requests cannot both win.
-      const rows = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM background_jobs
-        WHERE id = ${id}::uuid AND owner_id = ${ownerId}::uuid FOR UPDATE
+      const [job] = await tx.$queryRaw<
+        Prisma.background_jobsGetPayload<undefined>[]
+      >`
+        SELECT * FROM background_jobs
+        WHERE id = ${id}::uuid AND ${jobAccess(callerId)}
+        FOR UPDATE
       `;
-      if (!rows.length) throw new NotFoundException();
-      const job = await tx.background_jobs.findUniqueOrThrow({ where: { id } });
-      if (job.status !== 'FAILED') throw new ConflictException();
-      return tx.background_jobs.update({
+      if (job) {
+        if (job.status !== 'FAILED') throw new ConflictException();
+        return tx.background_jobs.update({
+          where: { id },
+          data: {
+            status: 'PENDING',
+            generation: { increment: 1 },
+            attempts: 0,
+            error_code: null,
+            result: Prisma.DbNull,
+            updated_at: new Date(),
+            outbox: { create: { generation: job.generation + 1 } },
+          },
+        });
+      }
+      const exists = await tx.background_jobs.findUnique({
         where: { id },
-        data: {
-          status: 'PENDING',
-          generation: { increment: 1 },
-          attempts: 0,
-          error_code: null,
-          result: Prisma.DbNull,
-          updated_at: new Date(),
-          outbox: { create: { generation: job.generation + 1 } },
-        },
+        select: { id: true },
       });
+      if (!exists) throw new NotFoundException();
+      throw new ForbiddenException();
     });
   }
 }

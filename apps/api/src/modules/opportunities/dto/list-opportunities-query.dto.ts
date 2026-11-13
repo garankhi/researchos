@@ -1,32 +1,16 @@
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OpportunityStatus } from '@researchos/database';
-import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
 
-export class ListOpportunitiesQueryDto {
-  @ApiPropertyOptional({
-    description: 'One-based page number.',
-    default: 1,
-    minimum: 1,
-  })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(21474836)
-  page: number = 1;
-
-  @ApiPropertyOptional({
-    description: 'Maximum records per page.',
-    default: 20,
-    minimum: 1,
-    maximum: 100,
-  })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  pageSize: number = 20;
-
+/**
+ * Query parameters for listing visible research opportunities.
+ *
+ * The paging itself comes from the shared `PaginationQueryDto` — `page`,
+ * `limit` and `sort` — so this endpoint paginates the way every other list
+ * endpoint in the API does.
+ */
+export class ListOpportunitiesQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     description: 'Filter by group scope.',
     format: 'uuid',
@@ -50,4 +34,13 @@ export class ListOpportunitiesQueryDto {
   @IsOptional()
   @IsEnum(OpportunityStatus)
   status?: OpportunityStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter by the researcher who created the opportunity, without widening visibility.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  creatorId?: string;
 }

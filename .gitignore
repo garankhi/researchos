@@ -3,6 +3,14 @@ docs/*
 !docs/*.md
 !docs/adr/
 !docs/adr/*.md
+!docs/res/
+docs/res/*
+!docs/res/RES-101-research-interest-endpoints.md
+!docs/res/RES-130-group-directions.md
+!docs/res/RES-54-applications.md
+!docs/res/RES-126-group-member-endpoints-add-remove-role.md
+!docs/res/RES-162-output-publish-archive.md
+!docs/res/RES-163-opportunity-pagination-alignment.md
 !docs/database/
 !docs/database/*.md
 !docs/database/*.dbml

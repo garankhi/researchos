@@ -3,7 +3,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
-import { Agent } from 'node:http';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,19 +16,21 @@ import {
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
-import supertest from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Exercise the same compiled Nest metadata and providers as the deployed apps.
 import { AppModule } from '../dist/app.module.js';
 import { HttpExceptionFilter } from '../dist/common/filters/http-exception.filter.js';
 import { ApiResponseInterceptor } from '../dist/common/interceptors/api-response.interceptor.js';
 import { OutboxService } from '../../worker/dist/modules/jobs/outbox.service.js';
+import { createHttpTestClient } from './http-test-client.js';
 
 describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone worker', () => {
   const previousPrefix = process.env.QUEUE_PREFIX;
   const prefix = `durable-e2e-${randomUUID()}`;
   const owners = [randomUUID(), randomUUID(), randomUUID()];
   const tokens = owners.map(() => randomUUID());
+  // These fixture grants should already be effective on the PostgreSQL clock.
+  const grantedAt = new Date(0);
   const cookie = (index = 0) => `researchos_session=${tokens[index]}`;
   let app: INestApplication;
   let prisma: PrismaService;
@@ -39,13 +40,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
   let dlq: Queue;
   let worker: ChildProcess | undefined;
   let workerOutput = '';
-  // Own the client socket lifecycle across long Redis/worker waits. Retire
-  // idle sockets before the HTTP server's default 5-second keep-alive cutoff.
-  const httpAgent = new Agent({ keepAlive: true, timeout: 2_000 });
-  const request = (server: Parameters<typeof supertest>[0]) =>
-    supertest.agent(server).use((req) => {
-      req.agent(httpAgent);
-    });
+  const { request, close } = createHttpTestClient();
 
   beforeAll(async () => {
     process.env.QUEUE_PREFIX = prefix;
@@ -93,20 +88,21 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
             user_id: owners[index]!,
             role: 'ADMIN',
             grant_source: 'SYSTEM',
+            granted_at: grantedAt,
           },
         });
-      await prisma.user_sessions.create({
-        data: {
-          user_id: owners[index]!,
-          auth_method: 'LOCAL',
-          session_token_hash: createHash('sha256')
-            .update(tokens[index]!)
-            .digest('hex'),
-          authenticated_at: new Date(),
-          expires_at: new Date(Date.now() + 3_600_000),
-          idle_expires_at: new Date(Date.now() + 1_800_000),
-        },
-      });
+      const tokenHash = createHash('sha256')
+        .update(tokens[index]!)
+        .digest('hex');
+      await prisma.$executeRaw`
+        INSERT INTO user_sessions (
+          user_id, auth_method, session_token_hash, authenticated_at,
+          expires_at, idle_expires_at
+        ) VALUES (
+          ${owners[index]}::uuid, 'LOCAL', ${tokenHash}, CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP + interval '1 hour', CURRENT_TIMESTAMP + interval '30 minutes'
+        )
+      `;
     }
   });
 
@@ -173,6 +169,139 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     worker = undefined;
   }
 
+  it('creates, lists, and removes follows with real authorization and target visibility', async () => {
+    const [callerId, targetId] = owners as [string, string, string];
+    const groupId = randomUUID();
+    const fieldId = randomUUID();
+    const subfieldId = randomUUID();
+    const topicId = randomUUID();
+    const post = (entityType: string, entityId: string, owner = 0) =>
+      request(app.getHttpServer())
+        .post('/follows')
+        .set('Cookie', cookie(owner))
+        .send({ entityType, entityId });
+    const list = (owner = 0) =>
+      request(app.getHttpServer())
+        .get('/follows?limit=1')
+        .set('Cookie', cookie(owner));
+    const remove = (entityType: string, entityId: string) =>
+      request(app.getHttpServer())
+        .delete(`/follows/${entityType}/${entityId}`)
+        .set('Cookie', cookie());
+
+    try {
+      await prisma.user_role_assignments.createMany({
+        data: [callerId, targetId].map((user_id) => ({
+          user_id,
+          role: 'RESEARCHER' as const,
+          grant_source: 'SYSTEM' as const,
+          granted_at: grantedAt,
+        })),
+      });
+      await prisma.researcher_profiles.create({ data: { user_id: targetId } });
+      await prisma.research_groups.create({
+        data: {
+          id: groupId,
+          code: groupId,
+          name: 'Follow fixture',
+          lead_id: targetId,
+        },
+      });
+      await prisma.research_fields.create({
+        data: { id: fieldId, name: fieldId, external_id: fieldId },
+      });
+      await prisma.research_subfields.create({
+        data: {
+          id: subfieldId,
+          field_id: fieldId,
+          name: subfieldId,
+          external_id: subfieldId,
+        },
+      });
+      await prisma.research_topics.create({
+        data: {
+          id: topicId,
+          subfield_id: subfieldId,
+          name: 'Follow topic',
+          created_by: targetId,
+        },
+      });
+
+      await request(app.getHttpServer()).get('/follows').expect(401);
+      await post('GROUP', groupId, 2).expect(403);
+      const invalid = await post('UNKNOWN', 'invalid').expect(400);
+      expect(invalid.body.errors).toEqual(
+        expect.arrayContaining([
+          { field: 'entityType', messages: ['entity_type_invalid'] },
+          { field: 'entityId', messages: ['entity_id_uuid'] },
+        ]),
+      );
+      const unsupported = await post('OUTPUT', randomUUID()).expect(400);
+      expect(unsupported.body.message).toBe('follow_target_type_unsupported');
+      const selfFollow = await post(
+        'RESEARCHER',
+        callerId.toUpperCase(),
+      ).expect(400);
+      expect(selfFollow.body.message).toBe('follow_self');
+      await post('RESEARCHER', targetId).expect(404);
+      await post('GROUP', randomUUID()).expect(404);
+      await prisma.researcher_profiles.update({
+        where: { user_id: targetId },
+        data: { profile_confirmed_at: new Date() },
+      });
+      await post('RESEARCHER', targetId).expect(201);
+      await post('TOPIC', topicId).expect(201);
+      const concurrent = await Promise.all([
+        post('GROUP', groupId),
+        post('GROUP', groupId),
+      ]);
+      expect(
+        concurrent.map(({ status }) => status).sort((a, b) => a - b),
+      ).toEqual([201, 409]);
+      expect((await list().expect(200)).body.data.meta.total).toBe(3);
+      expect((await list(1).expect(200)).body.data.meta.total).toBe(0);
+
+      await prisma.research_groups.update({
+        where: { id: groupId },
+        data: { is_active: false, archived_at: new Date() },
+      });
+      await prisma.researcher_profiles.update({
+        where: { user_id: targetId },
+        data: { profile_confirmed_at: null },
+      });
+      const page = (await list().expect(200)).body.data;
+      expect(page.meta.total).toBe(1);
+      expect(page.items).toMatchObject([
+        {
+          entityType: 'TOPIC',
+          entityId: topicId,
+          displayName: 'Follow topic',
+          state: 'ACTIVE',
+        },
+      ]);
+      await remove('UNKNOWN', groupId).expect(400);
+      await remove('GROUP', groupId).expect(204);
+      await remove('GROUP', groupId).expect(204);
+      await remove('RESEARCHER', targetId).expect(204);
+      await remove('TOPIC', topicId).expect(204);
+      expect((await list().expect(200)).body.data.meta.total).toBe(0);
+    } finally {
+      await prisma.user_follows.deleteMany({
+        where: { follower_id: callerId },
+      });
+      await prisma.research_topics.deleteMany({ where: { id: topicId } });
+      await prisma.research_subfields.deleteMany({ where: { id: subfieldId } });
+      await prisma.research_fields.deleteMany({ where: { id: fieldId } });
+      await prisma.research_groups.deleteMany({ where: { id: groupId } });
+      await prisma.researcher_profiles.deleteMany({
+        where: { user_id: targetId },
+      });
+      await prisma.user_role_assignments.deleteMany({
+        where: { user_id: { in: [callerId, targetId] }, role: 'RESEARCHER' },
+      });
+    }
+  });
+
   it('enforces real session, role, input validation and owner isolation', async () => {
     await request(app.getHttpServer())
       .post('/jobs/probes')
@@ -236,18 +365,20 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       .get(statusUrl)
       .set('Cookie', cookie())
       .expect(200);
+    // The job exists, so another caller is denied access rather than told
+    // the job is missing: 404 is reserved for a job that does not exist.
     await request(app.getHttpServer())
       .get(statusUrl)
       .set('Cookie', cookie(1))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .get(statusUrl)
       .set('Cookie', cookie(2))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .post(`${statusUrl}/retry`)
       .set('Cookie', cookie(1))
-      .expect(404);
+      .expect(403);
     await request(app.getHttpServer())
       .post(`${statusUrl}/retry`)
       .set('Cookie', cookie(2))
@@ -516,7 +647,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       await queue?.close();
       await dlq?.close();
       await app?.close();
-      httpAgent.destroy();
+      close();
       if (previousPrefix === undefined) delete process.env.QUEUE_PREFIX;
       else process.env.QUEUE_PREFIX = previousPrefix;
     }

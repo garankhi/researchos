@@ -286,7 +286,7 @@ Backend phải xác thực người bấm đăng là **owner và còn quyền re
 
 `PRIVATE` **không** phải một lựa chọn khi đăng: `PRIVATE` nghĩa là chưa share, còn đăng là hành động share. Nếu cô An không muốn share, bài đứng yên ở bản nháp của cô và chỉ hiện trong hồ sơ cá nhân.
 
-SQL đồng thời ghi sự kiện chia sẻ vào `research_updates` để làm nguồn cho digest. Không có `group_output_links` cũng không cản bài xuất hiện trong Discovery.
+SQL ghi sự kiện chia sẻ vào outbox cùng transaction. Sau commit, worker ghi sự kiện vào `research_updates` để làm nguồn cho digest. Không có `group_output_links` cũng không cản bài xuất hiện trong Discovery.
 
 ### Khi người khác đã thêm cùng bài báo
 
@@ -328,7 +328,7 @@ Owner chuyển P1 sang ARCHIVED và ghi `archived_at`. Bài ẩn khỏi Discover
 | Bảng | Dùng để làm gì? |
 |---|---|
 | `research_groups` | Thông tin group, `lead_id` xác định Leader |
-| `group_members` | Các thành viên và vai trò như CORE_MEMBER, COLLABORATOR, STUDENT_MEMBER |
+| `group_members` | Các thành viên và vai trò như MEMBER, GROUP_LEADER |
 | `group_directions` | Hướng nghiên cứu có tiêu đề/mô tả riêng, có thể tham chiếu Topic |
 
 Ví dụ G1 có hướng “Xây dựng công cụ hỗ trợ giảng dạy tại FPTU”. Đây là kế hoạch/hướng hoạt động của group, có thể gắn một Topic AI trong taxonomy; không phải cứ tạo direction là tạo Topic mới.
@@ -488,7 +488,7 @@ Researcher có thể follow researcher, group, Topic, project hoặc công trìn
 
 1. Bình đã là researcher, follow cô An, group G1 và Topic T1. Ghi ba hàng trong `user_follows`.
 2. Bình bật email hàng tuần: `digest_preferences.enabled=true`. Follow không tự bật nhận email.
-3. Cô An phát hành P1, rồi G1 chấp nhận P1. SQL ghi các hành động có ý nghĩa vào `research_updates`.
+3. Cô An phát hành P1, rồi G1 chấp nhận P1. SQL ghi các sự kiện vào outbox để worker chuyển sang `research_updates` sau commit.
 4. Đến kỳ gửi, worker tìm nội dung mới khớp các follow của Bình và kiểm tra quyền xem.
 5. Nếu có nội dung hợp lệ, tạo một `digest_deliveries` cho Bình và kỳ đó, cùng các `digest_items`.
 6. P1 chỉ thành **một item**, dù khớp cả tác giả, group và Topic. `matched_reasons` có thể giữ cả ba lý do.

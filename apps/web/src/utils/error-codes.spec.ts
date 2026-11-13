@@ -106,6 +106,7 @@ const RESOLVED_CODES = [
   'status_invalid',
   'status_required',
   'email_already_registered',
+  'expected_role_invalid',
   'application_deadline_invalid',
   'archived_at_invalid',
 ];

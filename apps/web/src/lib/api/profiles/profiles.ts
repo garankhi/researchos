@@ -24,6 +24,7 @@ import type {
 import type {
   ApiErrorResponseDto,
   ProfileResponseDtoEnvelope,
+  ProfilesControllerGetInterestsByUserIdEnvelope,
   UpdateProfileDto,
 } from '../models';
 
@@ -204,7 +205,7 @@ export function useProfilesControllerGetMyProfile<
 }
 
 /**
- * Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).
+ * Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId) and of their account (fullName, departmentUnit, academicTitle, academicDegree). orcidId, email and userType are not editable here.
  * @summary Update current user profile
  */
 export const profilesControllerUpdateMyProfile = (
@@ -463,6 +464,181 @@ export function useProfilesControllerGetProfileById<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getProfilesControllerGetProfileByIdQueryOptions(
+    userId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the interests of the target researcher, each with the taxonomy path of its topic and its review status.
+ * @summary List the research interests of a researcher
+ */
+export const profilesControllerGetInterestsByUserId = (
+  userId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfilesControllerGetInterestsByUserIdEnvelope>(
+    { url: `/profiles/${userId}/interests`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getProfilesControllerGetInterestsByUserIdQueryKey = (
+  userId: string,
+) => {
+  return [`/profiles/${userId}/interests`] as const;
+};
+
+export const getProfilesControllerGetInterestsByUserIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProfilesControllerGetInterestsByUserIdQueryKey(userId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>
+  > = ({ signal }) =>
+    profilesControllerGetInterestsByUserId(userId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: userId !== null && userId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProfilesControllerGetInterestsByUserIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>
+>;
+export type ProfilesControllerGetInterestsByUserIdQueryError =
+  ApiErrorResponseDto;
+
+export function useProfilesControllerGetInterestsByUserId<
+  TData = Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetInterestsByUserId<
+  TData = Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetInterestsByUserId<
+  TData = Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List the research interests of a researcher
+ */
+
+export function useProfilesControllerGetInterestsByUserId<
+  TData = Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetInterestsByUserId>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProfilesControllerGetInterestsByUserIdQueryOptions(
     userId,
     options,
   );

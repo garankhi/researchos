@@ -1,9 +1,11 @@
 import type { QueueOptions } from 'bullmq';
+import type { RedisOptions } from 'ioredis';
 
 export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
 export const DIGEST_QUEUE = 'digest-jobs';
+export const RESEARCH_UPDATES_QUEUE = 'research-updates';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
 export const DIGEST_SEND_JOB = 'digest-send';
@@ -68,7 +70,7 @@ export function createQueueOptions(
   redisUrl: string,
   prefix = 'researchos',
   role: 'producer' | 'worker' = 'producer',
-): QueueOptions {
+): QueueOptions & { connection: RedisOptions } {
   let url: URL;
   try {
     url = new URL(redisUrl);

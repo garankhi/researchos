@@ -16,6 +16,7 @@ import {
   DEAD_LETTER_QUEUE,
   DIGEST_QUEUE,
   DIGEST_SEND_JOB,
+  RESEARCH_UPDATES_QUEUE,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
@@ -45,6 +46,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   let databaseUrl: string;
   let queue: Queue;
   let backgroundQueue: Queue;
+  let researchUpdatesQueue: Queue;
   let dlq: Queue;
   let worker: ChildProcess | undefined;
   let created = false;
@@ -68,6 +70,9 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     // digest items are intentionally immutable in the normal schema.
     await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`);
     created = true;
+    await admin.$executeRawUnsafe(
+      `ALTER DATABASE "${database}" SET researchos.research_updates_queue_prefix = '${prefix}'`,
+    );
     process.env.DATABASE_URL = databaseUrl;
     try {
       prisma = new PrismaService();
@@ -87,8 +92,10 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     const options = createQueueOptions(process.env.REDIS_URL!, prefix);
     queue = new Queue(DIGEST_QUEUE, options);
     backgroundQueue = new Queue(BACKGROUND_QUEUE, options);
+    researchUpdatesQueue = new Queue(RESEARCH_UPDATES_QUEUE, options);
     dlq = new Queue(DEAD_LETTER_QUEUE, options);
 
+    await startWorker();
     author = await createUser();
     publicOutput = await createOutput(
       '<b>Released & "$&"</b>',
@@ -113,16 +120,17 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
         },
       })
     ).id;
-    await startWorker();
   });
 
   afterAll(async () => {
     await stopWorker();
     await queue?.obliterate({ force: true });
     await backgroundQueue?.obliterate({ force: true });
+    await researchUpdatesQueue?.obliterate({ force: true });
     await dlq?.obliterate({ force: true });
     await queue?.close();
     await backgroundQueue?.close();
+    await researchUpdatesQueue?.close();
     await dlq?.close();
     await prisma?.$disconnect();
     if (created) await admin.$executeRawUnsafe(`DROP DATABASE "${database}"`);
@@ -219,11 +227,18 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
           current_release_id: revision.id,
         },
       });
+      const event = await vi.waitFor(
+        async () => {
+          const published = await prisma.research_updates.findFirst({
+            where: { output_id: output.id },
+          });
+          expect(published, workerOutput).not.toBeNull();
+          return published!;
+        },
+        { timeout: 8_000 },
+      );
+      return event.id;
     }
-    const event = await prisma.research_updates.findFirst({
-      where: { output_id: output.id },
-    });
-    if (event) return event.id;
     return (
       await prisma.research_updates.create({
         data: {
@@ -493,9 +508,11 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
         attempts: 1,
         provider_message_id: accepted.messageId,
       });
-      expect(await jobs.findOwned(delivery.user_id, job.id)).toMatchObject({
-        status: 'COMPLETED',
-      });
+      expect(await jobs.findAccessible(delivery.user_id, job.id)).toMatchObject(
+        {
+          status: 'COMPLETED',
+        },
+      );
       expect(received).toHaveLength(index + 1);
     } finally {
       await prisma.$executeRaw`DROP TRIGGER test_digest_sent_write_conflict ON digest_deliveries`;
@@ -593,11 +610,15 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
       )
       .toBe(job.id);
     const polling = new JobStatusService(jobs, prisma);
-    expect(await polling.findOwned(delivery.user_id, job.id)).toMatchObject({
+    expect(
+      await polling.findAccessible(delivery.user_id, job.id),
+    ).toMatchObject({
       status: 'FAILED',
       attempts: 5,
     });
-    expect(await polling.retryOwned(delivery.user_id, job.id)).toMatchObject({
+    expect(
+      await polling.retryAccessible(delivery.user_id, job.id),
+    ).toMatchObject({
       attempts: 5,
     });
     await expect

@@ -76,7 +76,7 @@ export class CreateOpportunityDto {
   })
   @ValidateIf((_o, value) => value != null)
   @IsString()
-  @Matches(/\S/, { message: 'expectedRole must not be blank' })
+  @Matches(/\S/, { message: 'expected_role_invalid' })
   @MaxLength(255)
   expectedRole?: string | null;
 

@@ -223,8 +223,8 @@ const GROUPS = [
       'Machine learning, natural language processing and explainable AI for Vietnamese industry.',
     lead_email: 'quang.tran@researchos.local',
     members: [
-      { email: 'minh.nguyen@researchos.local', role: 'CORE_MEMBER' },
-      { email: 'hung.pham@researchos.local', role: 'STUDENT_MEMBER' },
+      { email: 'minh.nguyen@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'hung.pham@researchos.local', role: 'MEMBER' },
     ],
   },
   {
@@ -233,7 +233,7 @@ const GROUPS = [
     description:
       'Green supply chains, sustainable finance and the energy transition in manufacturing.',
     lead_email: 'thao.le@researchos.local',
-    members: [{ email: 'hung.pham@researchos.local', role: 'COLLABORATOR' }],
+    members: [{ email: 'hung.pham@researchos.local', role: 'MEMBER' }],
   },
 ];
 

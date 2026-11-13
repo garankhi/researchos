@@ -27,21 +27,22 @@ model AuditLog {
 
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 model background_jobs {
-  queue_prefix    String   @default("researchos") @db.VarChar(128)
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  owner_id        String   @db.Uuid
-  kind            String   @db.VarChar(64)
-  idempotency_key String   @db.VarChar(128)
-  payload         Json
-  status          String   @default("PENDING") @db.VarChar(16)
-  generation      Int      @default(0)
-  attempts        Int      @default(0)
-  result          Json?
-  error_code      String?  @db.VarChar(64)
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
-  users           users    @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  outbox          outbox[]
+  queue_prefix             String                    @default("researchos") @db.VarChar(128)
+  id                       String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id                 String                    @db.Uuid
+  kind                     String                    @db.VarChar(64)
+  idempotency_key          String                    @db.VarChar(128)
+  payload                  Json
+  status                   String                    @default("PENDING") @db.VarChar(16)
+  generation               Int                       @default(0)
+  attempts                 Int                       @default(0)
+  result                   Json?
+  error_code               String?                   @db.VarChar(64)
+  created_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  users                    users                     @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  outbox                   outbox[]
+  pending_research_updates pending_research_updates?
 
   @@unique([owner_id, kind, idempotency_key], map: "uq_background_job_request")
 }
@@ -165,7 +166,7 @@ model group_directions {
 model group_members {
   group_id        String            @db.Uuid
   user_id         String            @db.Uuid
-  role            group_member_role @default(COLLABORATOR)
+  role            group_member_role @default(MEMBER)
   joined_at       DateTime          @default(now()) @db.Timestamptz(6)
   research_groups research_groups   @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users           users             @relation(fields: [user_id], references: [id], onUpdate: NoAction)
@@ -414,33 +415,34 @@ model output_revision_files {
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model output_revisions {
-  id                                                                                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  output_id                                                                               String                  @unique(map: "uq_output_editable_draft", where: raw("(released_at IS NULL)")) @db.Uuid
+  id                                                                                      String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  output_id                                                                               String                     @unique(map: "uq_output_editable_draft", where: raw("(released_at IS NULL)")) @db.Uuid
   revision_no                                                                             Int
-  title                                                                                   String                  @db.VarChar(500)
+  title                                                                                   String                     @db.VarChar(500)
   abstract                                                                                String?
-  venue                                                                                   String?                 @db.VarChar(255)
-  publisher                                                                               String?                 @db.VarChar(255)
+  venue                                                                                   String?                    @db.VarChar(255)
+  publisher                                                                               String?                    @db.VarChar(255)
   publication_year                                                                        Int?
-  publication_status                                                                      publication_status      @default(UNPUBLISHED)
-  output_type                                                                             String                  @default("PAPER") @db.VarChar(50)
+  publication_status                                                                      publication_status         @default(UNPUBLISHED)
+  output_type                                                                             String                     @default("PAPER") @db.VarChar(50)
   external_url                                                                            String?
-  authors_snapshot                                                                        Json                    @default("[]")
-  created_by                                                                              String                  @db.Uuid
-  released_by                                                                             String?                 @db.Uuid
-  released_at                                                                             DateTime?               @db.Timestamptz(6)
-  created_at                                                                              DateTime                @default(now()) @db.Timestamptz(6)
-  updated_at                                                                              DateTime                @default(now()) @db.Timestamptz(6)
-  group_output_links_group_output_links_output_id_accepted_revision_idTooutput_revisions  group_output_links[]    @relation("group_output_links_output_id_accepted_revision_idTooutput_revisions")
-  group_output_links_group_output_links_output_id_requested_revision_idTooutput_revisions group_output_links[]    @relation("group_output_links_output_id_requested_revision_idTooutput_revisions")
+  authors_snapshot                                                                        Json                       @default("[]")
+  created_by                                                                              String                     @db.Uuid
+  released_by                                                                             String?                    @db.Uuid
+  released_at                                                                             DateTime?                  @db.Timestamptz(6)
+  created_at                                                                              DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                                                                              DateTime                   @default(now()) @db.Timestamptz(6)
+  group_output_links_group_output_links_output_id_accepted_revision_idTooutput_revisions  group_output_links[]       @relation("group_output_links_output_id_accepted_revision_idTooutput_revisions")
+  group_output_links_group_output_links_output_id_requested_revision_idTooutput_revisions group_output_links[]       @relation("group_output_links_output_id_requested_revision_idTooutput_revisions")
   output_revision_files                                                                   output_revision_files[]
-  users_output_revisions_created_byTousers                                                users                   @relation("output_revisions_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
-  research_outputs_output_revisions_output_idToresearch_outputs                           research_outputs        @relation("output_revisions_output_idToresearch_outputs", fields: [output_id], references: [id], onUpdate: NoAction)
-  users_output_revisions_released_byTousers                                               users?                  @relation("output_revisions_released_byTousers", fields: [released_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_output_revisions_created_byTousers                                                users                      @relation("output_revisions_created_byTousers", fields: [created_by], references: [id], onUpdate: NoAction)
+  research_outputs_output_revisions_output_idToresearch_outputs                           research_outputs           @relation("output_revisions_output_idToresearch_outputs", fields: [output_id], references: [id], onUpdate: NoAction)
+  users_output_revisions_released_byTousers                                               users?                     @relation("output_revisions_released_byTousers", fields: [released_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
   output_topics                                                                           output_topics[]
+  pending_research_updates                                                                pending_research_updates[]
   /// List back-relation avoids requiring a redundant UNIQUE(id, current_release_id).
   /// The composite FK and research_outputs.id PK still restrict it to the owning output.
-  research_outputs_research_outputs_id_current_release_idTooutput_revisions               research_outputs[]      @relation("research_outputs_id_current_release_idTooutput_revisions")
+  research_outputs_research_outputs_id_current_release_idTooutput_revisions               research_outputs[]         @relation("research_outputs_id_current_release_idTooutput_revisions")
   research_updates                                                                        research_updates[]
   search_index                                                                            search_index[]
 
@@ -551,29 +553,30 @@ model research_fields {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 model research_groups {
-  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code                   String                   @unique @db.VarChar(50)
-  name                   String                   @db.VarChar(255)
-  lead_id                String                   @db.Uuid
-  description            String?
-  is_active              Boolean                  @default(true)
-  archived_at            DateTime?                @db.Timestamptz(6)
-  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  achievement_posts      achievement_posts[]
-  group_directions       group_directions[]
-  group_members          group_members[]
-  group_output_links     group_output_links[]
-  interest_circles       interest_circles[]
-  output_files           output_files[]
-  users                  users                    @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
-  research_opportunities research_opportunities[]
-  research_outputs       research_outputs[]
-  research_projects      research_projects[]
-  research_records       research_records[]
-  research_seminars      research_seminars[]
-  research_updates       research_updates[]
-  resource_handovers     resource_handovers[]
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                     String                     @unique @db.VarChar(50)
+  name                     String                     @db.VarChar(255)
+  lead_id                  String                     @db.Uuid
+  description              String?
+  is_active                Boolean                    @default(true)
+  archived_at              DateTime?                  @db.Timestamptz(6)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  achievement_posts        achievement_posts[]
+  group_directions         group_directions[]
+  group_members            group_members[]
+  group_output_links       group_output_links[]
+  interest_circles         interest_circles[]
+  output_files             output_files[]
+  pending_research_updates pending_research_updates[]
+  users                    users                      @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
+  research_opportunities   research_opportunities[]
+  research_outputs         research_outputs[]
+  research_projects        research_projects[]
+  research_records         research_records[]
+  research_seminars        research_seminars[]
+  research_updates         research_updates[]
+  resource_handovers       resource_handovers[]
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -620,6 +623,7 @@ model research_opportunities {
   create_request_hash      String?                    @db.Char(64)
   create_response          Json?
   opportunity_applications opportunity_applications[]
+  pending_research_updates pending_research_updates[]
   users                    users                      @relation(fields: [creator_id], references: [id], onUpdate: NoAction)
   research_groups          research_groups?           @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   research_projects        research_projects?         @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
@@ -635,33 +639,34 @@ model research_opportunities {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 model research_outputs {
-  id                                                                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  doi                                                                       String?               @unique @db.VarChar(255)
-  owner_id                                                                  String?               @db.Uuid
-  created_by                                                                String?               @db.Uuid
-  sharing_status                                                            output_sharing_status @default(DRAFT)
-  current_release_id                                                        String?               @db.Uuid
-  visibility                                                                visibility_level      @default(PRIVATE)
-  access_group_id                                                           String?               @db.Uuid
-  provenance_tag                                                            data_provenance_type  @default(PAPER)
-  import_state                                                              output_import_state   @default(NONE)
-  last_synced_at                                                            DateTime?             @db.Timestamptz(6)
-  first_shared_at                                                           DateTime?             @db.Timestamptz(6)
-  archived_at                                                               DateTime?             @db.Timestamptz(6)
-  created_at                                                                DateTime              @default(now()) @db.Timestamptz(6)
-  updated_at                                                                DateTime              @default(now()) @db.Timestamptz(6)
+  id                                                                        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doi                                                                       String?                    @unique @db.VarChar(255)
+  owner_id                                                                  String?                    @db.Uuid
+  created_by                                                                String?                    @db.Uuid
+  sharing_status                                                            output_sharing_status      @default(DRAFT)
+  current_release_id                                                        String?                    @db.Uuid
+  visibility                                                                visibility_level           @default(PRIVATE)
+  access_group_id                                                           String?                    @db.Uuid
+  provenance_tag                                                            data_provenance_type       @default(PAPER)
+  import_state                                                              output_import_state        @default(NONE)
+  last_synced_at                                                            DateTime?                  @db.Timestamptz(6)
+  first_shared_at                                                           DateTime?                  @db.Timestamptz(6)
+  archived_at                                                               DateTime?                  @db.Timestamptz(6)
+  created_at                                                                DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                                                                DateTime                   @default(now()) @db.Timestamptz(6)
   achievement_posts                                                         achievement_posts[]
   group_output_links                                                        group_output_links[]
   output_authors                                                            output_authors[]
   output_external_ids                                                       output_external_ids[]
   output_files                                                              output_files[]
   /// One editable draft is unique; historical released revisions are still a list.
-  output_revisions_output_revisions_output_idToresearch_outputs             output_revisions[]    @relation("output_revisions_output_idToresearch_outputs")
+  output_revisions_output_revisions_output_idToresearch_outputs             output_revisions[]         @relation("output_revisions_output_idToresearch_outputs")
+  pending_research_updates                                                  pending_research_updates[]
   publication_claims                                                        publication_claims[]
-  research_groups                                                           research_groups?      @relation(fields: [access_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  users_research_outputs_created_byTousers                                  users?                @relation("research_outputs_created_byTousers", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  output_revisions_research_outputs_id_current_release_idTooutput_revisions output_revisions?     @relation("research_outputs_id_current_release_idTooutput_revisions", fields: [id, current_release_id], references: [output_id, id], onUpdate: NoAction)
-  users_research_outputs_owner_idTousers                                    users?                @relation("research_outputs_owner_idTousers", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_groups                                                           research_groups?           @relation(fields: [access_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users_research_outputs_created_byTousers                                  users?                     @relation("research_outputs_created_byTousers", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  output_revisions_research_outputs_id_current_release_idTooutput_revisions output_revisions?          @relation("research_outputs_id_current_release_idTooutput_revisions", fields: [id, current_release_id], references: [output_id, id], onUpdate: NoAction)
+  users_research_outputs_owner_idTousers                                    users?                     @relation("research_outputs_owner_idTousers", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   research_updates                                                          research_updates[]
   resource_handovers                                                        resource_handovers[]
 
@@ -740,20 +745,21 @@ model research_records {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 model research_seminars {
-  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  group_id          String?            @db.Uuid
-  organizer_id      String             @db.Uuid
-  title             String             @db.VarChar(255)
-  seminar_type      seminar_type
-  scheduled_at      DateTime           @db.Timestamptz(6)
-  published_at      DateTime?          @db.Timestamptz(6)
-  location_or_link  String
-  research_context  String?
-  follow_up_actions String?
-  created_at        DateTime           @default(now()) @db.Timestamptz(6)
-  research_groups   research_groups?   @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  users             users              @relation(fields: [organizer_id], references: [id], onUpdate: NoAction)
-  research_updates  research_updates[]
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id                 String?                    @db.Uuid
+  organizer_id             String                     @db.Uuid
+  title                    String                     @db.VarChar(255)
+  seminar_type             seminar_type
+  scheduled_at             DateTime                   @db.Timestamptz(6)
+  published_at             DateTime?                  @db.Timestamptz(6)
+  location_or_link         String
+  research_context         String?
+  follow_up_actions        String?
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  pending_research_updates pending_research_updates[]
+  research_groups          research_groups?           @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users                    users                      @relation(fields: [organizer_id], references: [id], onUpdate: NoAction)
+  research_updates         research_updates[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1003,6 +1009,7 @@ model users {
   output_revisions_output_revisions_created_byTousers                   output_revisions[]         @relation("output_revisions_created_byTousers")
   output_revisions_output_revisions_released_byTousers                  output_revisions[]         @relation("output_revisions_released_byTousers")
   output_topics                                                         output_topics[]
+  pending_research_updates                                              pending_research_updates[]
   project_members                                                       project_members[]
   publication_claims                                                    publication_claims[]
   research_groups                                                       research_groups[]
@@ -1025,6 +1032,28 @@ model users {
   user_role_assignments_user_role_assignments_revoked_byTousers         user_role_assignments[]    @relation("user_role_assignments_revoked_byTousers")
   user_role_assignments_user_role_assignments_user_idTousers            user_role_assignments[]    @relation("user_role_assignments_user_idTousers")
   user_sessions                                                         user_sessions[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model pending_research_updates {
+  event_key              String                  @id @db.VarChar(255)
+  job_id                 String                  @unique @db.Uuid
+  event_type             research_update_type
+  actor_id               String                  @db.Uuid
+  output_id              String?                 @db.Uuid
+  revision_id            String?                 @db.Uuid
+  group_id               String?                 @db.Uuid
+  opportunity_id         String?                 @db.Uuid
+  seminar_id             String?                 @db.Uuid
+  occurred_at            DateTime                @db.Timestamptz(6)
+  users                  users                   @relation(fields: [actor_id], references: [id], onUpdate: NoAction)
+  research_groups        research_groups?        @relation(fields: [group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  background_jobs        background_jobs         @relation(fields: [job_id], references: [id], onUpdate: NoAction)
+  research_opportunities research_opportunities? @relation(fields: [opportunity_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_outputs       research_outputs?       @relation(fields: [output_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  output_revisions       output_revisions?       @relation(fields: [output_id, revision_id], references: [output_id, id], onDelete: Restrict, onUpdate: NoAction)
+  research_seminars      research_seminars?      @relation(fields: [seminar_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 }
 
 /// Where a piece of data came from. Self-declared data is not trusted by
@@ -1146,9 +1175,8 @@ enum expected_role_type {
 }
 
 enum group_member_role {
-  CORE_MEMBER
-  COLLABORATOR
-  STUDENT_MEMBER
+  MEMBER
+  GROUP_LEADER
 }
 
 enum group_output_status {

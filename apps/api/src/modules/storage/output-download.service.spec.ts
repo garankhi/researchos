@@ -1,11 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { PassThrough, Readable } from 'node:stream';
-import {
-  ConflictException,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+import { domainErrorCodes } from '@researchos/error-codes';
 import type { PrismaService } from '@researchos/database';
 import { describe, expect, it, vi } from 'vitest';
 import { ObjectStorageService } from './object-storage.service.js';
@@ -17,6 +14,7 @@ const file = {
   storage_key: 'outputs/test/object',
   sha256: createHash('sha256').update(body).digest('hex'),
   size_bytes: BigInt(body.length),
+  allowed: true,
 };
 
 function setup() {
@@ -63,7 +61,10 @@ describe('OutputDownloadService', () => {
 
     await expect(
       service.prepareDownload('user', 'file', new AbortController().signal),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      code: domainErrorCodes.storage.fileConflict,
+    });
     expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
@@ -73,8 +74,23 @@ describe('OutputDownloadService', () => {
 
     await expect(
       service.prepareDownload('user', 'file', new AbortController().signal),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.storage.fileAccessDenied,
+    });
     expect(queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('denies an existing but invisible file as 403', async () => {
+    const { service, queryRaw } = setup();
+    queryRaw.mockReset().mockResolvedValueOnce([{ ...file, allowed: false }]);
+    await expect(
+      service.prepareDownload('user', 'file', new AbortController().signal),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.storage.fileAccessDenied,
+    });
+    expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it('destroys the storage stream when the request is aborted during staging', async () => {

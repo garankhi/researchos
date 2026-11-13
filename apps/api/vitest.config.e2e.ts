@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['**/*.e2e-spec.ts'],
+    include: ['**/*.e2e-spec.{ts,mjs}'],
     // The queue e2e waits for a worker to start and for a Redis failure to
     // be noticed, so it needs more than the 5s default. The queue-specific
     // config sets the same budget.

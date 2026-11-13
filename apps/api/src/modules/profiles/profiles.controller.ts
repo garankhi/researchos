@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -15,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import { ProfileResponseDto } from './dto/profile-response.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { ProfilesService } from './profiles.service.js';
@@ -24,7 +26,7 @@ import { ProfilesService } from './profiles.service.js';
  *
  * All routes require authentication. Visibility of third-party profiles is
  * derived from the confirmation state: confirmed profiles are public to the
- * university, whereas unconfirmed profiles return 404 to non-owners.
+ * university, whereas unconfirmed profiles return 403 to non-owners.
  */
 @ApiTags('profiles')
 @ApiBearerAuth()
@@ -66,8 +68,10 @@ export class ProfilesController {
     type: ProfileResponseDto,
   })
   @ApiNotFoundResponse({
-    description:
-      'The requested researcher profile was not found or is unconfirmed.',
+    description: 'The requested researcher profile was not found.',
+  })
+  @ApiForbiddenResponse({
+    description: 'The profile is unconfirmed and the caller is not the owner.',
   })
   @Get(':userId')
   async getProfileById(
@@ -78,9 +82,38 @@ export class ProfilesController {
   }
 
   @ApiOperation({
+    summary: 'List the research interests of a researcher',
+    description:
+      'Returns the interests of the target researcher, each with the taxonomy path of its topic and its review status.',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'Unique identifier of the target user account (UUID).',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description:
+      'The interests of the target researcher, newest declaration first.',
+    type: [ProfileInterestResponseDto],
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested researcher profile was not found.',
+  })
+  @ApiForbiddenResponse({
+    description: 'The profile is unconfirmed and the caller is not the owner.',
+  })
+  @Get(':userId/interests')
+  async getInterestsByUserId(
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<ProfileInterestResponseDto[]> {
+    return this.profilesService.findInterestsByUserId(targetUserId, callerId);
+  }
+
+  @ApiOperation({
     summary: 'Update current user profile',
     description:
-      'Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).',
+      'Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId) and of their account (fullName, departmentUnit, academicTitle, academicDegree). orcidId, email and userType are not editable here.',
   })
   @ApiOkResponse({
     description: 'Researcher profile updated successfully.',

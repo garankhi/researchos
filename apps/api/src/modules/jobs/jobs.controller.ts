@@ -62,7 +62,7 @@ export class JobsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Returns the requesting user’s durable job status' })
+  @ApiOperation({ summary: 'Returns the status of an accessible durable job' })
   @ApiParam({
     name: 'id',
     description: 'Logical job UUID returned on submission.',
@@ -70,24 +70,22 @@ export class JobsController {
   @ApiOkResponse({ description: 'Current durable status.', type: JobDto })
   @ApiForbiddenResponse({
     description:
-      'The LOCAL session must change its password before accessing jobs.',
+      'Job belongs to another owner, or the LOCAL session must change its password before accessing jobs.',
   })
   @ApiBadRequestResponse({ description: 'Invalid job UUID.' })
-  @ApiNotFoundResponse({
-    description: 'Job is missing or belongs to another user.',
-  })
+  @ApiNotFoundResponse({ description: 'Job does not exist.' })
   find(
     @CurrentUserId() userId: string,
     @Param('id', uuidPipe) id: string,
   ): Promise<JobDto> {
-    return this.jobs.findOwned(userId, id);
+    return this.jobs.findAccessible(userId, id);
   }
 
   @Post(':id/retry')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Reprocesses an owned failed job in a new bounded generation',
+    summary: 'Reprocesses a failed job in a new bounded generation',
   })
   @ApiParam({ name: 'id', description: 'Failed logical job UUID.' })
   @ApiAcceptedResponse({
@@ -96,16 +94,15 @@ export class JobsController {
   })
   @ApiBadRequestResponse({ description: 'Invalid job UUID.' })
   @ApiForbiddenResponse({
-    description: 'Requires ADMIN; ownership is still required.',
+    description:
+      'Requires ADMIN. Research update jobs can be retried across owners.',
   })
-  @ApiNotFoundResponse({
-    description: 'Job is missing or belongs to another user.',
-  })
+  @ApiNotFoundResponse({ description: 'Job does not exist.' })
   @ApiConflictResponse({ description: 'Only failed jobs can be reprocessed.' })
   retry(
     @CurrentUserId() userId: string,
     @Param('id', uuidPipe) id: string,
   ): Promise<JobDto> {
-    return this.jobs.retryOwned(userId, id);
+    return this.jobs.retryAccessible(userId, id);
   }
 }

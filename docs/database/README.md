@@ -408,7 +408,7 @@ Hai thao tác đồng thời: row lock + điều kiện PENDING khiến chỉ m�
 
 `user_follows` giữ đích đa hình RESEARCHER/GROUP/TOPIC/PROJECT/OUTPUT. Không có FK tới từng đích: backend phải kiểm tra tồn tại, quyền xem, module đã mở và xử lý archive/xóa. Follow không cấp quyền xem.
 
-`research_updates` là ledger nhỏ cho các hành động chia sẻ có ý nghĩa, không phải event bus tổng quát. Trigger ghi cùng transaction khi chia sẻ cá nhân lần đầu, đổi revision cá nhân, chấp nhận pin group, mở opportunity lần đầu, đăng seminar. Project phase sau ghi sự kiện có ý nghĩa rõ ràng. Update tên/updated_at/sync thông thường không tạo event. Unique event_key giúp không nhân event khi lặp thao tác; mở lại cùng opportunity hoặc gỡ/rồi gắn lại cùng group+revision không gửi thông báo mới trong MVP.
+`research_updates` lưu các hành động chia sẻ có ý nghĩa. Trigger ghi job, outbox và payload có FK trong `pending_research_updates` cùng transaction nghiệp vụ khi chia sẻ cá nhân lần đầu, đổi revision đã phát hành, chấp nhận pin group, mở opportunity lần đầu hoặc đăng seminar. Sau commit, worker chuyển payload sang ledger và giữ `occurred_at` gốc. Unique `event_key` chống trùng khi replay, mở lại cùng opportunity hoặc gỡ/rồi gắn lại cùng group+revision. Event project thuộc module project.
 
 `digest_deliveries` có unique user/kỳ, trạng thái, attempts 0..5, next_attempt_at, locked_until và kết quả nhà cung cấp. `digest_items` unique `(delivery_id,subject_type,subject_id)` nên một bài khớp nhiều group/topic/researcher/follow chỉ có một item. Trigger suy ra subject từ event; worker hợp nhất `matched_reasons`, chọn event/phiên bản phù hợp và giữ `content_snapshot` cho truy vết. Chỉ một event đại diện/item, không lưu bảng riêng cho mọi event đã gộp.
 

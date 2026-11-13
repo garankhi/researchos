@@ -192,7 +192,17 @@ BEGIN
  PERFORM pg_temp.expect_error(format('INSERT INTO digest_preferences(user_id,enabled) VALUES(%L,true)',s),'23514');
  INSERT INTO user_follows(follower_id,entity_type,entity_id) VALUES(b,'OUTPUT',work),(b,'GROUP',g2);
  INSERT INTO digest_preferences(user_id,enabled) VALUES(b,true);
- PERFORM pg_temp.assert_true((SELECT count(*)=4 FROM research_updates WHERE output_id=work),'only four meaningful release/group events');
+ -- Replaying an event with either actor must keep the first payload and job.
+ PERFORM enqueue_research_update('output:'||work||':'||r1,'OUTPUT_SHARED',a,work,r1);
+ PERFORM enqueue_research_update('output:'||work||':'||r1,'OUTPUT_SHARED',b,work,r1);
+ PERFORM pg_temp.assert_true((SELECT actor_id=a FROM pending_research_updates WHERE event_key='output:'||work||':'||r1),'event replay preserves the first actor');
+ PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM background_jobs WHERE kind='research-update' AND idempotency_key='output:'||work||':'||r1),'event replay leaves only one durable job');
+ PERFORM pg_temp.assert_true((SELECT count(*)=4 FROM pending_research_updates WHERE output_id=work),'only four meaningful release/group events');
+ PERFORM pg_temp.assert_true((SELECT count(*)=4 FROM pending_research_updates p JOIN outbox o ON o.job_id=p.job_id WHERE p.output_id=work AND o.destination='WORK'),'every pending event has durable work');
+ PERFORM pg_temp.assert_true(NOT EXISTS(SELECT 1 FROM research_updates WHERE output_id=work),'triggers only enqueue events');
+ -- Seed ledger fixtures for digest constraints in this rollback-only test.
+ INSERT INTO research_updates(event_key,event_type,actor_id,output_id,revision_id,group_id,occurred_at)
+ SELECT event_key,event_type,actor_id,output_id,revision_id,group_id,occurred_at FROM pending_research_updates WHERE output_id=work;
  SELECT id INTO event1 FROM research_updates WHERE output_id=work AND event_type='OUTPUT_SHARED';
  SELECT id INTO event2 FROM research_updates WHERE output_id=work AND group_id=g2;
  INSERT INTO digest_deliveries(id,user_id,period_start,period_end) VALUES(delivery,b,CURRENT_TIMESTAMP-interval '7 days',CURRENT_TIMESTAMP);

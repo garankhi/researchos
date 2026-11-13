@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   HttpStatus,
   ValidationPipe,
 } from '@nestjs/common';
@@ -218,6 +217,32 @@ describe('GroupsController', () => {
       );
     });
 
+    it('filters by member without dropping the visibility clause', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_groups.count.mockResolvedValue(1);
+      prismaMock.research_groups.findMany.mockResolvedValue([mockGroup]);
+
+      const controller = await setupController(prismaMock);
+      await controller.findAll(
+        {
+          page: 1,
+          limit: 20,
+          memberId: outsiderId,
+        } as ListResearchGroupsQueryDto,
+        memberId,
+      );
+
+      const where = prismaMock.research_groups.findMany.mock.calls[0][0].where;
+      // The member filter narrows the set; the visibility clause above still
+      // decides which groups the caller may see at all.
+      expect(where.AND).toContainEqual({
+        group_members: { some: { user_id: outsiderId } },
+      });
+      expect(where.AND[0].OR).toContainEqual({
+        group_members: { some: { user_id: memberId } },
+      });
+    });
+
     it('rejects invalid sort keys with 400 and preserves isActive=false under ValidationPipe', async () => {
       const prismaMock = createPrismaMock();
       const controller = await setupController(prismaMock);
@@ -270,15 +295,18 @@ describe('GroupsController', () => {
       prismaMock.group_members.findUnique.mockResolvedValueOnce({
         group_id: groupId,
         user_id: memberId,
-        role: 'COLLABORATOR',
+        role: 'MEMBER',
       });
       const memberView = await controller.findOne(groupId, memberId);
       expect(memberView.id).toBe(groupId);
 
       prismaMock.group_members.findUnique.mockResolvedValueOnce(null);
-      await expect(controller.findOne(groupId, outsiderId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        controller.findOne(groupId, outsiderId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
     });
 
     it('throws 404 group_not_found when group does not exist', async () => {
@@ -333,7 +361,10 @@ describe('GroupsController', () => {
 
       await expect(
         controller.update(groupId, { name: 'Unauthorized Edit' }, outsiderId),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.groups.accessDenied,
+      });
     });
 
     it('rejects explicit null for non-nullable fields (code, name, leadId, isActive) with 400', async () => {

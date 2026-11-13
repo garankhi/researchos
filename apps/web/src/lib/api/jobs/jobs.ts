@@ -146,7 +146,7 @@ export const useJobsControllerCreate = <
   );
 };
 /**
- * @summary Returns the requesting user’s durable job status
+ * @summary Returns the status of an accessible durable job
  */
 export const jobsControllerFind = (
   id: string,
@@ -278,7 +278,7 @@ export function useJobsControllerFind<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary Returns the requesting user’s durable job status
+ * @summary Returns the status of an accessible durable job
  */
 
 export function useJobsControllerFind<
@@ -311,7 +311,7 @@ export function useJobsControllerFind<
 }
 
 /**
- * @summary Reprocesses an owned failed job in a new bounded generation
+ * @summary Reprocesses a failed job in a new bounded generation
  */
 export const jobsControllerRetry = (
   id: string,
@@ -373,7 +373,7 @@ export type JobsControllerRetryMutationError = ApiErrorResponseDto;
 export type JobsControllerRetryMutationVariables = { id: string };
 
 /**
- * @summary Reprocesses an owned failed job in a new bounded generation
+ * @summary Reprocesses a failed job in a new bounded generation
  */
 export const useJobsControllerRetry = <
   TError = ApiErrorResponseDto,
