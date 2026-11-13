@@ -217,6 +217,32 @@ describe('GroupsController', () => {
       );
     });
 
+    it('filters by member without dropping the visibility clause', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_groups.count.mockResolvedValue(1);
+      prismaMock.research_groups.findMany.mockResolvedValue([mockGroup]);
+
+      const controller = await setupController(prismaMock);
+      await controller.findAll(
+        {
+          page: 1,
+          limit: 20,
+          memberId: outsiderId,
+        } as ListResearchGroupsQueryDto,
+        memberId,
+      );
+
+      const where = prismaMock.research_groups.findMany.mock.calls[0][0].where;
+      // The member filter narrows the set; the visibility clause above still
+      // decides which groups the caller may see at all.
+      expect(where.AND).toContainEqual({
+        group_members: { some: { user_id: outsiderId } },
+      });
+      expect(where.AND[0].OR).toContainEqual({
+        group_members: { some: { user_id: memberId } },
+      });
+    });
+
     it('rejects invalid sort keys with 400 and preserves isActive=false under ValidationPipe', async () => {
       const prismaMock = createPrismaMock();
       const controller = await setupController(prismaMock);

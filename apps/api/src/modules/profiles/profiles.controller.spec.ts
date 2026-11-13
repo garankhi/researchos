@@ -67,12 +67,28 @@ describe('ProfilesController', () => {
     users: mockOtherUser,
   };
 
-  const createPrismaMock = () => ({
-    researcher_profiles: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    },
-  });
+  const createPrismaMock = () => {
+    const prismaMock = {
+      researcher_profiles: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      },
+      users: {
+        update: vi.fn(),
+      },
+      research_interests: {
+        findMany: vi.fn(),
+      },
+    };
+
+    // The service writes the profile and the account in one transaction, so
+    // the mock hands the same client to the callback the way Prisma does.
+    return Object.assign(prismaMock, {
+      $transaction: vi.fn(async (run: (client: unknown) => unknown) =>
+        run(prismaMock),
+      ),
+    });
+  };
 
   const setupController = async (
     prismaMock: ReturnType<typeof createPrismaMock>,
@@ -229,6 +245,173 @@ describe('ProfilesController', () => {
         controller.updateMyProfile('missing-id', {
           bio: 'Test',
         }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.NOT_FOUND,
+          code: domainErrorCodes.profiles.profileNotFound,
+        }),
+      );
+    });
+
+    it('writes the account fields to users, not to the profile', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
+        mockConfirmedProfile,
+      );
+      prismaMock.researcher_profiles.update.mockResolvedValue({
+        ...mockConfirmedProfile,
+        users: { ...mockUser, full_name: 'Nguyễn Văn A' },
+      });
+
+      const controller = await setupController(prismaMock);
+      await controller.updateMyProfile(callerId, {
+        fullName: 'Nguyễn Văn A',
+        departmentUnit: 'Software Engineering',
+        academicTitle: 'PGS',
+        academicDegree: null,
+      });
+
+      expect(prismaMock.users.update).toHaveBeenCalledWith({
+        where: { id: callerId },
+        data: {
+          full_name: 'Nguyễn Văn A',
+          department_unit: 'Software Engineering',
+          academic_title: 'PGS',
+          academic_degree: null,
+        },
+      });
+      // The profile write stays on the profile table.
+      expect(prismaMock.researcher_profiles.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            full_name: expect.anything(),
+          }),
+        }),
+      );
+    });
+
+    it('skips the users write when the payload carries no account field', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
+        mockConfirmedProfile,
+      );
+      prismaMock.researcher_profiles.update.mockResolvedValue(
+        mockConfirmedProfile,
+      );
+
+      const controller = await setupController(prismaMock);
+      await controller.updateMyProfile(callerId, { bio: 'Only a bio.' });
+
+      expect(prismaMock.users.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getInterestsByUserId', () => {
+    const mockInterest = {
+      id: 'i0000000-0000-0000-0000-000000000001',
+      user_id: otherUserId,
+      topic_id: 't0000000-0000-0000-0000-000000000001',
+      source_type: 'DECLARED',
+      status: 'ACTIVE',
+      provenance_tag: 'HUMAN',
+      evidence_note: null,
+      declared_at: new Date('2026-11-01T09:00:00.000Z'),
+      reviewed_at: new Date('2026-11-02T09:00:00.000Z'),
+      research_topics: {
+        id: 't0000000-0000-0000-0000-000000000001',
+        name: 'Deep Learning',
+        research_subfields: {
+          id: 's0000000-0000-0000-0000-000000000001',
+          name: 'Artificial Intelligence',
+          research_fields: {
+            id: 'f0000000-0000-0000-0000-000000000001',
+            name: 'Computer Science',
+          },
+        },
+      },
+    };
+
+    it('returns the interests with their taxonomy path', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
+        user_id: otherUserId,
+        profile_confirmed_at: new Date('2026-11-01T09:00:00.000Z'),
+      });
+      prismaMock.research_interests.findMany.mockResolvedValue([mockInterest]);
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getInterestsByUserId(
+        otherUserId,
+        callerId,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: mockInterest.id,
+        userId: otherUserId,
+        topicId: mockInterest.topic_id,
+        status: 'ACTIVE',
+        sourceType: 'DECLARED',
+        topicPath: {
+          topic: {
+            id: 't0000000-0000-0000-0000-000000000001',
+            name: 'Deep Learning',
+          },
+          subfield: {
+            id: 's0000000-0000-0000-0000-000000000001',
+            name: 'Artificial Intelligence',
+          },
+          field: {
+            id: 'f0000000-0000-0000-0000-000000000001',
+            name: 'Computer Science',
+          },
+        },
+      });
+    });
+
+    it('refuses a non-owner when the profile is unconfirmed', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
+        user_id: otherUserId,
+        profile_confirmed_at: null,
+      });
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.getInterestsByUserId(otherUserId, callerId),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.FORBIDDEN,
+          code: domainErrorCodes.profiles.profileAccessDenied,
+        }),
+      );
+      expect(prismaMock.research_interests.findMany).not.toHaveBeenCalled();
+    });
+
+    it('lets the owner read the interests of their own unconfirmed profile', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
+        user_id: otherUserId,
+        profile_confirmed_at: null,
+      });
+      prismaMock.research_interests.findMany.mockResolvedValue([]);
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.getInterestsByUserId(otherUserId, otherUserId),
+      ).resolves.toEqual([]);
+    });
+
+    it('throws 404 when the target profile does not exist', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.researcher_profiles.findUnique.mockResolvedValue(null);
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.getInterestsByUserId('non-existent-user', callerId),
       ).rejects.toThrow(
         expect.objectContaining({
           status: HttpStatus.NOT_FOUND,

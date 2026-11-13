@@ -8,6 +8,28 @@
 import type { UpdateProfileDtoAvailabilityStatus } from './updateProfileDtoAvailabilityStatus';
 
 export interface UpdateProfileDto {
+  /**
+   * Full display name of the researcher. Required to be non-blank when sent.
+   * @maxLength 255
+   */
+  fullName?: string;
+  /**
+   * Department or administrative unit. Required to be non-blank when sent.
+   * @maxLength 255
+   */
+  departmentUnit?: string;
+  /**
+   * Academic title; null clears the stored title.
+   * @maxLength 100
+   * @nullable
+   */
+  academicTitle?: string | null;
+  /**
+   * Academic degree; null clears the stored degree.
+   * @maxLength 100
+   * @nullable
+   */
+  academicDegree?: string | null;
   /** Biographical summary and research statement. */
   bio?: string;
   /** Collaboration availability status of the researcher. */

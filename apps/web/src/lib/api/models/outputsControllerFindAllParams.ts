@@ -30,4 +30,8 @@ export type OutputsControllerFindAllParams = {
    * Filter outputs linked to a specific research group (UUID).
    */
   groupId?: string;
+  /**
+   * Filter outputs a specific researcher is an author of (UUID), including co-authored works they do not own.
+   */
+  authorId?: string;
 };

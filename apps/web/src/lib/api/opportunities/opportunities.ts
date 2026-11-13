@@ -155,7 +155,7 @@ export const useOpportunitiesControllerCreate = <
  * @summary Lists published opportunities and opportunities managed by the caller
  */
 export const opportunitiesControllerFindAll = (
-  params?: OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
@@ -175,7 +175,7 @@ export const getOpportunitiesControllerFindAllQueryOptions = <
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
   TError = unknown,
 >(
-  params?: OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -213,7 +213,7 @@ export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
   TError = unknown,
 >(
-  params: undefined | OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -240,7 +240,7 @@ export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
   TError = unknown,
 >(
-  params?: OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -267,7 +267,7 @@ export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
   TError = unknown,
 >(
-  params?: OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -290,7 +290,7 @@ export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
   TError = unknown,
 >(
-  params?: OpportunitiesControllerFindAllParams,
+  params: OpportunitiesControllerFindAllParams,
   options?: {
     query?: Partial<
       UseQueryOptions<

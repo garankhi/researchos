@@ -6,14 +6,11 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { OpportunityResponseDto } from './opportunityResponseDto';
+import type { PaginationMetaDto } from './paginationMetaDto';
 
 export interface OpportunityPageDto {
   /** Visible opportunities on this page. */
   items: OpportunityResponseDto[];
-  /** Current one-based page number. */
-  page: number;
-  /** Maximum number of items per page. */
-  pageSize: number;
-  /** Total opportunities matching the filters and caller visibility. */
-  total: number;
+  /** The pagination metadata of this page. */
+  meta: PaginationMetaDto;
 }

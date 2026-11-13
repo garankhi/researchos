@@ -589,7 +589,8 @@ export const useGroupsControllerUpdate = <
   );
 };
 /**
- * @summary List group members (lead and members only)
+ * The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.
+ * @summary List group members
  */
 export const groupMembersControllerFindAll = (
   groupId: string,
@@ -740,7 +741,7 @@ export function useGroupMembersControllerFindAll<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary List group members (lead and members only)
+ * @summary List group members
  */
 
 export function useGroupMembersControllerFindAll<

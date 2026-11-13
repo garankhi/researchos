@@ -401,4 +401,129 @@ BEGIN
 
  RAISE NOTICE 'PASS a group opportunity is indexed as a public posting';
 END $$;
+
+-- The per-tab counts of one term. This is the query behind
+-- GET /search/counts: one request replaces four separate searches that
+-- exist only to read a total, so the four totals have to be permission
+-- filtered exactly like the results they count.
+--
+-- The totals are counted with COUNT(*) FILTER over one filtered scan, so
+-- the per-tab numbers must agree with the per-tab predicate the search
+-- endpoint uses, and a caller must never see a total for a slice they
+-- cannot read.
+DO $$
+DECLARE
+ owner uuid=gen_random_uuid(); outsider uuid=gen_random_uuid(); inactive uuid=gen_random_uuid();
+ o uuid; r uuid; priv uuid; privr uuid; g uuid; op uuid;
+ research bigint; people bigint; grp bigint; opp bigint; n int;
+ term text='quantum materials'; pat text='%quantum materials%';
+BEGIN
+ INSERT INTO users(id,user_type,email,full_name,department_unit)
+ VALUES(owner,'FACULTY','counts-owner@test.invalid','Counts Owner','FPTU'),
+      (outsider,'FACULTY','counts-outsider@test.invalid','Counts Outsider','FPTU'),
+      (inactive,'FACULTY','counts-inactive@test.invalid','Counts Inactive','FPTU');
+ UPDATE users SET is_active=false WHERE id=inactive;
+
+ -- One row per entity type, all matching the term.
+ INSERT INTO researcher_profiles(user_id,bio,profile_confirmed_at)
+ VALUES(owner,'A researcher working on quantum materials',clock_timestamp());
+ INSERT INTO research_groups(id,code,name,lead_id,description)
+ VALUES(gen_random_uuid(),'COUNTS-SEARCH-GRP','Quantum Materials Lab',owner,'Quantum materials and photonics.');
+ SELECT id INTO g FROM research_groups WHERE code='COUNTS-SEARCH-GRP';
+
+ INSERT INTO research_opportunities(id,group_id,opportunity_kind,target_audience,creator_id,title,description)
+ VALUES(gen_random_uuid(),g,'RESEARCH_COLLABORATION','ANY_RESEARCHER',owner,'Quantum Fellowship','A fellowship on quantum materials.');
+ UPDATE research_opportunities
+    SET status='OPEN', application_deadline=clock_timestamp()+interval '30 days', published_at=clock_timestamp()
+  WHERE title='Quantum Fellowship';
+ SELECT id INTO op FROM research_opportunities WHERE title='Quantum Fellowship';
+
+ -- A community work and a private one, both matching the term.
+ INSERT INTO research_outputs(id,sharing_status,visibility,owner_id,created_by)
+ VALUES(gen_random_uuid(),'DRAFT','FPTU_COMMUNITY',owner,owner) RETURNING id INTO o;
+ INSERT INTO output_revisions(id,output_id,revision_no,title,abstract,created_by)
+ VALUES(gen_random_uuid(),o,1,'Quantum Materials at Scale','A study of quantum materials at scale',owner) RETURNING id INTO r;
+ UPDATE output_revisions SET released_at=clock_timestamp(),released_by=owner WHERE id=r;
+ UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=r WHERE id=o;
+
+ INSERT INTO research_outputs(id,sharing_status,visibility,owner_id,created_by)
+ VALUES(gen_random_uuid(),'DRAFT','PRIVATE',owner,owner) RETURNING id INTO priv;
+ INSERT INTO output_revisions(id,output_id,revision_no,title,abstract,created_by)
+ VALUES(gen_random_uuid(),priv,1,'Private Quantum Materials Notes','Unpublished notes on quantum materials',owner) RETURNING id INTO privr;
+ UPDATE output_revisions SET released_at=clock_timestamp(),released_by=owner WHERE id=privr;
+ UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=privr WHERE id=priv;
+
+ -- The owner sees both works, so the research tab counts two.
+ SELECT
+   count(*) FILTER (WHERE v.entity_type='OUTPUT'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='RESEARCHER'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='GROUP'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='OPPORTUNITY'::search_entity_type)
+ INTO research,people,grp,opp
+ FROM visible_search_index(owner) v, websearch_to_tsquery('simple',term) q
+ WHERE v.doc @@ q OR v.title ILIKE pat ESCAPE '\';
+
+ PERFORM pg_temp.assert_true(research=2,'the owner counts both matching works');
+ PERFORM pg_temp.assert_true(people=1,'the owner counts the researcher profile');
+ PERFORM pg_temp.assert_true(grp=1,'the owner counts the research group');
+ PERFORM pg_temp.assert_true(opp=1,'the owner counts the opportunity');
+
+ -- The totals agree with the per-tab predicate the search endpoint uses.
+ SELECT count(*) INTO n FROM visible_search_index(owner) v, websearch_to_tsquery('simple',term) q
+ WHERE v.entity_type='OUTPUT'::search_entity_type AND (v.doc @@ q OR v.title ILIKE pat ESCAPE '\');
+ PERFORM pg_temp.assert_true(n=research,'the research total matches the per-tab count');
+ SELECT count(*) INTO n FROM visible_search_index(owner) v, websearch_to_tsquery('simple',term) q
+ WHERE v.entity_type='RESEARCHER'::search_entity_type AND (v.doc @@ q OR v.title ILIKE pat ESCAPE '\');
+ PERFORM pg_temp.assert_true(n=people,'the people total matches the per-tab count');
+ SELECT count(*) INTO n FROM visible_search_index(owner) v, websearch_to_tsquery('simple',term) q
+ WHERE v.entity_type='GROUP'::search_entity_type AND (v.doc @@ q OR v.title ILIKE pat ESCAPE '\');
+ PERFORM pg_temp.assert_true(n=grp,'the group total matches the per-tab count');
+ SELECT count(*) INTO n FROM visible_search_index(owner) v, websearch_to_tsquery('simple',term) q
+ WHERE v.entity_type='OPPORTUNITY'::search_entity_type AND (v.doc @@ q OR v.title ILIKE pat ESCAPE '\');
+ PERFORM pg_temp.assert_true(n=opp,'the opportunity total matches the per-tab count');
+
+ -- An outsider sees the community work but not the private one, so the
+ -- research tab counts one rather than two.
+ SELECT
+   count(*) FILTER (WHERE v.entity_type='OUTPUT'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='RESEARCHER'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='GROUP'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='OPPORTUNITY'::search_entity_type)
+ INTO research,people,grp,opp
+ FROM visible_search_index(outsider) v, websearch_to_tsquery('simple',term) q
+ WHERE v.doc @@ q OR v.title ILIKE pat ESCAPE '\';
+
+ PERFORM pg_temp.assert_true(research=1,'an outsider does not count the private work');
+ PERFORM pg_temp.assert_true(people=1,'an outsider counts the public researcher profile');
+ PERFORM pg_temp.assert_true(grp=1,'an outsider counts the research group');
+ PERFORM pg_temp.assert_true(opp=1,'an outsider counts the opportunity');
+
+ -- An inactive account sees nothing in any tab.
+ SELECT
+   count(*) FILTER (WHERE v.entity_type='OUTPUT'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='RESEARCHER'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='GROUP'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='OPPORTUNITY'::search_entity_type)
+ INTO research,people,grp,opp
+ FROM visible_search_index(inactive) v, websearch_to_tsquery('simple',term) q
+ WHERE v.doc @@ q OR v.title ILIKE pat ESCAPE '\';
+
+ PERFORM pg_temp.assert_true(research=0 AND people=0 AND grp=0 AND opp=0,
+   'an inactive account counts nothing in any tab');
+
+ -- A term that matches nothing counts zero everywhere.
+ SELECT
+   count(*) FILTER (WHERE v.entity_type='OUTPUT'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='RESEARCHER'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='GROUP'::search_entity_type),
+   count(*) FILTER (WHERE v.entity_type='OPPORTUNITY'::search_entity_type)
+ INTO research,people,grp,opp
+ FROM visible_search_index(owner) v, websearch_to_tsquery('simple','nonexistentterm') q
+ WHERE v.doc @@ q OR v.title ILIKE '%nonexistentterm%' ESCAPE '\';
+
+ PERFORM pg_temp.assert_true(research=0 AND people=0 AND grp=0 AND opp=0,
+   'a term that matches nothing counts zero everywhere');
+
+ RAISE NOTICE 'PASS the per-tab counts are permission filtered and agree with the per-tab predicate';
+END $$;
 ROLLBACK;

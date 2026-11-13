@@ -4,6 +4,21 @@ import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
 
 /**
  * A single permission-filtered search result item from `search_index`.
+ *
+ * The item is deliberately one flat shape for all four entity types: the
+ * client branches on `entityType` and picks the field that carries the
+ * subtitle for that tab.
+ *
+ * | `entityType` | title | body | authorsText |
+ * | --- | --- | --- | --- |
+ * | `OUTPUT` | work title | abstract | author names |
+ * | `RESEARCHER` | researcher full name | bio | researcher full name |
+ * | `GROUP` | group name | group description | group leader name |
+ * | `OPPORTUNITY` | opportunity title | opportunity description | creator name |
+ *
+ * A typed `subtitle` field was considered and rejected: it would add a
+ * field the server has to keep in sync with the index, for a value the
+ * client can already pick per tab.
  */
 export class SearchResultItemDto {
   @ApiProperty({

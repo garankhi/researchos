@@ -25,9 +25,11 @@ import type {
   ApiErrorResponseDto,
   ApplicationPageDtoEnvelope,
   ApplicationResponseDtoEnvelope,
+  ApplicationsControllerForGroupParams,
   ApplicationsControllerMineParams,
   ApplicationsControllerReceivedParams,
   CreateApplicationDto,
+  GroupApplicationPageDtoEnvelope,
   RespondApplicationDto,
 } from '../models';
 
@@ -502,6 +504,196 @@ export function useApplicationsControllerMine<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getApplicationsControllerMineQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns every application on the group's opportunities, with the opportunity identity and the server-calculated countdown. Only the opportunities the caller may manage are included.
+ * @summary List a group's applications across its opportunities
+ */
+export const applicationsControllerForGroup = (
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupApplicationPageDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/applications`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getApplicationsControllerForGroupQueryKey = (
+  groupId: string,
+  params?: ApplicationsControllerForGroupParams,
+) => {
+  return [
+    `/research-groups/${groupId}/applications`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getApplicationsControllerForGroupQueryOptions = <
+  TData = Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getApplicationsControllerForGroupQueryKey(groupId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof applicationsControllerForGroup>>
+  > = ({ signal }) =>
+    applicationsControllerForGroup(groupId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: groupId !== null && groupId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ApplicationsControllerForGroupQueryResult = NonNullable<
+  Awaited<ReturnType<typeof applicationsControllerForGroup>>
+>;
+export type ApplicationsControllerForGroupQueryError = ApiErrorResponseDto;
+
+export function useApplicationsControllerForGroup<
+  TData = Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+          TError,
+          Awaited<ReturnType<typeof applicationsControllerForGroup>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useApplicationsControllerForGroup<
+  TData = Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+          TError,
+          Awaited<ReturnType<typeof applicationsControllerForGroup>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useApplicationsControllerForGroup<
+  TData = Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List a group's applications across its opportunities
+ */
+
+export function useApplicationsControllerForGroup<
+  TData = Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  params: ApplicationsControllerForGroupParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof applicationsControllerForGroup>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getApplicationsControllerForGroupQueryOptions(
+    groupId,
     params,
     options,
   );

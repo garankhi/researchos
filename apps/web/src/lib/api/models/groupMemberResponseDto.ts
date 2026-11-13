@@ -16,4 +16,32 @@ export interface GroupMemberResponseDto {
   role: GroupMemberResponseDtoRole;
   /** Timestamp when the user joined the group. */
   joinedAt: string;
+  /** Full display name of the member. */
+  fullName: string;
+  /** Institutional email address of the member. */
+  email: string;
+  /** Department or administrative unit of the member. */
+  departmentUnit: string;
+  /**
+   * Academic title of the member, when the member has one.
+   * @nullable
+   */
+  academicTitle: string | null;
+  /**
+   * Academic degree of the member, when the member has one.
+   * @nullable
+   */
+  academicDegree: string | null;
+  /** Category classification of the member. */
+  userType: string;
+  /**
+   * Storage key referencing the member avatar image.
+   * @nullable
+   */
+  avatarStorageKey: string | null;
+  /**
+   * Biographical summary of the member, when the member has a profile.
+   * @nullable
+   */
+  bio: string | null;
 }

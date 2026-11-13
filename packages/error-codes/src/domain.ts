@@ -78,6 +78,11 @@ export const domainErrorCodes = {
     memberNotFound: 'group_member_not_found',
     memberAlreadyExists: 'group_member_already_exists',
     leadRemovalDenied: 'group_lead_removal_denied',
+    outputLinkNotFound: 'group_output_link_not_found',
+    outputLinkExists: 'group_output_link_already_exists',
+    outputLinkConflict: 'group_output_link_conflict',
+    outputLinkInvalid: 'group_output_link_invalid',
+    outputNotShared: 'group_output_not_shared',
   },
   identity: {
     invalidCredentials: 'invalid_credentials',
@@ -111,6 +116,14 @@ export const domainErrorCodes = {
   outputs: {
     outputNotFound: 'output_not_found',
     outputAccessDenied: 'output_access_denied',
+    outputNotOwner: 'output_not_owner',
+    outputNotPublishable: 'output_not_publishable',
+    outputAlreadyPublished: 'output_already_published',
+    outputNotArchived: 'output_not_archived',
+    outputRevisionLocked: 'output_revision_locked',
+    outputRevisionNotFound: 'output_revision_not_found',
+    outputVisibilityInvalid: 'output_visibility_invalid',
+    outputAccessGroupInvalid: 'output_access_group_invalid',
   },
   storage: {
     fileNotFound: 'output_file_not_found',

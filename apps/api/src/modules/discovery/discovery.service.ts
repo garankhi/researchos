@@ -16,6 +16,8 @@ import {
   SearchQueryDto,
   SearchTab,
 } from './dto/search-query.dto.js';
+import { SearchCountsQueryDto } from './dto/search-counts-query.dto.js';
+import { SearchCountsResponseDto } from './dto/search-counts-response.dto.js';
 import {
   PaginatedSearchResultsResponseDto,
   SearchResultItemDto,
@@ -48,6 +50,27 @@ interface RawSearchIndexRow {
   authors_text: string | null;
   rank: number | string;
   updated_at: Date | string;
+}
+
+/**
+ * One row of the per-tab count query: a `bigint` total per search tab.
+ */
+interface RawSearchCountRow {
+  research: bigint | number | null;
+  people: bigint | number | null;
+  group_count: bigint | number | null;
+  opportunity: bigint | number | null;
+}
+
+/**
+ * Converts a PostgreSQL `bigint` count into a plain number for the wire.
+ */
+function toCount(value: bigint | number | null | undefined): number {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+
+  return typeof value === 'number' ? value : Number(value);
 }
 
 /**
@@ -88,6 +111,58 @@ export class DiscoveryService {
       default:
         throw new BadRequestException('validation_failed');
     }
+  }
+
+  /**
+   * Counts the permission-filtered matches of one term per search tab.
+   *
+   * The counts endpoint exists so a tab badge for a tab nobody has visited
+   * yet has a source: one request replaces four `limit=1` requests that only
+   * exist to read a total.
+   *
+   * Every count is permission-filtered exactly like the results it counts —
+   * the same `visible_search_index(actor)` predicate over the same matching
+   * expression — so a caller never sees a total for a slice they cannot read.
+   */
+  async counts(
+    actorId: string,
+    query: SearchCountsQueryDto,
+  ): Promise<SearchCountsResponseDto> {
+    const term = typeof query.q === 'string' ? query.q.trim() : '';
+    if (
+      term.length < MIN_SEARCH_QUERY_LENGTH ||
+      term.length > MAX_SEARCH_QUERY_LENGTH
+    ) {
+      throw new BadRequestException('validation_failed');
+    }
+
+    const likePattern = `%${escapeLikePattern(term)}%`;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        `SET LOCAL statement_timeout = '${SEARCH_STATEMENT_TIMEOUT_MS}ms'`,
+      );
+
+      const rows = await tx.$queryRaw<RawSearchCountRow[]>(Prisma.sql`
+        SELECT
+          COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.OUTPUT}::search_entity_type)::bigint AS research,
+          COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.RESEARCHER}::search_entity_type)::bigint AS people,
+          COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.GROUP}::search_entity_type)::bigint AS group_count,
+          COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.OPPORTUNITY}::search_entity_type)::bigint AS opportunity
+        FROM visible_search_index(${actorId}::uuid) v,
+             websearch_to_tsquery('simple', ${term}) q
+        WHERE v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\'
+      `);
+
+      const row = rows[0];
+
+      return {
+        research: toCount(row?.research),
+        people: toCount(row?.people),
+        group: toCount(row?.group_count),
+        opportunity: toCount(row?.opportunity),
+      };
+    });
   }
 
   /**

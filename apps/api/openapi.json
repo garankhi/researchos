@@ -78,6 +78,67 @@
         ]
       }
     },
+    "/search/counts": {
+      "get": {
+        "description": "Returns one permission-filtered total per search tab (`research`, `people`, `group`, `opportunity`) for the given term, using the same matching expression as `GET /search`. The totals are the source for the tab badges, so a tab nobody has opened yet still has a count.",
+        "operationId": "DiscoveryController_counts",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Search query text matched via PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram (`ILIKE`). Must be between 2 and 200 characters after trimming.",
+            "schema": {
+              "minLength": 2,
+              "maxLength": 200,
+              "example": "machine learning",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The number of matching records per search tab.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCountsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query term length outside [2, 200] characters after trimming.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count the matching results of one search term per tab",
+        "tags": [
+          "discovery"
+        ]
+      }
+    },
     "/search": {
       "get": {
         "description": "Queries the requested tab slice (`research`, `people`, `group`, or `opportunity`) of `search_index` through `visible_search_index(actor)` using PostgreSQL full-text search (`websearch_to_tsquery`) and title trigram matching (`ILIKE`), ranked strictly by text relevance (`ts_rank`).",
@@ -576,6 +637,17 @@
             }
           },
           {
+            "name": "memberId",
+            "required": false,
+            "in": "query",
+            "description": "Filter groups a specific researcher belongs to (UUID), whether or not they lead the group.",
+            "schema": {
+              "format": "uuid",
+              "example": "2f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e12",
+              "type": "string"
+            }
+          },
+          {
             "name": "isActive",
             "required": false,
             "in": "query",
@@ -777,6 +849,7 @@
     },
     "/research-groups/{groupId}/members": {
       "get": {
+        "description": "The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.",
         "operationId": "GroupMembersController_findAll",
         "parameters": [
           {
@@ -872,7 +945,7 @@
             "bearer": []
           }
         ],
-        "summary": "List group members (lead and members only)",
+        "summary": "List group members",
         "tags": [
           "groups"
         ]
@@ -1544,6 +1617,433 @@
         "summary": "Delete an unused direction as the group lead",
         "tags": [
           "group-directions"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/outputs": {
+      "get": {
+        "description": "Returns the group links with their status, the revision each group shows, and the revision the pending request asks for.",
+        "operationId": "GroupOutputLinksController_list",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group whose curated content is managed.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated group output links.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOutputLinkPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, revision, or payload. The revision must be a released revision of the output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, research output, or group output link does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The link is not in a state that allows this action, or it already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the research outputs linked to the group",
+        "tags": [
+          "group-outputs"
+        ]
+      },
+      "post": {
+        "description": "Creates the link as PENDING for the group lead to decide, or as ACCEPTED when the caller may both manage the group and own the work.",
+        "operationId": "GroupOutputLinksController_request",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group whose curated content is managed.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupOutputLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Link requested, or accepted outright.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOutputLinkResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, revision, or payload. The revision must be a released revision of the output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, research output, or group output link does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The link is not in a state that allows this action, or it already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request a research output for the group",
+        "tags": [
+          "group-outputs"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/outputs/{outputId}": {
+      "patch": {
+        "description": "Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.",
+        "operationId": "GroupOutputLinksController_decide",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group whose curated content is managed.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Research output whose group link is decided.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideGroupOutputLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOutputLinkResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, revision, or payload. The revision must be a released revision of the output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, research output, or group output link does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The link is not in a state that allows this action, or it already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept or reject a pending group content request",
+        "tags": [
+          "group-outputs"
+        ]
+      },
+      "delete": {
+        "description": "The link moves to the REMOVED status; the work stays visible and findable everywhere else.",
+        "operationId": "GroupOutputLinksController_remove",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group whose curated content is managed.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Research output removed from the group content.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link removed from the group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOutputLinkResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, revision, or payload. The revision must be a released revision of the output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, research output, or group output link does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The link is not in a state that allows this action, or it already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a research output from the group content",
+        "tags": [
+          "group-outputs"
         ]
       }
     },
@@ -2809,25 +3309,37 @@
         "parameters": [
           {
             "name": "page",
-            "required": false,
+            "required": true,
             "in": "query",
-            "description": "One-based page number.",
+            "description": "Page number, 1-based.",
             "schema": {
               "minimum": 1,
               "default": 1,
+              "example": 1,
               "type": "number"
             }
           },
           {
-            "name": "pageSize",
-            "required": false,
+            "name": "limit",
+            "required": true,
             "in": "query",
-            "description": "Maximum records per page.",
+            "description": "How many records one page holds.",
             "schema": {
               "minimum": 1,
               "maximum": 100,
               "default": 20,
+              "example": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
             }
           },
           {
@@ -2864,6 +3376,16 @@
                 "CLOSED",
                 "EXPIRED"
               ]
+            }
+          },
+          {
+            "name": "creatorId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by the researcher who created the opportunity, without widening visibility.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
             }
           }
         ],
@@ -3532,6 +4054,120 @@
         ]
       }
     },
+    "/research-groups/{groupId}/applications": {
+      "get": {
+        "description": "Returns every application on the group's opportunities, with the opportunity identity and the server-calculated countdown. Only the opportunities the caller may manage are included.",
+        "operationId": "ApplicationsController_forGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group whose opportunities the applications belong to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated group applications with opportunity identity and countdowns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupApplicationPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, application note, or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller may not manage any opportunity of this group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Research group does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a group's applications across its opportunities",
+        "tags": [
+          "applications"
+        ]
+      }
+    },
     "/applications/{applicationId}/respond": {
       "post": {
         "description": "Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.",
@@ -3779,6 +4415,17 @@
             "schema": {
               "format": "uuid",
               "example": "22222222-2222-4222-8222-222222222222",
+              "type": "string"
+            }
+          },
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "description": "Filter outputs a specific researcher is an author of (UUID), including co-authored works they do not own.",
+            "schema": {
+              "format": "uuid",
+              "example": "33333333-3333-4333-8333-333333333333",
               "type": "string"
             }
           }
@@ -4063,6 +4710,293 @@
         ]
       }
     },
+    "/outputs/{outputId}/revision": {
+      "patch": {
+        "description": "Updates the editable draft revision of a work the caller owns. Only the fields present in the body are changed. Every corrected field is locked against later automated syncs, so a subsequent OpenAlex pull cannot overwrite a value a person stood behind. A released revision is immutable and cannot be edited.",
+        "operationId": "OutputsController_updateRevision",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOutputRevisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated draft revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputRevisionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, or a field value that fails validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output or its editable draft revision was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The revision has already been released and cannot be edited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corrects the metadata of a work draft revision",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/publish": {
+      "post": {
+        "description": "Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the visibility the caller chose. The work becomes searchable, discoverable, and linkable into a group. This is the single visibility action, whether the draft came from an OpenAlex pull or from a work created inside the platform.",
+        "operationId": "OutputsController_publish",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishOutputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The published work, now shared under the requested visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, an unsupported visibility, or a visibility that does not match the access group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is already published, or it has no editable draft revision to publish.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publishes a work and shares it with the chosen audience",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/archive": {
+      "post": {
+        "description": "Takes a published work out of every shared surface. The work keeps its revisions, its authorship claims and its group links; only its sharing ends. Archiving is the only way to un-share a work — a published work cannot be reset to draft, because the sharing history is not erasable.",
+        "operationId": "OutputsController_archive",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archived work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or does not own this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is not published, so it cannot be archived.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archives a published work",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/profiles/me": {
       "get": {
         "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
@@ -4101,7 +5035,7 @@
         ]
       },
       "patch": {
-        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId).",
+        "description": "Updates editable fields of the caller’s researcher profile (bio, availabilityStatus, googleScholarUrl, scopusAuthorId) and of their account (fullName, departmentUnit, academicTitle, academicDegree). orcidId, email and userType are not editable here.",
         "operationId": "ProfilesController_updateMyProfile",
         "parameters": [],
         "requestBody": {
@@ -4201,6 +5135,65 @@
           }
         ],
         "summary": "Get researcher profile by user ID",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/{userId}/interests": {
+      "get": {
+        "description": "Returns the interests of the target researcher, each with the taxonomy path of its topic and its review status.",
+        "operationId": "ProfilesController_getInterestsByUserId",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the target user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interests of the target researcher, newest declaration first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilesControllerGetInterestsByUserIdEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The profile is unconfirmed and the caller is not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the research interests of a researcher",
         "tags": [
           "profiles"
         ]
@@ -5178,6 +6171,37 @@
       }
     },
     "schemas": {
+      "SearchCountsResponseDto": {
+        "type": "object",
+        "properties": {
+          "research": {
+            "type": "number",
+            "description": "Number of matching research outputs visible to the caller (the `research` tab).",
+            "example": 12
+          },
+          "people": {
+            "type": "number",
+            "description": "Number of matching researcher profiles visible to the caller (the `people` tab).",
+            "example": 3
+          },
+          "group": {
+            "type": "number",
+            "description": "Number of matching research groups visible to the caller (the `group` tab).",
+            "example": 2
+          },
+          "opportunity": {
+            "type": "number",
+            "description": "Number of matching opportunities visible to the caller (the `opportunity` tab).",
+            "example": 7
+          }
+        },
+        "required": [
+          "research",
+          "people",
+          "group",
+          "opportunity"
+        ]
+      },
       "SearchResultItemDto": {
         "type": "object",
         "properties": {
@@ -5613,13 +6637,64 @@
             "type": "string",
             "description": "Timestamp when the user joined the group.",
             "format": "date-time"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the member.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "email": {
+            "type": "string",
+            "description": "Institutional email address of the member.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit of the member.",
+            "example": "Software Engineering"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title of the member, when the member has one.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree of the member, when the member has one.",
+            "example": "TS",
+            "nullable": true
+          },
+          "userType": {
+            "type": "string",
+            "description": "Category classification of the member.",
+            "example": "FACULTY"
+          },
+          "avatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the member avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary of the member, when the member has a profile.",
+            "nullable": true
           }
         },
         "required": [
           "groupId",
           "userId",
           "role",
-          "joinedAt"
+          "joinedAt",
+          "fullName",
+          "email",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "userType",
+          "avatarStorageKey",
+          "bio"
         ]
       },
       "GroupMemberPageDto": {
@@ -5860,6 +6935,180 @@
             "nullable": true
           }
         }
+      },
+      "GroupOutputLinkResponseDto": {
+        "type": "object",
+        "properties": {
+          "outputId": {
+            "type": "string",
+            "description": "Research output linked to the group.",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Group holding the link.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Link lifecycle state.",
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "REJECTED",
+              "REMOVED"
+            ]
+          },
+          "requestedRevisionId": {
+            "type": "string",
+            "description": "Revision the request asked the group to pin.",
+            "format": "uuid"
+          },
+          "requestedBy": {
+            "type": "string",
+            "description": "Researcher who requested the link.",
+            "format": "uuid"
+          },
+          "requestedAt": {
+            "type": "string",
+            "description": "Timestamp of the request.",
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": "string",
+            "description": "Group lead who decided the request, if any.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "description": "Timestamp of the decision, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decisionNote": {
+            "type": "string",
+            "description": "Note recorded with the request or the decision.",
+            "nullable": true
+          },
+          "acceptedRevisionId": {
+            "type": "string",
+            "description": "Revision the group currently pins, if any; null once the link is removed.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "acceptedBy": {
+            "type": "string",
+            "description": "Researcher who accepted the link, if any.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "acceptedAt": {
+            "type": "string",
+            "description": "Timestamp of the acceptance, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "removedBy": {
+            "type": "string",
+            "description": "Researcher who removed the link, if any.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "removedAt": {
+            "type": "string",
+            "description": "Timestamp of the removal, if any.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "outputId",
+          "groupId",
+          "status",
+          "requestedRevisionId",
+          "requestedBy",
+          "requestedAt",
+          "decidedBy",
+          "decidedAt",
+          "decisionNote",
+          "acceptedRevisionId",
+          "acceptedBy",
+          "acceptedAt",
+          "removedBy",
+          "removedAt"
+        ]
+      },
+      "GroupOutputLinkPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Group output links in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupOutputLinkResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CreateGroupOutputLinkDto": {
+        "type": "object",
+        "properties": {
+          "outputId": {
+            "type": "string",
+            "description": "Research output to link into the group.",
+            "format": "uuid"
+          },
+          "revisionId": {
+            "type": "string",
+            "description": "Released revision of the output to pin; it must belong to the output.",
+            "format": "uuid"
+          },
+          "decisionNote": {
+            "type": "string",
+            "description": "Note explaining the request to the group lead.",
+            "nullable": true,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "outputId",
+          "revisionId"
+        ]
+      },
+      "DecideGroupOutputLinkDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Decision to record: ACCEPTED pins the requested revision into the group, REJECTED declines it and preserves the previously accepted pin.",
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ]
+          },
+          "decisionNote": {
+            "type": "string",
+            "description": "Note recorded with the decision.",
+            "nullable": true,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "LoginDto": {
         "type": "object",
@@ -6806,24 +8055,18 @@
               "$ref": "#/components/schemas/OpportunityResponseDto"
             }
           },
-          "page": {
-            "type": "number",
-            "description": "Current one-based page number."
-          },
-          "pageSize": {
-            "type": "number",
-            "description": "Maximum number of items per page."
-          },
-          "total": {
-            "type": "number",
-            "description": "Total opportunities matching the filters and caller visibility."
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
           }
         },
         "required": [
           "items",
-          "page",
-          "pageSize",
-          "total"
+          "meta"
         ]
       },
       "UpdateOpportunityDto": {
@@ -7011,6 +8254,132 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ApplicationResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "GroupApplicationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Application identifier.",
+            "format": "uuid"
+          },
+          "opportunityId": {
+            "type": "string",
+            "description": "Opportunity receiving the application.",
+            "format": "uuid"
+          },
+          "applicantId": {
+            "type": "string",
+            "description": "Researcher submitting the application.",
+            "format": "uuid"
+          },
+          "applicantNote": {
+            "type": "string",
+            "description": "Researcher application note."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current application state.",
+            "enum": [
+              "PENDING",
+              "INVITED_TO_DISCUSS",
+              "DECLINED",
+              "WITHDRAWN"
+            ]
+          },
+          "responseNote": {
+            "type": "string",
+            "description": "Opportunity owner response note.",
+            "nullable": true
+          },
+          "respondedBy": {
+            "type": "string",
+            "description": "Researcher who responded, if any.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "appliedAt": {
+            "type": "string",
+            "description": "Submission timestamp set by PostgreSQL.",
+            "format": "date-time"
+          },
+          "responseDueAt": {
+            "type": "string",
+            "description": "Response deadline snapshotted from the SLA at submission.",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": "string",
+            "description": "Response timestamp, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "description": "Withdrawal timestamp, if any.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "countdownAsOf": {
+            "type": "string",
+            "description": "Database time used for this server-calculated countdown.",
+            "format": "date-time"
+          },
+          "remainingSeconds": {
+            "type": "number",
+            "description": "Nonnegative seconds remaining while pending; null after response or withdrawal.",
+            "nullable": true
+          },
+          "isOverdue": {
+            "type": "boolean",
+            "description": "Whether this pending application has reached its response deadline."
+          },
+          "opportunityTitle": {
+            "type": "string",
+            "description": "Title of the opportunity the application targets."
+          }
+        },
+        "required": [
+          "id",
+          "opportunityId",
+          "applicantId",
+          "applicantNote",
+          "status",
+          "responseNote",
+          "respondedBy",
+          "appliedAt",
+          "responseDueAt",
+          "respondedAt",
+          "withdrawnAt",
+          "countdownAsOf",
+          "remainingSeconds",
+          "isOverdue",
+          "opportunityTitle"
+        ]
+      },
+      "GroupApplicationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Applications in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupApplicationResponseDto"
             }
           },
           "meta": {
@@ -7433,6 +8802,70 @@
           "accessGroupId"
         ]
       },
+      "UpdateOutputRevisionDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the work. Must not be blank once released.",
+            "maxLength": 500,
+            "example": "Deep Learning for Medical Image Classification"
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Abstract or summary of the work. Send null to clear the stored abstract.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Publication venue or journal name. Send null to clear the stored venue.",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "publicationYear": {
+            "type": "number",
+            "description": "Calendar year of publication. Send null to clear the stored year.",
+            "nullable": true,
+            "minimum": 1000,
+            "maximum": 9999,
+            "example": 2026
+          },
+          "externalUrl": {
+            "type": "string",
+            "description": "External URL pointing to the publication source. Send null to clear the stored link.",
+            "nullable": true
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Type classification of the work (e.g. PAPER, DATASET, PREPRINT).",
+            "maxLength": 50,
+            "example": "PAPER"
+          }
+        }
+      },
+      "PublishOutputDto": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Who may see the published work. FPTU_COMMUNITY opens it to the whole FPTU community; RESEARCH_GROUP opens it to the members of the access group.",
+            "enum": [
+              "FPTU_COMMUNITY",
+              "RESEARCH_GROUP"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "string",
+            "description": "The research group that gains access. Required when visibility is RESEARCH_GROUP and rejected otherwise. The group must be one the caller is a member of.",
+            "format": "uuid",
+            "example": "55555555-5555-4555-8555-555555555555"
+          }
+        },
+        "required": [
+          "visibility"
+        ]
+      },
       "ProfileResponseDto": {
         "type": "object",
         "properties": {
@@ -7553,9 +8986,120 @@
           "onboardingCompletedAt"
         ]
       },
+      "ProfileInterestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the interest.",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Researcher who owns this interest.",
+            "format": "uuid"
+          },
+          "topicId": {
+            "type": "string",
+            "description": "Research topic referenced by this interest.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUGGESTED",
+              "ACTIVE",
+              "REJECTED"
+            ],
+            "description": "Current state of the interest: active, suggested by the platform, or rejected."
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "DECLARED",
+              "INFERRED"
+            ],
+            "description": "Whether the interest was declared or inferred; preserved on review."
+          },
+          "provenanceTag": {
+            "type": "string",
+            "enum": [
+              "PAPER",
+              "AI_TRACE",
+              "AI_INF",
+              "HUMAN",
+              "EXT",
+              "UNK"
+            ],
+            "description": "Origin of the evidence supporting the interest."
+          },
+          "evidenceNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "System-recorded supporting evidence, when available."
+          },
+          "declaredAt": {
+            "type": "string",
+            "description": "Time the interest was first recorded.",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Time of the latest researcher decision, or null before review."
+          },
+          "topicPath": {
+            "description": "Full taxonomy context of the interest topic: field, subfield and topic.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DirectionTopicPathDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "topicId",
+          "status",
+          "sourceType",
+          "provenanceTag",
+          "evidenceNote",
+          "declaredAt",
+          "reviewedAt",
+          "topicPath"
+        ]
+      },
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher. Required to be non-blank when sent.",
+            "example": "PGS. TS. Nguyễn Văn A",
+            "maxLength": 255
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit. Required to be non-blank when sent.",
+            "example": "Software Engineering",
+            "maxLength": 255
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title; null clears the stored title.",
+            "example": "PGS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree; null clears the stored degree.",
+            "example": "TS",
+            "nullable": true,
+            "maxLength": 100
+          },
           "bio": {
             "type": "string",
             "description": "Biographical summary and research statement.",
@@ -8378,6 +9922,30 @@
           "message"
         ]
       },
+      "SearchCountsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/SearchCountsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "PaginatedSearchResultsResponseDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -8582,6 +10150,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/GroupDirectionResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "GroupOutputLinkPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupOutputLinkPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "GroupOutputLinkResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupOutputLinkResponseDto"
           },
           "message": {
             "type": "string",
@@ -8954,6 +10570,30 @@
           "message"
         ]
       },
+      "GroupApplicationPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupApplicationPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "PaginatedOutputsResponseDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -9056,6 +10696,30 @@
           "message"
         ]
       },
+      "OutputRevisionResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputRevisionResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "ProfileResponseDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -9068,6 +10732,33 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ProfilesControllerGetInterestsByUserIdEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileInterestResponseDto"
+            }
           },
           "message": {
             "type": "string",

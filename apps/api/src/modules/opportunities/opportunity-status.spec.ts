@@ -328,7 +328,7 @@ describe('Deadline-based opportunity expiry', () => {
     });
     await expect(service.findAll(actorId, query)).resolves.toMatchObject({
       items: [],
-      total: 0,
+      meta: { total: 0 },
     });
     expect(row.status).toBe(OpportunityStatus.EXPIRED);
     expect(

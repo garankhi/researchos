@@ -30,6 +30,7 @@ import {
   ApplicationResponseDto,
   CreateApplicationDto,
 } from './dto/application.dto.js';
+import { GroupApplicationPageDto } from './dto/group-application.dto.js';
 import { RespondApplicationDto } from './dto/respond-application.dto.js';
 import { ApplicationsService } from './applications.service.js';
 
@@ -109,6 +110,34 @@ export class ApplicationsController {
     @Query() query: PaginationQueryDto,
   ): Promise<ApplicationPageDto> {
     return this.applications.mine(actorId, query);
+  }
+
+  @Get('research-groups/:groupId/applications')
+  @ApiParam({
+    name: 'groupId',
+    description: 'Group whose opportunities the applications belong to.',
+    format: 'uuid',
+  })
+  @ApiOperation({
+    summary: "List a group's applications across its opportunities",
+    description:
+      "Returns every application on the group's opportunities, with the opportunity identity and the server-calculated countdown. Only the opportunities the caller may manage are included.",
+  })
+  @ApiOkResponse({
+    description:
+      'Paginated group applications with opportunity identity and countdowns.',
+    type: GroupApplicationPageDto,
+  })
+  @ApiNotFoundResponse({ description: 'Research group does not exist.' })
+  @ApiForbiddenResponse({
+    description: 'The caller may not manage any opportunity of this group.',
+  })
+  forGroup(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @CurrentUserId() actorId: string,
+    @Query() query: PaginationQueryDto,
+  ): Promise<GroupApplicationPageDto> {
+    return this.applications.forGroup(groupId, actorId, query);
   }
 
   @Post('applications/:applicationId/respond')

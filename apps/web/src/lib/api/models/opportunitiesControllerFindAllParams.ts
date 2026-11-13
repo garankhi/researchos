@@ -9,16 +9,20 @@ import type { OpportunitiesControllerFindAllStatus } from './opportunitiesContro
 
 export type OpportunitiesControllerFindAllParams = {
   /**
-   * One-based page number.
+   * Page number, 1-based.
    * @minimum 1
    */
   page?: number;
   /**
-   * Maximum records per page.
+   * How many records one page holds.
    * @minimum 1
    * @maximum 100
    */
-  pageSize?: number;
+  limit?: number;
+  /**
+   * Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.
+   */
+  sort?: string;
   /**
    * Filter by group scope.
    */
@@ -31,4 +35,8 @@ export type OpportunitiesControllerFindAllParams = {
    * Filter by lifecycle status without widening visibility.
    */
   status?: OpportunitiesControllerFindAllStatus;
+  /**
+   * Filter by the researcher who created the opportunity, without widening visibility.
+   */
+  creatorId?: string;
 };
