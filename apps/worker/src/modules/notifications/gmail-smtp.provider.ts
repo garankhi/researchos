@@ -6,6 +6,10 @@ import type {
   MailProvider,
 } from './mail-provider.js';
 
+// Nodemailer strips or replaces these characters when building the SMTP envelope.
+// eslint-disable-next-line no-control-regex
+const REWRITTEN_RECIPIENT_CHARACTERS = /[\x00-\x1f\x7f<>]/;
+
 export class GmailSmtpProvider implements MailProvider {
   private readonly transport;
 
@@ -34,16 +38,18 @@ export class GmailSmtpProvider implements MailProvider {
   }
 
   async send(message: MailMessage): Promise<MailOutcome> {
-    // The ledger supplies one recipient. SMTP address-list syntax is invalid here.
-    if (!isEmail(message.to)) {
+    const { to } = message;
+    if (!isEmail(to) || REWRITTEN_RECIPIENT_CHARACTERS.test(to)) {
       return { accepted: false, code: 'smtp_permanent' };
     }
+    // Nodemailer trims spaces inside quoted local parts when parsing envelope strings.
+    const recipient = { name: '', address: to };
     try {
       const info = await this.transport.sendMail({
         ...message,
         from: { name: 'ResearchOS', address: this.user },
-        to: { name: '', address: message.to },
-        envelope: { from: this.user, to: [message.to] },
+        to: recipient,
+        envelope: { from: this.user, to: [recipient] },
       });
       return info.accepted.length === 1
         ? { accepted: true, messageId: info.messageId }

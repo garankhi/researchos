@@ -22,6 +22,7 @@ const RETRYABLE_DATABASE_ERRORS = new Set([
   'P1008', // Operation timed out
   'P1017', // Connection closed
   'P2024', // Connection pool timed out
+  'P2028', // Interactive transaction expired or closed
   'P2034', // Write conflict or deadlock
 ]);
 
@@ -160,7 +161,8 @@ export class DigestSender {
       ) {
         throw error;
       }
-      // SMTP already accepted the message. Retry the fenced database write only.
+      // Retry the database transaction with the same SMTP result. The delivery
+      // status and attempt check prevent replaying a completed or stale write.
       await this.recordOutcome(ref, prefix, claim, outcome);
     }
   }

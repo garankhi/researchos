@@ -144,7 +144,7 @@ await backgroundJobs.submitInTransaction(tx, recipientId, DIGEST_SEND_JOB, deliv
 
 Import `DIGEST_SEND_JOB` from `@researchos/queue`. A producer rollback removes
 the delivery and its job/outbox record together. The job carries only the
-delivery reference. RES-89 owns preferences, preparation and history.
+delivery reference. RES-31 owns preferences, preparation and history.
 
 ## Enable demo mail
 

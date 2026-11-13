@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { ConfigModule } from '@nestjs/config';
 import { resolveEnvFilePaths } from '@researchos/config';
 import {
@@ -517,6 +518,42 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     } finally {
       await prisma.$executeRaw`DROP TRIGGER test_digest_sent_write_conflict ON digest_deliveries`;
     }
+  });
+
+  it('records SMTP acceptance after the completion transaction expires', async () => {
+    const index = received.length;
+    const { delivery, job } = await fixture();
+    await waitMail(index);
+
+    const deliveryLocked = Promise.withResolvers<void>();
+    const releaseDelivery = Promise.withResolvers<void>();
+    const holdDelivery = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM digest_deliveries WHERE id = ${delivery.id}::uuid FOR UPDATE`;
+        deliveryLocked.resolve();
+        await releaseDelivery.promise;
+      },
+      { timeout: 15_000 },
+    );
+    try {
+      await Promise.race([deliveryLocked.promise, holdDelivery]);
+      respond(index, accepted);
+      await waitForDatabaseLock('FROM digest_deliveries');
+      // Keep the lock past Prisma's default five-second transaction timeout.
+      await delay(5_500);
+    } finally {
+      releaseDelivery.resolve();
+      await holdDelivery;
+    }
+
+    expect(await waitStatus(delivery.id, 'SENT')).toMatchObject({
+      attempts: 1,
+      provider_message_id: accepted.messageId,
+    });
+    expect(await jobs.findAccessible(delivery.user_id, job.id)).toMatchObject({
+      status: 'COMPLETED',
+    });
+    expect(received).toHaveLength(index + 1);
   });
 
   it('honors explicit Vietnamese and cancels when all prepared items are unauthorized', async () => {

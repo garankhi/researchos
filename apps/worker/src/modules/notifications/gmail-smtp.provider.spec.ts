@@ -36,7 +36,9 @@ describe('Gmail SMTP adapter', () => {
       }),
     );
     expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ envelope: { from, to: [mail.to] } }),
+      expect.objectContaining({
+        envelope: { from, to: [{ name: '', address: mail.to }] },
+      }),
     );
   });
 
@@ -67,18 +69,49 @@ describe('Gmail SMTP adapter', () => {
     },
   );
 
-  it('sends to a quoted mailbox as a single recipient', async () => {
-    const to = '"a,b"@example.test';
-    sendMail.mockResolvedValue({ accepted: [to], messageId: 'smtp-message' });
-    const provider = new GmailSmtpProvider(from, 'fixture-app-password');
+  it.each(['"a,b"@example.test', '" a"@example.test', '"a "@example.test'])(
+    'preserves %j as the only envelope recipient',
+    async (to) => {
+      const { default: nodemailer } =
+        await vi.importActual<typeof import('nodemailer')>('nodemailer');
+      const streamTransport = nodemailer.createTransport({
+        streamTransport: true,
+        buffer: true,
+      });
+      const buildEnvelope = vi.fn(
+        async (message: Parameters<typeof streamTransport.sendMail>[0]) => {
+          const result = await streamTransport.sendMail(message);
+          return { accepted: result.envelope.to, messageId: result.messageId };
+        },
+      );
+      sendMail.mockImplementationOnce(buildEnvelope);
+      const provider = new GmailSmtpProvider(from, 'fixture-app-password');
 
+      await expect(provider.send({ ...mail, to })).resolves.toEqual({
+        accepted: true,
+        messageId: expect.any(String),
+      });
+      await expect(buildEnvelope.mock.results[0]?.value).resolves.toMatchObject(
+        {
+          accepted: [to],
+        },
+      );
+    },
+  );
+
+  it.each([
+    ['opening angle bracket', '"a<b"@example.test'],
+    ['closing angle bracket', '"a>b"@example.test'],
+    ['tab', '"a\tb"@example.test'],
+    ['line break', '"a\r\nb"@example.test'],
+    ['DEL', '"a\x7fb"@example.test'],
+  ])('rejects a quoted mailbox with %s before sending', async (_, to) => {
+    const provider = new GmailSmtpProvider(from, 'fixture-app-password');
     await expect(provider.send({ ...mail, to })).resolves.toEqual({
-      accepted: true,
-      messageId: 'smtp-message',
+      accepted: false,
+      code: 'smtp_permanent',
     });
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ envelope: { from, to: [to] } }),
-    );
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   it('rejects an address list before touching SMTP', async () => {
