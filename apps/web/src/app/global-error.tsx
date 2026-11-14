@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { NextIntlClientProvider, useTranslations } from 'next-intl';
 import messages from '@/messages/vi.json';
 import { routing } from '@/i18n/routing';
@@ -69,20 +68,12 @@ function GlobalErrorCopy({ onRetry }: { onRetry: () => void }) {
   const tCommon = useTranslations('common');
 
   return (
-    <Container maxWidth="sm">
-      <Stack spacing={2} sx={{ alignItems: 'center', textAlign: 'center' }}>
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          {t('globalTitle')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {t('globalDescription')}
-        </Typography>
-        <Box>
-          <Button variant="contained" onClick={onRetry}>
-            {tCommon('retry')}
-          </Button>
-        </Box>
-      </Stack>
-    </Container>
+    <main style={{ maxWidth: '38rem', padding: '1rem', textAlign: 'center' }}>
+      <h1>{t('globalTitle')}</h1>
+      <p>{t('globalDescription')}</p>
+      <button type="button" onClick={onRetry}>
+        {tCommon('retry')}
+      </button>
+    </main>
   );
 }

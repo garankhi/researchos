@@ -119,7 +119,7 @@ const fieldMessages = resolveFieldErrorCodes(t, apiFieldErrorCodes(mutation.erro
 ))}
 ```
 
-`FieldError` renders a MUI `FormHelperText` in the error style. Pass an `id`
+`FieldError` renders a translated message in the Chakra error color. Pass an `id`
 and reference it from the input's `aria-describedby` so a screen reader
 announces the message with the field.
 

@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { Alert, Box, Stack } from '@mui/material';
+import { Alert, Stack } from '@chakra-ui/react';
 import { FormSubmitButton, FormTextField } from '@/components/ui/form';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
@@ -21,7 +21,7 @@ import type { LoginFormValues } from '../schemas/login-form.schema';
  *
  * It is the whole form convention in one component: a zod schema whose
  * messages are error **codes**, react-hook-form for the state, the shared
- * MUI form primitives for the controls, and the message catalog for every
+ * Chakra form primitives for the controls, and the message catalog for every
  * label and error.
  *
  * ## Where the failures go
@@ -55,12 +55,7 @@ export function LoginForm() {
 
   const [serverMessage, setServerMessage] = useState<string | null>(null);
 
-  const {
-    control,
-    handleSubmit,
-    setError,
-    formState: { errors },
-  } = useForm<LoginFormValues>({
+  const { control, handleSubmit, setError } = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: { email: '', password: '' },
   });
@@ -121,12 +116,13 @@ export function LoginForm() {
   });
 
   return (
-    <Box component="form" onSubmit={onSubmit} noValidate>
-      <Stack spacing={2}>
+    <form onSubmit={onSubmit} noValidate>
+      <Stack gap="3">
         {serverMessage ? (
-          <Alert severity="error" role="alert">
-            {serverMessage}
-          </Alert>
+          <Alert.Root status="error" role="alert">
+            <Alert.Indicator />
+            <Alert.Description>{serverMessage}</Alert.Description>
+          </Alert.Root>
         ) : null}
 
         <FormTextField
@@ -135,7 +131,6 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           control={control}
-          error={Boolean(errors.email)}
         />
 
         <FormTextField
@@ -144,11 +139,10 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           control={control}
-          error={Boolean(errors.password)}
         />
 
-        <FormSubmitButton mutation={mutation} label={t('submit')} fullWidth />
+        <FormSubmitButton mutation={mutation} label={t('submit')} w="full" />
       </Stack>
-    </Box>
+    </form>
   );
 }

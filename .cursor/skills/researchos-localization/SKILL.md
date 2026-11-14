@@ -165,19 +165,17 @@ uses. They are duplicated on purpose: `request.ts` cannot import from
 
 ## Links
 
-`next/link` does not know about the locale prefix, so a link to `/demo`
-would drop the user out of their language. Use the wrapper.
+Use the locale-aware link wrapper with Chakra's `asChild`. The wrapper
+exports a Client Component reference for use in Server Components.
 
-```typescript
+```tsx
+import { Button } from '@chakra-ui/react';
 import NextLink from '@/components/ui/link';
 
-<Button component={NextLink} href="/demo">Demo</Button>
+<Button asChild>
+  <NextLink href="/login">{t('signInAction')}</NextLink>
+</Button>
 ```
-
-`components/ui/link.tsx` re-exports the `Link` from `@/i18n/navigation`.
-It exists for two reasons: it keeps the locale prefix, and it is a Client
-Component, which is what makes `<Button component={NextLink}>` legal under
-Next.js 16.
 
 For programmatic navigation, use the router from `@/i18n/navigation`:
 
@@ -187,8 +185,8 @@ import { useRouter, usePathname } from '@/i18n/navigation';
 const router = useRouter();
 const pathname = usePathname();
 
-router.push('/demo');                        // keeps the current locale
-router.push('/demo', { locale: 'en' });      // switches locale
+router.push('/login');                        // keeps the current locale
+router.push('/login', { locale: 'en' });      // switches locale
 ```
 
 `usePathname()` returns the pathname **without** the locale prefix.
@@ -481,7 +479,7 @@ they can translate:
 
 - `not-found.tsx`, `unauthorized.tsx`, `forbidden.tsx` — Server
   Components, use `getTranslations`.
-- `error.tsx`, `demo/error.tsx` — Client Components, use
+- `error.tsx` — Client Components, use
   `useTranslations`.
 
 `app/global-error.tsx` replaces the root layout, so the provider is gone.

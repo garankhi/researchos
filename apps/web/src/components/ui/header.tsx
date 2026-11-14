@@ -1,148 +1,84 @@
 'use client';
-import * as React from 'react';
-import AppBar from '@mui/material/AppBar';
-import Box from '@mui/material/Box';
-import Toolbar from '@mui/material/Toolbar';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import Menu from '@mui/material/Menu';
-import MenuIcon from '@mui/icons-material/Menu';
-import Container from '@mui/material/Container';
-import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import SearchBar from '@/components/ui/search-bar';
-import { LanguageToggle } from '@/components/ui/language-toggle';
-import { useTranslations } from 'next-intl';
 
-/**
- * The navigation items, keyed by message id.
- *
- * The key is the message id, not the label — the label itself comes from
- * the message catalog, so it changes with the locale.
- */
+import type { ReactNode } from 'react';
+import {
+  Button,
+  Flex,
+  HStack,
+  IconButton,
+  Link,
+  Menu,
+  Portal,
+} from '@chakra-ui/react';
+import { MenuIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import NextLink from './link';
+import SearchBar from './search-bar';
+import { LanguageToggle } from './language-toggle';
+import { ThemeToggle } from './theme-toggle';
+
 const pageKeys = ['products', 'pricing', 'blog'] as const;
 
-/**
- * The application header.
- *
- * It is a shared primitive, so it knows nothing about a domain. The
- * account area — the avatar, the account menu and the sign-out — belongs
- * to the identity feature, so the header receives it as `accountSlot`
- * rather than importing it.
- *
- * The direction of the dependency is the point: the feature knows about
- * the header's slot, not the other way round. A shared primitive that
- * imported a feature would be the lowest layer depending on the highest.
- */
-function ResponsiveAppBar({ accountSlot }: { accountSlot?: React.ReactNode }) {
+export default function Header({ accountSlot }: { accountSlot?: ReactNode }) {
   const t = useTranslations('nav');
-  const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(
-    null,
-  );
-
-  const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElNav(event.currentTarget);
-  };
-
-  const handleCloseNavMenu = () => {
-    setAnchorElNav(null);
-  };
+  const common = useTranslations('common');
 
   return (
-    <AppBar position="static">
-      <Container maxWidth={false}>
-        <Toolbar disableGutters sx={{ position: 'relative' }}>
-          <Typography
-            variant="h6"
-            noWrap
-            component="a"
-            href="/"
-            sx={{
-              mr: 2,
-              display: { xs: 'none', md: 'flex' },
-              fontWeight: 700,
-              color: 'inherit',
-              textDecoration: 'none',
-            }}
-          >
-            ResearchOS
-          </Typography>
-
-          <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-            <IconButton
-              size="large"
-              aria-label={t('openMenu')}
-              aria-controls="menu-appbar"
-              aria-haspopup="true"
-              onClick={handleOpenNavMenu}
-              color="inherit"
-            >
-              <MenuIcon />
-            </IconButton>
-            <Menu
-              id="menu-appbar"
-              anchorEl={anchorElNav}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'left',
-              }}
-              open={Boolean(anchorElNav)}
-              onClose={handleCloseNavMenu}
-              sx={{ display: { xs: 'block', md: 'none' } }}
-            >
+    <Flex
+      as="header"
+      bg="bg.panel"
+      borderBottomWidth="1px"
+      px={{ base: '2', md: '4' }}
+      minH="16"
+      py="2"
+      flexWrap={{ base: 'wrap', sm: 'nowrap' }}
+      gap={{ base: '1', md: '3' }}
+      align="center"
+    >
+      <Menu.Root positioning={{ placement: 'bottom-start' }}>
+        <Menu.Trigger asChild>
+          <IconButton variant="ghost" aria-label={t('openMenu')} hideFrom="md">
+            <MenuIcon />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner hideFrom="md">
+            <Menu.Content>
               {pageKeys.map((page) => (
-                <MenuItem key={page} onClick={handleCloseNavMenu}>
-                  <Typography sx={{ textAlign: 'center' }}>
-                    {t(page)}
-                  </Typography>
-                </MenuItem>
+                <Menu.Item key={page} value={page}>
+                  {t(page)}
+                </Menu.Item>
               ))}
-            </Menu>
-          </Box>
-          <Typography
-            variant="h5"
-            noWrap
-            component="a"
-            href="/"
-            sx={{
-              mr: 2,
-              display: { xs: 'flex', md: 'none' },
-              flexGrow: 1,
-              fontWeight: 700,
-              color: 'inherit',
-              textDecoration: 'none',
-            }}
-          >
-            ResearchOS
-          </Typography>
-          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
-            {pageKeys.map((page) => (
-              <Button
-                key={page}
-                onClick={handleCloseNavMenu}
-                sx={{ my: 2, color: 'inherit', display: 'block' }}
-              >
-                {t(page)}
-              </Button>
-            ))}
-          </Box>
-          <Box
-            sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <SearchBar />
-            <LanguageToggle />
-            <ThemeToggle />
-            {accountSlot}
-          </Box>
-        </Toolbar>
-      </Container>
-    </AppBar>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+      <Link asChild fontSize="lg" fontWeight="bold" flexShrink="0">
+        <NextLink href="/">{common('appName')}</NextLink>
+      </Link>
+
+      <HStack as="nav" gap="0" hideBelow="md">
+        {pageKeys.map((page) => (
+          <Button key={page} size="sm" variant="ghost">
+            {t(page)}
+          </Button>
+        ))}
+      </HStack>
+      <Flex flex="1" minW="0" justify="center" hideBelow="md">
+        <SearchBar mode="inline" />
+      </Flex>
+
+      <HStack
+        gap={{ base: '0', sm: '1' }}
+        ms="auto"
+        w={{ base: 'full', sm: 'auto' }}
+        justify="end"
+      >
+        <SearchBar mode="popover" />
+        <LanguageToggle />
+        <ThemeToggle />
+        {accountSlot}
+      </HStack>
+    </Flex>
   );
 }
-export default ResponsiveAppBar;

@@ -27,7 +27,7 @@ apps/web/src/messages/
 | `notFound` | The 404 screen |
 | `unauthorized` | The 401 screen |
 | `forbidden` | The 403 screen |
-| `demo` | The demo page |
+| `storybook` | Copy for Storybook examples |
 
 ### `errors.codes` — the backend error codes
 
@@ -248,9 +248,9 @@ passing a string literal is a compile error.
 'use client';
 
 import { useTranslations } from 'next-intl';
-import Button from '@mui/material/Button';
+import { Button } from '@chakra-ui/react';
 
-export function SaveButton() {
+export function SaveButton({ saving }: { saving: boolean }) {
   const t = useTranslations('common');
 
   return <Button loading={saving}>{t('save')}</Button>;
@@ -403,9 +403,9 @@ export const routing = defineRouting({
 
 | Mode | URLs | Note |
 | --- | --- | --- |
-| `always` | `/vi/demo`, `/en/demo` | What ResearchOS uses |
-| `as-needed` | `/demo`, `/en/demo` | The default locale is unprefixed — two URLs reach one page |
-| `never` | `/demo` | The locale comes from a cookie only; not shareable |
+| `always` | `/vi/login`, `/en/login` | What ResearchOS uses |
+| `as-needed` | `/login`, `/en/login` | The default locale is unprefixed — two URLs reach one page |
+| `never` | `/login` | The locale comes from a cookie only; not shareable |
 
 `always` is chosen because every page is then addressable in both
 languages and a shared link carries its language.
@@ -447,7 +447,7 @@ const pathname = usePathname();
 router.replace(pathname, { locale: 'en' });
 ```
 
-`usePathname()` returns `/demo`, and the router writes `/en/demo`.
+`usePathname()` returns `/login`, and the router writes `/en/login`.
 
 ### Preserving the query string
 
@@ -481,9 +481,9 @@ export const config = {
 | Request | Response |
 | --- | --- |
 | `/` | Redirect to `/vi` (or the negotiated locale) |
-| `/demo` | Redirect to `/vi/demo` |
-| `/vi/demo` | Pass through, with the locale header set |
-| `/en/demo` | Pass through, with the locale header set |
+| `/login` | Redirect to `/vi/login` |
+| `/vi/login` | Pass through, with the locale header set |
+| `/en/login` | Pass through, with the locale header set |
 
 It also emits a `Link` header listing the alternate locales, so search
 engines can index each language separately.
@@ -580,7 +580,6 @@ Design decisions:
 | `app/[locale]/unauthorized.tsx` | Server | `getTranslations` |
 | `app/[locale]/forbidden.tsx` | Server | `getTranslations` |
 | `app/[locale]/error.tsx` | Client | `useTranslations` |
-| `app/[locale]/demo/error.tsx` | Client | `useTranslations` |
 | `app/global-error.tsx` | Client | Own `NextIntlClientProvider` |
 
 `global-error.tsx` replaces the root layout, so the provider that normally

@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Box, Container, Paper, Stack, Typography } from '@mui/material';
+import { Box, Container, Heading, Stack, Text } from '@chakra-ui/react';
 import { getTranslations } from 'next-intl/server';
 import { LoginForm } from '@/features/identity';
 import { LoadingSkeleton } from '@/components/ui/feedback';
@@ -22,24 +22,24 @@ export default async function LoginPage() {
   const t = await getTranslations('identity');
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Stack spacing={3} sx={{ alignItems: 'center' }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
+    <Container as="main" maxW="sm" py="6">
+      <Stack gap="4" align="center">
+        <Box textAlign="center">
+          <Heading as="h1" size="xl">
             {t('title')}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
+          </Heading>
+          <Text textStyle="sm" color="fg.muted">
             {t('subtitle')}
-          </Typography>
+          </Text>
         </Box>
 
-        <Paper sx={{ p: 4, width: '100%' }}>
+        <Box p="4" w="full" bg="bg.panel" borderWidth="1px" borderRadius="lg">
           <Suspense
             fallback={<LoadingSkeleton variant="rectangular" height={120} />}
           >
             <LoginForm />
           </Suspense>
-        </Paper>
+        </Box>
       </Stack>
     </Container>
   );

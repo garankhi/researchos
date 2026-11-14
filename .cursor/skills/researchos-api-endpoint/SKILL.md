@@ -26,7 +26,7 @@ the interceptor, the exception filter or the OpenAPI transform.
 | The session guard, the role guard, access control | **this skill** |
 | The wording — the message catalog, locale routing | `researchos-localization` |
 | Building a screen against the generated client | `researchos-ui` |
-| Forms — react-hook-form, zod, MUI form controls | `researchos-forms` |
+| Forms — react-hook-form, zod, Chakra UI form controls | `researchos-forms` |
 
 `researchos-api-endpoint` decides **what the server says**;
 `researchos-localization` owns the words the frontend renders for it.
@@ -281,7 +281,7 @@ Read the file you need; do not read them all.
 | `researchos-contract` | The response envelope and error codes on the wire |
 | `researchos-localization` | The message catalog, the locale routing, the wording |
 | `researchos-ui` | Building a screen against the generated client |
-| `researchos-forms` | react-hook-form, zod, the MUI form controls |
+| `researchos-forms` | react-hook-form, zod, the Chakra UI form controls |
 
 ## Reference
 
