@@ -21,8 +21,8 @@ import {
  */
 describe('isSafeReturnTo', () => {
   it('accepts a path on this site', () => {
-    expect(isSafeReturnTo('/demo')).toBe(true);
-    expect(isSafeReturnTo('/demo/slow?tab=1')).toBe(true);
+    expect(isSafeReturnTo('/outputs')).toBe(true);
+    expect(isSafeReturnTo('/outputs/123?tab=1')).toBe(true);
   });
 
   it('rejects an absolute URL', () => {
@@ -40,7 +40,7 @@ describe('isSafeReturnTo', () => {
     // Some browsers normalise `\` to `/`, which would turn `/\host`
     // into `//host`  another host.
     expect(isSafeReturnTo('/\\evil.example')).toBe(false);
-    expect(isSafeReturnTo('/demo\\..\\evil')).toBe(false);
+    expect(isSafeReturnTo('/outputs\\..\\evil')).toBe(false);
   });
 
   it('rejects a value that does not start with a slash', () => {
@@ -51,9 +51,9 @@ describe('isSafeReturnTo', () => {
   it('rejects a value that carries a control character', () => {
     // A control character can truncate the value before the checks run,
     // so the check has to look at the whole string.
-    expect(isSafeReturnTo('/demo\n')).toBe(false);
-    expect(isSafeReturnTo('/demo\r\nSet-Cookie: x=1')).toBe(false);
-    expect(isSafeReturnTo('/demo\u0000')).toBe(false);
+    expect(isSafeReturnTo('/outputs\n')).toBe(false);
+    expect(isSafeReturnTo('/outputs\r\nSet-Cookie: x=1')).toBe(false);
+    expect(isSafeReturnTo('/outputs\u0000')).toBe(false);
   });
 
   it('rejects an empty value', () => {
@@ -63,9 +63,9 @@ describe('isSafeReturnTo', () => {
 
 describe('resolveReturnTo', () => {
   it('reads the path out of the search parameters', () => {
-    const searchParams = new URLSearchParams({ returnTo: '/demo' });
+    const searchParams = new URLSearchParams({ returnTo: '/outputs' });
 
-    expect(resolveReturnTo(searchParams)).toBe('/demo');
+    expect(resolveReturnTo(searchParams)).toBe('/outputs');
   });
 
   it('falls back to the home page when there is no parameter', () => {
@@ -84,12 +84,12 @@ describe('resolveReturnTo', () => {
   it('strips a locale prefix, because the router adds it back', () => {
     // The locale-aware router prepends the locale itself, so a value
     // that already carries one would end up doubled.
-    expect(resolveReturnTo(new URLSearchParams({ returnTo: '/vi/demo' }))).toBe(
-      '/demo',
-    );
-    expect(resolveReturnTo(new URLSearchParams({ returnTo: '/en/demo' }))).toBe(
-      '/demo',
-    );
+    expect(
+      resolveReturnTo(new URLSearchParams({ returnTo: '/vi/outputs' })),
+    ).toBe('/outputs');
+    expect(
+      resolveReturnTo(new URLSearchParams({ returnTo: '/en/outputs' })),
+    ).toBe('/outputs');
   });
 
   it('maps a bare locale to the home page', () => {
@@ -100,23 +100,23 @@ describe('resolveReturnTo', () => {
 
   it('reads a repeated parameter once', () => {
     const searchParams = new URLSearchParams(
-      'returnTo=/demo&returnTo=https://evil.example',
+      'returnTo=/outputs&returnTo=https://evil.example',
     );
 
-    expect(resolveReturnTo(searchParams)).toBe('/demo');
+    expect(resolveReturnTo(searchParams)).toBe('/outputs');
   });
 });
 
 describe('buildLoginHref', () => {
   it('puts the current page into the link', () => {
-    expect(buildLoginHref('/demo')).toBe('/login?returnTo=%2Fdemo');
+    expect(buildLoginHref('/outputs')).toBe('/login?returnTo=%2Foutputs');
   });
 
   it('strips the locale prefix, because the router adds it back', () => {
     // The locale-aware router prepends the locale itself, so a value
     // that already carries one would end up doubled.
-    expect(buildLoginHref('/vi/demo')).toBe('/login?returnTo=%2Fdemo');
-    expect(buildLoginHref('/en/demo')).toBe('/login?returnTo=%2Fdemo');
+    expect(buildLoginHref('/vi/outputs')).toBe('/login?returnTo=%2Foutputs');
+    expect(buildLoginHref('/en/outputs')).toBe('/login?returnTo=%2Foutputs');
   });
 
   it('maps a bare locale to the home page', () => {
@@ -128,10 +128,10 @@ describe('buildLoginHref', () => {
     // login screen reads it back. Whatever the header puts in, the
     // reader has to get out again.
     const cases: Array<[string, string]> = [
-      ['/demo', '/demo'],
-      ['/demo/slow', '/demo/slow'],
-      ['/vi/demo', '/demo'],
-      ['/en/demo', '/demo'],
+      ['/outputs', '/outputs'],
+      ['/outputs/123', '/outputs/123'],
+      ['/vi/outputs', '/outputs'],
+      ['/en/outputs', '/outputs'],
       ['/vi', DEFAULT_RETURN_TO],
     ];
 

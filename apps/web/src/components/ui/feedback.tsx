@@ -2,40 +2,21 @@
 
 import {
   Alert,
-  AlertTitle,
   Button,
-  FormHelperText,
+  Container,
+  Heading,
+  Icon,
   Skeleton,
   Stack,
-  Typography,
-} from '@mui/material';
+  Text,
+} from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-
-/**
- * Shared loading and error display primitives.
- *
- * Standards for ResearchOS screens:
- * - Block loading states are skeletons that match the shape of the content
- *   they replace. A spinner hides the layout; a skeleton reserves the space
- *   and avoids a layout shift when data arrives. Skeletons are for content
- *   that occupies an area of the page — a list, a card, a detail panel.
- * - Mutations do not change the layout, so their indicator belongs in the
- *   button: `<Button loading={mutation.isPending}>`. See the
- *   `researchos-ui` skill.
- * - Every error state offers a way forward. A dead-end message with no
- *   recovery action is a bug, not an error state.
- * - Errors are scoped: say what failed, not "something went wrong".
- *
- * Note: MUI v9 removed system props (`gap`, `flex`, `py`, `px`, `alignItems`)
- * from the direct prop surface. They must go through `sx` or they leak onto
- * the DOM as invalid HTML attributes. `spacing` on Stack still works.
- */
 
 export function LoadingSkeleton({
   variant = 'text',
   width,
-  height,
+  height = variant === 'text' ? '1em' : undefined,
   count = 1,
 }: {
   variant?: 'text' | 'rectangular' | 'circular';
@@ -43,59 +24,47 @@ export function LoadingSkeleton({
   height?: number | string;
   count?: number;
 }) {
-  if (count === 1) {
-    return (
-      <Skeleton
-        variant={variant}
-        width={width}
-        height={height}
-        aria-hidden
-        data-testid="loading-skeleton"
-      />
-    );
-  }
+  // Chakra treats numbers as size tokens. This component accepts pixels.
+  const cssWidth = typeof width === 'number' ? `${width}px` : width;
+  const cssHeight = typeof height === 'number' ? `${height}px` : height;
+  const items = Array.from({ length: count }, (_, index) => (
+    <Skeleton
+      key={index}
+      w={cssWidth}
+      h={cssHeight}
+      borderRadius={variant === 'circular' ? 'full' : 'l2'}
+      aria-hidden
+      data-testid="loading-skeleton"
+    />
+  ));
 
-  return (
-    <Stack spacing={1} aria-busy="true" aria-live="polite">
-      {Array.from({ length: count }, (_, index) => (
-        <Skeleton
-          key={index}
-          variant={variant}
-          width={width}
-          height={height}
-          aria-hidden
-          data-testid="loading-skeleton"
-        />
-      ))}
+  return count === 1 ? (
+    items[0]
+  ) : (
+    <Stack gap="1" aria-busy="true">
+      {items}
     </Stack>
   );
 }
 
-/**
- * Card-shaped skeleton for a list item or feed entry.
- */
 export function ListItemSkeleton() {
   return (
     <Stack
       direction="row"
-      spacing={2}
+      gap="2"
+      align="center"
       aria-busy="true"
-      aria-live="polite"
       data-testid="list-item-skeleton"
-      sx={{ alignItems: 'center' }}
     >
-      <Skeleton variant="circular" width={40} height={40} aria-hidden />
-      <Stack spacing={1} sx={{ flex: 1 }}>
-        <Skeleton variant="text" height={20} aria-hidden />
-        <Skeleton variant="text" width="60%" aria-hidden />
+      <LoadingSkeleton variant="circular" width={40} height={40} />
+      <Stack flex="1" gap="1">
+        <LoadingSkeleton />
+        <LoadingSkeleton width="60%" />
       </Stack>
     </Stack>
   );
 }
 
-/**
- * Error state with an optional recovery action.
- */
 export function ErrorState({
   title,
   message,
@@ -110,29 +79,28 @@ export function ErrorState({
   const t = useTranslations('common');
 
   return (
-    <Alert
-      severity="error"
-      variant="outlined"
+    <Alert.Root
+      status="error"
+      variant="outline"
       role="alert"
-      action={
-        onRetry ? (
-          <Button color="inherit" size="small" onClick={onRetry}>
-            {t('retry')}
-          </Button>
-        ) : null
-      }
-      sx={{ alignItems: 'center' }}
+      flexWrap="wrap"
+      gap="3"
     >
-      <AlertTitle>{title}</AlertTitle>
-      {message ? <Typography variant="body2">{message}</Typography> : null}
+      <Alert.Indicator />
+      <Alert.Content flex="1" minW="12rem">
+        <Alert.Title>{title}</Alert.Title>
+        {message && <Alert.Description>{message}</Alert.Description>}
+      </Alert.Content>
+      {onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          {t('retry')}
+        </Button>
+      )}
       {action}
-    </Alert>
+    </Alert.Root>
   );
 }
 
-/**
- * Empty state for a list that loaded successfully but has nothing in it.
- */
 export function EmptyState({
   title,
   message,
@@ -144,67 +112,64 @@ export function EmptyState({
 }) {
   return (
     <Stack
-      spacing={1}
+      gap="1"
+      align="center"
+      textAlign="center"
+      py="6"
+      px="3"
       data-testid="empty-state"
-      sx={{ alignItems: 'center', textAlign: 'center', py: 6, px: 3 }}
     >
-      <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-        {title}
-      </Typography>
-      {message ? (
-        <Typography variant="body2" color="text.secondary">
+      <Text fontWeight="medium">{title}</Text>
+      {message && (
+        <Text textStyle="sm" color="fg.muted">
           {message}
-        </Typography>
-      ) : null}
+        </Text>
+      )}
       {action}
     </Stack>
   );
 }
 
-/**
- * A validation message for one field.
- *
- * The backend groups validation failures by field — a `400` carries
- * `errors: [{ field, messages }]` — precisely so each message can sit under
- * the input that caused it. Render one of these per invalid field instead
- * of flattening the whole group into a single toast line.
- *
- * `messages` holds every message the server sent for that field. Pass them
- * as separate children so each one gets its own line.
- *
- * ```tsx
- * const t = useTranslations('errors');
- * const fieldMessages = resolveFieldErrorCodes(
- *   t,
- *   apiFieldErrorCodes(mutation.error),
- *   t('unknown'),
- * );
- *
- * {Object.entries(fieldMessages ?? {}).map(([field, message]) => (
- *   <FieldError key={field}>{message}</FieldError>
- * ))}
- * ```
- *
- * Note: in the target contract the validation wording is a **code**, resolved
- * against the message catalog by `resolveFieldErrorCodes()`. The backend
- * does not send codes yet, so today every field falls back to a localized
- * generic message. See the `researchos-localization` skill.
- */
+// Pass the id to aria-describedby on the corresponding input.
 export function FieldError({
   children,
   id,
 }: {
   children: ReactNode;
-  /**
-   * Id of the input this message describes. Pass the same value to the
-   * input's `aria-describedby` so a screen reader announces the error with
-   * the field rather than on its own.
-   */
   id?: string;
 }) {
   return (
-    <FormHelperText id={id} error sx={{ mx: 0 }}>
+    <Text id={id} textStyle="sm" color="fg.error">
       {children}
-    </FormHelperText>
+    </Text>
+  );
+}
+
+export function RouteFeedback({
+  icon,
+  title,
+  description,
+  action,
+  role,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  action: ReactNode;
+  role?: 'alert';
+}) {
+  return (
+    <Container as="main" maxW="lg" py="8">
+      <Stack gap="3" align="center" textAlign="center" role={role}>
+        <Icon size="2xl" color={role ? 'fg.error' : 'fg.muted'}>
+          {icon}
+        </Icon>
+        <Heading as="h1" size="xl">
+          {title}
+        </Heading>
+        <Text color="fg.muted">{description}</Text>
+        {action}
+      </Stack>
+    </Container>
   );
 }

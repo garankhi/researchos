@@ -40,7 +40,7 @@ Next.js file conventions:
 
 | File | Catches |
 | --- | --- |
-| `app/error.tsx` | Uncaught errors in that segment and its children. Props: `error`, `retry()` |
+| `app/[locale]/error.tsx` | Uncaught errors in that segment and its children. Props: `error`, `retry()` |
 | `app/global-error.tsx` | Failure in the root layout. Renders its own `<html>` and `<body>` |
 | `app/loading.tsx` | Suspense fallback while the segment resolves |
 | `app/not-found.tsx` | `notFound()` |
@@ -51,9 +51,8 @@ Scope an `error.tsx` to the narrowest segment that owns the failure. A crash
 in one feature should not take down the whole app.
 
 `notFound()`, `unauthorized()` and `forbidden()` work by throwing during a
-server render, so they cannot be called from a click handler. Give each one a
-dedicated route that calls it. The backend enforces permission; the frontend
-only reflects it — the route decides, the boundary renders.
+server render. Call them from the affected route and enforce permission in
+the API. Storybook renders the corresponding access feedback for UI review.
 
 In `error.tsx`, `error` is typed `unknown` — narrow it with `instanceof Error`
 before reading `.message`. Do not name the component `Error`: a default export
@@ -72,7 +71,10 @@ re-renders the failed segment and is what a "try again" button should call;
 'use client';
 
 import { useEffect } from 'react';
-import { Box, Button, Container, Stack, Typography } from '@mui/material';
+import { Button } from '@chakra-ui/react';
+import { useTranslations } from 'next-intl';
+import { CircleAlert } from 'lucide-react';
+import { RouteFeedback } from '@/components/ui/feedback';
 
 export default function SegmentError({
   error,
@@ -81,26 +83,19 @@ export default function SegmentError({
   error: unknown;
   retry: () => void;
 }) {
+  const t = useTranslations('errors');
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Stack spacing={2} role="alert" sx={{ alignItems: 'center', textAlign: 'center' }}>
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          Đã xảy ra lỗi khi tải trang
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Lỗi tạm thời. Vui lòng thử lại.
-        </Typography>
-        <Box>
-          <Button variant="contained" onClick={() => retry()}>
-            Thử lại
-          </Button>
-        </Box>
-      </Stack>
-    </Container>
+    <RouteFeedback
+      role="alert"
+      icon={<CircleAlert aria-hidden />}
+      title={t('title')}
+      description={t('description')}
+      action={<Button onClick={retry}>{t('retry')}</Button>}
+    />
   );
 }
 ```

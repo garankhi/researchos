@@ -57,14 +57,13 @@ mutator -> TypeScript inference.
    `src/`. The following kept working untouched:
 
    - `apps/web/src/features/health/hooks/use-api-health.ts` — `query.data.status`
-   - `apps/web/src/app/demo/_components/api-section.tsx` — `slow.data`, `health.data?.status`
 
 4. **Negative case confirmed.** Removing the `@ts-expect-error` on
    `Unwrap<HealthStatusDto>` produced a compile error, so `Unwrap` does not
    match a non-envelope payload.
 
 5. **`void` payloads are untouched.** `/demo/fail` has no response schema, so
-   Orval keeps `axiosInstance<void>` and `Unwrap<void>` stays `void`.
+   the endpoint is exercised by the Nest HTTP tests. Web codegen excludes the diagnostic tag.
 
 6. **The tolerant mutator behaves correctly at runtime.** `isEnvelope` was
    tested against enveloped bodies, raw object payloads, raw strings,

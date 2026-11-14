@@ -6,6 +6,7 @@
     "cancel": "Cancel",
     "save": "Save",
     "close": "Close",
+    "notifications": "Notifications",
     "backToHome": "Back to home"
   },
   "nav": {
@@ -18,7 +19,7 @@
     "logout": "Log out",
     "openSettings": "Open settings",
     "openMenu": "Open menu",
-    "accountOfCurrentUser": "Account of current user"
+    "accountOfCurrentUser": "Account menu for {name}"
   },
   "search": {
     "open": "Open search",
@@ -210,167 +211,12 @@
     "title": "Access denied",
     "description": "This resource is restricted by role or visibility scope. If you need access, contact an administrator."
   },
-  "demo": {
-    "title": "Demo & testing",
-    "description": "This page collects the frontend conventions: MUI, Tailwind, dark mode, loading, error, forms, access boundaries and the API client. Use it to verify a change quickly.",
-    "sections": {
-      "mui": {
-        "title": "MUI components",
-        "description": "A sample of components and variants to check the theme and the emotion cache."
-      },
-      "cascade": {
-        "title": "Tailwind x MUI cascade",
-        "description": "A Tailwind utility class must beat the MUI default style, without `!important`."
-      },
-      "theme": {
-        "title": "Theme & dark mode",
-        "description": "Verify that next-themes and MUI share one color scheme."
-      },
-      "api": {
-        "title": "API client (Orval + TanStack Query)",
-        "description": "Every button below calls a real endpoint on apps/api through the Orval-generated hooks."
-      },
-      "loading": {
-        "title": "Loading states",
-        "description": "Skeletons match the shape of the content — no spinner, so no layout shift."
-      },
-      "error": {
-        "title": "Error states",
-        "description": "Every error says what went wrong and always offers a way forward."
-      },
-      "access": {
-        "title": "Access boundaries (404 / 401 / 403)",
-        "description": "Dedicated routes call notFound(), unauthorized() and forbidden() during a server render."
-      },
-      "suspense": {
-        "title": "Suspense fallback"
-      },
-      "forms": {
-        "title": "Forms",
-        "description": "zod schema, react-hook-form and MUI form components — the whole form convention."
-      }
-    },
-    "actions": {
-      "callAgain": "Call again",
-      "invalidateAll": "Invalidate all",
-      "clearCache": "Clear cache",
-      "changeDelay": "Change delay",
-      "loadAfter": "Load after {ms}ms",
-      "callFailing": "Call the failing endpoint",
-      "callRandom": "Call at random",
-      "throwError": "Throw an error",
-      "openRouteError": "Open the route-level error"
-    },
-    "states": {
-      "success": "success",
-      "expectedFailure": "Request failed (expected)",
-      "noError": "No error",
-      "randomFailure": "This one failed",
-      "notCalled": "Not called yet — press the button to send a request.",
-      "loaded": "Loaded",
-      "resolvedAfter": "The server component resolved after {seconds} seconds."
-    },
-    "labels": {
-      "buttons": "Buttons",
-      "chips": "Chips",
-      "inputs": "Inputs",
-      "typography": "Typography",
-      "text": "Text",
-      "computedBackground": "Computed background",
-      "reference": "Reference: {value}",
-      "tailwindWins": "Tailwind wins",
-      "notMatching": "Not matching",
-      "themeSwitcher": "Theme",
-      "systemPreference": "System preference",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System",
-      "followSystem": "Enable to follow the system",
-      "state": "State",
-      "componentBoundary": "Component boundary",
-      "segmentError": "Segment-level error route"
-    },
-    "notes": {
-      "cancelOnNavigate": "Press it and navigate away before the response arrives: the request is aborted and the component reports no error.",
-      "noRetry": "This endpoint uses `retry: false` so the error shows immediately. TanStack Query retries 3 times with exponential backoff by default.",
-      "cascade": "If the result is “Not matching”, the `mui` layer sits above `utilities` — re-check `@layer` in globals.css and `enableCssLayer` in layout.tsx.",
-      "themeBridge": "If the class on '<html>' does not match next-themes, the bridge in theme-provider.tsx is broken.",
-      "themeHydrating": "Waiting for mount — client-side state cannot be read yet.",
-      "errorBoundary": "The error is thrown once; the “Try again” button in the boundary calls `retry()` and the component works again. The boundary uses `catchError` from `next/error`: `redirect()` and `notFound()` still pass through instead of being swallowed as a generic error.",
-      "authInterrupts": "`forbidden()` and `unauthorized()` require `experimental.authInterrupts: true` in next.config.ts — otherwise the build fails.",
-      "skeletonShape": "A skeleton must keep the size of the real content, otherwise the page jumps when the data arrives.",
-      "muiSystemProps": "MUI v9 removed the system props (gap, flex, py, px, alignItems) from the direct prop surface — they must go through `sx`, or they leak onto the DOM as invalid HTML attributes."
-    },
-    "typography": {
-      "heading1": "Heading 1",
-      "heading5": "Heading 5",
-      "subtitle1": "Subtitle 1",
-      "body1": "Body 1 — the standard line of text.",
-      "body2": "Body 2 — secondary, for descriptions.",
-      "caption": "Caption — a small annotation."
-    },
-    "alerts": {
-      "successTitle": "Success",
-      "successBody": "A success message.",
-      "warningTitle": "Warning",
-      "warningBody": "A warning message.",
-      "infoBody": "Additional information."
-    },
-    "loading": {
-      "toggle": "Show/hide",
-      "show": "Show again",
-      "hide": "Hide",
-      "rectangularCircular": "Rectangular + circular",
-      "multipleLines": "Multiple lines",
-      "listItem": "List item",
-      "emptyState": "Empty state (no data — not an error)",
-      "hidden": "(Skeleton hidden)",
-      "emptyTitle": "No results yet",
-      "emptyMessage": "The current filters match nothing.",
-      "clearFilters": "Clear filters"
-    },
-    "mui": {
-      "contained": "Contained",
-      "outlined": "Outlined",
-      "text": "Text",
-      "error": "Error",
-      "disabled": "Disabled",
-      "chipDefault": "Default",
-      "chipSuccess": "Success",
-      "chipWarning": "Warning",
-      "chipDeletable": "Deletable",
-      "inputText": "Text",
-      "inputDisabled": "Disabled"
-    },
-    "cascade": {
-      "heading": "Tailwind bg-amber-500 vs MUI backgroundColor",
-      "body": "MUI sets backgroundColor to primary.main; Tailwind sets bg-amber-500."
-    },
-    "theme": {
-      "htmlClass": "'<html>' class: \"{value}\"",
-      "htmlClassEmpty": "(empty)",
-      "nextThemesResolved": "next-themes: {value}",
-      "nextThemesUnresolved": "not set",
-      "nextThemesMounting": "next-themes: (mounting)"
-    },
-    "errorSection": {
-      "sharedState": "Shared ErrorState (with a retry button)",
-      "healthy": "The component is working normally.",
-      "intentional": "An intentional error from the demo component",
-      "routeLevel": "Route-level error (app/error.tsx) — use the button below"
-    },
-    "forms": {
-      "titleLabel": "Title",
-      "emailLabel": "Email",
-      "statusLabel": "Status",
-      "statusDraft": "Draft",
-      "statusActive": "Active",
-      "subscribeLabel": "Receive notifications",
-      "hint": "Submit the empty form to see the validation errors under each field.",
-      "actions": "Actions",
-      "submit": "Submit",
-      "reset": "Reset",
-      "note": "The error message is a code (like {unknown}) looked up in the catalog, not an English sentence."
+  "storybook": {
+    "feedback": {
+      "emptyTitle": "No research results",
+      "emptyMessage": "Try a different keyword.",
+      "errorTitle": "Could not load research results",
+      "errorMessage": "Try loading the results again."
     }
   }
 }

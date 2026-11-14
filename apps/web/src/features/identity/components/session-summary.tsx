@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Box, Button, Chip, Stack, Typography } from '@mui/material';
+import { Badge, Box, Button, Stack, Text } from '@chakra-ui/react';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
@@ -48,12 +48,12 @@ export function SessionSummary() {
 
   if (isSignedOut || !user) {
     return (
-      <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
-        <Typography variant="body2" color="text.secondary">
+      <Stack gap="1" align="start">
+        <Text textStyle="sm" color="fg.muted">
           {t('signedOut')}
-        </Typography>
-        <Button variant="contained" component={NextLink} href="/login">
-          {t('signInAction')}
+        </Text>
+        <Button asChild>
+          <NextLink href="/login">{t('signInAction')}</NextLink>
         </Button>
       </Stack>
     );
@@ -75,25 +75,25 @@ export function SessionSummary() {
   };
 
   return (
-    <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
-      <Typography variant="h6" component="p" sx={{ fontWeight: 600 }}>
+    <Stack gap="1" align="start">
+      <Text textStyle="lg" fontWeight="semibold">
         {t('welcome', { name: user.fullName })}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
+      </Text>
+      <Text textStyle="sm" color="fg.muted">
         {user.email}
-      </Typography>
+      </Text>
 
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      <Box display="flex" gap="1" flexWrap="wrap">
         {user.roles.map((role) => (
-          <Chip key={role} label={role} size="small" />
+          <Badge key={role}>{role}</Badge>
         ))}
       </Box>
 
       <Button
-        variant="outlined"
+        variant="outline"
         onClick={handleLogout}
         loading={logout.isPending}
-        sx={{ mt: 1 }}
+        mt="1"
       >
         {t('signOut')}
       </Button>

@@ -4,7 +4,11 @@ import { defineConfig } from 'orval';
 // (or `turbo run openapi`), then regenerate the client with `pnpm --filter web orval`.
 export default defineConfig({
   api: {
-    input: '../api/openapi.json',
+    input: {
+      target: '../api/openapi.json',
+      // The diagnostic endpoints are exercised by the Nest HTTP tests.
+      filters: { mode: 'exclude', tags: ['demo'] },
+    },
     output: {
       target: './src/lib/api/client.ts',
       schemas: './src/lib/api/models',

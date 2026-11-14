@@ -1,92 +1,59 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import Button from '@mui/material/Button';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Tooltip from '@mui/material/Tooltip';
-import CheckIcon from '@mui/icons-material/Check';
-import TranslateIcon from '@mui/icons-material/Translate';
+import { Button, Menu, Portal, Text } from '@chakra-ui/react';
+import { Languages } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { useTransition } from 'react';
 import { usePathname, useRouter } from '@/i18n/navigation';
-import { LOCALE_LABELS, routing, type Locale } from '@/i18n/routing';
+import { isLocale, LOCALE_LABELS, routing } from '@/i18n/routing';
 
-/**
- * Language switcher.
- *
- * Switching locale keeps the user on the same page: the pathname is read
- * without the locale prefix and re-applied with the new one, so `/vi/demo`
- * becomes `/en/demo` rather than dropping the user on the home page.
- *
- * The switch happens through `router.replace` rather than `push` — a
- * language change is a preference, not a new step in the history, so the
- * back button should not walk through it.
- *
- * Each locale is labelled in its own language ("Tiếng Việt", "English"),
- * because a reader who does not read the current UI language still has to
- * recognise their own.
- */
 export function LanguageToggle() {
   const t = useTranslations('language');
-  const locale = useLocale() as Locale;
+  const locale = useLocale();
+  const current = isLocale(locale) ? LOCALE_LABELS[locale] : '';
   const router = useRouter();
   const pathname = usePathname();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isPending, startTransition] = useTransition();
 
-  const handleSelect = (target: Locale) => {
-    setAnchorEl(null);
-
-    if (target === locale) return;
+  function handleSelect({ value }: { value: string }) {
+    if (!isLocale(value) || value === locale) return;
 
     startTransition(() => {
-      router.replace(pathname, { locale: target });
+      const { search, hash } = window.location;
+      router.replace(pathname + search + hash, { locale: value });
     });
-  };
+  }
 
   return (
-    <>
-      <Tooltip title={t('label')}>
+    <Menu.Root positioning={{ placement: 'bottom-end' }}>
+      <Menu.Trigger asChild>
         <Button
-          color="inherit"
-          startIcon={<TranslateIcon />}
+          variant="ghost"
+          aria-label={current ? `${t('label')}: ${current}` : t('label')}
+          title={t('label')}
           disabled={isPending}
-          aria-label={t('label')}
-          aria-haspopup="menu"
-          aria-controls="language-menu"
-          onClick={(event) => setAnchorEl(event.currentTarget)}
-          sx={{ minWidth: 0 }}
+          px={{ base: '2', md: '3' }}
         >
-          {LOCALE_LABELS[locale]}
+          <Languages />
+          <Text as="span" hideBelow="md">
+            {current}
+          </Text>
         </Button>
-      </Tooltip>
-
-      <Menu
-        id="language-menu"
-        anchorEl={anchorEl}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
-        keepMounted
-      >
-        {routing.locales.map((option) => (
-          <MenuItem
-            key={option}
-            selected={option === locale}
-            onClick={() => handleSelect(option)}
-          >
-            <ListItemIcon>
-              {option === locale ? <CheckIcon fontSize="small" /> : null}
-            </ListItemIcon>
-            <ListItemText>{LOCALE_LABELS[option]}</ListItemText>
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <Menu.Content>
+            <Menu.RadioItemGroup value={locale} onValueChange={handleSelect}>
+              {routing.locales.map((option) => (
+                <Menu.RadioItem key={option} value={option} lang={option}>
+                  <Menu.ItemIndicator />
+                  {LOCALE_LABELS[option]}
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioItemGroup>
+          </Menu.Content>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
   );
 }
-
-export default LanguageToggle;

@@ -101,7 +101,7 @@ export function isSafeReturnTo(value: string): boolean {
  * Removes a leading locale prefix from a path.
  *
  * The locale-aware router adds the prefix itself, so a value that already
- * carries one would end up doubled  `/vi/demo` becoming `/vi/vi/demo`.
+ * carries one would end up doubled  `/vi/login` becoming `/vi/vi/login`.
  *
  * The prefix is only stripped when the rest of the path is still a safe
  * path, so stripping can never turn an unsafe value into a different
@@ -154,7 +154,7 @@ export function resolveReturnTo(
  * page, having lost the page they came for.
  *
  * The path is the **locale-free** pathname, because the locale-aware
- * router adds the prefix itself — `/vi/demo` would become `/vi/vi/demo`.
+ * router adds the prefix itself — `/vi/login` would become `/vi/vi/login`.
  *
  * The value is sanitized on the way in as well as on the way out. A
  * hostile value is harmless here — it is the reader that has to trust

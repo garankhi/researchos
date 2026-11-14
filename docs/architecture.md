@@ -61,7 +61,7 @@ researchos/
           providers/      Client provider toàn app
         features/         Một thư mục cho mỗi nghiệp vụ
         lib/              Hạ tầng; api/ do Orval sinh ra
-        theme/            Cấu hình theme MUI
+        theme/            Cấu hình Chakra UI v3
     api/                  NestJS HTTP API
       src/
         main.ts
@@ -119,7 +119,7 @@ apps/web/src/
   lib/                      Hạ tầng, không có logic nghiệp vụ
     api/                    DO ORVAL SINH RA — không sửa tay
     axios-instance.ts       Mutator cho Orval; phải nằm ngoài api/
-  theme/                    Cấu hình theme MUI
+  theme/                    Cấu hình Chakra UI v3
 ~~~
 
 Test của frontend nằm cạnh file nó test, đặt tên `*.spec.ts`:

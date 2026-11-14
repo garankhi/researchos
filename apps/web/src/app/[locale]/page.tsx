@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Box, Container, Stack, Typography } from '@mui/material';
+import { Container, Heading, Stack } from '@chakra-ui/react';
 import { getTranslations } from 'next-intl/server';
 import { SessionSummary } from '@/features/identity';
 import { ApiStatus } from './_components/api-status';
@@ -15,13 +15,11 @@ export default async function Home() {
   const t = await getTranslations('home');
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack spacing={3}>
-        <Box>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
-            {t('title')}
-          </Typography>
-        </Box>
+    <Container as="main" maxW="3xl" py="4">
+      <Stack gap="3">
+        <Heading as="h1" size="xl">
+          {t('title')}
+        </Heading>
 
         <Suspense fallback={<p>{t('loadingStatus')}</p>}>
           <SessionSummary />

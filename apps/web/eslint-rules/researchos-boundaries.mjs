@@ -99,7 +99,7 @@ function isSharedUiPrimitive(filename) {
  * Resolves an import source to an absolute path inside the app.
  *
  * Handles the `@/` alias and relative paths. A bare package specifier
- * (`react`, `@mui/material`) resolves to `null` — it is not our code.
+ * (`react`, `@chakra-ui/react`) resolves to `null` — it is not our code.
  */
 function resolveImport(source, fromFile) {
   let absolute;
