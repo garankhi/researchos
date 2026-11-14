@@ -576,9 +576,10 @@ Design decisions:
 
 | File | Component type | Translation API |
 | --- | --- | --- |
-| `app/[locale]/not-found.tsx` | Server | `getTranslations` |
-| `app/[locale]/unauthorized.tsx` | Server | `getTranslations` |
-| `app/[locale]/forbidden.tsx` | Server | `getTranslations` |
+| `app/[locale]/not-found.tsx` | Server | Renders `AccessFeedback` |
+| `app/[locale]/unauthorized.tsx` | Server | Renders `AccessFeedback` |
+| `app/[locale]/forbidden.tsx` | Server | Renders `AccessFeedback` |
+| `components/ui/access-feedback.tsx` | Client | `useTranslations` from the current locale provider |
 | `app/[locale]/error.tsx` | Client | `useTranslations` |
 | `app/global-error.tsx` | Client | Own `NextIntlClientProvider` |
 

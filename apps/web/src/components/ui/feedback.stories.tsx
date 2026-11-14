@@ -20,6 +20,11 @@ export const Loading: Story = {
       <ListItemSkeleton />
     </Stack>
   ),
+  play: async ({ canvas }) => {
+    const [firstRow] = canvas.getAllByTestId('list-item-skeleton');
+    const avatar = firstRow.querySelector('[data-testid="loading-skeleton"]');
+    await expect(avatar).toHaveStyle({ width: '40px', height: '40px' });
+  },
 };
 
 function EmptyExample() {

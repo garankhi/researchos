@@ -28,29 +28,32 @@ export const KeyboardNavigation: Story = {
       name: new RegExp(args.user.fullName),
     });
 
+    async function openMenuWithKeyboard() {
+      await userEvent.keyboard('{Enter}');
+      const menu = await body.findByRole('menu');
+      const logout = within(menu).getByRole('menuitem');
+      await waitFor(() => {
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        expect(menu).toHaveFocus();
+        expect(menu).toHaveAttribute('aria-activedescendant', logout.id);
+      });
+    }
+
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
-    await userEvent.keyboard('{Enter}');
-
-    const menu = await body.findByRole('menu');
-    const logout = within(menu).getByRole('menuitem');
-    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(menu).toHaveFocus();
-    await expect(menu).toHaveAttribute('aria-activedescendant', logout.id);
+    await openMenuWithKeyboard();
 
     await userEvent.keyboard('{Escape}');
-    await waitFor(() =>
-      expect(body.queryByRole('menu')).not.toBeInTheDocument(),
-    );
-    await expect(trigger).toHaveFocus();
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => {
+      expect(body.queryByRole('menu')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
     await expect(args.onLogout).not.toHaveBeenCalled();
 
+    await openMenuWithKeyboard();
     await userEvent.keyboard('{Enter}');
-    const reopenedMenu = await body.findByRole('menu');
-    await expect(reopenedMenu).toHaveFocus();
-    await userEvent.keyboard('{Enter}');
-    await expect(args.onLogout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(args.onLogout).toHaveBeenCalledTimes(1));
   },
 };
 

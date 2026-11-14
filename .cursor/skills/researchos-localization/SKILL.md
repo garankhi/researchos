@@ -477,10 +477,10 @@ covers both. The form conventions are in the `researchos-forms` skill.
 The route-level files under `app/[locale]/` render inside the provider, so
 they can translate:
 
-- `not-found.tsx`, `unauthorized.tsx`, `forbidden.tsx` — Server
-  Components, use `getTranslations`.
-- `error.tsx` — Client Components, use
-  `useTranslations`.
+- `not-found.tsx`, `unauthorized.tsx`, and `forbidden.tsx` are Server
+  Components that render the shared `AccessFeedback` Client Component.
+  `AccessFeedback` calls `useTranslations` for the current locale.
+- `error.tsx` is a Client Component that calls `useTranslations`.
 
 `app/global-error.tsx` replaces the root layout, so the provider is gone.
 It mounts its own `NextIntlClientProvider` with the default locale's

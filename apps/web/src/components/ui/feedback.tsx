@@ -24,11 +24,14 @@ export function LoadingSkeleton({
   height?: number | string;
   count?: number;
 }) {
+  // Chakra treats numbers as size tokens. This component accepts pixels.
+  const cssWidth = typeof width === 'number' ? `${width}px` : width;
+  const cssHeight = typeof height === 'number' ? `${height}px` : height;
   const items = Array.from({ length: count }, (_, index) => (
     <Skeleton
       key={index}
-      w={width}
-      h={height}
+      w={cssWidth}
+      h={cssHeight}
       borderRadius={variant === 'circular' ? 'full' : 'l2'}
       aria-hidden
       data-testid="loading-skeleton"

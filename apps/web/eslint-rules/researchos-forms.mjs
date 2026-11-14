@@ -13,34 +13,50 @@
  * | `form-must-use-react-hook-form` | A `<form>` is driven by `useForm` |
  * | `form-must-handle-submit` | A `<form>` has an `onSubmit` |
  * | `form-control-must-be-wired` | Every Chakra control is registered or controlled |
-
  * | `form-error-must-be-resolved` | A field error is resolved through the catalog |
  *
  * The rules live here rather than in `eslint.config.mjs` because they need
  * to reason about JSX and imports, not just paths.
  */
 
-const FORM_CONTROLS = new Set([
-  'Input',
-  'Textarea',
-  'NativeSelect.Field',
-  'Select.Root',
-  'Checkbox.Root',
-  'RadioGroup.Root',
-  'Switch.Root',
-  'Slider.Root',
-  'Combobox.Root',
-  'NumberInput.Root',
-  'FormTextField',
-  'FormSelect',
-  'FormCheckbox',
+const NATIVE_CHAKRA_CONTROLS = new Set(['Input', 'Textarea', 'NativeSelect.Field']);
+const SHARED_FORM_CONTROLS = new Set(['FormTextField', 'FormSelect', 'FormCheckbox']);
+const COMPOUND_CONTROL_BINDINGS = new Map([
+  ['Select.Root', ['value', 'onValueChange']],
+  ['Checkbox.Root', ['checked', 'onCheckedChange']],
+  ['RadioGroup.Root', ['value', 'onValueChange']],
+  ['Switch.Root', ['checked', 'onCheckedChange']],
+  ['Slider.Root', ['value', 'onValueChange']],
+  ['Combobox.Root', ['value', 'onValueChange']],
+  ['NumberInput.Root', ['value', 'onValueChange']],
 ]);
 
-function controlName(node) {
-  if (node.type === 'JSXMemberExpression') {
-    return `${elementName(node.object)}.${elementName(node.property)}`;
+function chakraImports(program) {
+  const names = new Map();
+  for (const statement of program.body) {
+    if (statement.type !== 'ImportDeclaration') continue;
+    if (statement.source.value !== '@chakra-ui/react') continue;
+    for (const specifier of statement.specifiers) {
+      if (
+        specifier.type === 'ImportSpecifier' &&
+        specifier.imported.type === 'Identifier'
+      ) {
+        names.set(specifier.local.name, specifier.imported.name);
+      } else if (specifier.type === 'ImportNamespaceSpecifier') {
+        names.set(specifier.local.name, '');
+      }
+    }
   }
-  return elementName(node);
+  return names;
+}
+
+function controlName(node, chakraNames) {
+  if (node.type === 'JSXIdentifier') {
+    return chakraNames.get(node.name) ?? node.name;
+  }
+  if (node.type !== 'JSXMemberExpression') return null;
+  const owner = controlName(node.object, chakraNames);
+  return owner ? `${owner}.${node.property.name}` : node.property.name;
 }
 
 /**
@@ -100,32 +116,14 @@ function reactHookFormBindings(program) {
 }
 
 /**
- * Collects the local names that a `register()` call was destructured into.
- *
+ * Collects whole registrations and rest bindings such as `registration`.
  * ```typescript
  * const { ref, ...registration } = register('title');
  * ```
  *
  */
-function destructuredRegisterNames(program) {
+function registerResultNames(program) {
   const names = new Set();
-
-  /**
-   * Returns `true` when the initializer is a `register()` call.
-   *
-   * The field name is not checked: `register('title')` and a dynamic
-   * `register(name)` are both registrations.
-   */
-  function isRegisterCall(declarator) {
-    const init = declarator.init;
-
-    if (!init || init.type !== 'CallExpression') return false;
-    if (init.callee.type !== 'Identifier' || init.callee.name !== 'register') {
-      return false;
-    }
-
-    return true;
-  }
 
   function walkBody(body) {
     for (const statement of body) {
@@ -133,34 +131,19 @@ function destructuredRegisterNames(program) {
         for (const declarator of statement.declarations) {
           const id = declarator.id;
 
+          if (!isRegisterCall(declarator.init)) continue;
+          if (id.type === 'Identifier') {
+            names.add(id.name);
+            continue;
+          }
           if (id.type !== 'ObjectPattern') continue;
 
-          // Only a `register()` call counts. A destructure of anything else
-          // is not a registration.
-          if (!isRegisterCall(declarator)) continue;
-
           for (const property of id.properties) {
-            // The rest element — `{...registration}` — is the spread that
-            // binds the control, so its name is what the rule looks for.
-            if (property.type === 'RestElement') {
-              if (property.argument.type === 'Identifier') {
-                names.add(property.argument.name);
-              }
-
-              continue;
-            }
-
-            if (property.type !== 'Property') continue;
-            if (property.key.type !== 'Identifier') continue;
-            if (property.key.name !== 'ref') continue;
-
-            // A shorthand `{ ref }` binds the ref on its own. The control
-            // still needs the rest of the registration, so this shape on
-            // its own does not bind it.
-            if (property.shorthand) continue;
-
-            if (property.value.type === 'Identifier') {
-              names.add(property.value.name);
+            if (
+              property.type === 'RestElement' &&
+              property.argument.type === 'Identifier'
+            ) {
+              names.add(property.argument.name);
             }
           }
         }
@@ -282,63 +265,33 @@ function mentionsErrors(node) {
   return false;
 }
 
-/**
- * Returns `true` when the element is bound to the form.
- *
- * A control is bound when it is registered (`{...register('title')}`),
- * controlled by a `Controller` (`{...field}` or explicit `value` +
- * `onChange`), or carries a `name` of its own.
- *
- * Chakra's compound controls use callbacks such as onCheckedChange and
- * onValueChange.
- *
- * @param {object} openingElement The JSX opening element.
- * @param {Set<string>} registeredNames The names bound from a destructured
- *   `register()` call, so a `{...registration}` spread counts as bound.
- */
-function isBoundToForm(openingElement, registeredNames) {
-  if (hasAttribute(openingElement, 'name')) {
-    return true;
-  }
+function isRegisterCall(node) {
+  if (node?.type !== 'CallExpression') return false;
+  const callee = node.callee;
+  return (
+    (callee.type === 'Identifier' && callee.name === 'register') ||
+    (callee.type === 'MemberExpression' &&
+      !callee.computed &&
+      callee.property.name === 'register')
+  );
+}
 
-  if (
-    (hasAttribute(openingElement, 'value') &&
-      (hasAttribute(openingElement, 'onChange') || hasAttribute(openingElement, 'onValueChange'))) ||
-    (hasAttribute(openingElement, 'checked') &&
-      (hasAttribute(openingElement, 'onChange') || hasAttribute(openingElement, 'onCheckedChange')))
-  ) {
-    return true;
-  }
+function hasAllAttributes(node, names) {
+  return names.every((name) => hasAttribute(node, name));
+}
 
-  for (const spread of spreadsOf(openingElement)) {
-    const argument = spread.argument;
-
-    // `{...register('title')}` — the spread brings the name with it.
-    if (argument.type === 'CallExpression') {
-      const callee = argument.callee;
-
-      if (callee.type === 'Identifier' && callee.name === 'register') {
-        return true;
-      }
-
-      continue;
-    }
-
-    // `{...field}` — the `Controller` render prop's field object.
-    if (argument.type === 'Identifier' && argument.name === 'field') {
-      return true;
-    }
-
-    // `{...registration}` — the rest of a destructured `register()` call.
-    if (
-      argument.type === 'Identifier' &&
-      registeredNames.has(argument.name)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+function hasNativeBinding(node, registeredNames) {
+  return (
+    hasAllAttributes(node, ['value', 'onChange']) ||
+    hasAllAttributes(node, ['checked', 'onChange']) ||
+    hasAllAttributes(node, ['name', 'onChange', 'onBlur', 'ref']) ||
+    spreadsOf(node).some(
+      ({ argument }) =>
+        isRegisterCall(argument) ||
+        (argument.type === 'Identifier' &&
+          (argument.name === 'field' || registeredNames.has(argument.name))),
+    )
+  );
 }
 
 const noNativeFormControls = {
@@ -450,7 +403,11 @@ const formControlMustBeWired = {
     schema: [],
     messages: {
       notWired:
-        '`<{{element}}>` is not bound to the form, so its value is never submitted and never validated. Register it with `{{...register(\'name\')}}`, or wrap it in a `<Controller>` and spread `{{...field}}` — or pass `value` and `onChange` explicitly.',
+        'Bind `<{{element}}>` with register() or pass the Controller field props.',
+      missingFieldName:
+        'Pass a field name to `<{{element}}>` so it can register with the form.',
+      missingCompoundBinding:
+        'Bind `<{{element}}>` with Controller. Pass `{{valueProp}}` and adapt `{{changeProp}}` to field.onChange.',
     },
   },
 
@@ -461,20 +418,34 @@ const formControlMustBeWired = {
     // display-only field on a settings screen is not a form control.
     if (!bindings.has('useForm') && !bindings.has('Controller')) return {};
 
-    const registeredNames = destructuredRegisterNames(context.sourceCode.ast);
+    const program = context.sourceCode.ast;
+    const chakraNames = chakraImports(program);
+    const registeredNames = registerResultNames(program);
 
     return {
       JSXOpeningElement(node) {
-        const name = elementName(node.name);
+        const element = controlName(node.name, chakraNames);
+        const compoundBinding = COMPOUND_CONTROL_BINDINGS.get(element);
 
-        if (!name || !FORM_CONTROLS.has(controlName(node.name))) return;
-        if (isBoundToForm(node, registeredNames)) return;
-
-        context.report({
-          node,
-          messageId: 'notWired',
-          data: { element: name },
-        });
+        if (compoundBinding) {
+          if (hasAllAttributes(node, compoundBinding)) return;
+          const [valueProp, changeProp] = compoundBinding;
+          context.report({
+            node,
+            messageId: 'missingCompoundBinding',
+            data: { element, valueProp, changeProp },
+          });
+        } else if (
+          NATIVE_CHAKRA_CONTROLS.has(element) &&
+          !hasNativeBinding(node, registeredNames)
+        ) {
+          context.report({ node, messageId: 'notWired', data: { element } });
+        } else if (
+          SHARED_FORM_CONTROLS.has(element) &&
+          !hasAttribute(node, 'name')
+        ) {
+          context.report({ node, messageId: 'missingFieldName', data: { element } });
+        }
       },
     };
   },

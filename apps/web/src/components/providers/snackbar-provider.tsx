@@ -63,7 +63,12 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
     <SnackbarContext.Provider value={value}>
       {children}
       <Portal>
-        <Toaster toaster={toaster} insetInline={{ base: '3', sm: '6' }}>
+        <Toaster
+          toaster={toaster}
+          aria-label={t('notifications')}
+          aria-keyshortcuts="Alt+T"
+          insetInline={{ base: '3', sm: '6' }}
+        >
           {(toast) => (
             <Toast.Root role={toast.type === 'error' ? 'alert' : 'status'}>
               <Toast.Indicator />

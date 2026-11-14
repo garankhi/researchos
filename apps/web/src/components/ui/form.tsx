@@ -77,6 +77,7 @@ export function FormTextField<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 >({
+  id,
   name,
   label,
   helperText,
@@ -96,7 +97,12 @@ export function FormTextField<
   });
 
   return (
-    <Field.Root invalid={invalid} disabled={field.disabled} required={required}>
+    <Field.Root
+      id={id}
+      invalid={invalid}
+      disabled={field.disabled}
+      required={required}
+    >
       <Field.Label>{label}</Field.Label>
       <Input {...inputProps} {...field} value={field.value ?? ''} />
       <FieldMessage error={errorMessage} helperText={helperText} />
@@ -108,6 +114,7 @@ export function FormSelect<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 >({
+  id,
   name,
   label,
   helperText,
@@ -128,7 +135,12 @@ export function FormSelect<
   });
 
   return (
-    <Field.Root invalid={invalid} disabled={field.disabled} required={required}>
+    <Field.Root
+      id={id}
+      invalid={invalid}
+      disabled={field.disabled}
+      required={required}
+    >
       <Field.Label>{label}</Field.Label>
       <NativeSelect.Root>
         <NativeSelect.Field

@@ -10,6 +10,7 @@ const config: StorybookConfig = {
     config.optimizeDeps.include = [
       ...(config.optimizeDeps.include ?? []),
       'next-intl/navigation',
+      'react-hook-form',
     ];
     return config;
   },
