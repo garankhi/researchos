@@ -1,12 +1,103 @@
-import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
+import {
+  createSystem,
+  defaultConfig,
+  defineConfig,
+  type SystemStyleObject,
+} from '@chakra-ui/react';
+
+const bodyFont = 'var(--font-inter, Inter), system-ui, sans-serif';
+const headingFont = `var(--font-manrope, Manrope), ${bodyFont}`;
+
+const highlightedRow: SystemStyleObject = {
+  bg: 'interactiveRow.highlight',
+  _before: {
+    content: '""',
+    position: 'absolute',
+    insetBlock: '0',
+    insetInlineStart: '0',
+    width: '2px',
+    bg: 'interactiveRow.indicator',
+    pointerEvents: 'none',
+    '@media (forced-colors: active)': {
+      bg: 'Highlight',
+      forcedColorAdjust: 'none',
+    },
+  },
+};
 
 const config = defineConfig({
   theme: {
+    semanticTokens: {
+      colors: {
+        interactiveRow: {
+          highlight: { value: { base: '#e8e8e8', _dark: '#303034' } },
+          indicator: { value: { base: '#737373', _dark: '#a1a1aa' } },
+        },
+        drawerBackdrop: {
+          value: {
+            base: 'rgba(232, 232, 232, 0.92)',
+            _dark: 'rgba(0, 0, 0, 0.68)',
+          },
+        },
+        blue: {
+          solid: { value: '#006DD9' },
+          solidHover: { value: '#003971' },
+        },
+      },
+      shadows: {
+        overlayPanel: {
+          value: {
+            base: '0 4px 12px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08)',
+            _dark:
+              '0 4px 16px rgba(0, 0, 0, 0.55), 0 1px 4px rgba(0, 0, 0, 0.32)',
+          },
+        },
+      },
+    },
+    layerStyles: {
+      interactiveRow: {
+        value: {
+          position: 'relative',
+          '&:not(:disabled, [data-disabled], [aria-disabled="true"])': {
+            _hover: highlightedRow,
+            _focusVisible: highlightedRow,
+            _highlighted: highlightedRow,
+          },
+        },
+      },
+    },
+    recipes: {
+      button: {
+        variants: {
+          variant: {
+            solid: {
+              colorPalette: 'blue',
+              _hover: { bg: 'blue.solidHover' },
+              _active: { bg: 'blue.solidHover' },
+              _expanded: { bg: 'blue.solidHover' },
+            },
+          },
+        },
+      },
+    },
     tokens: {
+      radii: {
+        '2xs': { value: '0' },
+        xs: { value: '0' },
+        sm: { value: '0' },
+        md: { value: '0' },
+        lg: { value: '0' },
+        xl: { value: '0' },
+        '2xl': { value: '0' },
+        '3xl': { value: '0' },
+        '4xl': { value: '0' },
+        full: { value: '0' },
+      },
       fonts: {
-        body: { value: 'var(--font-geist-sans), system-ui, sans-serif' },
-        heading: { value: 'var(--font-geist-sans, system-ui), sans-serif' },
+        body: { value: bodyFont },
+        heading: { value: headingFont },
         mono: { value: 'var(--font-geist-mono, monospace)' },
+        sans: { value: bodyFont },
       },
     },
   },
@@ -16,7 +107,7 @@ const config = defineConfig({
       minHeight: '100dvh',
       display: 'flex',
       flexDirection: 'column',
-      colorPalette: 'blue',
+      colorPalette: 'gray',
     },
   },
 });

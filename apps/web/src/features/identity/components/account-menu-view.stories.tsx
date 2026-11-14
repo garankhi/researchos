@@ -8,7 +8,6 @@ const meta = {
   args: {
     user: {
       fullName: 'Nguyễn Minh Anh',
-      email: 'minh.anh@example.test',
     },
     isLoggingOut: false,
     onLogout: fn(),
@@ -21,6 +20,23 @@ type Story = StoryObj<typeof meta>;
 
 export const SignedIn: Story = {};
 
+export const HoverMenu: Story = {
+  globals: { locale: 'en' },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const trigger = canvas.getByRole('button', { name: /Account menu/ });
+    await userEvent.hover(trigger);
+    const menu = await within(canvasElement.ownerDocument.body).findByRole(
+      'menu',
+    );
+    await expect(
+      within(menu).getByRole('menuitem', { name: 'Your profile' }),
+    ).toHaveAttribute('href', '/en/profile/my-profile');
+    await expect(menu).toHaveStyle({ borderRadius: '0px' });
+    await userEvent.click(trigger);
+    await expect(menu).toBeVisible();
+  },
+};
+
 /**
  * The menu holds more than one item, so an item is addressed by its label
  * rather than by its role alone.
@@ -30,6 +46,7 @@ function menuItem(container: HTMLElement, name: string) {
 }
 
 export const KeyboardNavigation: Story = {
+  globals: { colorMode: 'light' },
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
     const trigger = canvas.getByRole('button', {
@@ -39,12 +56,18 @@ export const KeyboardNavigation: Story = {
     async function openMenuWithKeyboard() {
       await userEvent.keyboard('{Enter}');
       const menu = await body.findByRole('menu');
-      const first = within(menu).getAllByRole('menuitem')[0];
+      const first = within(menu).getByRole('menuitem', {
+        name: /Your profile|Hồ sơ của bạn/,
+      });
       await waitFor(() => {
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
         expect(menu).toHaveFocus();
         expect(menu).toHaveAttribute('aria-activedescendant', first.id);
+        expect(first).toHaveStyle({ backgroundColor: '#e8e8e8' });
       });
+      const indicator = window.getComputedStyle(first, '::before');
+      expect(indicator.width).toBe('2px');
+      expect(indicator.backgroundColor).toBe('rgb(115, 115, 115)');
     }
 
     await userEvent.tab();

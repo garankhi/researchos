@@ -8,6 +8,30 @@ The Chakra system is defined in `apps/web/src/theme/theme.ts` with
 semantic token or recipe to the shared system when several components need
 the same treatment. Keep one-off layout values on the component.
 
+Use square corners for buttons, cards, inputs, menus, overlays and loading
+bones. Chakra radius tokens are zero. The header’s Add new button may use a
+pill radius. Any other rounded corners require an explicit design request.
+The circle in the default avatar is part of the image.
+
+## Interactive rows and elevation
+
+Apply `layerStyle="interactiveRow"` to full-width action rows in menus,
+drawers, and similar lists. An enabled row highlights across its full width
+with `#e8e8e8` in light mode and a theme-adjusted gray in dark mode. A 2 px
+line sits at the leading edge, on the left in left-to-right layouts. The
+line sits over the row so icons and text keep their position. The same
+highlight appears on keyboard focus or when a menu marks the row as active
+during arrow-key navigation. Keep the component’s focus indicator and let
+disabled items retain their muted treatment. Use the account menu and
+Add new drawer as examples.
+
+Set `boxShadow="overlayPanel"` on the raised surface of a menu, popover,
+drawer, or dialog. Apply elevation to the panel, with its action rows flat.
+Use `bg="drawerBackdrop"` for modal drawers. The translucent light backdrop
+appears approximately `#eaeaea` over white and leaves the page visible. The
+dark backdrop dims the page with translucent black. Check the hover,
+keyboard highlight, and shadow in both color modes.
+
 ## Responsive props
 
 Use Chakra's mobile-first style props and its default breakpoints. For

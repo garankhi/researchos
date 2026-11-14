@@ -11,22 +11,86 @@
     "backToHome": "Back to home"
   },
   "nav": {
-    "products": "Products",
-    "pricing": "Pricing",
-    "blog": "Blog",
+    "home": "Home",
+    "opportunities": "Opportunities",
+    "groups": "Groups",
+    "updates": "Update notifications",
+    "messages": "Messages",
+    "requests": "Request notifications",
+    "primary": "Main navigation",
     "profile": "Profile",
     "account": "Account",
     "dashboard": "Dashboard",
     "logout": "Log out",
     "myProfile": "My profile",
+    "yourProfile": "Your profile",
+    "verifyAffiliation": "Verify your affiliation",
+    "savedList": "Your saved list",
+    "settings": "Settings",
+    "helpCenter": "Help Center",
     "openSettings": "Open settings",
-    "openMenu": "Open menu",
+    "more": "More",
     "accountOfCurrentUser": "Account menu for {name}"
   },
   "search": {
     "open": "Open search",
-    "label": "search",
-    "placeholder": "Search for research, journals, people…"
+    "label": "Search",
+    "placeholder": "Search research, people, groups…",
+    "submit": "Search",
+    "title": "Search results",
+    "minimum": "Enter at least 2 characters.",
+    "maximum": "Enter no more than 200 characters.",
+    "invalid": "Remove invalid characters from the search.",
+    "empty": "No results found",
+    "tryAnother": "Try another search term or tab.",
+    "loadError": "Could not load search results",
+    "countsError": "Could not load result counts",
+    "sort": "Sort by",
+    "rank": "Relevance",
+    "sortTitle": "Title",
+    "updatedAt": "Recently updated",
+    "tabs": {
+      "people": "People",
+      "research": "Outputs",
+      "group": "Groups",
+      "opportunity": "Opportunities"
+    },
+    "pagination": "Search result pages",
+    "page": "Page {page} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "followed": "Now following {title}",
+    "unfollowed": "Unfollowed {title}",
+    "followError": "Could not update this follow.",
+    "followingLoadError": "Could not load followed accounts and groups."
+  },
+  "addResearch": {
+    "trigger": "Add new",
+    "title": "Add your research",
+    "published": {
+      "label": "Published research",
+      "description": "Articles, books, etc."
+    },
+    "preprint": {
+      "label": "Preprint",
+      "description": "Draft or paper before peer review"
+    },
+    "conference": {
+      "label": "Conference paper",
+      "description": "Add a conference paper"
+    },
+    "presentation": {
+      "label": "Presentation",
+      "description": "Add a presentation"
+    },
+    "poster": { "label": "Poster", "description": "Add a conference poster" },
+    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
+    "other": {
+      "label": "Other",
+      "description": "Methods, proposal, code, etc."
+    }
   },
   "theme": {
     "label": "Toggle light/dark mode",

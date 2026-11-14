@@ -1,16 +1,11 @@
 import type { Preview } from '@storybook/nextjs-vite';
 import { NextIntlClientProvider } from 'next-intl';
-import { Geist, Geist_Mono } from 'next/font/google';
 import { ChakraThemeProvider } from '../src/components/providers/theme-provider';
 import { LOCALE_LABELS, isLocale, routing } from '../src/i18n/routing';
 import en from '../src/messages/en.json';
 import vi from '../src/messages/vi.json';
+import { fontVariableClasses } from '../src/theme/fonts';
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 const messages = { en, vi };
 
 const preview: Preview = {
@@ -57,7 +52,7 @@ const preview: Preview = {
       // Portaled content inherits the iframe's locale and color mode.
       root.lang = locale;
       root.classList.remove('light', 'dark');
-      root.classList.add(geistSans.variable, geistMono.variable, colorMode);
+      root.classList.add(...fontVariableClasses, colorMode);
       root.style.colorScheme = colorMode;
 
       return (

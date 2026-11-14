@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Button,
   Flex,
@@ -10,75 +10,237 @@ import {
   Menu,
   Portal,
 } from '@chakra-ui/react';
-import { MenuIcon } from 'lucide-react';
+import { Bell, ChevronDown, ListChecks, Mail } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { AddResearchDrawer } from '@/features/identity';
+import { usePathname } from '@/i18n/navigation';
+import { BrandLink } from './brand-link';
 import NextLink from './link';
 import SearchBar from './search-bar';
-import { LanguageToggle } from './language-toggle';
-import { ThemeToggle } from './theme-toggle';
 
-const pageKeys = ['products', 'pricing', 'blog'] as const;
+const morePages = ['opportunities', 'groups'] as const;
+
+const activityActions = [
+  { label: 'updates', icon: Bell },
+  { label: 'messages', icon: Mail },
+  { label: 'requests', icon: ListChecks },
+] as const;
+
+function PrimaryNavigation({
+  moreTrigger,
+  onAddResearch,
+}: {
+  moreTrigger: RefObject<HTMLButtonElement | null>;
+  onAddResearch: () => void;
+}) {
+  const t = useTranslations('nav');
+  const addResearch = useTranslations('addResearch');
+  const pathname = usePathname();
+
+  return (
+    <HStack
+      as="nav"
+      aria-label={t('primary')}
+      gridArea="navigation"
+      gap={{ base: '2', sm: '4', lg: '5' }}
+      ps={{ base: '2', sm: '4', lg: '0' }}
+      css={{
+        '& > :is(a, button)': {
+          height: { base: '52px', lg: '66px' },
+          fontSize: '14px',
+          position: 'relative',
+        },
+        '& > a, & > button[aria-disabled]': {
+          _after: {
+            content: '""',
+            position: 'absolute',
+            insetInline: '0',
+            bottom: '-1px',
+            height: '2px',
+            bg: { base: 'transparent', lg: 'border.emphasized' },
+            pointerEvents: 'none',
+          },
+          _currentPage: {
+            _after: { height: { base: '2px', lg: '1.5px' }, bg: 'blue.solid' },
+          },
+        },
+      }}
+    >
+      <Link
+        asChild
+        fontWeight="normal"
+        color="fg"
+        whiteSpace="nowrap"
+        _hover={{ textDecoration: 'none', color: 'fg.muted' }}
+      >
+        <NextLink href="/" aria-current={pathname === '/' ? 'page' : undefined}>
+          {t('home')}
+        </NextLink>
+      </Link>
+      {morePages.map((page) => (
+        <Button
+          key={page}
+          type="button"
+          variant="plain"
+          size="sm"
+          px="0"
+          borderWidth="0"
+          color="fg"
+          aria-disabled="true"
+          hideBelow="lg"
+        >
+          {t(page)}
+        </Button>
+      ))}
+      <Menu.Root positioning={{ placement: 'bottom-start' }}>
+        <Menu.Trigger asChild>
+          <Button
+            ref={moreTrigger}
+            type="button"
+            variant="ghost"
+            px="0"
+            minW="0"
+            gap="1"
+            fontWeight="normal"
+            hideFrom="lg"
+          >
+            {t('more')}
+            <ChevronDown aria-hidden />
+          </Button>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner hideFrom="lg">
+            <Menu.Content aria-label={t('more')} boxShadow="overlayPanel">
+              {morePages.map((page) => (
+                <Menu.Item key={page} value={page} disabled>
+                  {t(page)}
+                </Menu.Item>
+              ))}
+              <Menu.Item
+                value="add-research"
+                layerStyle="interactiveRow"
+                onSelect={onAddResearch}
+              >
+                {addResearch('trigger')}
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+    </HStack>
+  );
+}
+
+function HeaderActions({ children }: { children?: ReactNode }) {
+  const t = useTranslations('nav');
+
+  return (
+    <Flex
+      gap={{ base: '0', xl: '1' }}
+      gridArea="actions"
+      ms="auto"
+      pe={{ base: '2', sm: '4', lg: '0' }}
+      align="center"
+      justify="end"
+    >
+      <SearchBar mode="popover" />
+      {activityActions.map(({ label, icon: Icon }) => {
+        const actionLabel = t(label);
+
+        return (
+          <IconButton
+            key={label}
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-header-icon="compact"
+            aria-label={actionLabel}
+            title={actionLabel}
+            aria-disabled="true"
+          >
+            <Icon aria-hidden />
+          </IconButton>
+        );
+      })}
+      {children}
+    </Flex>
+  );
+}
 
 export default function Header({ accountSlot }: { accountSlot?: ReactNode }) {
-  const t = useTranslations('nav');
-  const common = useTranslations('common');
+  const [addResearchOpen, setAddResearchOpen] = useState(false);
+  const moreTrigger = useRef<HTMLButtonElement>(null);
 
   return (
     <Flex
       as="header"
       bg="bg.panel"
+      color="fg"
       borderBottomWidth="1px"
-      px={{ base: '2', md: '4' }}
-      minH="16"
-      py="2"
-      flexWrap={{ base: 'wrap', sm: 'nowrap' }}
-      gap={{ base: '1', md: '3' }}
+      borderColor="border.emphasized"
+      px={{ lg: '5', xl: '10' }}
+      minH="66px"
+      display="grid"
+      gridTemplateAreas={{
+        base: '"brand brand" "navigation actions"',
+        lg: '"primary search actions"',
+      }}
+      gridTemplateColumns={{
+        base: 'max-content minmax(0, 1fr)',
+        lg: 'minmax(max-content, 1fr) clamp(10rem, calc(100% - 60rem), 24rem) minmax(max-content, 1fr)',
+      }}
+      columnGap={{ base: '1', lg: '3', xl: '6' }}
       align="center"
+      css={{
+        '& [data-header-icon]': {
+          boxSize: { base: '34px', sm: '42px' },
+          minW: '0',
+          _icon: { boxSize: { base: '22px', sm: '25px' } },
+          '@media (hover: hover)': {
+            '&:hover': { bg: 'bg.muted' },
+          },
+        },
+        '& [data-header-icon="compact"]': {
+          boxSize: { base: '30px', sm: '38px' },
+          _icon: { boxSize: '21px' },
+        },
+      }}
     >
-      <Menu.Root positioning={{ placement: 'bottom-start' }}>
-        <Menu.Trigger asChild>
-          <IconButton variant="ghost" aria-label={t('openMenu')} hideFrom="md">
-            <MenuIcon />
-          </IconButton>
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Positioner hideFrom="md">
-            <Menu.Content>
-              {pageKeys.map((page) => (
-                <Menu.Item key={page} value={page}>
-                  {t(page)}
-                </Menu.Item>
-              ))}
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-      <Link asChild fontSize="lg" fontWeight="bold" flexShrink="0">
-        <NextLink href="/">{common('appName')}</NextLink>
-      </Link>
-
-      <HStack as="nav" gap="0" hideBelow="md">
-        {pageKeys.map((page) => (
-          <Button key={page} size="sm" variant="ghost">
-            {t(page)}
-          </Button>
-        ))}
-      </HStack>
-      <Flex flex="1" minW="0" justify="center" hideBelow="md">
+      <Flex
+        gridArea="primary"
+        display={{ base: 'contents', lg: 'flex' }}
+        align="center"
+        gap={{ lg: '4', xl: '12' }}
+      >
+        <Flex
+          gridArea="brand"
+          h={{ base: '56px', lg: 'auto' }}
+          justify={{ base: 'center', lg: 'start' }}
+          align="center"
+          borderBottomWidth={{ base: '1px', lg: '0' }}
+          borderColor="border.emphasized"
+        >
+          <BrandLink />
+        </Flex>
+        <PrimaryNavigation
+          moreTrigger={moreTrigger}
+          onAddResearch={() => setAddResearchOpen(true)}
+        />
+      </Flex>
+      <Flex gridArea="search" minW="0" hideBelow="lg">
         <SearchBar mode="inline" />
       </Flex>
-
-      <HStack
-        gap={{ base: '0', sm: '1' }}
-        ms="auto"
-        w={{ base: 'full', sm: 'auto' }}
-        justify="end"
-      >
-        <SearchBar mode="popover" />
-        <LanguageToggle />
-        <ThemeToggle />
+      <HeaderActions>
         {accountSlot}
-      </HStack>
+        <AddResearchDrawer
+          inHeader
+          open={addResearchOpen}
+          onOpenChange={setAddResearchOpen}
+          finalFocusEl={() =>
+            moreTrigger.current?.offsetWidth ? moreTrigger.current : null
+          }
+        />
+      </HeaderActions>
     </Flex>
   );
 }
