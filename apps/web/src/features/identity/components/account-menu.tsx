@@ -151,11 +151,16 @@ export function AccountMenu() {
 
         <Divider />
 
-        <MenuItem onClick={handleClose} disabled>
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            router.push('/profile/my-profile');
+          }}
+        >
           <ListItemIcon>
             <AccountCircle fontSize="small" />
           </ListItemIcon>
-          <ListItemText primary={user.email} />
+          <ListItemText primary={t('profile')} />
         </MenuItem>
 
         <MenuItem onClick={handleLogout} disabled={logout.isPending}>

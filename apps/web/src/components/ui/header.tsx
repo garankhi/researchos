@@ -136,9 +136,11 @@ function ResponsiveAppBar({ accountSlot }: { accountSlot?: React.ReactNode }) {
             sx={{ flexGrow: 0, display: 'flex', alignItems: 'center', gap: 1 }}
           >
             <SearchBar />
-            <LanguageToggle />
+            <React.Suspense fallback={null}>
+              <LanguageToggle />
+            </React.Suspense>
             <ThemeToggle />
-            {accountSlot}
+            <React.Suspense fallback={null}>{accountSlot}</React.Suspense>
           </Box>
         </Toolbar>
       </Container>
