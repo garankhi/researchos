@@ -29,6 +29,15 @@ export class ApplicationResponseDto {
   opportunityId: string;
 
   @ApiProperty({
+    description:
+      'Title of the opportunity the application targets, if available.',
+    type: String,
+    nullable: true,
+    required: false,
+  })
+  opportunityTitle?: string | null;
+
+  @ApiProperty({
     description: 'Researcher submitting the application.',
     format: 'uuid',
   })

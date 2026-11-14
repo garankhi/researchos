@@ -8162,6 +8162,11 @@
             "description": "Opportunity receiving the application.",
             "format": "uuid"
           },
+          "opportunityTitle": {
+            "type": "string",
+            "description": "Title of the opportunity the application targets, if available.",
+            "nullable": true
+          },
           "applicantId": {
             "type": "string",
             "description": "Researcher submitting the application.",
@@ -8283,6 +8288,11 @@
             "description": "Opportunity receiving the application.",
             "format": "uuid"
           },
+          "opportunityTitle": {
+            "type": "string",
+            "description": "Title of the opportunity the application targets.",
+            "nullable": true
+          },
           "applicantId": {
             "type": "string",
             "description": "Researcher submitting the application.",
@@ -8348,10 +8358,6 @@
           "isOverdue": {
             "type": "boolean",
             "description": "Whether this pending application has reached its response deadline."
-          },
-          "opportunityTitle": {
-            "type": "string",
-            "description": "Title of the opportunity the application targets."
           }
         },
         "required": [
@@ -8368,8 +8374,7 @@
           "withdrawnAt",
           "countdownAsOf",
           "remainingSeconds",
-          "isOverdue",
-          "opportunityTitle"
+          "isOverdue"
         ]
       },
       "GroupApplicationPageDto": {

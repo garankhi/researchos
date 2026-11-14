@@ -13,7 +13,7 @@ export class GroupApplicationResponseDto extends ApplicationResponseDto {
   @ApiProperty({
     description: 'Title of the opportunity the application targets.',
   })
-  opportunityTitle: string;
+  declare opportunityTitle: string;
 }
 
 /**
