@@ -80,7 +80,11 @@ export class ProfilesService {
      * A user without a profile row has not been confirmed either, so the
      * same rule applies to them.
      */
-    this.assertProfileReadable(targetUserId, callerId, user.researcher_profiles);
+    this.assertProfileReadable(
+      targetUserId,
+      callerId,
+      user.researcher_profiles,
+    );
 
     return this.mapToResponse(user);
   }
@@ -109,7 +113,11 @@ export class ProfilesService {
       );
     }
 
-    this.assertProfileReadable(targetUserId, callerId, user.researcher_profiles);
+    this.assertProfileReadable(
+      targetUserId,
+      callerId,
+      user.researcher_profiles,
+    );
 
     const rows = await this.prisma.research_interests.findMany({
       where: { user_id: targetUserId },
@@ -164,8 +172,7 @@ export class ProfilesService {
   ): void {
     // A missing profile row counts as unconfirmed: the account exists, but
     // nobody has confirmed the researcher behind it yet.
-    const confirmed =
-      profile !== null && profile.profile_confirmed_at !== null;
+    const confirmed = profile !== null && profile.profile_confirmed_at !== null;
 
     if (targetUserId !== callerId && !confirmed) {
       throw new CodedHttpException(

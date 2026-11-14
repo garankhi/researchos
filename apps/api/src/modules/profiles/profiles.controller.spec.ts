@@ -354,9 +354,7 @@ describe('ProfilesController', () => {
     it('writes the account fields to users, not to the profile', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUniqueOrThrow.mockResolvedValue(mockConfirmedUser);
-      prismaMock.researcher_profiles.upsert.mockResolvedValue(
-        confirmedProfile,
-      );
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(confirmedProfile);
 
       const controller = await setupController(prismaMock);
       await controller.updateMyProfile(callerId, {
@@ -382,9 +380,7 @@ describe('ProfilesController', () => {
     it('skips the users write when the payload carries no account field', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUniqueOrThrow.mockResolvedValue(mockConfirmedUser);
-      prismaMock.researcher_profiles.upsert.mockResolvedValue(
-        confirmedProfile,
-      );
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(confirmedProfile);
 
       const controller = await setupController(prismaMock);
       await controller.updateMyProfile(callerId, { bio: 'Only a bio.' });
