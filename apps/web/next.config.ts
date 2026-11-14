@@ -9,18 +9,11 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   reactCompiler: true,
   experimental: {
+    optimizePackageImports: ['@chakra-ui/react'],
     // Required by the `unauthorized()` and `forbidden()` helpers so they can
     // interrupt rendering and render `unauthorized.tsx` / `forbidden.tsx`.
     // Both are still experimental in Next 16.
     authInterrupts: true,
-  },
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
   },
 };
 

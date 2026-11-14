@@ -1,297 +1,210 @@
 'use client';
 
-import { Controller, useFormContext, useFormState } from 'react-hook-form';
-import type { Control, FieldPath, FieldValues } from 'react-hook-form';
+import {
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  NativeSelect,
+  type ButtonProps,
+  type InputProps,
+  type NativeSelectFieldProps,
+} from '@chakra-ui/react';
+import {
+  useController,
+  useFormContext,
+  type Control,
+  type FieldPath,
+  type FieldValues,
+} from 'react-hook-form';
 import { useTranslations } from 'next-intl';
-import TextField from '@mui/material/TextField';
-import type { TextFieldProps } from '@mui/material/TextField';
-import Checkbox from '@mui/material/Checkbox';
-import FormControl from '@mui/material/FormControl';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import type { FormControlLabelProps } from '@mui/material/FormControlLabel';
-import Button from '@mui/material/Button';
-import type { ButtonProps } from '@mui/material/Button';
 import { resolveErrorCode } from '@/utils/error-messages';
 
-/**
- * Shared form field primitives.
- *
- * These exist so the conventions in the `researchos-forms` skill are the
- * path of least resistance. Each one wires a control to react-hook-form,
- * reflects the field's error state onto the MUI control, and resolves the
- * error message through the message catalog — the three things that are
- * easy to get wrong and that the eslint rules check for.
- *
- * The rules are in `apps/web/eslint-rules/researchos-forms.mjs`.
- */
-
-type BaseFieldProps<
+type FieldProps<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 > = {
-  /** The field name, matching the zod schema key. */
   name: TName;
-  /** The label shown on the control. Always a translated string. */
   label: string;
-  /** Helper text shown when the field is valid. */
   helperText?: string;
-  /**
-   * The form control. Optional: when it is omitted the field reads the
-   * surrounding `<FormProvider>`.
-   */
   control?: Control<TValues>;
+  disabled?: boolean;
+  required?: boolean;
 };
 
-/**
- * Resolves the control from the prop or the surrounding provider.
- *
- * `useFormContext()` returns `null` outside a `<FormProvider>`, so a
- * primitive that relied on it alone would throw on a form that keeps
- * everything in one component. Passing `control` explicitly is the way to
- * use these without a provider.
- */
-function useResolvedControl<TValues extends FieldValues>(
-  controlProp: Control<TValues> | undefined,
-  component: string,
-): Control<TValues> {
+function useFormField<
+  TValues extends FieldValues,
+  TName extends FieldPath<TValues>,
+>({
+  name,
+  control: controlProp,
+  disabled,
+}: Pick<FieldProps<TValues, TName>, 'name' | 'control' | 'disabled'>) {
   const context = useFormContext<TValues>();
   const control = controlProp ?? context?.control;
-
   if (!control) {
     throw new Error(
-      `${component} needs a form. Wrap the form in a <FormProvider>, or pass the \`control\` prop.`,
+      'Form fields need a control prop or a surrounding FormProvider.',
     );
   }
 
-  return control;
+  const { field, fieldState } = useController({ name, control, disabled });
+  const t = useTranslations('errors');
+  const code = fieldState.error?.message;
+
+  return {
+    ...field,
+    invalid: fieldState.invalid,
+    errorMessage: code
+      ? resolveErrorCode(t, code, t('unknown'), 'field')
+      : undefined,
+  };
 }
 
-/**
- * Reads a field's error message as a plain string.
- *
- * react-hook-form types the message as `string | FieldError` because a
- * nested error object is legal, but the resolver always produces a string
- * here — zod's message is the code the catalog resolves.
- */
-function messageOf(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined;
-
-  const message = (error as { message?: unknown }).message;
-
-  return typeof message === 'string' ? message : undefined;
+function FieldMessage({
+  error,
+  helperText,
+}: {
+  error?: string;
+  helperText?: string;
+}) {
+  if (error) return <Field.ErrorText>{error}</Field.ErrorText>;
+  if (helperText) return <Field.HelperText>{helperText}</Field.HelperText>;
+  return null;
 }
 
-/**
- * A text field bound to react-hook-form.
- *
- * The control is registered with the form, so the value is submitted and
- * validated like any other field. The error message is resolved through
- * the catalog — the raw code never reaches the screen.
- *
- * The ref goes to `inputRef`, not `ref`. MUI v9 forwards `ref` to the root
- * `FormControl` and `inputRef` to the DOM `<input>`; react-hook-form needs
- * the DOM input so it can focus the first invalid field.
- *
- * ```tsx
- * <FormTextField name="title" label={t('title')} />
- * ```
- */
 export function FormTextField<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 >({
+  id,
   name,
   label,
   helperText,
-  control: controlProp,
+  control,
+  disabled,
+  required,
   ...inputProps
-}: BaseFieldProps<TValues, TName> &
-  Omit<TextFieldProps, 'name' | 'label' | 'helperText'>) {
-  const t = useTranslations('errors');
-  const control = useResolvedControl(controlProp, 'FormTextField');
-
-  const { errors } = useFormState({ control });
-  const error = errors[name];
-  const message = messageOf(error);
+}: FieldProps<TValues, TName> &
+  Omit<
+    InputProps,
+    'name' | 'value' | 'defaultValue' | 'onChange' | 'onBlur' | 'ref'
+  >) {
+  const { invalid, errorMessage, ...field } = useFormField({
+    name,
+    control,
+    disabled,
+  });
 
   return (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <TextField
-          {...inputProps}
-          {...field}
-          label={label}
-          error={Boolean(error)}
-          helperText={
-            message
-              ? resolveErrorCode(t, message, t('unknown'), 'field')
-              : helperText
-          }
-          inputRef={field.ref}
-        />
-      )}
-    />
+    <Field.Root
+      id={id}
+      invalid={invalid}
+      disabled={field.disabled}
+      required={required}
+    >
+      <Field.Label>{label}</Field.Label>
+      <Input {...inputProps} {...field} value={field.value ?? ''} />
+      <FieldMessage error={errorMessage} helperText={helperText} />
+    </Field.Root>
   );
 }
 
-/**
- * A select bound to react-hook-form.
- *
- * MUI's `Select` renders a hidden input plus a listbox, so `register` does
- * not drive the displayed value — it needs a `Controller`. This component
- * does that wiring so the caller does not have to remember it.
- *
- * ```tsx
- * <FormSelect name="status" label={t('status')}>
- *   <MenuItem value="active">{t('statusActive')}</MenuItem>
- * </FormSelect>
- * ```
- */
 export function FormSelect<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 >({
+  id,
   name,
   label,
   helperText,
+  control,
+  disabled,
+  required,
   children,
-  control: controlProp,
   ...selectProps
-}: BaseFieldProps<TValues, TName> & {
-  children: React.ReactNode;
-} & Omit<TextFieldProps, 'name' | 'label' | 'helperText' | 'select'>) {
-  const t = useTranslations('errors');
-  const control = useResolvedControl(controlProp, 'FormSelect');
-
-  const { errors } = useFormState({ control });
-  const error = errors[name];
-  const message = messageOf(error);
+}: FieldProps<TValues, TName> &
+  Omit<
+    NativeSelectFieldProps,
+    'name' | 'value' | 'defaultValue' | 'onChange' | 'onBlur' | 'ref'
+  >) {
+  const { invalid, errorMessage, ...field } = useFormField({
+    name,
+    control,
+    disabled,
+  });
 
   return (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <TextField
+    <Field.Root
+      id={id}
+      invalid={invalid}
+      disabled={field.disabled}
+      required={required}
+    >
+      <Field.Label>{label}</Field.Label>
+      <NativeSelect.Root>
+        <NativeSelect.Field
           {...selectProps}
           {...field}
-          select
-          label={label}
-          error={Boolean(error)}
-          helperText={
-            message
-              ? resolveErrorCode(t, message, t('unknown'), 'field')
-              : helperText
-          }
+          value={field.value ?? ''}
         >
           {children}
-        </TextField>
-      )}
-    />
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <FieldMessage error={errorMessage} helperText={helperText} />
+    </Field.Root>
   );
 }
 
-/**
- * A checkbox bound to react-hook-form.
- *
- * A toggle reports its state through `checked`, not `value`, so it needs
- * its own wiring rather than a plain `register` spread.
- *
- * ```tsx
- * <FormCheckbox name="subscribe" label={t('subscribe')} />
- * ```
- */
 export function FormCheckbox<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
 >({
   name,
   label,
-  control: controlProp,
-  ...labelProps
-}: Omit<BaseFieldProps<TValues, TName>, 'helperText'> &
-  Omit<Partial<FormControlLabelProps>, 'label' | 'control'>) {
-  const control = useResolvedControl(controlProp, 'FormCheckbox');
-
-  const { errors } = useFormState({ control });
-  const error = errors[name];
+  helperText,
+  control,
+  disabled,
+  required,
+}: FieldProps<TValues, TName>) {
+  const {
+    invalid,
+    errorMessage,
+    name: fieldName,
+    value,
+    onChange,
+    onBlur,
+    ref,
+    disabled: fieldDisabled,
+  } = useFormField({
+    name,
+    control,
+    disabled,
+  });
 
   return (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field }) => (
-        // MUI v9's `Checkbox` and `FormControlLabel` take no error prop, so
-        // the error state belongs on the `FormControl` that wraps them.
-        <FormControl error={Boolean(error)} component="fieldset">
-          <FormControlLabel
-            {...labelProps}
-            control={
-              <Checkbox
-                checked={Boolean(field.value)}
-                onChange={(event) => field.onChange(event.target.checked)}
-                onBlur={field.onBlur}
-                name={field.name}
-                ref={field.ref}
-              />
-            }
-            label={label}
-          />
-        </FormControl>
-      )}
-    />
+    <Field.Root invalid={invalid} disabled={fieldDisabled} required={required}>
+      <Checkbox.Root
+        name={fieldName}
+        checked={Boolean(value)}
+        onCheckedChange={({ checked }) => onChange(checked === true)}
+      >
+        <Checkbox.HiddenInput ref={ref} onBlur={onBlur} />
+        <Checkbox.Control />
+        <Checkbox.Label>{label}</Checkbox.Label>
+      </Checkbox.Root>
+      <FieldMessage error={errorMessage} helperText={helperText} />
+    </Field.Root>
   );
 }
 
-/**
- * The submit button of a form.
- *
- * It is bound to the **mutation's** `isPending`, never the form's
- * `isSubmitting` and never a query's `isPending`.
- *
- * ## Why the form's own state is not enough
- *
- * react-hook-form's `isSubmitting` is true from the moment the submit
- * handler starts until the handler's promise settles. A form that validates
- * and then fires a mutation spends that time in two phases — and the
- * request the user actually cares about is the second one. Binding the
- * button to `isSubmitting` therefore shows the spinner during client-side
- * validation, and it can stop showing it before the server has answered.
- *
- * The mutation's `isPending` covers exactly the window that matters: the
- * request is in flight.
- *
- * ## Why never a query's `isPending`
- *
- * `isPending` on a query means "no data yet". For a query with
- * `enabled: false` that stays `true` forever, so a button bound to it
- * would be permanently disabled. A mutation that has not fired is not
- * pending, so its flag is the correct signal.
- *
- * MUI v9's `loading` prop renders a spinner and disables the button, so a
- * double submit is impossible while the request is in flight.
- *
- * ```tsx
- * const mutation = useCreateProfile();
- *
- * <FormSubmitButton mutation={mutation} label={t('save')} />
- * ```
- */
 export function FormSubmitButton({
   mutation,
   label,
   ...buttonProps
 }: {
-  /**
-   * The mutation whose request the button reflects.
-   *
-   * Only `isPending` is read — the primitive does not care what the
-   * mutation does with the data.
-   */
   mutation: { isPending: boolean };
-  /** The button label. Always a translated string. */
   label: React.ReactNode;
 } & Omit<ButtonProps, 'loading' | 'type'>) {
   return (

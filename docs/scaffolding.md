@@ -51,10 +51,10 @@ Git repository và remote origin đã tồn tại; không cần chạy lại git
 Chạy tại root:
 
 ~~~powershell
-pnpm dlx create-next-app@16.4.3 apps/web --ts --eslint --tailwind --app --src-dir --import-alias '@/*' --use-pnpm --skip-install --disable-git --no-react-compiler --no-cache-components --no-agent-feedback --yes
+pnpm dlx create-next-app@16.4.3 apps/web --ts --eslint --no-tailwind --app --src-dir --import-alias '@/*' --use-pnpm --skip-install --disable-git --no-react-compiler --no-cache-components --no-agent-feedback --yes
 ~~~
 
-Lựa chọn: TypeScript, ESLint, Tailwind, App Router, src và alias @/*. React Compiler/Cache Components chưa bật ở bước scaffold. Các flag này là tùy chọn của CLI chính thức.
+Lựa chọn: TypeScript, ESLint, App Router, src và alias @/*. React Compiler/Cache Components chưa bật ở bước scaffold. Các flag này là tùy chọn của CLI chính thức.
 
 Nếu muốn tự trả lời các câu hỏi của CLI, dùng lệnh ngắn dưới đây THAY CHO lệnh trên:
 

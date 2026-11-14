@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Button } from '@mui/material';
+import { Button } from '@chakra-ui/react';
 import { usePathname } from '@/i18n/navigation';
 import NextLink from '@/components/ui/link';
 import { AccountMenu } from './account-menu';
@@ -26,9 +26,7 @@ import { buildLoginHref } from '../utils/return-to';
  * were instead of dumping them on the home page.
  *
  * The path comes from `usePathname()` of the locale-aware router, so it
- * is **locale-free** — `/demo`, not `/vi/demo`. The router adds the
- * prefix itself, and a value that already carried one would end up
- * doubled.
+ * is locale-free. The router adds the locale prefix when following the link.
  */
 export function AccountSlot() {
   const t = useTranslations('identity');
@@ -45,13 +43,8 @@ export function AccountSlot() {
   }
 
   return (
-    <Button
-      component={NextLink}
-      href={buildLoginHref(pathname)}
-      color="inherit"
-      variant="outlined"
-    >
-      {t('signInAction')}
+    <Button asChild variant="outline" size="sm">
+      <NextLink href={buildLoginHref(pathname)}>{t('signInAction')}</NextLink>
     </Button>
   );
 }

@@ -69,37 +69,16 @@ A mutation does not change the layout — the button stays where it is and the
 page keeps its content. A spinner belongs *in* the button, not in the page
 body.
 
-MUI v9's `Button` has a built-in `loading` prop that renders a
-`CircularProgress` and disables the button, so a second submit cannot fire
-while the first is in flight. `loadingPosition` controls where the indicator
-sits — `'start'` keeps the label visible and pushes it right, `'center'`
-replaces the label with the spinner.
+Chakra's `Button` uses `loading` and optional `loadingText`. Bind it to the
+mutation's pending flag to show the spinner and prevent another submit.
 
-Bind it to the **mutation's** pending flag, not a query's. `isPending` on a
-query with `enabled: false` is `true` forever; a mutation that is disabled
-has not fired at all, so `isPending` on it is the correct signal.
+```tsx
+import { Button } from '@chakra-ui/react';
 
-```typescript
-import { Button, CircularProgress, IconButton } from '@mui/material';
-
-// MUI v9 renders a CircularProgress and disables the button.
-<Button variant="contained" loading={mutation.isPending}>
-  Lưu
+<Button loading={mutation.isPending} loadingText={t('loading')}>
+  {t('save')}
 </Button>
-
-// The label stays visible, the spinner pushes it right.
-<Button variant="contained" loading={mutation.isPending} loadingPosition="start">
-  Lưu
-</Button>
-
-// A small inline action.
-<IconButton aria-label="Lưu" disabled={mutation.isPending}>
-  {mutation.isPending ? <CircularProgress size={16} /> : <SaveIcon />}
-</IconButton>
 ```
-
-`loading` implies `disabled`, so a double submit is impossible while the
-mutation is in flight.
 
 In a **form**, the submit button uses the `FormSubmitButton` primitive,
 which takes the mutation and binds `loading` to its `isPending` for you.
@@ -245,7 +224,7 @@ const fieldMessages = resolveFieldErrorCodes(
 ))}
 ```
 
-`FieldError` renders a MUI `FormHelperText` in the error style. Pass an `id`
+`FieldError` renders a translated message in the Chakra error color. Pass an `id`
 and reference it from the input's `aria-describedby` so a screen reader
 announces the message with the field.
 
@@ -335,34 +314,7 @@ showSnackbar({ severity: 'success', message: t('saved') });
 | `autoHideDuration` | Defaults to 4000. `null` disables auto-hide — use it for an error |
 | `actionLabel` + `onAction` | An optional recovery button inside the toast |
 
-The provider handles the details the raw MUI component leaves to you:
-
-- `role="status"` for a success (polite — it should not interrupt a screen
-  reader) and `role="alert"` for an error (assertive).
-- An **error never auto-hides** unless you pass an explicit
-  `autoHideDuration`. A toast that vanishes after four seconds is a message
-  many users never finish reading.
-- `anchorOrigin` is bottom-right.
-
-`useSnackbar()` **throws** outside a `SnackbarProvider` rather than silently
-doing nothing. A missing provider is a wiring bug, and a silent no-op looks
-like a snackbar that never appears.
-
-If you need a raw `Snackbar` for a one-off, `SnackbarContent` defaults to
-`role="alert"` — override it through the `content` slot:
-
-```typescript
-<Snackbar
-  open={open}
-  autoHideDuration={4000}
-  onClose={handleClose}
-  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-  slotProps={{
-    content: {
-      role: 'status',
-      sx: { bgcolor: 'success.main', color: 'success.contrastText' },
-    },
-  }}
-  message={t('saved')}
-/>
-```
+The provider uses Chakra's portaled toaster at the bottom end, with polite
+status announcements for confirmations and an alert for errors. Errors stay
+visible until dismissed unless you set a duration. Use `SnackbarProvider`
+near the app root or as a Storybook decorator for stories that need toasts.

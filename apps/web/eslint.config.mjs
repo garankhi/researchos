@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "storybook-static/**",
     "next-env.d.ts",
   ]),
   {
@@ -95,16 +96,14 @@ const eslintConfig = defineConfig([
       researchosForms: { rules: researchosFormRules },
     },
     rules: {
-      // Form controls are MUI components, so they inherit the theme.
+      // Form controls are Chakra components, so they inherit the theme.
       "researchosForms/no-native-form-controls": "error",
       // A `<form>` is driven by `useForm`.
       "researchosForms/form-must-use-react-hook-form": "error",
       // A `<form>` handles its submit event.
       "researchosForms/form-must-handle-submit": "error",
-      // Every MUI control is registered or controlled.
+      // Every Chakra control is registered or controlled.
       "researchosForms/form-control-must-be-wired": "error",
-      // MUI's `select` needs a `Controller`, not `register`.
-      "researchosForms/select-requires-controller": "error",
       // A field error is resolved through the catalog, never raw.
       "researchosForms/form-error-must-be-resolved": "error",
     },

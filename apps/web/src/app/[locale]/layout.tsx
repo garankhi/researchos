@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v16-appRouter';
+import { EmotionRegistry } from '@/components/providers/emotion-registry';
 import { AppThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
-import '../globals.css';
 import Header from '@/components/ui/header';
 import { AccountSlot } from '@/features/identity';
 import { NextIntlClientProvider } from 'next-intl';
@@ -45,16 +44,13 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable}`}
       // next-themes writes the color scheme class onto <html> before React
       // hydrates; without this the mismatch is reported as a hydration warning.
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
-        {/* `enableCssLayer` puts MUI styles in the `mui` cascade layer so
-            Tailwind utilities win without !important. The matching layer
-            order is declared in globals.css. */}
-        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+      <body>
+        <EmotionRegistry>
           <AppThemeProvider>
             <QueryProvider>
               <NextIntlClientProvider
@@ -71,9 +67,6 @@ export default async function RootLayout({
                   },
                 }}
               >
-                {/* The snackbar sits inside the i18n provider so a message
-                    can be translated at the point it is shown, and inside
-                    the MUI provider so `Snackbar` can anchor to the theme. */}
                 <SnackbarProvider>
                   {/* The header is a shared primitive and knows nothing
                       about a domain, so the account area is passed in as a
@@ -86,7 +79,7 @@ export default async function RootLayout({
               </NextIntlClientProvider>
             </QueryProvider>
           </AppThemeProvider>
-        </AppRouterCacheProvider>
+        </EmotionRegistry>
       </body>
     </html>
   );

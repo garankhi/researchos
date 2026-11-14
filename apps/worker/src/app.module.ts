@@ -22,11 +22,9 @@ import { JobsModule } from './modules/jobs/jobs.module.js';
       isGlobal: true,
       cache: true,
       // The workspace root `.env` holds the shared variables; an app-local
-      // `.env` overrides them for this app only. This file lives in `src/`,
-      // so the package root is two levels up.
-      envFilePath: resolveEnvFilePaths(
-        resolve(import.meta.dirname, '..', '..'),
-      ),
+      // `.env` overrides them for this app only. Both src and dist are
+      // direct children of the worker package.
+      envFilePath: resolveEnvFilePaths(resolve(import.meta.dirname, '..')),
     }),
     PrismaModule,
     JobsModule,

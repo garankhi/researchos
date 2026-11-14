@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Box, Button, Container, Stack, Typography } from '@mui/material';
-import { ErrorOutlined } from '@mui/icons-material';
+import { Button } from '@chakra-ui/react';
+import { CircleAlert } from 'lucide-react';
+import { RouteFeedback } from '@/components/ui/feedback';
 import { useTranslations } from 'next-intl';
 
 /**
@@ -38,25 +39,12 @@ export default function RouteError({
   }, [error]);
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Stack
-        spacing={2}
-        role="alert"
-        sx={{ alignItems: 'center', textAlign: 'center' }}
-      >
-        <ErrorOutlined color="error" sx={{ fontSize: 48 }} />
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 500 }}>
-          {t('title')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {t('description')}
-        </Typography>
-        <Box>
-          <Button variant="contained" onClick={() => retry()}>
-            {t('retry')}
-          </Button>
-        </Box>
-      </Stack>
-    </Container>
+    <RouteFeedback
+      role="alert"
+      icon={<CircleAlert aria-hidden />}
+      title={t('title')}
+      description={t('description')}
+      action={<Button onClick={retry}>{t('retry')}</Button>}
+    />
   );
 }

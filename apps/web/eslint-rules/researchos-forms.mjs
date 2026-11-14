@@ -9,51 +9,69 @@
  *
  * | Rule | Convention |
  * | --- | --- |
- * | `no-native-form-controls` | Form controls are MUI components |
+ * | `no-native-form-controls` | Form controls are Chakra components |
  * | `form-must-use-react-hook-form` | A `<form>` is driven by `useForm` |
  * | `form-must-handle-submit` | A `<form>` has an `onSubmit` |
- * | `form-control-must-be-wired` | Every MUI control is registered or controlled |
- * | `select-requires-controller` | MUI's `select` needs `Controller`, not `register` |
+ * | `form-control-must-be-wired` | Every Chakra control is registered or controlled |
  * | `form-error-must-be-resolved` | A field error is resolved through the catalog |
  *
  * The rules live here rather than in `eslint.config.mjs` because they need
  * to reason about JSX and imports, not just paths.
  */
 
-/**
- * The MUI components that represent a single form control.
- *
- * A control is one the user fills in, and therefore one that must be
- * registered with the form. Layout wrappers (`FormControl`,
- * `FormHelperText`, `FormLabel`, `FormGroup`, `InputLabel`) are not
- * controls and are deliberately absent.
- */
-const FORM_CONTROLS = new Set([
-  'TextField',
-  'Select',
-  'Checkbox',
-  'Radio',
-  'RadioGroup',
-  'Switch',
-  'Slider',
-  'Autocomplete',
+const NATIVE_CHAKRA_CONTROLS = new Set(['Input', 'Textarea', 'NativeSelect.Field']);
+const SHARED_FORM_CONTROLS = new Set(['FormTextField', 'FormSelect', 'FormCheckbox']);
+const COMPOUND_CONTROL_BINDINGS = new Map([
+  ['Select.Root', ['value', 'onValueChange']],
+  ['Checkbox.Root', ['checked', 'onCheckedChange']],
+  ['RadioGroup.Root', ['value', 'onValueChange']],
+  ['Switch.Root', ['checked', 'onCheckedChange']],
+  ['Slider.Root', ['value', 'onValueChange']],
+  ['Combobox.Root', ['value', 'onValueChange']],
+  ['NumberInput.Root', ['value', 'onValueChange']],
 ]);
+
+function chakraImports(program) {
+  const names = new Map();
+  for (const statement of program.body) {
+    if (statement.type !== 'ImportDeclaration') continue;
+    if (statement.source.value !== '@chakra-ui/react') continue;
+    for (const specifier of statement.specifiers) {
+      if (
+        specifier.type === 'ImportSpecifier' &&
+        specifier.imported.type === 'Identifier'
+      ) {
+        names.set(specifier.local.name, specifier.imported.name);
+      } else if (specifier.type === 'ImportNamespaceSpecifier') {
+        names.set(specifier.local.name, '');
+      }
+    }
+  }
+  return names;
+}
+
+function controlName(node, chakraNames) {
+  if (node.type === 'JSXIdentifier') {
+    return chakraNames.get(node.name) ?? node.name;
+  }
+  if (node.type !== 'JSXMemberExpression') return null;
+  const owner = controlName(node.object, chakraNames);
+  return owner ? `${owner}.${node.property.name}` : node.property.name;
+}
 
 /**
  * The native HTML form controls.
  *
  * `input` is allowed in its `type="hidden"` form: react-hook-form needs a
  * real DOM input for a hidden field, and it is the one case where a native
- * element is clearer than a MUI one.
+ * element is clearer than a Chakra one.
  */
 const NATIVE_CONTROLS = new Set(['input', 'select', 'textarea']);
 
 /**
  * Returns the local name of a JSX element.
  *
- * `<TextField />` is `TextField`; `<Mui.TextField />` is `TextField`; a
- * member expression is matched on its last segment, so a namespaced import
- * is caught the same way a direct one is.
+ * A member expression is matched on its last segment.
  */
 function elementName(node) {
   if (!node) return null;
@@ -98,39 +116,14 @@ function reactHookFormBindings(program) {
 }
 
 /**
- * Collects the local names that a `register()` call was destructured into.
- *
+ * Collects whole registrations and rest bindings such as `registration`.
  * ```typescript
  * const { ref, ...registration } = register('title');
  * ```
  *
- * The MUI `TextField` needs the ref split out from the rest of the
- * registration, because MUI forwards `ref` to the root element and
- * `inputRef` to the DOM input. The spread of the remaining properties —
- * `{...registration}` — is what binds the control.
- *
- * The rule has to recognise the pattern, otherwise it would flag the
- * primitives that exist to make the convention easy to follow.
  */
-function destructuredRegisterNames(program) {
+function registerResultNames(program) {
   const names = new Set();
-
-  /**
-   * Returns `true` when the initializer is a `register()` call.
-   *
-   * The field name is not checked: `register('title')` and a dynamic
-   * `register(name)` are both registrations.
-   */
-  function isRegisterCall(declarator) {
-    const init = declarator.init;
-
-    if (!init || init.type !== 'CallExpression') return false;
-    if (init.callee.type !== 'Identifier' || init.callee.name !== 'register') {
-      return false;
-    }
-
-    return true;
-  }
 
   function walkBody(body) {
     for (const statement of body) {
@@ -138,34 +131,19 @@ function destructuredRegisterNames(program) {
         for (const declarator of statement.declarations) {
           const id = declarator.id;
 
+          if (!isRegisterCall(declarator.init)) continue;
+          if (id.type === 'Identifier') {
+            names.add(id.name);
+            continue;
+          }
           if (id.type !== 'ObjectPattern') continue;
 
-          // Only a `register()` call counts. A destructure of anything else
-          // is not a registration.
-          if (!isRegisterCall(declarator)) continue;
-
           for (const property of id.properties) {
-            // The rest element — `{...registration}` — is the spread that
-            // binds the control, so its name is what the rule looks for.
-            if (property.type === 'RestElement') {
-              if (property.argument.type === 'Identifier') {
-                names.add(property.argument.name);
-              }
-
-              continue;
-            }
-
-            if (property.type !== 'Property') continue;
-            if (property.key.type !== 'Identifier') continue;
-            if (property.key.name !== 'ref') continue;
-
-            // A shorthand `{ ref }` binds the ref on its own. The control
-            // still needs the rest of the registration, so this shape on
-            // its own does not bind it.
-            if (property.shorthand) continue;
-
-            if (property.value.type === 'Identifier') {
-              names.add(property.value.name);
+            if (
+              property.type === 'RestElement' &&
+              property.argument.type === 'Identifier'
+            ) {
+              names.add(property.argument.name);
             }
           }
         }
@@ -287,99 +265,33 @@ function mentionsErrors(node) {
   return false;
 }
 
-/**
- * Returns `true` when the element is bound to the form.
- *
- * A control is bound when it is registered (`{...register('title')}`),
- * controlled by a `Controller` (`{...field}` or explicit `value` +
- * `onChange`), or carries a `name` of its own.
- *
- * A toggle reports its state through `checked`, not `value` — MUI's
- * `Checkbox`, `Switch` and `Radio` all use it — so `checked` + `onChange`
- * counts as bound too.
- *
- * @param {object} openingElement The JSX opening element.
- * @param {Set<string>} registeredNames The names bound from a destructured
- *   `register()` call, so a `{...registration}` spread counts as bound.
- */
-function isBoundToForm(openingElement, registeredNames) {
-  if (hasAttribute(openingElement, 'name')) {
-    return true;
-  }
-
-  const hasChange = hasAttribute(openingElement, 'onChange');
-
-  if (hasChange) {
-    if (hasAttribute(openingElement, 'value')) {
-      return true;
-    }
-
-    if (hasAttribute(openingElement, 'checked')) {
-      return true;
-    }
-  }
-
-  for (const spread of spreadsOf(openingElement)) {
-    const argument = spread.argument;
-
-    // `{...register('title')}` — the spread brings the name with it.
-    if (argument.type === 'CallExpression') {
-      const callee = argument.callee;
-
-      if (callee.type === 'Identifier' && callee.name === 'register') {
-        return true;
-      }
-
-      continue;
-    }
-
-    // `{...field}` — the `Controller` render prop's field object.
-    if (argument.type === 'Identifier' && argument.name === 'field') {
-      return true;
-    }
-
-    // `{...registration}` — the rest of a destructured `register()` call.
-    if (
-      argument.type === 'Identifier' &&
-      registeredNames.has(argument.name)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+function isRegisterCall(node) {
+  if (node?.type !== 'CallExpression') return false;
+  const callee = node.callee;
+  return (
+    (callee.type === 'Identifier' && callee.name === 'register') ||
+    (callee.type === 'MemberExpression' &&
+      !callee.computed &&
+      callee.property.name === 'register')
+  );
 }
 
-/**
- * Returns `true` when the element is registered with `register()`.
- *
- * Both the inline spread (`{...register('title')}`) and the destructured
- * one (`const { ref, ...registration } = register('title')`) count — the
- * second is the shape MUI's `TextField` needs, because it takes the ref
- * separately.
- */
-function isRegisteredWithRegister(openingElement, registeredNames) {
-  if (
-    spreadsOf(openingElement).some((spread) => {
-      const argument = spread.argument;
+function hasAllAttributes(node, names) {
+  return names.every((name) => hasAttribute(node, name));
+}
 
-      return (
-        argument.type === 'CallExpression' &&
-        argument.callee.type === 'Identifier' &&
-        argument.callee.name === 'register'
-      );
-    })
-  ) {
-    return true;
-  }
-
-  return spreadsOf(openingElement).some((spread) => {
-    const argument = spread.argument;
-
-    return (
-      argument.type === 'Identifier' && registeredNames.has(argument.name)
-    );
-  });
+function hasNativeBinding(node, registeredNames) {
+  return (
+    hasAllAttributes(node, ['value', 'onChange']) ||
+    hasAllAttributes(node, ['checked', 'onChange']) ||
+    hasAllAttributes(node, ['name', 'onChange', 'onBlur', 'ref']) ||
+    spreadsOf(node).some(
+      ({ argument }) =>
+        isRegisterCall(argument) ||
+        (argument.type === 'Identifier' &&
+          (argument.name === 'field' || registeredNames.has(argument.name))),
+    )
+  );
 }
 
 const noNativeFormControls = {
@@ -387,12 +299,12 @@ const noNativeFormControls = {
     type: 'problem',
     docs: {
       description:
-        'Require MUI form components instead of native HTML form controls.',
+        'Require Chakra form components instead of native HTML form controls.',
     },
     schema: [],
     messages: {
       nativeControl:
-        'Native `<{{element}}>` is not allowed — use the MUI equivalent (`TextField`, `Select`, `Checkbox`, …) so the control inherits the theme, the dark mode and the shared styling. The only exception is `<input type="hidden">`, which react-hook-form needs for a hidden field.',
+        'Use a Chakra field such as Input, Textarea, or NativeSelect.Field in place of a native `<{{element}}>`. Hidden inputs may be rendered directly.',
     },
   },
 
@@ -408,10 +320,10 @@ const noNativeFormControls = {
           const type = attributeOf(node, 'type');
 
           if (
-            type &&
-            type.type === 'JSXExpressionContainer' &&
-            type.expression.type === 'Literal' &&
-            type.expression.value === 'hidden'
+            (type?.type === 'Literal' && type.value === 'hidden') ||
+            (type?.type === 'JSXExpressionContainer' &&
+              type.expression.type === 'Literal' &&
+              type.expression.value === 'hidden')
           ) {
             return;
           }
@@ -486,12 +398,16 @@ const formControlMustBeWired = {
     type: 'problem',
     docs: {
       description:
-        'Require every MUI form control in a react-hook-form file to be registered or controlled.',
+        'Require every Chakra form control in a react-hook-form file to be registered or controlled.',
     },
     schema: [],
     messages: {
       notWired:
-        '`<{{element}}>` is not bound to the form, so its value is never submitted and never validated. Register it with `{{...register(\'name\')}}`, or wrap it in a `<Controller>` and spread `{{...field}}` — or pass `value` and `onChange` explicitly.',
+        'Bind `<{{element}}>` with register() or pass the Controller field props.',
+      missingFieldName:
+        'Pass a field name to `<{{element}}>` so it can register with the form.',
+      missingCompoundBinding:
+        'Bind `<{{element}}>` with Controller. Pass `{{valueProp}}` and adapt `{{changeProp}}` to field.onChange.',
     },
   },
 
@@ -502,51 +418,34 @@ const formControlMustBeWired = {
     // display-only field on a settings screen is not a form control.
     if (!bindings.has('useForm') && !bindings.has('Controller')) return {};
 
-    const registeredNames = destructuredRegisterNames(context.sourceCode.ast);
+    const program = context.sourceCode.ast;
+    const chakraNames = chakraImports(program);
+    const registeredNames = registerResultNames(program);
 
     return {
       JSXOpeningElement(node) {
-        const name = elementName(node.name);
+        const element = controlName(node.name, chakraNames);
+        const compoundBinding = COMPOUND_CONTROL_BINDINGS.get(element);
 
-        if (!name || !FORM_CONTROLS.has(name)) return;
-        if (isBoundToForm(node, registeredNames)) return;
-
-        context.report({
-          node,
-          messageId: 'notWired',
-          data: { element: name },
-        });
-      },
-    };
-  },
-};
-
-const selectRequiresController = {
-  meta: {
-    type: 'problem',
-    docs: {
-      description:
-        'Disallow `register()` on a MUI select, which requires a `Controller`.',
-    },
-    schema: [],
-    messages: {
-      selectNeedsController:
-        'A MUI `select` cannot be registered with `register()` — MUI\'s `Select` renders a hidden input plus a listbox, so the spread does not drive the displayed value. Wrap it in a `<Controller>` and pass `value` and `onChange` from `field`.',
-    },
-  },
-
-  create(context) {
-    const registeredNames = destructuredRegisterNames(context.sourceCode.ast);
-
-    return {
-      JSXOpeningElement(node) {
-        const name = elementName(node.name);
-
-        if (name !== 'TextField') return;
-        if (!hasAttribute(node, 'select')) return;
-        if (!isRegisteredWithRegister(node, registeredNames)) return;
-
-        context.report({ node, messageId: 'selectNeedsController' });
+        if (compoundBinding) {
+          if (hasAllAttributes(node, compoundBinding)) return;
+          const [valueProp, changeProp] = compoundBinding;
+          context.report({
+            node,
+            messageId: 'missingCompoundBinding',
+            data: { element, valueProp, changeProp },
+          });
+        } else if (
+          NATIVE_CHAKRA_CONTROLS.has(element) &&
+          !hasNativeBinding(node, registeredNames)
+        ) {
+          context.report({ node, messageId: 'notWired', data: { element } });
+        } else if (
+          SHARED_FORM_CONTROLS.has(element) &&
+          !hasAttribute(node, 'name')
+        ) {
+          context.report({ node, messageId: 'missingFieldName', data: { element } });
+        }
       },
     };
   },
@@ -599,15 +498,8 @@ const formErrorMustBeResolved = {
     }
 
     return {
-      // Only the attribute visitor is needed: a JSX expression container
-      // inside an attribute is visited twice (once by the attribute, once
-      // by the container), which would report the same node twice.
-      JSXAttribute(node) {
-        const value = node.value;
-
-        if (!value || value.type !== 'JSXExpressionContainer') return;
-
-        checkExpression(value.expression);
+      JSXExpressionContainer(node) {
+        checkExpression(node.expression);
       },
     };
   },
@@ -618,6 +510,5 @@ export const researchosFormRules = {
   'form-must-use-react-hook-form': formMustUseReactHookForm,
   'form-must-handle-submit': formMustHandleSubmit,
   'form-control-must-be-wired': formControlMustBeWired,
-  'select-requires-controller': selectRequiresController,
   'form-error-must-be-resolved': formErrorMustBeResolved,
 };

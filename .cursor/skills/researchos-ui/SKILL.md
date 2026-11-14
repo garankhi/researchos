@@ -1,6 +1,6 @@
 ---
 name: researchos-ui
-description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, Zustand client state, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, when deciding between the query cache and a Zustand store, or when the user mentions loading states, error states, React Query, Zustand, Orval, MUI, dark mode, responsive design, breakpoints, or Next.js route conventions.
+description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, Zustand client state, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, when deciding between the query cache and a Zustand store, or when the user mentions loading states, error states, React Query, Zustand, Orval, Chakra UI, dark mode, responsive design, breakpoints, or Next.js route conventions.
 ---
 
 # ResearchOS UI
@@ -22,7 +22,7 @@ looks wrong or when `query.data` has the wrong type.
 | The wire format — envelope, error shape, codes | `researchos-contract` |
 | How to build a screen, folder boundaries, state, feedback | **this skill** |
 | Server state (TanStack Query) and client state (Zustand) | **this skill** |
-| Forms — react-hook-form, zod, MUI form controls | `researchos-forms` |
+| Forms — react-hook-form, zod, Chakra UI v3 form controls | `researchos-forms` |
 | Wording — the message catalog, locale routing | `researchos-localization` |
 | Adding or changing an endpoint, codegen | `researchos-api-endpoint` |
 
@@ -167,29 +167,19 @@ Each row links to the section that shows the how.
 - [ ] `error.tsx` uses `retry`, narrows `error` from `unknown`, and is not
       exported as `Error`
       → [routing.md](reference/routing.md#segment--appsegmenterrortsx)
-- [ ] `notFound()` / `unauthorized()` / `forbidden()` are called from a
-      dedicated route, never from a click handler
+- [ ] Call `notFound()`, `unauthorized()`, or `forbidden()` while rendering the affected route
       → [routing.md](reference/routing.md#access-boundaries)
 
 ### UI
 
-- [ ] MUI layout props (`gap`, `flex`, `py`, `px`, `alignItems`,
-      `textAlign`, `fontWeight`) go through `sx`
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#v9-prop-surface)
-- [ ] Links use the `components/ui/link` wrapper, not `component={Link}`
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#links)
-- [ ] Responsive layout uses `sx` breakpoints, not a `useMediaQuery` branch
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#swap-with-sx-do-not-measure)
-- [ ] MUI and Tailwind breakpoints are never mixed in one tree
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#breakpoints)
-- [ ] Collapsed menus hide themselves on wide screens (`display` on the
-      `Menu`)
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#the-collapse-to-a-menu-pattern)
-- [ ] Flex children that hold text set `minWidth: 0`; popovers use
-      `min(92vw, …)`
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#never-let-a-child-overflow)
-- [ ] The theme is read only after mount, via `useSyncExternalStore`
-      → [mui-and-responsive.md](reference/mui-and-responsive.md#dark-mode)
+- [ ] Use Chakra style props and semantic tokens from the shared system
+      → [Chakra guide](reference/chakra-and-responsive.md#theme-and-tokens)
+- [ ] Compose locale-aware links with `asChild`
+      → [Chakra guide](reference/chakra-and-responsive.md#links)
+- [ ] Use responsive props and check portal visibility and keyboard focus
+      → [Chakra guide](reference/chakra-and-responsive.md#portals)
+- [ ] Check both themes, including cold hydration when changing providers
+      → [Chakra guide](reference/chakra-and-responsive.md#light-and-dark-mode)
 
 ### i18n and verification
 
@@ -223,9 +213,9 @@ Check the change in a browser, not just the build. A build passing does not
 prove the loading state appears, the error state recovers, or the cascade
 resolves in the right order.
 
-`/demo` is a scratch page that exercises these conventions end to end — MUI
-components, the cascade, dark mode, the API client, loading, error and the
-access boundaries. Use it to confirm a change behaves.
+Use Storybook for component examples and loading, error and access states.
+Run `pnpm --filter web build-storybook` and `pnpm --filter web test:storybook`
+for story changes. Verify navigation and HTTP status on real routes.
 
 If the change adds or changes an endpoint, regenerate the client first — see
 the `researchos-api-endpoint` skill for the codegen step.
@@ -240,7 +230,7 @@ Read the file you need; do not read them all.
 | [reference/data-and-errors.md](reference/data-and-errors.md) | The response envelope, query flags and the `isPending` trap, error codes and field errors |
 | [reference/client-state.md](reference/client-state.md) | TanStack Query vs Zustand, where a store lives, the store rules, clearing a store from a mutation |
 | [reference/loading-and-feedback.md](reference/loading-and-feedback.md) | Skeletons, mutation indicators, shared primitives, the snackbar provider, mutation feedback |
-| [reference/mui-and-responsive.md](reference/mui-and-responsive.md) | MUI v9 props, links, the Tailwind/MUI cascade, breakpoints, overflow, dark mode |
+| [reference/chakra-and-responsive.md](reference/chakra-and-responsive.md) | Chakra UI v3 tokens, responsive props, links, light and dark mode, portals, Storybook |
 | [reference/routing.md](reference/routing.md) | Error states at each level, route templates, access boundaries, Next.js file conventions, Suspense |
 | [reference/tooling.md](reference/tooling.md) | Orval imports, the eslint boundary rules, commands, query-vs-mutation hooks, the common-mistakes table |
 
@@ -249,7 +239,7 @@ Read the file you need; do not read them all.
 | Skill | Owns |
 | --- | --- |
 | `researchos-contract` | The response envelope and error codes on the wire |
-| `researchos-forms` | react-hook-form, zod, the MUI form controls, the form eslint rules |
+| `researchos-forms` | react-hook-form, zod, the Chakra UI v3 form controls, the form eslint rules |
 | `researchos-localization` | The message catalog, the locale routing, the wording |
 | `researchos-api-endpoint` | Adding an endpoint, the DTOs, the OpenAPI spec, the codegen |
 

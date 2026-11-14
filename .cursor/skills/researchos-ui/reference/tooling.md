@@ -184,12 +184,12 @@ config's `packageJson` is not set.
 | Clearing the store but leaving the query cache | The screen reads a stale session back out of the cache |
 | A user-facing string literal in a component | The string stays in one language forever. Use `t('…')` |
 | Looking a validation message up in the catalog | Validation messages are not codes yet — there is no key for them |
-| MUI system props passed directly | Invalid HTML attributes leak onto the DOM |
+| A custom component drops Chakra style props | Compose it with `chakra()` or apply the props to a Chakra wrapper |
 | `useMediaQuery` branching for layout | The server renders the mobile branch; hydration mismatch and a flash of the wrong layout |
 | A kept-mounted `Menu` without `display` on wide screens | The popup lingers in the DOM and flashes when the window is resized across the breakpoint |
 | A fixed px popover width | Overflows a phone viewport |
 | A flex child with text and no `minWidth: 0` | The row cannot shrink; a horizontal scrollbar appears |
-| Mixing MUI `sx` breakpoints with Tailwind `md:` classes | The two scales differ (MUI `md` is 900px, Tailwind `md:` is 768px) — the breakpoint lands in the wrong place |
+| A responsive trigger is hidden while its portal stays visible | Apply the same Chakra breakpoint to the portaled positioner |
 | `component={Link}` with `next/link` | "Functions cannot be passed directly to Client Components" |
 | Reading the theme during render | Hydration mismatch |
 | Exporting a component as `Error` | Shadows the global `Error`; breaks `instanceof` |

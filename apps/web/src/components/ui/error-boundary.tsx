@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Box, Button, Stack, Typography } from '@mui/material';
-import { ErrorOutlined } from '@mui/icons-material';
+import { ErrorState } from './feedback';
 import { catchError, type ErrorInfo } from 'next/error';
-import { useTranslations } from 'next-intl';
 
 /**
  * Component-level error boundary for ResearchOS.
@@ -28,42 +26,13 @@ function ErrorFallback(
   { title, message }: { title: string; message?: string },
   { error, retry }: ErrorInfo,
 ) {
-  const t = useTranslations('common');
-
   useEffect(() => {
     // Replace with your error reporting service. `error.digest` correlates
     // a production error with the server-side log entry.
     console.error(error);
   }, [error]);
 
-  return (
-    <Box
-      role="alert"
-      sx={{
-        p: 3,
-        border: 1,
-        borderColor: 'error.main',
-        borderRadius: 1,
-      }}
-    >
-      <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <ErrorOutlined color="error" fontSize="small" />
-          <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-            {title}
-          </Typography>
-        </Stack>
-        {message ? (
-          <Typography variant="body2" color="text.secondary">
-            {message}
-          </Typography>
-        ) : null}
-        <Button variant="outlined" size="small" onClick={() => retry()}>
-          {t('retry')}
-        </Button>
-      </Stack>
-    </Box>
-  );
+  return <ErrorState title={title} message={message} onRetry={retry} />;
 }
 
 export default catchError(ErrorFallback);
