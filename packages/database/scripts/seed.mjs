@@ -161,6 +161,93 @@ const USERS = [
     department_unit: 'Khoa Toan Tin',
     roles: ['RESEARCHER'],
   },
+
+  // ---------------------------------------------------------------------
+  // The extended demo cast
+  //
+  // The four accounts above are the fixed development roles. The accounts
+  // below are the cast the demo records belong to: enough people for the
+  // groups to have leads and members, for the opportunities to have
+  // applicants and responders, and for the publications to have
+  // co-authors beyond their owner.
+  //
+  // Every one of them is a researcher — `FACULTY` through the baseline
+  // rule, `STUDENT` through an explicit `RESEARCHER` role — because the
+  // triggers refuse a group without an active lead, an application from
+  // a non-researcher, and a follow from a non-researcher.
+  // ---------------------------------------------------------------------
+  {
+    email: 'lan.pham@researchos.local',
+    full_name: 'Pham Lan',
+    user_type: 'FACULTY',
+    academic_title: 'TS',
+    academic_degree: 'PGS',
+    department_unit: 'Khoa Toan Tin',
+    roles: [],
+  },
+  {
+    email: 'dung.tran@researchos.local',
+    full_name: 'Tran Dung',
+    user_type: 'FACULTY',
+    academic_title: 'ThS',
+    academic_degree: 'TS',
+    department_unit: 'Khoa Toan Tin',
+    roles: [],
+  },
+  {
+    email: 'hoa.bui@researchos.local',
+    full_name: 'Bui Hoa',
+    user_type: 'FACULTY',
+    academic_title: 'TS',
+    academic_degree: 'PGS',
+    department_unit: 'Truong Kinh Te',
+    roles: [],
+  },
+  {
+    email: 'nam.do@researchos.local',
+    full_name: 'Do Nam',
+    user_type: 'FACULTY',
+    academic_title: 'ThS',
+    academic_degree: 'TS',
+    department_unit: 'Truong Kinh Te',
+    roles: [],
+  },
+  {
+    email: 'linh.tran@researchos.local',
+    full_name: 'Tran Linh',
+    user_type: 'STUDENT',
+    academic_title: null,
+    academic_degree: null,
+    department_unit: 'Khoa Toan Tin',
+    roles: ['RESEARCHER'],
+  },
+  {
+    email: 'anh.vo@researchos.local',
+    full_name: 'Vo Anh',
+    user_type: 'STUDENT',
+    academic_title: null,
+    academic_degree: null,
+    department_unit: 'Khoa Toan Tin',
+    roles: ['RESEARCHER'],
+  },
+  {
+    email: 'khanh.ly@researchos.local',
+    full_name: 'Ly Khanh',
+    user_type: 'STUDENT',
+    academic_title: null,
+    academic_degree: null,
+    department_unit: 'Truong Kinh Te',
+    roles: ['RESEARCHER'],
+  },
+  {
+    email: 'son.nguyen@researchos.local',
+    full_name: 'Nguyen Son',
+    user_type: 'STUDENT',
+    academic_title: null,
+    academic_degree: null,
+    department_unit: 'Truong Kinh Te',
+    roles: ['RESEARCHER'],
+  },
 ];
 
 /**
@@ -207,6 +294,70 @@ const PROFILES = [
     availability_status: 'NOT_AVAILABLE',
     bio: 'Master’s student working on data mining for logistics research.',
   },
+  {
+    email: 'lan.pham@researchos.local',
+    orcid_id: '0000-0001-6244-9987',
+    scopus_author_id: '66000000004',
+    google_scholar_url: 'https://scholar.google.com/citations?user=demo-pham-lan',
+    availability_status: 'OPEN_FOR_COLLABORATION',
+    bio: 'Builds time series forecasting models for industrial sensor streams and energy demand.',
+  },
+  {
+    email: 'dung.tran@researchos.local',
+    orcid_id: '0000-0002-9071-3356',
+    scopus_author_id: '66000000005',
+    google_scholar_url: null,
+    availability_status: 'OPEN_FOR_COLLABORATION',
+    bio: 'Leads the computer vision work on defect detection in manufacturing lines.',
+  },
+  {
+    email: 'hoa.bui@researchos.local',
+    orcid_id: '0000-0001-8391-4472',
+    scopus_author_id: '66000000006',
+    google_scholar_url: 'https://scholar.google.com/citations?user=demo-bui-hoa',
+    availability_status: 'MENTORING_ONLY',
+    bio: 'Supervises master’s students on green finance and corporate climate disclosure.',
+  },
+  {
+    email: 'nam.do@researchos.local',
+    orcid_id: '0000-0002-3180-6644',
+    scopus_author_id: '66000000007',
+    google_scholar_url: null,
+    availability_status: 'SEEKING_GROUP',
+    bio: 'Studies inventory and supply chain optimisation under demand uncertainty.',
+  },
+  {
+    email: 'linh.tran@researchos.local',
+    orcid_id: null,
+    scopus_author_id: null,
+    google_scholar_url: null,
+    availability_status: 'OPEN_FOR_COLLABORATION',
+    bio: 'Graduate student working on retrieval-augmented generation for Vietnamese academic search.',
+  },
+  {
+    email: 'anh.vo@researchos.local',
+    orcid_id: null,
+    scopus_author_id: null,
+    google_scholar_url: null,
+    availability_status: 'NOT_AVAILABLE',
+    bio: 'Graduate student working on anomaly detection in industrial sensor networks.',
+  },
+  {
+    email: 'khanh.ly@researchos.local',
+    orcid_id: null,
+    scopus_author_id: null,
+    google_scholar_url: null,
+    availability_status: 'LIMITED_AVAILABILITY',
+    bio: 'Graduate student studying carbon accounting and emissions reporting for manufacturers.',
+  },
+  {
+    email: 'son.nguyen@researchos.local',
+    orcid_id: null,
+    scopus_author_id: null,
+    google_scholar_url: null,
+    availability_status: 'SEEKING_GROUP',
+    bio: 'Graduate student interested in reinforcement learning for robotics and control.',
+  },
 ];
 
 /**
@@ -225,6 +376,10 @@ const GROUPS = [
     members: [
       { email: 'minh.nguyen@researchos.local', role: 'GROUP_LEADER' },
       { email: 'hung.pham@researchos.local', role: 'MEMBER' },
+      { email: 'lan.pham@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'dung.tran@researchos.local', role: 'MEMBER' },
+      { email: 'linh.tran@researchos.local', role: 'MEMBER' },
+      { email: 'anh.vo@researchos.local', role: 'MEMBER' },
     ],
   },
   {
@@ -233,7 +388,59 @@ const GROUPS = [
     description:
       'Green supply chains, sustainable finance and the energy transition in manufacturing.',
     lead_email: 'thao.le@researchos.local',
-    members: [{ email: 'hung.pham@researchos.local', role: 'MEMBER' }],
+    members: [
+      { email: 'hung.pham@researchos.local', role: 'MEMBER' },
+      { email: 'hoa.bui@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'nam.do@researchos.local', role: 'MEMBER' },
+      { email: 'khanh.ly@researchos.local', role: 'MEMBER' },
+    ],
+  },
+  {
+    code: 'FPTU-FORECAST',
+    name: 'Forecasting and Operations Lab',
+    description:
+      'Time series forecasting, inventory optimisation and decision support under uncertainty.',
+    lead_email: 'lan.pham@researchos.local',
+    members: [
+      { email: 'nam.do@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'anh.vo@researchos.local', role: 'MEMBER' },
+      { email: 'son.nguyen@researchos.local', role: 'MEMBER' },
+    ],
+  },
+  {
+    code: 'FPTU-CVLAB',
+    name: 'Computer Vision for Manufacturing Lab',
+    description:
+      'Visual inspection, defect detection and robotics on the factory floor.',
+    lead_email: 'dung.tran@researchos.local',
+    members: [
+      { email: 'son.nguyen@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'quang.tran@researchos.local', role: 'MEMBER' },
+      { email: 'anh.vo@researchos.local', role: 'MEMBER' },
+    ],
+  },
+  {
+    code: 'FPTU-GREENFIN',
+    name: 'Green Finance Research Circle',
+    description:
+      'Climate disclosure, carbon accounting and the instruments that fund the transition.',
+    lead_email: 'hoa.bui@researchos.local',
+    members: [
+      { email: 'thao.le@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'khanh.ly@researchos.local', role: 'MEMBER' },
+    ],
+  },
+  {
+    code: 'FPTU-VLPR',
+    name: 'Vietnamese Language and Retrieval Group',
+    description:
+      'Vietnamese language technology, retrieval and evaluation for scientific text.',
+    lead_email: 'minh.nguyen@researchos.local',
+    members: [
+      { email: 'quang.tran@researchos.local', role: 'GROUP_LEADER' },
+      { email: 'linh.tran@researchos.local', role: 'MEMBER' },
+      { email: 'hung.pham@researchos.local', role: 'MEMBER' },
+    ],
   },
 ];
 
@@ -259,11 +466,81 @@ const DIRECTIONS = [
     topic_external_id: 'https://openalex.org/T10181',
   },
   {
+    group_code: 'FPTU-AILAB',
+    title: 'Robust learning under distribution shift',
+    description:
+      'Keeping a deployed model accurate when the sensor distribution moves underneath it.',
+    topic_external_id: 'https://openalex.org/T11689',
+  },
+  {
     group_code: 'FPTU-SUSTAIN',
     title: 'Financing the green transition in manufacturing',
     description:
       'Which instruments actually move a factory off fossil fuel, and which do not.',
     topic_external_id: 'https://openalex.org/T10047',
+  },
+  {
+    group_code: 'FPTU-SUSTAIN',
+    title: 'Supply chain visibility under demand uncertainty',
+    description:
+      'How much of a supply chain a planner can actually see before the disruption arrives.',
+    topic_external_id: 'https://openalex.org/T10328',
+  },
+  {
+    group_code: 'FPTU-FORECAST',
+    title: 'Probabilistic forecasting for demand and energy load',
+    description:
+      'Forecasts that carry their own uncertainty, rather than a single point estimate.',
+    topic_external_id: 'https://openalex.org/T12205',
+  },
+  {
+    group_code: 'FPTU-FORECAST',
+    title: 'Anomaly detection in industrial telemetry',
+    description:
+      'Finding the equipment fault before it becomes a production stoppage.',
+    topic_external_id: 'https://openalex.org/T11512',
+  },
+  {
+    group_code: 'FPTU-CVLAB',
+    title: 'Visual inspection and defect detection on the line',
+    description:
+      'Replacing the manual inspection step without losing the recall the safety case needs.',
+    topic_external_id: 'https://openalex.org/T11714',
+  },
+  {
+    group_code: 'FPTU-CVLAB',
+    title: 'Reinforcement learning for robotic control',
+    description:
+      'Learning the motion policy for a robot that works next to people.',
+    topic_external_id: 'https://openalex.org/T10462',
+  },
+  {
+    group_code: 'FPTU-GREENFIN',
+    title: 'Carbon accounting for mid-sized manufacturers',
+    description:
+      'A reporting method a factory can actually run without a dedicated sustainability team.',
+    topic_external_id: 'https://openalex.org/T10539',
+  },
+  {
+    group_code: 'FPTU-GREENFIN',
+    title: 'Corporate climate disclosure and governance',
+    description:
+      'What the disclosure rules ask of a firm, and what they change about its decisions.',
+    topic_external_id: 'https://openalex.org/T10019',
+  },
+  {
+    group_code: 'FPTU-VLPR',
+    title: 'Retrieval for Vietnamese academic corpora',
+    description:
+      'Finding the right passage in a Vietnamese scientific corpus is the hard part.',
+    topic_external_id: 'https://openalex.org/T10286',
+  },
+  {
+    group_code: 'FPTU-VLPR',
+    title: 'Graph-structured reasoning over scholarly data',
+    description:
+      'A citation graph carries more signal than a bag of words about the same paper.',
+    topic_external_id: 'https://openalex.org/T11273',
   },
 ];
 
@@ -281,19 +558,96 @@ const INTERESTS = [
     topic_external_ids: [
       'https://openalex.org/T12026',
       'https://openalex.org/T11689',
+      'https://openalex.org/T10181',
     ],
   },
   {
     email: 'minh.nguyen@researchos.local',
-    topic_external_ids: ['https://openalex.org/T10181', 'https://openalex.org/T12072'],
+    topic_external_ids: [
+      'https://openalex.org/T10181',
+      'https://openalex.org/T12072',
+      'https://openalex.org/T10286',
+    ],
   },
   {
     email: 'thao.le@researchos.local',
-    topic_external_ids: ['https://openalex.org/T10047', 'https://openalex.org/T10539'],
+    topic_external_ids: [
+      'https://openalex.org/T10047',
+      'https://openalex.org/T10539',
+      'https://openalex.org/T10019',
+    ],
   },
   {
     email: 'hung.pham@researchos.local',
-    topic_external_ids: ['https://openalex.org/T11912'],
+    topic_external_ids: [
+      'https://openalex.org/T11912',
+      'https://openalex.org/T10286',
+      'https://openalex.org/T10538',
+    ],
+  },
+  {
+    email: 'lan.pham@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T12205',
+      'https://openalex.org/T11270',
+      'https://openalex.org/T11689',
+    ],
+  },
+  {
+    email: 'dung.tran@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T11714',
+      'https://openalex.org/T10462',
+      'https://openalex.org/T10191',
+    ],
+  },
+  {
+    email: 'hoa.bui@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T10019',
+      'https://openalex.org/T10539',
+      'https://openalex.org/T10047',
+    ],
+  },
+  {
+    email: 'nam.do@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T10328',
+      'https://openalex.org/T12205',
+      'https://openalex.org/T10054',
+    ],
+  },
+  {
+    email: 'linh.tran@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T10286',
+      'https://openalex.org/T10181',
+      'https://openalex.org/T11273',
+    ],
+  },
+  {
+    email: 'anh.vo@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T11512',
+      'https://openalex.org/T12205',
+      'https://openalex.org/T10080',
+    ],
+  },
+  {
+    email: 'khanh.ly@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T10539',
+      'https://openalex.org/T10019',
+      'https://openalex.org/T11821',
+    ],
+  },
+  {
+    email: 'son.nguyen@researchos.local',
+    topic_external_ids: [
+      'https://openalex.org/T10462',
+      'https://openalex.org/T10191',
+      'https://openalex.org/T11714',
+    ],
   },
 ];
 
@@ -348,6 +702,123 @@ const OPPORTUNITIES = [
     response_sla_days: 10,
     deadline_in_days: 60,
   },
+  {
+    group_code: 'FPTU-AILAB',
+    creator_email: 'quang.tran@researchos.local',
+    title: 'Co-author wanted: explainability evaluation for industrial models',
+    opportunity_kind: 'RESEARCH_COLLABORATION',
+    target_audience: 'ANY_RESEARCHER',
+    expected_role: 'Co-author',
+    required_expertise_tags: ['explainable ai', 'evaluation', 'human studies'],
+    description:
+      'We need someone who has run a human evaluation of model explanations and can write the protocol up cleanly.',
+    response_sla_days: 7,
+    deadline_in_days: 40,
+  },
+  {
+    group_code: 'FPTU-FORECAST',
+    creator_email: 'lan.pham@researchos.local',
+    title: 'Master’s project: probabilistic forecasting of factory energy load',
+    opportunity_kind: 'PROJECT_FORMATION',
+    target_audience: 'STUDENT',
+    expected_role: 'Master’s student',
+    required_expertise_tags: ['time series', 'forecasting', 'python'],
+    description:
+      'A funded master’s project on demand forecasting for a mid-sized manufacturer, with real load data and a group that meets every week.',
+    response_sla_days: 7,
+    deadline_in_days: 50,
+  },
+  {
+    group_code: 'FPTU-FORECAST',
+    creator_email: 'nam.do@researchos.local',
+    title: 'Data exchange: anonymised production and inventory records',
+    opportunity_kind: 'DATA_METHOD_EXCHANGE',
+    target_audience: 'ANY_RESEARCHER',
+    expected_role: 'Data provider',
+    required_expertise_tags: ['supply chain', 'inventory', 'operations research'],
+    description:
+      'We are looking for partners willing to share anonymised order and stock records so the inventory models can be tested outside our own case.',
+    response_sla_days: 12,
+    deadline_in_days: 75,
+  },
+  {
+    group_code: 'FPTU-CVLAB',
+    creator_email: 'dung.tran@researchos.local',
+    title: 'Co-author wanted on visual inspection for surface defects',
+    opportunity_kind: 'RESEARCH_COLLABORATION',
+    target_audience: 'ANY_RESEARCHER',
+    expected_role: 'Co-author',
+    required_expertise_tags: ['computer vision', 'deep learning', 'manufacturing'],
+    description:
+      'A defect-detection dataset and a running baseline are in place. We want a co-author who has dealt with the recall-versus-precision trade-off on a real line.',
+    response_sla_days: 8,
+    deadline_in_days: 55,
+  },
+  {
+    group_code: 'FPTU-CVLAB',
+    creator_email: 'son.nguyen@researchos.local',
+    title: 'Master’s project: reinforcement learning for robotic grasping',
+    opportunity_kind: 'PROJECT_FORMATION',
+    target_audience: 'STUDENT',
+    expected_role: 'Master’s student',
+    required_expertise_tags: ['reinforcement learning', 'robotics', 'python'],
+    description:
+      'A simulation-first project on learned grasping policies, with hardware access in the second half of the project.',
+    response_sla_days: 10,
+    deadline_in_days: 65,
+  },
+  {
+    group_code: 'FPTU-GREENFIN',
+    creator_email: 'hoa.bui@researchos.local',
+    title: 'Funding call: climate disclosure research collaboration',
+    opportunity_kind: 'FUNDING_CALL',
+    target_audience: 'FACULTY',
+    expected_role: 'Co-PI',
+    required_expertise_tags: ['climate disclosure', 'corporate governance', 'finance'],
+    description:
+      'A joint proposal on what climate disclosure changes about corporate decisions, with a small internal seed fund attached.',
+    response_sla_days: 14,
+    deadline_in_days: 90,
+  },
+  {
+    group_code: 'FPTU-VLPR',
+    creator_email: 'minh.nguyen@researchos.local',
+    title: 'Co-author wanted: retrieval evaluation for Vietnamese corpora',
+    opportunity_kind: 'RESEARCH_COLLABORATION',
+    target_audience: 'ANY_RESEARCHER',
+    expected_role: 'Co-author',
+    required_expertise_tags: ['information retrieval', 'evaluation', 'vietnamese'],
+    description:
+      'The corpus is annotated and the baseline is in place. We are looking for someone comfortable designing retrieval metrics.',
+    response_sla_days: 7,
+    deadline_in_days: 45,
+  },
+  {
+    group_code: 'FPTU-VLPR',
+    creator_email: 'quang.tran@researchos.local',
+    title: 'Project formation: knowledge graph over the faculty publication record',
+    opportunity_kind: 'PROJECT_FORMATION',
+    target_audience: 'STUDENT',
+    expected_role: 'Master’s student',
+    required_expertise_tags: ['knowledge graph', 'graph learning', 'python'],
+    description:
+      'A master’s project building a citation graph over the faculty record, with an evaluation against a text-only baseline.',
+    response_sla_days: 9,
+    deadline_in_days: 60,
+  },
+  {
+    group_code: 'FPTU-SUSTAIN',
+    creator_email: 'thao.le@researchos.local',
+    title: 'Co-author wanted: carbon accounting method for mid-sized firms',
+    opportunity_kind: 'RESEARCH_COLLABORATION',
+    target_audience: 'ANY_RESEARCHER',
+    expected_role: 'Co-author',
+    required_expertise_tags: ['carbon accounting', 'sustainability', 'operations research'],
+    description:
+      'We need a co-author who has actually sat with a factory and worked out what they can measure every month.',
+    response_sla_days: 10,
+    deadline_in_days: 70,
+  },
 ];
 
 /**
@@ -380,6 +851,7 @@ const OUTPUTS = [
     authors: [
       { email: 'quang.tran@researchos.local', name: 'Tran Quang', order: 1, corresponding: true },
       { email: 'minh.nguyen@researchos.local', name: 'Nguyen Minh', order: 2, corresponding: false },
+      { email: 'lan.pham@researchos.local', name: 'Pham Lan', order: 3, corresponding: false },
     ],
   },
   {
@@ -400,6 +872,7 @@ const OUTPUTS = [
     authors: [
       { email: 'minh.nguyen@researchos.local', name: 'Nguyen Minh', order: 1, corresponding: true },
       { email: 'quang.tran@researchos.local', name: 'Tran Quang', order: 2, corresponding: false },
+      { email: 'linh.tran@researchos.local', name: 'Tran Linh', order: 3, corresponding: false },
     ],
   },
   {
@@ -417,7 +890,433 @@ const OUTPUTS = [
     group_code: 'FPTU-SUSTAIN',
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10047', 'https://openalex.org/T10539'],
-    authors: [{ email: 'thao.le@researchos.local', name: 'Le Thao', order: 1, corresponding: true }],
+    authors: [
+      { email: 'thao.le@researchos.local', name: 'Le Thao', order: 1, corresponding: true },
+      { email: 'hoa.bui@researchos.local', name: 'Bui Hoa', order: 2, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0004',
+    owner_email: 'lan.pham@researchos.local',
+    title: 'Probabilistic load forecasting for mid-sized factories',
+    abstract:
+      'We compare interval forecasts with point forecasts on hourly factory load data, and show that the interval quality matters more than the point accuracy for scheduling decisions.',
+    venue: 'International Journal of Energy Systems',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0004',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T12205', 'https://openalex.org/T11270'],
+    authors: [
+      { email: 'lan.pham@researchos.local', name: 'Pham Lan', order: 1, corresponding: true },
+      { email: 'nam.do@researchos.local', name: 'Do Nam', order: 2, corresponding: false },
+      { email: 'anh.vo@researchos.local', name: 'Vo Anh', order: 3, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0005',
+    owner_email: 'dung.tran@researchos.local',
+    title: 'Recall-aware visual inspection of surface defects',
+    abstract:
+      'We show that the defect recall a safety case requires pushes the operating point far from what an average F1 score would pick, and report the cost of that gap on two production lines.',
+    venue: 'Conference on Industrial Machine Vision',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0005',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T11714'],
+    authors: [
+      { email: 'dung.tran@researchos.local', name: 'Tran Dung', order: 1, corresponding: true },
+      { email: 'quang.tran@researchos.local', name: 'Tran Quang', order: 2, corresponding: false },
+      { email: 'son.nguyen@researchos.local', name: 'Nguyen Son', order: 3, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0006',
+    owner_email: 'hoa.bui@researchos.local',
+    title: 'What climate disclosure changes in corporate governance',
+    abstract:
+      'We compare governance outcomes before and after a disclosure mandate, and find the effect concentrates in firms with a weak board rather than in the average firm.',
+    venue: 'Journal of Corporate Governance',
+    publisher: 'FPTU Press',
+    publication_year: 2025,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0006',
+    visibility: 'RESEARCH_GROUP',
+    group_code: 'FPTU-GREENFIN',
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10019'],
+    authors: [
+      { email: 'hoa.bui@researchos.local', name: 'Bui Hoa', order: 1, corresponding: true },
+      { email: 'thao.le@researchos.local', name: 'Le Thao', order: 2, corresponding: false },
+      { email: 'khanh.ly@researchos.local', name: 'Ly Khanh', order: 3, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0007',
+    owner_email: 'nam.do@researchos.local',
+    title: 'Inventory visibility under uncertain demand',
+    abstract:
+      'We quantify how much of a multi-tier supply chain a planner can actually see, and show that visibility below the second tier changes replenishment policy more than any forecast improvement.',
+    venue: 'Journal of Supply Chain Management',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0007',
+    visibility: 'RESEARCH_GROUP',
+    group_code: 'FPTU-FORECAST',
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10328'],
+    authors: [
+      { email: 'nam.do@researchos.local', name: 'Do Nam', order: 1, corresponding: true },
+      { email: 'lan.pham@researchos.local', name: 'Pham Lan', order: 2, corresponding: false },
+      { email: 'hung.pham@researchos.local', name: 'Pham Hung', order: 3, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0008',
+    owner_email: 'minh.nguyen@researchos.local',
+    title: 'Retrieval evaluation for Vietnamese academic corpora',
+    abstract:
+      'We propose a passage-level retrieval evaluation for Vietnamese scientific corpora, and report the gap between the metrics commonly used and the ones practitioners actually act on.',
+    venue: 'Proceedings of the National Conference on Language Technology',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0008',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10286'],
+    authors: [
+      { email: 'minh.nguyen@researchos.local', name: 'Nguyen Minh', order: 1, corresponding: true },
+      { email: 'linh.tran@researchos.local', name: 'Tran Linh', order: 2, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0009',
+    owner_email: 'son.nguyen@researchos.local',
+    title: 'Learned grasping policies for a robot working near people',
+    abstract:
+      'We train a grasping policy in simulation and transfer it to hardware, and report the safety behaviour it shows when the grasp fails mid-motion.',
+    venue: 'International Conference on Robotics and Automation',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0009',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10462', 'https://openalex.org/T10191'],
+    authors: [
+      { email: 'son.nguyen@researchos.local', name: 'Nguyen Son', order: 1, corresponding: true },
+      { email: 'dung.tran@researchos.local', name: 'Tran Dung', order: 2, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0010',
+    owner_email: 'anh.vo@researchos.local',
+    title: 'Early detection of equipment faults in industrial telemetry',
+    abstract:
+      'We compare unsupervised and supervised early-warning signals on a year of sensor telemetry, and report the lead time each method actually delivers before a real stoppage.',
+    venue: 'Journal of Industrial Informatics',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0010',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T11512'],
+    authors: [
+      { email: 'anh.vo@researchos.local', name: 'Vo Anh', order: 1, corresponding: true },
+      { email: 'lan.pham@researchos.local', name: 'Pham Lan', order: 2, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0011',
+    owner_email: 'khanh.ly@researchos.local',
+    title: 'A monthly carbon accounting method a factory can actually run',
+    abstract:
+      'We derive a monthly emissions accounting method from measurements a mid-sized manufacturer already takes, and report the first-year results for four partner firms.',
+    venue: 'Journal of Sustainable Finance',
+    publisher: 'FPTU Press',
+    publication_year: 2026,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0011',
+    visibility: 'RESEARCH_GROUP',
+    group_code: 'FPTU-GREENFIN',
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10539', 'https://openalex.org/T11821'],
+    authors: [
+      { email: 'khanh.ly@researchos.local', name: 'Ly Khanh', order: 1, corresponding: true },
+      { email: 'hoa.bui@researchos.local', name: 'Bui Hoa', order: 2, corresponding: false },
+    ],
+  },
+  {
+    doi: '10.5555/researchos.demo.0012',
+    owner_email: 'hung.pham@researchos.local',
+    title: 'Mining logistics data for inventory and route decisions',
+    abstract:
+      'We apply data mining to a year of logistics records and find that the strongest signal for stock-out risk is the delivery-time variance rather than the demand forecast.',
+    venue: 'Proceedings of the National Conference on Language Technology',
+    publisher: 'FPTU Press',
+    publication_year: 2025,
+    output_type: 'PAPER',
+    external_url: 'https://doi.org/10.5555/researchos.demo.0012',
+    visibility: 'FPTU_COMMUNITY',
+    group_code: null,
+    provenance_tag: 'PAPER',
+    topic_external_ids: ['https://openalex.org/T10538', 'https://openalex.org/T11912'],
+    authors: [
+      { email: 'hung.pham@researchos.local', name: 'Pham Hung', order: 1, corresponding: true },
+      { email: 'nam.do@researchos.local', name: 'Do Nam', order: 2, corresponding: false },
+    ],
+  },
+];
+
+/**
+ * The demo applications.
+ *
+ * An application is a researcher asking for a place in an opportunity, so it
+ * ties a person to an opportunity, and through the opportunity to the
+ * group that published it.
+ *
+ * The trigger `guard_application` only lets an application start as
+ * `PENDING`, and only for an open, unexpired opportunity and a researcher
+ * applicant. The response is a separate write, and it needs the responder
+ * to be allowed to manage the opportunity.
+ *
+ * The responder is therefore the creator of the opportunity or a lead of
+ * the group it belongs to — never the applicant.
+ */
+const APPLICATIONS = [
+  {
+    opportunity_title: 'PhD student wanted: robust machine learning for sensor data',
+    applicant_email: 'anh.vo@researchos.local',
+    applicant_note:
+      'My master’s thesis is on drift in sensor streams, and I would like to continue into a PhD on the same problem.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'PhD student wanted: robust machine learning for sensor data',
+    applicant_email: 'linh.tran@researchos.local',
+    applicant_note:
+      'I work on retrieval, but the robustness half of the problem is what interests me most.',
+    status: 'INVITED_TO_DISCUSS',
+    responder_email: 'quang.tran@researchos.local',
+    response_note:
+      'Your evaluation work would be a good fit. Let us talk about the funding arrangements.',
+  },
+  {
+    opportunity_title: 'Co-author wanted on a Vietnamese NLP benchmark paper',
+    applicant_email: 'hung.pham@researchos.local',
+    applicant_note:
+      'I have run an evaluation study for the logistics data mining paper and can bring the methodology across.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Co-author wanted: explainability evaluation for industrial models',
+    applicant_email: 'anh.vo@researchos.local',
+    applicant_note:
+      'I am interested in the human side of the evaluation and have experience with operator interviews.',
+    status: 'INVITED_TO_DISCUSS',
+    responder_email: 'quang.tran@researchos.local',
+    response_note:
+      'This matches what we need. Let us sketch the evaluation protocol.',
+  },
+  {
+    opportunity_title: 'Master’s project: probabilistic forecasting of factory energy load',
+    applicant_email: 'son.nguyen@researchos.local',
+    applicant_note:
+      'I have worked on forecasting for a course project and would like to apply it to real load data.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Master’s project: reinforcement learning for robotic grasping',
+    applicant_email: 'son.nguyen@researchos.local',
+    applicant_note:
+      'Reinforcement learning is the subject I want to work on, and the simulation-first structure suits me.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Co-author wanted on visual inspection for surface defects',
+    applicant_email: 'lan.pham@researchos.local',
+    applicant_note:
+      'We have run a line study on the same recall-versus-precision question and can share the measurements.',
+    status: 'DECLINED',
+    responder_email: 'dung.tran@researchos.local',
+    response_note:
+      'Thank you — the dataset here is already fixed, so there is no room for a second line study.',
+  },
+  {
+    opportunity_title: 'Co-author wanted: carbon accounting method for mid-sized firms',
+    applicant_email: 'khanh.ly@researchos.local',
+    applicant_note:
+      'The monthly measurement method is the part I want to work on, and I can commit the field work.',
+    status: 'INVITED_TO_DISCUSS',
+    responder_email: 'thao.le@researchos.local',
+    response_note:
+      'Good — the field work is exactly the bottleneck. Let us agree on the measurement set.',
+  },
+  {
+    opportunity_title: 'Funding call: climate disclosure research collaboration',
+    applicant_email: 'thao.le@researchos.local',
+    applicant_note:
+      'Our group already has the disclosure data, and the seed fund would let us run the panel study.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Co-author wanted: retrieval evaluation for Vietnamese corpora',
+    applicant_email: 'linh.tran@researchos.local',
+    applicant_note:
+      'I am finishing a master’s project on the same corpus and would like to extend it into a paper.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Project formation: knowledge graph over the faculty publication record',
+    applicant_email: 'anh.vo@researchos.local',
+    applicant_note:
+      'I have worked with the citation export and would like to build the graph pipeline.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Data exchange: anonymised production and inventory records',
+    applicant_email: 'hung.pham@researchos.local',
+    applicant_note:
+      'Our group has records from two suppliers that we could share in anonymised form.',
+    status: 'PENDING',
+  },
+  {
+    opportunity_title: 'Data exchange: emissions data from manufacturing partners',
+    applicant_email: 'nam.do@researchos.local',
+    applicant_note:
+      'We can bring the supplier-side emissions data the study needs.',
+    status: 'WITHDRAWN',
+  },
+];
+
+/**
+ * The demo follows.
+ *
+ * A follow is a researcher watching another researcher, a group, a topic or
+ * a publication. The trigger `guard_researcher_feature` refuses a follow
+ * from an account without researcher access.
+ *
+ * The entity is named by the kind it is, so a follow on a group points at
+ * the group and not at a researcher who happens to share its id.
+ */
+const FOLLOWS = [
+  {
+    follower_email: 'hung.pham@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-AILAB',
+  },
+  {
+    follower_email: 'hung.pham@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-FORECAST',
+  },
+  {
+    follower_email: 'hung.pham@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'lan.pham@researchos.local',
+  },
+  {
+    follower_email: 'linh.tran@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-VLPR',
+  },
+  {
+    follower_email: 'linh.tran@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-AILAB',
+  },
+  {
+    follower_email: 'linh.tran@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'minh.nguyen@researchos.local',
+  },
+  {
+    follower_email: 'anh.vo@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-CVLAB',
+  },
+  {
+    follower_email: 'anh.vo@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-FORECAST',
+  },
+  {
+    follower_email: 'anh.vo@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'dung.tran@researchos.local',
+  },
+  {
+    follower_email: 'son.nguyen@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-CVLAB',
+  },
+  {
+    follower_email: 'son.nguyen@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'dung.tran@researchos.local',
+  },
+  {
+    follower_email: 'khanh.ly@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-GREENFIN',
+  },
+  {
+    follower_email: 'khanh.ly@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-SUSTAIN',
+  },
+  {
+    follower_email: 'khanh.ly@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'hoa.bui@researchos.local',
+  },
+  {
+    follower_email: 'nam.do@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-SUSTAIN',
+  },
+  {
+    follower_email: 'nam.do@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'thao.le@researchos.local',
+  },
+  {
+    follower_email: 'quang.tran@researchos.local',
+    entity_type: 'GROUP',
+    entity_code: 'FPTU-CVLAB',
+  },
+  {
+    follower_email: 'quang.tran@researchos.local',
+    entity_type: 'RESEARCHER',
+    entity_email: 'lan.pham@researchos.local',
+  },
+  {
+    follower_email: 'quang.tran@researchos.local',
+    entity_type: 'OUTPUT',
+    entity_doi: '10.5555/researchos.demo.0004',
+  },
+  {
+    follower_email: 'minh.nguyen@researchos.local',
+    entity_type: 'OUTPUT',
+    entity_doi: '10.5555/researchos.demo.0008',
+  },
+  {
+    follower_email: 'thao.le@researchos.local',
+    entity_type: 'OUTPUT',
+    entity_doi: '10.5555/researchos.demo.0006',
   },
 ];
 
@@ -1230,6 +2129,199 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
   }
 }
 
+/**
+ * Writes the applications.
+ *
+ * An application starts as `PENDING`, because the trigger `guard_application`
+ * refuses any other status on an insert. The response is a second write:
+ * the trigger only lets a pending application transition once, and it only
+ * lets somebody who can manage the opportunity respond to it.
+ *
+ * The response is therefore written through a transition rather than an
+ * update, so that the trigger sees the same shape it expects.
+ */
+async function seedApplications(prisma, idsByEmail) {
+  for (const application of APPLICATIONS) {
+    const applicantId = idsByEmail.get(application.applicant_email);
+
+    if (!applicantId) {
+      fail(`The application of ${application.applicant_email} has no account.`);
+    }
+
+    const opportunity = await prisma.research_opportunities.findFirst({
+      where: { title: application.opportunity_title },
+    });
+
+    if (!opportunity) {
+      fail(`The opportunity "${application.opportunity_title}" was not seeded.`);
+    }
+
+    const existing = await prisma.opportunity_applications.findFirst({
+      where: {
+        opportunity_id: opportunity.id,
+        applicant_id: applicantId,
+      },
+    });
+
+    // A withdrawn application is kept, so the unique index only covers the
+    // applications that are still live. One that was withdrawn is left
+    // alone: the history is part of the demo.
+    if (existing) {
+      if (existing.status === 'WITHDRAWN' || existing.status === application.status) {
+        continue;
+      }
+
+      const responderId = application.responder_email
+        ? idsByEmail.get(application.responder_email)
+        : null;
+
+      /*
+       * A withdrawal is made by the applicant, not by a responder, so it
+       * carries no `responded_by`.
+       */
+      if (application.status === 'WITHDRAWN') {
+        await prisma.opportunity_applications.update({
+          where: { id: existing.id },
+          data: { status: 'WITHDRAWN' },
+        });
+
+        continue;
+      }
+
+      if (application.status !== 'PENDING' && !responderId) {
+        fail(
+          `The response to "${application.opportunity_title}" has no responder account.`,
+        );
+      }
+
+      await prisma.opportunity_applications.update({
+        where: { id: existing.id },
+        data: {
+          status: application.status,
+          responded_by: responderId,
+          response_note: application.response_note ?? null,
+        },
+      });
+
+      continue;
+    }
+    const created = await prisma.opportunity_applications.create({
+      data: {
+        opportunity_id: opportunity.id,
+        applicant_id: applicantId,
+        applicant_note: application.applicant_note,
+        status: 'PENDING',
+        /*
+         * The trigger computes the SLA deadline from the opportunity's
+         * response window and overwrites whatever is written here, but
+         * Prisma insists on the column, so a placeholder is given.
+         */
+        response_due_at: new Date(),
+      },
+    });
+
+    if (application.status === 'PENDING') {
+      continue;
+    }
+
+    /*
+     * A withdrawal is made by the applicant, not by a responder. The
+     * trigger treats it as the applicant giving up, so `responded_by`
+     * stays empty and only the timestamp is set.
+     */
+    if (application.status === 'WITHDRAWN') {
+      await prisma.opportunity_applications.update({
+        where: { id: created.id },
+        data: { status: 'WITHDRAWN' },
+      });
+
+      continue;
+    }
+
+    const responderId = application.responder_email
+      ? idsByEmail.get(application.responder_email)
+      : null;
+
+    if (!responderId) {
+      fail(
+        `The response to "${application.opportunity_title}" has no responder account.`,
+      );
+    }
+
+    await prisma.opportunity_applications.update({
+      where: { id: created.id },
+      data: {
+        status: application.status,
+        responded_by: responderId,
+        response_note: application.response_note ?? null,
+      },
+    });
+  }
+}
+
+/**
+ * Writes the follows.
+ *
+ * A follow points at a researcher, a group, a topic or a publication. The
+ * entity is resolved from the name the demo record uses — an email for a
+ * researcher, a code for a group, a DOI for a publication — so the seed
+ * never has to know a uuid.
+ */
+async function seedFollows(prisma, idsByEmail, idsByCode) {
+  for (const follow of FOLLOWS) {
+    const followerId = idsByEmail.get(follow.follower_email);
+
+    if (!followerId) {
+      fail(`The follow of ${follow.follower_email} has no account.`);
+    }
+
+    let entityId;
+
+    if (follow.entity_type === 'RESEARCHER') {
+      entityId = idsByEmail.get(follow.entity_email);
+
+      if (!entityId) {
+        fail(`The followed researcher ${follow.entity_email} has no account.`);
+      }
+    } else if (follow.entity_type === 'GROUP') {
+      entityId = idsByCode.get(follow.entity_code);
+
+      if (!entityId) {
+        fail(`The followed group ${follow.entity_code} was not seeded.`);
+      }
+    } else if (follow.entity_type === 'OUTPUT') {
+      const output = await prisma.research_outputs.findUnique({
+        where: { doi: follow.entity_doi },
+        select: { id: true },
+      });
+
+      if (!output) {
+        fail(`The followed publication ${follow.entity_doi} was not seeded.`);
+      }
+
+      entityId = output.id;
+    } else {
+      fail(`The follow of ${follow.follower_email} has an unknown entity type.`);
+    }
+
+    await prisma.user_follows.upsert({
+      where: {
+        follower_id_entity_type_entity_id: {
+          follower_id: followerId,
+          entity_type: follow.entity_type,
+          entity_id: entityId,
+        },
+      },
+      create: {
+        follower_id: followerId,
+        entity_type: follow.entity_type,
+        entity_id: entityId,
+      },
+      update: {},
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
@@ -1274,6 +2366,14 @@ export async function seedDemoRecords(prisma, idsByTopicExternalId) {
   log('');
   log('Seeding the demo publications ...');
   await seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId);
+
+  log('');
+  log('Seeding the demo applications ...');
+  await seedApplications(prisma, idsByEmail);
+
+  log('');
+  log('Seeding the demo follows ...');
+  await seedFollows(prisma, idsByEmail, idsByCode);
 }
 
 /**
@@ -1333,6 +2433,8 @@ export async function reportCounts(prisma) {
     interests,
     opportunities,
     outputs,
+    applications,
+    follows,
     searchIndex,
   ] = await Promise.all([
     prisma.research_fields.count(),
@@ -1345,22 +2447,26 @@ export async function reportCounts(prisma) {
     prisma.research_interests.count(),
     prisma.research_opportunities.count(),
     prisma.research_outputs.count(),
+    prisma.opportunity_applications.count(),
+    prisma.user_follows.count(),
     prisma.search_index.count(),
   ]);
 
   log('');
   log('Seed complete.');
-  log(`  research_fields     ${fields}`);
-  log(`  research_subfields  ${subfields}`);
-  log(`  research_topics     ${topics}`);
-  log(`  users               ${users}`);
-  log(`  researcher_profiles ${profiles}`);
-  log(`  research_groups     ${groups}`);
-  log(`  group_directions    ${directions}`);
-  log(`  research_interests  ${interests}`);
-  log(`  opportunities       ${opportunities}`);
-  log(`  research_outputs    ${outputs}`);
-  log(`  search_index        ${searchIndex}`);
+  log(`  research_fields       ${fields}`);
+  log(`  research_subfields    ${subfields}`);
+  log(`  research_topics       ${topics}`);
+  log(`  users                 ${users}`);
+  log(`  researcher_profiles   ${profiles}`);
+  log(`  research_groups       ${groups}`);
+  log(`  group_directions      ${directions}`);
+  log(`  research_interests    ${interests}`);
+  log(`  opportunities         ${opportunities}`);
+  log(`  research_outputs      ${outputs}`);
+  log(`  applications          ${applications}`);
+  log(`  follows               ${follows}`);
+  log(`  search_index          ${searchIndex}`);
 }
 
 /**
