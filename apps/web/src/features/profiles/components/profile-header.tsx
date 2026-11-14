@@ -1,20 +1,23 @@
 'use client';
 
 import {
-  Avatar,
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  Link as MuiLink,
+  Flex,
+  Heading,
+  Link,
+  Skeleton,
   Stack,
-  Typography,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import SchoolIcon from '@mui/icons-material/School';
-import LinkIcon from '@mui/icons-material/Link';
-import VerifiedIcon from '@mui/icons-material/Verified';
+  Text,
+} from '@chakra-ui/react';
+import {
+  CheckCircle2,
+  ExternalLink,
+  GraduationCap,
+  Link2,
+  Pencil,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { initialsOf } from '../utils/initials';
 import type {
@@ -22,21 +25,21 @@ import type {
   ProfileResponseDtoAvailabilityStatus,
 } from '../types';
 
-function getAvailabilityColor(
+function getAvailabilityPalette(
   status: ProfileResponseDtoAvailabilityStatus,
-): 'success' | 'info' | 'primary' | 'warning' | 'default' {
+): 'green' | 'blue' | 'purple' | 'orange' | 'gray' {
   switch (status) {
     case 'OPEN_FOR_COLLABORATION':
-      return 'success';
+      return 'green';
     case 'SEEKING_GROUP':
-      return 'info';
+      return 'blue';
     case 'MENTORING_ONLY':
-      return 'primary';
+      return 'purple';
     case 'LIMITED_AVAILABILITY':
-      return 'warning';
+      return 'orange';
     case 'NOT_AVAILABLE':
     default:
-      return 'default';
+      return 'gray';
   }
 }
 
@@ -45,167 +48,194 @@ export function ProfileHeader({
   isOwner,
   onEdit,
 }: {
-  profile: ProfileResponseDto;
+  /**
+   * The profile, or `undefined` while it is still being fetched or when
+   * the request did not produce one.
+   *
+   * The header is part of the page's permanent chrome, so it has to be
+   * renderable without a profile: the shell keeps the header in place
+   * while the content area reports what happened. A missing profile
+   * therefore draws a placeholder rather than taking the header — and
+   * with it the page layout — down.
+   */
+  profile?: ProfileResponseDto;
   isOwner?: boolean;
   onEdit?: () => void;
 }) {
   const t = useTranslations('profile');
   const tAvailability = useTranslations('profile.availability');
 
+  if (!profile) {
+    return (
+      <Box
+        bg="bg.panel"
+        borderWidth="1px"
+        borderRadius="lg"
+        p={{ base: '4', md: '6' }}
+        mb="6"
+      >
+        <Flex
+          direction={{ base: 'column', sm: 'row' }}
+          gap="6"
+          align={{ base: 'center', sm: 'flex-start' }}
+        >
+          <Skeleton
+            w={{ base: '20', sm: '25' }}
+            h={{ base: '20', sm: '25' }}
+            borderRadius="full"
+            flexShrink={0}
+          />
+
+          <Stack gap="3" flex="1" minW="0">
+            <Skeleton h="6" w="48" maxW="full" />
+            <Skeleton h="4" w="72" maxW="full" />
+            <Skeleton h="4" w="40" maxW="full" />
+          </Stack>
+        </Flex>
+      </Box>
+    );
+  }
+
   const titlesAndDegrees = [profile.academicTitle, profile.academicDegree]
     .filter(Boolean)
     .join(', ');
 
   return (
-    <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-      <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={3}
-          sx={{ alignItems: { xs: 'center', sm: 'flex-start' } }}
+    <Box
+      bg="bg.panel"
+      borderWidth="1px"
+      borderRadius="lg"
+      p={{ base: '4', md: '6' }}
+      mb="6"
+    >
+      <Flex
+        direction={{ base: 'column', sm: 'row' }}
+        gap="6"
+        align={{ base: 'center', sm: 'flex-start' }}
+      >
+        <Flex
+          align="center"
+          justify="center"
+          w={{ base: '20', sm: '25' }}
+          h={{ base: '20', sm: '25' }}
+          flexShrink={0}
+          borderRadius="full"
+          bg="colorPalette.solid"
+          color="colorPalette.contrast"
+          fontSize={{ base: 'xl', sm: '2xl' }}
+          fontWeight="semibold"
         >
-          <Avatar
-            sx={{
-              width: { xs: 80, sm: 100 },
-              height: { xs: 80, sm: 100 },
-              fontSize: { xs: '1.75rem', sm: '2.25rem' },
-              bgcolor: 'primary.main',
-              fontWeight: 600,
-            }}
-          >
-            {initialsOf(profile.fullName)}
-          </Avatar>
+          {initialsOf(profile.fullName)}
+        </Flex>
 
-          <Stack
-            spacing={1.5}
-            sx={{ flex: 1, textAlign: { xs: 'center', sm: 'left' } }}
+        <Stack
+          gap="3"
+          flex="1"
+          minW="0"
+          textAlign={{ base: 'center', sm: 'left' }}
+        >
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap="3"
+            align={{ base: 'center', sm: 'center' }}
+            justify="space-between"
+            flexWrap="wrap"
           >
             <Box>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                sx={{
-                  alignItems: { xs: 'center', sm: 'center' },
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="h5"
-                    component="h1"
-                    sx={{ fontWeight: 700 }}
-                  >
-                    {profile.fullName}
-                  </Typography>
-                  {titlesAndDegrees ? (
-                    <Typography variant="subtitle1" color="text.secondary">
-                      {titlesAndDegrees}
-                    </Typography>
-                  ) : null}
-                </Box>
-
-                {isOwner && onEdit ? (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<EditIcon />}
-                    onClick={onEdit}
-                    sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' } }}
-                  >
-                    {t('editProfile')}
-                  </Button>
-                ) : null}
-              </Stack>
+              <Heading as="h1" size="lg" fontWeight="bold">
+                {profile.fullName}
+              </Heading>
+              {titlesAndDegrees ? (
+                <Text textStyle="md" color="fg.muted">
+                  {titlesAndDegrees}
+                </Text>
+              ) : null}
             </Box>
 
-            <Typography variant="body2" color="text.secondary">
-              {profile.departmentUnit} • {profile.email}
-            </Typography>
-
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{
-                flexWrap: 'wrap',
-                justifyContent: { xs: 'center', sm: 'flex-start' },
-                alignItems: 'center',
-                gap: 1,
-              }}
-            >
-              <Chip
-                label={tAvailability(profile.availabilityStatus)}
-                color={getAvailabilityColor(profile.availabilityStatus)}
-                size="small"
-                variant="outlined"
-              />
-
-              {profile.orcidId ? (
-                <Chip
-                  icon={<VerifiedIcon fontSize="small" />}
-                  label={`ORCID: ${profile.orcidId}`}
-                  size="small"
-                  variant="outlined"
-                  component="a"
-                  href={`https://orcid.org/${profile.orcidId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  clickable
-                />
-              ) : null}
-
-              {profile.googleScholarUrl ? (
-                <MuiLink
-                  href={profile.googleScholarUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  underline="hover"
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    fontSize: '0.8125rem',
-                  }}
-                >
-                  <SchoolIcon fontSize="inherit" />
-                  Google Scholar
-                </MuiLink>
-              ) : null}
-
-              {profile.scopusAuthorId ? (
-                <MuiLink
-                  href={`https://www.scopus.com/authid/detail.uri?authorId=${profile.scopusAuthorId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  underline="hover"
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    fontSize: '0.8125rem',
-                  }}
-                >
-                  <LinkIcon fontSize="inherit" />
-                  Scopus: {profile.scopusAuthorId}
-                </MuiLink>
-              ) : null}
-            </Stack>
-
-            {profile.bio ? (
-              <Typography
-                variant="body2"
-                sx={{
-                  pt: 1,
-                  whiteSpace: 'pre-line',
-                  color: 'text.primary',
-                }}
+            {isOwner && onEdit ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEdit}
+                alignSelf={{ base: 'stretch', sm: 'flex-start' }}
               >
-                {profile.bio}
-              </Typography>
+                <Pencil />
+                {t('editProfile')}
+              </Button>
             ) : null}
-          </Stack>
+          </Flex>
+
+          <Text textStyle="sm" color="fg.muted">
+            {profile.departmentUnit} • {profile.email}
+          </Text>
+
+          <Flex
+            gap="2"
+            flexWrap="wrap"
+            justify={{ base: 'center', sm: 'flex-start' }}
+            align="center"
+          >
+            <Badge
+              variant="outline"
+              colorPalette={getAvailabilityPalette(profile.availabilityStatus)}
+            >
+              {tAvailability(profile.availabilityStatus)}
+            </Badge>
+
+            {profile.orcidId ? (
+              <Link
+                href={`https://orcid.org/${profile.orcidId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                display="inline-flex"
+                alignItems="center"
+                gap="1"
+                textStyle="xs"
+              >
+                <CheckCircle2 />
+                {`ORCID: ${profile.orcidId}`}
+              </Link>
+            ) : null}
+
+            {profile.googleScholarUrl ? (
+              <Link
+                href={profile.googleScholarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                display="inline-flex"
+                alignItems="center"
+                gap="1"
+                textStyle="xs"
+              >
+                <GraduationCap />
+                Google Scholar
+                <ExternalLink />
+              </Link>
+            ) : null}
+
+            {profile.scopusAuthorId ? (
+              <Link
+                href={`https://www.scopus.com/authid/detail.uri?authorId=${profile.scopusAuthorId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                display="inline-flex"
+                alignItems="center"
+                gap="1"
+                textStyle="xs"
+              >
+                <Link2 />
+                {`Scopus: ${profile.scopusAuthorId}`}
+              </Link>
+            ) : null}
+          </Flex>
+
+          {profile.bio ? (
+            <Text textStyle="sm" pt="1" whiteSpace="pre-line">
+              {profile.bio}
+            </Text>
+          ) : null}
         </Stack>
-      </CardContent>
-    </Card>
+      </Flex>
+    </Box>
   );
 }

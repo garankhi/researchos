@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Container } from '@mui/material';
+import { Container } from '@chakra-ui/react';
 import { LoadingSkeleton } from '@/components/ui/feedback';
 import { ProfileShell } from '@/features/profiles';
 
@@ -19,7 +19,7 @@ export default function ProfilePage(props: ProfilePageProps) {
   return (
     <Suspense
       fallback={
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Container maxW="6xl" py="6">
           <LoadingSkeleton variant="rectangular" height={160} />
         </Container>
       }

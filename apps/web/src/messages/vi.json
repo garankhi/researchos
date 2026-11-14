@@ -7,7 +7,8 @@
     "save": "Lưu",
     "close": "Đóng",
     "notifications": "Thông báo",
-    "backToHome": "Về trang chủ"
+    "backToHome": "Về trang chủ",
+    "add": "Thêm"
   },
   "nav": {
     "products": "Sản phẩm",
@@ -17,6 +18,7 @@
     "account": "Tài khoản",
     "dashboard": "Bảng điều khiển",
     "logout": "Đăng xuất",
+    "myProfile": "Hồ sơ của tôi",
     "openSettings": "Mở cài đặt",
     "openMenu": "Mở menu",
     "accountOfCurrentUser": "Menu tài khoản của {name}"
@@ -74,8 +76,12 @@
     "scopusAuthorId": "Mã tác giả Scopus",
     "orcidId": "Mã ORCID",
     "profileUpdated": "Cập nhật hồ sơ thành công.",
+    "loadError": "Không tải được dữ liệu. Vui lòng thử lại.",
+    "updateError": "Không lưu được thay đổi. Vui lòng thử lại.",
     "profileAccessDenied": "Hồ sơ này chưa được xác nhận và chỉ chủ sở hữu mới có thể xem.",
     "profileNotFound": "Không tìm thấy hồ sơ nhà nghiên cứu.",
+    "profileEmpty": "Chưa có hồ sơ",
+    "profileEmptyDesc": "Nhà nghiên cứu này chưa thiết lập hồ sơ.",
     "unauthenticatedNotice": "Vui lòng đăng nhập để xem hồ sơ của bạn.",
     "tabs": {
       "applications": "Đơn ứng tuyển",
@@ -91,17 +97,31 @@
       "LIMITED_AVAILABILITY": "Khả năng tham gia hạn chế",
       "NOT_AVAILABLE": "Không sẵn sàng"
     },
+    "applicationStatus": {
+      "PENDING": "Đang chờ",
+      "INVITED_TO_DISCUSS": "Được mời trao đổi",
+      "DECLINED": "Đã từ chối",
+      "WITHDRAWN": "Đã rút"
+    },
+    "interestStatus": {
+      "SUGGESTED": "Được đề xuất",
+      "ACTIVE": "Đang hoạt động",
+      "REJECTED": "Đã từ chối"
+    },
     "applicationsTab": {
       "title": "Đơn ứng tuyển đã nộp",
       "description": "Theo dõi tiến độ đơn ứng tuyển cơ hội nghiên cứu và cam kết thời gian phản hồi.",
       "emptyTitle": "Chưa có đơn ứng tuyển",
       "emptyMessage": "Bạn chưa nộp đơn ứng tuyển cho cơ hội nghiên cứu nào.",
-      "deadline": "Hạn phản hồi: {date}",
-      "countdown": "Còn {seconds} giây",
-      "countdownOverdue": "Đã quá hạn",
       "withdraw": "Rút đơn",
       "withdrawing": "Đang rút đơn…",
       "withdrawSuccess": "Đã rút đơn ứng tuyển thành công.",
+      "withdrawError": "Không thể rút đơn. Vui lòng thử lại.",
+      "appliedOn": "Đã nộp ngày {date}",
+      "remaining": "Còn {time}",
+      "countdownOverdue": "Đã quá hạn",
+      "confirmWithdrawTitle": "Rút đơn ứng tuyển này?",
+      "confirmWithdrawDesc": "Việc rút đơn sẽ thông báo tới chủ quản. Bạn có thể nộp lại khi cơ hội còn mở.",
       "noteLabel": "Lời nhắn của bạn:",
       "responseNoteLabel": "Phản hồi từ chủ quản:"
     },
@@ -132,8 +152,13 @@
       "emptyTitle": "Chưa có sở thích nghiên cứu",
       "emptyMessage": "Chưa có chủ đề nghiên cứu nào được thêm.",
       "removeInterest": "Xóa",
+      "acceptInterest": "Chấp nhận",
+      "rejectInterest": "Từ chối",
       "interestAdded": "Đã thêm sở thích nghiên cứu thành công.",
+      "interestAddError": "Không thể thêm sở thích. Vui lòng thử lại.",
       "interestRemoved": "Đã xóa sở thích nghiên cứu.",
+      "interestAccepted": "Đã chấp nhận sở thích.",
+      "interestRejected": "Đã từ chối sở thích.",
       "selectTopic": "Chọn chủ đề nghiên cứu",
       "declared": "Tự khai",
       "inferred": "Gợi ý",

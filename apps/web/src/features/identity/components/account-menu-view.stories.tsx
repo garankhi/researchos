@@ -21,6 +21,14 @@ type Story = StoryObj<typeof meta>;
 
 export const SignedIn: Story = {};
 
+/**
+ * The menu holds more than one item, so an item is addressed by its label
+ * rather than by its role alone.
+ */
+function menuItem(container: HTMLElement, name: string) {
+  return within(container).getByRole('menuitem', { name });
+}
+
 export const KeyboardNavigation: Story = {
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
@@ -31,11 +39,11 @@ export const KeyboardNavigation: Story = {
     async function openMenuWithKeyboard() {
       await userEvent.keyboard('{Enter}');
       const menu = await body.findByRole('menu');
-      const logout = within(menu).getByRole('menuitem');
+      const first = within(menu).getAllByRole('menuitem')[0];
       await waitFor(() => {
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
         expect(menu).toHaveFocus();
-        expect(menu).toHaveAttribute('aria-activedescendant', logout.id);
+        expect(menu).toHaveAttribute('aria-activedescendant', first.id);
       });
     }
 
@@ -52,6 +60,10 @@ export const KeyboardNavigation: Story = {
     await expect(args.onLogout).not.toHaveBeenCalled();
 
     await openMenuWithKeyboard();
+
+    // The focus starts on the first item, so the logout item is reached
+    // with one more key press.
+    await userEvent.keyboard('{ArrowDown}');
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(args.onLogout).toHaveBeenCalledTimes(1));
   },
@@ -64,14 +76,12 @@ export const SigningOut: Story = {
     await userEvent.click(
       canvas.getByRole('button', { name: new RegExp(args.user.fullName) }),
     );
-    const menu = await within(canvasElement.ownerDocument.body).findByRole(
-      'menu',
-    );
+    const body = within(canvasElement.ownerDocument.body);
+    await body.findByRole('menu');
 
-    await expect(within(menu).getByRole('menuitem')).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    await expect(
+      menuItem(canvasElement.ownerDocument.body, 'Log out'),
+    ).toHaveAttribute('aria-disabled', 'true');
     await expect(args.onLogout).not.toHaveBeenCalled();
   },
 };

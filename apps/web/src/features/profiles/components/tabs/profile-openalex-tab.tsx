@@ -2,19 +2,16 @@
 
 import { useState } from 'react';
 import {
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  Link as MuiLink,
+  Flex,
+  Heading,
+  Link,
   Stack,
-  Typography,
-} from '@mui/material';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import LaunchIcon from '@mui/icons-material/Launch';
-import SchoolIcon from '@mui/icons-material/School';
+  Text,
+} from '@chakra-ui/react';
+import { Check, ExternalLink, GraduationCap, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import {
@@ -49,7 +46,10 @@ export function ProfileOpenAlexTab() {
       setOperatingId(work.id);
       setOperationType('accept');
       await acceptWork(work.id);
-      showSnackbar({ message: t('candidateAccepted'), severity: 'success' });
+      showSnackbar({
+        message: t('openalexTab.workAccepted'),
+        severity: 'success',
+      });
     } catch {
       showSnackbar({ message: t('updateError'), severity: 'error' });
     } finally {
@@ -63,7 +63,10 @@ export function ProfileOpenAlexTab() {
       setOperatingId(work.id);
       setOperationType('reject');
       await rejectWork(work.id);
-      showSnackbar({ message: t('candidateRejected'), severity: 'info' });
+      showSnackbar({
+        message: t('openalexTab.workRejected'),
+        severity: 'info',
+      });
     } catch {
       showSnackbar({ message: t('updateError'), severity: 'error' });
     } finally {
@@ -74,7 +77,7 @@ export function ProfileOpenAlexTab() {
 
   if (isLoading) {
     return (
-      <Stack spacing={2} sx={{ py: 2 }}>
+      <Stack gap="4" py="2">
         <LoadingSkeleton variant="rectangular" height={130} count={3} />
       </Stack>
     );
@@ -87,24 +90,19 @@ export function ProfileOpenAlexTab() {
   if (candidates.length === 0) {
     return (
       <EmptyState
-        title={t('tabs.openalexEmpty')}
-        message={t('tabs.openalexEmptyDesc')}
+        title={t('openalexTab.emptyTitle')}
+        message={t('openalexTab.emptyMessage')}
       />
     );
   }
 
   return (
-    <Stack spacing={2.5} sx={{ py: 1 }}>
-      <Stack
-        direction="row"
-        sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {t('openalexQueueTitle')} ({pendingCount})
-        </Typography>
-      </Stack>
+    <Stack gap="5" py="1">
+      <Heading as="h3" size="sm" fontWeight="semibold">
+        {t('openalexTab.title')} ({pendingCount})
+      </Heading>
 
-      <Stack spacing={2}>
+      <Stack gap="4">
         {candidates.map((work) => {
           const isCurrentOperating = operatingId === work.id;
           const isAccepting = isCurrentOperating && operationType === 'accept';
@@ -112,167 +110,127 @@ export function ProfileOpenAlexTab() {
           const authorsStr = work.authors?.join(', ');
 
           return (
-            <Card key={work.id} variant="outlined" sx={{ borderRadius: 2 }}>
-              <CardContent sx={{ p: 2.5 }}>
-                <Stack
-                  direction={{ xs: 'column', md: 'row' }}
-                  spacing={2}
-                  sx={{
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'flex-start', md: 'center' },
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="h6"
-                      component="h3"
-                      sx={{
-                        fontSize: '1.05rem',
-                        fontWeight: 600,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {work.title}
-                    </Typography>
-
-                    {authorsStr ? (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        {authorsStr}
-                      </Typography>
-                    ) : null}
-
-                    <Stack
-                      direction="row"
-                      spacing={1.5}
-                      sx={{
-                        mt: 1,
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: 1,
-                        fontSize: '0.85rem',
-                        color: 'text.secondary',
-                      }}
-                    >
-                      {work.venue ? (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ fontStyle: 'italic' }}
-                        >
-                          {work.venue}
-                        </Typography>
-                      ) : null}
-
-                      {work.publicationYear ? (
-                        <Typography variant="body2" color="text.secondary">
-                          ({work.publicationYear})
-                        </Typography>
-                      ) : null}
-
-                      {work.outputType ? (
-                        <Chip
-                          size="small"
-                          label={work.outputType}
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      ) : null}
-
-                      {work.doi ? (
-                        <MuiLink
-                          href={`https://doi.org/${work.doi}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          underline="hover"
-                          sx={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            fontSize: '0.8125rem',
-                          }}
-                        >
-                          DOI: {work.doi}
-                          <LaunchIcon sx={{ fontSize: '0.75rem' }} />
-                        </MuiLink>
-                      ) : null}
-
-                      {work.openalexId ? (
-                        <MuiLink
-                          href={work.openalexId}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          underline="hover"
-                          sx={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            fontSize: '0.8125rem',
-                          }}
-                        >
-                          <SchoolIcon fontSize="inherit" />
-                          OpenAlex
-                          <LaunchIcon sx={{ fontSize: '0.75rem' }} />
-                        </MuiLink>
-                      ) : null}
-                    </Stack>
-
-                    {work.abstract ? (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          mt: 1.5,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {work.abstract}
-                      </Typography>
-                    ) : null}
-                  </Box>
-
-                  <Stack
-                    direction="row"
-                    spacing={1.5}
-                    sx={{
-                      alignSelf: { xs: 'stretch', md: 'center' },
-                      justifyContent: { xs: 'flex-end', md: 'flex-start' },
-                    }}
+            <Box
+              key={work.id}
+              bg="bg.panel"
+              borderWidth="1px"
+              borderRadius="lg"
+              p="5"
+            >
+              <Flex
+                direction={{ base: 'column', md: 'row' }}
+                gap="4"
+                justify="space-between"
+                align={{ base: 'flex-start', md: 'center' }}
+              >
+                <Box flex="1" minW="0">
+                  <Heading
+                    as="h3"
+                    size="sm"
+                    fontWeight="semibold"
+                    lineHeight="1.4"
                   >
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      startIcon={<CloseIcon />}
-                      onClick={() => handleReject(work)}
-                      disabled={isCurrentOperating}
-                      loading={isRejecting}
+                    {work.title}
+                  </Heading>
+
+                  {authorsStr ? (
+                    <Text textStyle="sm" color="fg.muted" mt="1">
+                      {authorsStr}
+                    </Text>
+                  ) : null}
+
+                  <Flex mt="2" gap="3" align="center" flexWrap="wrap">
+                    {work.venue ? (
+                      <Text textStyle="sm" color="fg.muted" fontStyle="italic">
+                        {work.venue}
+                      </Text>
+                    ) : null}
+
+                    {work.publicationYear ? (
+                      <Text textStyle="sm" color="fg.muted">
+                        ({work.publicationYear})
+                      </Text>
+                    ) : null}
+
+                    {work.outputType ? (
+                      <Badge variant="outline" colorPalette="gray">
+                        {work.outputType}
+                      </Badge>
+                    ) : null}
+
+                    {work.doi ? (
+                      <Link
+                        href={`https://doi.org/${work.doi}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        display="inline-flex"
+                        alignItems="center"
+                        gap="1"
+                        textStyle="xs"
+                      >
+                        {`DOI: ${work.doi}`}
+                        <ExternalLink />
+                      </Link>
+                    ) : null}
+
+                    {work.openalexId ? (
+                      <Link
+                        href={work.openalexId}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        display="inline-flex"
+                        alignItems="center"
+                        gap="1"
+                        textStyle="xs"
+                      >
+                        <GraduationCap />
+                        OpenAlex
+                        <ExternalLink />
+                      </Link>
+                    ) : null}
+                  </Flex>
+
+                  {work.abstract ? (
+                    <Text
+                      textStyle="sm"
+                      color="fg.muted"
+                      mt="3"
+                      lineClamp={2}
+                      lineHeight="1.5"
                     >
-                      {t('rejectWork')}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="small"
-                      startIcon={<CheckIcon />}
-                      onClick={() => handleAccept(work)}
-                      disabled={isCurrentOperating}
-                      loading={isAccepting}
-                    >
-                      {t('acceptWork')}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
+                      {work.abstract}
+                    </Text>
+                  ) : null}
+                </Box>
+
+                <Flex
+                  gap="3"
+                  alignSelf={{ base: 'stretch', md: 'center' }}
+                  justify={{ base: 'flex-end', md: 'flex-start' }}
+                >
+                  <Button
+                    variant="outline"
+                    colorPalette="red"
+                    size="sm"
+                    onClick={() => handleReject(work)}
+                    disabled={isCurrentOperating}
+                    loading={isRejecting}
+                  >
+                    <X />
+                    {t('openalexTab.reject')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAccept(work)}
+                    disabled={isCurrentOperating}
+                    loading={isAccepting}
+                  >
+                    <Check />
+                    {t('openalexTab.accept')}
+                  </Button>
+                </Flex>
+              </Flex>
+            </Box>
           );
         })}
       </Stack>

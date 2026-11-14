@@ -4,18 +4,20 @@ import { useState } from 'react';
 import {
   Badge,
   Box,
-  Card,
-  CardContent,
   Container,
+  Heading,
+  Icon,
   Stack,
-  Tab,
   Tabs,
-  Typography,
-} from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import PersonSearchIcon from '@mui/icons-material/PersonSearch';
+  Text,
+} from '@chakra-ui/react';
+import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+} from '@/components/ui/feedback';
 import { useOpenAlexCandidates } from '../hooks/use-openalex-candidates';
 import { useProfile } from '../hooks/use-profile';
 import type { ProfileTab, PublicProfileTab } from '../types';
@@ -46,120 +48,132 @@ export function ProfileShell({
     isFailed,
     isForbidden,
     isNotFound,
-    error,
+    isEmpty,
     refetch,
   } = useProfile({ userId, isOwner });
 
   const { pendingCount } = useOpenAlexCandidates({ enabled: isOwner });
 
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <LoadingSkeleton variant="rectangular" height={160} />
-        <Box sx={{ mt: 3 }}>
-          <LoadingSkeleton variant="rectangular" height={48} />
-        </Box>
-        <Stack spacing={2} sx={{ mt: 3 }}>
-          <LoadingSkeleton variant="rectangular" height={120} count={3} />
+  /*
+   * The page never gives up its layout.
+   *
+   * A signed-in reader came here for a profile and a set of tabs, so the
+   * shell — the header, the tab list and the content area — is always
+   * rendered. What changes with the state of the request is the *content*
+   * inside that shell, never the shell itself.
+   *
+   * The states are kept apart on purpose:
+   *
+   * - **loading** — the request is in flight, so there is nothing to say
+   *   yet; the content area shows a skeleton;
+   * - **failed** — the request never produced an answer, so the content
+   *   area shows an error with a retry. It says nothing about the
+   *   researcher;
+   * - **forbidden** — the answer came back and refused access;
+   * - **empty** — the answer came back and said there is no profile yet;
+   * - **not found** — the answer came back and said there is no such
+   *   researcher.
+   *
+   * A failure is deliberately not rendered as "not found": the two mean
+   * opposite things to the reader, and collapsing them would make a
+   * transient API error look like a fact about the person.
+   */
+  const effectiveUserId = profile?.userId ?? userId;
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <Stack gap="4">
+          <LoadingSkeleton variant="rectangular" height={120} count={2} />
         </Stack>
-      </Container>
-    );
-  }
+      );
+    }
 
-  if (isForbidden) {
+    if (isFailed) {
+      return <ErrorState title={t('loadError')} onRetry={refetch} />;
+    }
+
+    if (isForbidden) {
+      return (
+        <Stack gap="3" align="center" textAlign="center" py="6">
+          <Icon size="2xl" color="fg.muted">
+            <LockKeyhole />
+          </Icon>
+          <Heading as="h2" size="md">
+            {t('profileAccessDenied')}
+          </Heading>
+          <Text textStyle="sm" color="fg.muted">
+            {t('unauthenticatedNotice')}
+          </Text>
+        </Stack>
+      );
+    }
+
+    if (isEmpty) {
+      return (
+        <EmptyState title={t('profileEmpty')} message={t('profileEmptyDesc')} />
+      );
+    }
+
+    if (isNotFound) {
+      return (
+        <Stack gap="3" align="center" textAlign="center" py="6">
+          <Icon size="2xl" color="fg.muted">
+            <SearchX />
+          </Icon>
+          <Heading as="h2" size="md">
+            {t('profileNotFound')}
+          </Heading>
+        </Stack>
+      );
+    }
+
+    if (!profile) {
+      return null;
+    }
+
+    /*
+     * The tabs. A tab whose content cannot be fetched renders its own
+     * error or empty state, so switching tabs always lands on something.
+     */
     return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
-        <Card
-          variant="outlined"
-          sx={{ textAlign: 'center', p: 4, borderRadius: 2 }}
-        >
-          <Stack spacing={2} sx={{ alignItems: 'center' }}>
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                bgcolor: 'action.hover',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'text.secondary',
-              }}
-            >
-              <LockOutlinedIcon fontSize="large" />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              {t('unconfirmedTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('unconfirmedDesc')}
-            </Typography>
-          </Stack>
-        </Card>
-      </Container>
-    );
-  }
+      <>
+        {isOwner ? (
+          <Tabs.Content value="applications">
+            <ProfileApplicationsTab />
+          </Tabs.Content>
+        ) : null}
 
-  if (isNotFound || !profile) {
-    return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
-        <Card
-          variant="outlined"
-          sx={{ textAlign: 'center', p: 4, borderRadius: 2 }}
-        >
-          <Stack spacing={2} sx={{ alignItems: 'center' }}>
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                bgcolor: 'action.hover',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'text.secondary',
-              }}
-            >
-              <PersonSearchIcon fontSize="large" />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              {t('notFoundTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('notFoundDesc')}
-            </Typography>
-          </Stack>
-        </Card>
-      </Container>
-    );
-  }
+        <Tabs.Content value="groups">
+          <ProfileGroupsTab userId={effectiveUserId} isOwner={isOwner} />
+        </Tabs.Content>
 
-  if (isFailed) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <ErrorState
-          title={t('loadError')}
-          message={
-            (error as { response?: { data?: { message?: string } } })?.response
-              ?.data?.message
-          }
-          onRetry={refetch}
-        />
-      </Container>
-    );
-  }
+        <Tabs.Content value="outputs">
+          <ProfileOutputsTab userId={effectiveUserId} isOwner={isOwner} />
+        </Tabs.Content>
 
-  const effectiveUserId = profile.userId;
+        <Tabs.Content value="interests">
+          <ProfileInterestsTab userId={effectiveUserId} isOwner={isOwner} />
+        </Tabs.Content>
+
+        {isOwner ? (
+          <Tabs.Content value="openalex">
+            <ProfileOpenAlexTab />
+          </Tabs.Content>
+        ) : null}
+      </>
+    );
+  };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+    <Container maxW="6xl" py={{ base: '4', md: '8' }}>
       <ProfileHeader
         profile={profile}
         isOwner={isOwner}
-        onEdit={isOwner ? () => setEditOpen(true) : undefined}
+        onEdit={isOwner && profile ? () => setEditOpen(true) : undefined}
       />
 
-      {isOwner ? (
+      {isOwner && profile ? (
         <ProfileEditDialog
           open={editOpen}
           onClose={() => setEditOpen(false)}
@@ -167,83 +181,40 @@ export function ProfileShell({
         />
       ) : null}
 
-      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-          <Tabs
-            value={activeTab}
-            onChange={(_, val) => setActiveTab(val)}
-            variant="scrollable"
-            scrollButtons="auto"
-          >
+      <Box bg="bg.panel" borderWidth="1px" borderRadius="lg" overflow="hidden">
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={(details) =>
+            setActiveTab(details.value as ProfileTab | PublicProfileTab)
+          }
+          variant="line"
+        >
+          <Tabs.List px={{ base: '2', sm: '4' }} overflowX="auto">
             {isOwner ? (
-              <Tab
-                value="applications"
-                label={t('tabs.applications')}
-                id="profile-tab-applications"
-                aria-controls="profile-tabpanel-applications"
-              />
+              <Tabs.Trigger value="applications">
+                {t('tabs.applications')}
+              </Tabs.Trigger>
             ) : null}
 
-            <Tab
-              value="groups"
-              label={t('tabs.groups')}
-              id="profile-tab-groups"
-              aria-controls="profile-tabpanel-groups"
-            />
+            <Tabs.Trigger value="groups">{t('tabs.groups')}</Tabs.Trigger>
 
-            <Tab
-              value="outputs"
-              label={t('tabs.outputs')}
-              id="profile-tab-outputs"
-              aria-controls="profile-tabpanel-outputs"
-            />
+            <Tabs.Trigger value="outputs">{t('tabs.outputs')}</Tabs.Trigger>
 
-            <Tab
-              value="interests"
-              label={t('tabs.interests')}
-              id="profile-tab-interests"
-              aria-controls="profile-tabpanel-interests"
-            />
+            <Tabs.Trigger value="interests">{t('tabs.interests')}</Tabs.Trigger>
 
             {isOwner ? (
-              <Tab
-                value="openalex"
-                label={
-                  <Badge
-                    badgeContent={pendingCount}
-                    color="primary"
-                    sx={{ '& .MuiBadge-badge': { right: -12, top: 2 } }}
-                  >
-                    {t('tabs.openalex')}
-                  </Badge>
-                }
-                id="profile-tab-openalex"
-                aria-controls="profile-tabpanel-openalex"
-              />
+              <Tabs.Trigger value="openalex">
+                <Badge colorPalette="blue" variant="surface">
+                  {t('tabs.openalex')}
+                  {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                </Badge>
+              </Tabs.Trigger>
             ) : null}
-          </Tabs>
-        </Box>
+          </Tabs.List>
 
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          {activeTab === 'applications' && isOwner ? (
-            <ProfileApplicationsTab />
-          ) : null}
-
-          {activeTab === 'groups' ? (
-            <ProfileGroupsTab userId={effectiveUserId} isOwner={isOwner} />
-          ) : null}
-
-          {activeTab === 'outputs' ? (
-            <ProfileOutputsTab userId={effectiveUserId} isOwner={isOwner} />
-          ) : null}
-
-          {activeTab === 'interests' ? (
-            <ProfileInterestsTab userId={effectiveUserId} isOwner={isOwner} />
-          ) : null}
-
-          {activeTab === 'openalex' && isOwner ? <ProfileOpenAlexTab /> : null}
-        </CardContent>
-      </Card>
+          <Box p={{ base: '4', sm: '6' }}>{renderContent()}</Box>
+        </Tabs.Root>
+      </Box>
     </Container>
   );
 }

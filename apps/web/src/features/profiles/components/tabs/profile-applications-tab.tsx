@@ -2,22 +2,19 @@
 
 import { useState } from 'react';
 import {
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Link as MuiLink,
+  Flex,
+  Heading,
+  Link,
+  Portal,
   Stack,
-  Typography,
-} from '@mui/material';
-import { useTranslations } from 'next-intl';
-import NextLink from 'next/link';
+  Text,
+} from '@chakra-ui/react';
+import { useFormatter, useTranslations } from 'next-intl';
+import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import {
   EmptyState,
@@ -27,19 +24,19 @@ import {
 import { useMyApplications } from '../../hooks/use-my-applications';
 import type { ApplicationResponseDto } from '../../types';
 
-function getStatusChipColor(
-  status: string,
-): 'warning' | 'success' | 'error' | 'default' {
+function getStatusPalette(status: string): 'yellow' | 'green' | 'red' | 'gray' {
   switch (status) {
     case 'PENDING':
-      return 'warning';
+      return 'yellow';
     case 'ACCEPTED':
-      return 'success';
+    case 'INVITED_TO_DISCUSS':
+      return 'green';
+    case 'DECLINED':
     case 'REJECTED':
-      return 'error';
+      return 'red';
     case 'WITHDRAWN':
     default:
-      return 'default';
+      return 'gray';
   }
 }
 
@@ -56,8 +53,9 @@ export function ProfileApplicationsTab() {
   const t = useTranslations('profile');
   const tApplicationStatus = useTranslations('profile.applicationStatus');
   const tCommon = useTranslations('common');
+  const format = useFormatter();
   const { showSnackbar } = useSnackbar();
-  const { applications, isLoading, isFailed, error, refetch, withdraw } =
+  const { applications, isLoading, isFailed, refetch, withdraw } =
     useMyApplications();
 
   const [confirmWithdrawApp, setConfirmWithdrawApp] =
@@ -69,10 +67,16 @@ export function ProfileApplicationsTab() {
     try {
       setWithdrawingId(confirmWithdrawApp.id);
       await withdraw(confirmWithdrawApp.id);
-      showSnackbar({ message: t('withdrawSuccess'), severity: 'success' });
+      showSnackbar({
+        message: t('applicationsTab.withdrawSuccess'),
+        severity: 'success',
+      });
       setConfirmWithdrawApp(null);
     } catch {
-      showSnackbar({ message: t('withdrawError'), severity: 'error' });
+      showSnackbar({
+        message: t('applicationsTab.withdrawError'),
+        severity: 'error',
+      });
     } finally {
       setWithdrawingId(null);
     }
@@ -80,180 +84,167 @@ export function ProfileApplicationsTab() {
 
   if (isLoading) {
     return (
-      <Stack spacing={2} sx={{ py: 2 }}>
+      <Stack gap="4" py="2">
         <LoadingSkeleton variant="rectangular" height={100} count={3} />
       </Stack>
     );
   }
 
   if (isFailed) {
-    return (
-      <ErrorState
-        title={t('loadError')}
-        message={
-          (error as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message
-        }
-        onRetry={() => refetch()}
-      />
-    );
+    return <ErrorState title={t('loadError')} onRetry={() => refetch()} />;
   }
 
   if (applications.length === 0) {
     return (
       <EmptyState
-        title={t('tabs.applicationsEmpty')}
-        message={t('tabs.applicationsEmptyDesc')}
+        title={t('applicationsTab.emptyTitle')}
+        message={t('applicationsTab.emptyMessage')}
       />
     );
   }
 
   return (
-    <Stack spacing={2} sx={{ py: 1 }}>
+    <Stack gap="4" py="1">
       {applications.map((app) => {
         const remaining = formatRemainingTime(app.remainingSeconds);
         const isWithdrawing = withdrawingId === app.id;
 
         return (
-          <Card key={app.id} variant="outlined" sx={{ borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={2}
-                sx={{
-                  justifyContent: 'space-between',
-                  alignItems: { xs: 'flex-start', sm: 'center' },
-                }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="h6"
-                    component="h3"
-                    sx={{ fontSize: '1.1rem', fontWeight: 600 }}
-                  >
-                    {app.opportunityTitle ? (
-                      <MuiLink
-                        component={NextLink}
-                        href={`/opportunities/${app.opportunityId}`}
-                        underline="hover"
-                        color="text.primary"
-                      >
+          <Box
+            key={app.id}
+            bg="bg.panel"
+            borderWidth="1px"
+            borderRadius="lg"
+            p="5"
+          >
+            <Flex
+              direction={{ base: 'column', sm: 'row' }}
+              gap="4"
+              justify="space-between"
+              align={{ base: 'flex-start', sm: 'center' }}
+            >
+              <Box flex="1" minW="0">
+                <Heading as="h3" size="sm" fontWeight="semibold">
+                  {app.opportunityTitle ? (
+                    <Link asChild color="fg">
+                      <NextLink href={`/opportunities/${app.opportunityId}`}>
                         {app.opportunityTitle}
-                      </MuiLink>
-                    ) : (
-                      `Opportunity #${app.opportunityId.slice(0, 8)}`
-                    )}
-                  </Typography>
+                      </NextLink>
+                    </Link>
+                  ) : (
+                    `Opportunity #${app.opportunityId.slice(0, 8)}`
+                  )}
+                </Heading>
 
-                  <Stack
-                    direction="row"
-                    spacing={1.5}
-                    sx={{
-                      mt: 1,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 1,
-                    }}
+                <Flex mt="2" gap="3" align="center" flexWrap="wrap">
+                  <Badge
+                    variant="outline"
+                    colorPalette={getStatusPalette(app.status)}
                   >
-                    <Chip
-                      size="small"
-                      label={tApplicationStatus(app.status)}
-                      color={getStatusChipColor(app.status)}
-                      variant="outlined"
-                    />
+                    {tApplicationStatus(app.status)}
+                  </Badge>
 
-                    <Typography variant="caption" color="text.secondary">
-                      {t('appliedOn', {
-                        date: new Date(app.appliedAt).toLocaleDateString(),
-                      })}
-                    </Typography>
+                  <Text textStyle="xs" color="fg.muted">
+                    {t('applicationsTab.appliedOn', {
+                      date: format.dateTime(new Date(app.appliedAt), {
+                        dateStyle: 'medium',
+                      }),
+                    })}
+                  </Text>
 
-                    {app.status === 'PENDING' && remaining ? (
-                      <Typography variant="caption" color="warning.main">
-                        {t('deadlineRemaining', { time: remaining })}
-                      </Typography>
-                    ) : null}
-
-                    {app.status === 'PENDING' && app.isOverdue ? (
-                      <Typography variant="caption" color="error.main">
-                        {t('overdue')}
-                      </Typography>
-                    ) : null}
-                  </Stack>
-
-                  {app.applicantNote ? (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1.5, whiteSpace: 'pre-line' }}
-                    >
-                      {app.applicantNote}
-                    </Typography>
+                  {app.status === 'PENDING' && remaining ? (
+                    <Text textStyle="xs" color="fg.warning">
+                      {t('applicationsTab.remaining', { time: remaining })}
+                    </Text>
                   ) : null}
 
-                  {app.responseNote ? (
-                    <Box
-                      sx={{
-                        mt: 1.5,
-                        p: 1.5,
-                        bgcolor: 'action.hover',
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontWeight: 600 }}
-                      >
-                        {t('responseNote')}:
-                      </Typography>
-                      <Typography variant="body2">
-                        {app.responseNote}
-                      </Typography>
-                    </Box>
+                  {app.status === 'PENDING' && app.isOverdue ? (
+                    <Text textStyle="xs" color="fg.error">
+                      {t('applicationsTab.countdownOverdue')}
+                    </Text>
                   ) : null}
-                </Box>
+                </Flex>
 
-                {app.status === 'PENDING' ? (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => setConfirmWithdrawApp(app)}
-                    loading={isWithdrawing}
-                    sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+                {app.applicantNote ? (
+                  <Text
+                    textStyle="sm"
+                    color="fg.muted"
+                    mt="3"
+                    whiteSpace="pre-line"
                   >
-                    {t('withdraw')}
-                  </Button>
+                    {app.applicantNote}
+                  </Text>
                 ) : null}
-              </Stack>
-            </CardContent>
-          </Card>
+
+                {app.responseNote ? (
+                  <Box mt="3" p="3" bg="bg.subtle" borderRadius="md">
+                    <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
+                      {t('applicationsTab.responseNoteLabel')}
+                    </Text>
+                    <Text textStyle="sm">{app.responseNote}</Text>
+                  </Box>
+                ) : null}
+              </Box>
+
+              {app.status === 'PENDING' ? (
+                <Button
+                  variant="outline"
+                  colorPalette="red"
+                  size="sm"
+                  onClick={() => setConfirmWithdrawApp(app)}
+                  loading={isWithdrawing}
+                  alignSelf={{ base: 'flex-start', sm: 'center' }}
+                >
+                  {t('applicationsTab.withdraw')}
+                </Button>
+              ) : null}
+            </Flex>
+          </Box>
         );
       })}
 
-      <Dialog
+      <Dialog.Root
         open={Boolean(confirmWithdrawApp)}
-        onClose={() => setConfirmWithdrawApp(null)}
+        onOpenChange={(details) => {
+          if (!details.open) setConfirmWithdrawApp(null);
+        }}
+        placement="center"
+        motionPreset="scale"
       >
-        <DialogTitle>{t('confirmWithdrawTitle')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>{t('confirmWithdrawDesc')}</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmWithdrawApp(null)} color="inherit">
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            onClick={handleWithdrawConfirm}
-            color="error"
-            variant="contained"
-            autoFocus
-          >
-            {t('withdraw')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>
+                  {t('applicationsTab.confirmWithdrawTitle')}
+                </Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text textStyle="sm" color="fg.muted">
+                  {t('applicationsTab.confirmWithdrawDesc')}
+                </Text>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmWithdrawApp(null)}
+                >
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  colorPalette="red"
+                  onClick={handleWithdrawConfirm}
+                  loading={withdrawingId !== null}
+                >
+                  {t('applicationsTab.withdraw')}
+                </Button>
+              </Dialog.Footer>
+              <Dialog.CloseTrigger />
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </Stack>
   );
 }

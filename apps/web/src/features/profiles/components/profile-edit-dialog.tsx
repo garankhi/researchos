@@ -1,21 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Stack,
-} from '@mui/material';
+import { Button, Dialog, Portal, Stack } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import {
   FormSelect,
   FormSubmitButton,
+  FormTextarea,
   FormTextField,
 } from '@/components/ui/form';
 import { ErrorState } from '@/components/ui/feedback';
@@ -42,6 +35,7 @@ export function ProfileEditDialog({
   const tCommon = useTranslations('common');
   const { showSnackbar } = useSnackbar();
   const updateProfile = useUpdateProfile();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const methods = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -77,6 +71,7 @@ export function ProfileEditDialog({
   }, [open, profile, reset]);
 
   const onSubmit = async (data: ProfileFormValues) => {
+    setSubmitError(null);
     try {
       await updateProfile.mutateAsync({
         data: {
@@ -90,111 +85,127 @@ export function ProfileEditDialog({
           scopusAuthorId: data.scopusAuthorId || undefined,
         },
       });
-      showSnackbar({ message: t('updateSuccess'), severity: 'success' });
+      showSnackbar({ message: t('profileUpdated'), severity: 'success' });
       onClose();
     } catch {
-      // Error handled by mutation state and displayed in dialog
+      // The failure is shown inline, next to the form that failed.
+      setSubmitError(t('updateError'));
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{t('editProfile')}</DialogTitle>
-      <FormProvider {...methods}>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogContent dividers>
-            <Stack spacing={2.5}>
-              {updateProfile.isError ? (
-                <ErrorState
-                  title={t('updateError')}
-                  message={
-                    (
-                      updateProfile.error as {
-                        response?: { data?: { message?: string } };
-                      }
-                    )?.response?.data?.message || t('updateError')
-                  }
-                />
-              ) : null}
-
-              <FormTextField
-                name="fullName"
-                label={t('fields.fullName')}
-                required
-                fullWidth
-              />
-
-              <FormTextField
-                name="departmentUnit"
-                label={t('fields.departmentUnit')}
-                required
-                fullWidth
-              />
-
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <FormTextField
-                  name="academicTitle"
-                  label={t('fields.academicTitle')}
-                  fullWidth
-                />
-                <FormTextField
-                  name="academicDegree"
-                  label={t('fields.academicDegree')}
-                  fullWidth
-                />
-              </Stack>
-
-              <FormSelect
-                name="availabilityStatus"
-                label={t('fields.availabilityStatus')}
-                fullWidth
-              >
-                {availabilityStatusValues.map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {tAvailability(status)}
-                  </MenuItem>
-                ))}
-              </FormSelect>
-
-              <FormTextField
-                name="googleScholarUrl"
-                label={t('fields.googleScholarUrl')}
-                fullWidth
-                placeholder="https://scholar.google.com/citations?user=..."
-              />
-
-              <FormTextField
-                name="scopusAuthorId"
-                label={t('fields.scopusAuthorId')}
-                fullWidth
-                placeholder="57200000000"
-              />
-
-              <FormTextField
-                name="bio"
-                label={t('fields.bio')}
-                multiline
-                rows={4}
-                fullWidth
-              />
-            </Stack>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button
-              onClick={onClose}
-              color="inherit"
-              disabled={updateProfile.isPending}
+    <Dialog.Root
+      open={open}
+      onOpenChange={(details) => {
+        if (!details.open) onClose();
+      }}
+      size="lg"
+      placement="center"
+      motionPreset="scale"
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header
+              flexDirection="column"
+              alignItems="flex-start"
+              gap="1"
             >
-              {tCommon('cancel')}
-            </Button>
-            <FormSubmitButton
-              mutation={updateProfile}
-              label={tCommon('save')}
-              variant="contained"
-            />
-          </DialogActions>
-        </form>
-      </FormProvider>
-    </Dialog>
+              <Dialog.Title>{t('editProfileDialogTitle')}</Dialog.Title>
+              <Dialog.Description textStyle="sm" color="fg.muted">
+                {t('editProfileDialogDesc')}
+              </Dialog.Description>
+            </Dialog.Header>
+
+            <FormProvider {...methods}>
+              <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                <Dialog.Body>
+                  <Stack gap="4">
+                    {submitError ? (
+                      <ErrorState
+                        title={t('updateError')}
+                        message={submitError}
+                      />
+                    ) : null}
+
+                    <FormTextField
+                      name="fullName"
+                      label={t('fullName')}
+                      required
+                    />
+
+                    <FormTextField
+                      name="departmentUnit"
+                      label={t('departmentUnit')}
+                      required
+                    />
+
+                    <Stack direction={{ base: 'column', sm: 'row' }} gap="4">
+                      <FormTextField
+                        name="academicTitle"
+                        label={t('academicTitle')}
+                        wrapperProps={{ flex: '1', minW: '0' }}
+                      />
+                      <FormTextField
+                        name="academicDegree"
+                        label={t('academicDegree')}
+                        wrapperProps={{ flex: '1', minW: '0' }}
+                      />
+                    </Stack>
+
+                    <FormSelect
+                      name="availabilityStatus"
+                      label={t('availabilityStatus')}
+                    >
+                      {availabilityStatusValues.map((status) => (
+                        <option key={status} value={status}>
+                          {tAvailability(status)}
+                        </option>
+                      ))}
+                    </FormSelect>
+
+                    <FormTextField
+                      name="googleScholarUrl"
+                      label={t('googleScholarUrl')}
+                      placeholder="https://scholar.google.com/citations?user=..."
+                    />
+
+                    <FormTextField
+                      name="scopusAuthorId"
+                      label={t('scopusAuthorId')}
+                      placeholder="57200000000"
+                    />
+
+                    <FormTextarea
+                      name="bio"
+                      label={t('bio')}
+                      rows={4}
+                      control={methods.control}
+                    />
+                  </Stack>
+                </Dialog.Body>
+
+                <Dialog.Footer>
+                  <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={updateProfile.isPending}
+                  >
+                    {tCommon('cancel')}
+                  </Button>
+                  <FormSubmitButton
+                    mutation={updateProfile}
+                    label={tCommon('save')}
+                  />
+                </Dialog.Footer>
+              </form>
+            </FormProvider>
+
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }

@@ -6,6 +6,7 @@
     "cancel": "Cancel",
     "save": "Save",
     "close": "Close",
+    "add": "Add",
     "notifications": "Notifications",
     "backToHome": "Back to home"
   },
@@ -17,6 +18,7 @@
     "account": "Account",
     "dashboard": "Dashboard",
     "logout": "Log out",
+    "myProfile": "My profile",
     "openSettings": "Open settings",
     "openMenu": "Open menu",
     "accountOfCurrentUser": "Account menu for {name}"
@@ -74,8 +76,12 @@
     "scopusAuthorId": "Scopus Author ID",
     "orcidId": "ORCID ID",
     "profileUpdated": "Profile updated successfully.",
+    "loadError": "Could not load the data. Please try again.",
+    "updateError": "Could not save the changes. Please try again.",
     "profileAccessDenied": "This profile is unconfirmed and visible only to its owner.",
     "profileNotFound": "Researcher profile not found.",
+    "profileEmpty": "No profile yet",
+    "profileEmptyDesc": "This researcher has not set up a profile yet.",
     "unauthenticatedNotice": "Please sign in to view your profile.",
     "tabs": {
       "applications": "Applications",
@@ -91,17 +97,31 @@
       "LIMITED_AVAILABILITY": "Limited Availability",
       "NOT_AVAILABLE": "Not Available"
     },
+    "applicationStatus": {
+      "PENDING": "Pending",
+      "INVITED_TO_DISCUSS": "Invited to discuss",
+      "DECLINED": "Declined",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "interestStatus": {
+      "SUGGESTED": "Suggested",
+      "ACTIVE": "Active",
+      "REJECTED": "Rejected"
+    },
     "applicationsTab": {
       "title": "Submitted Applications",
       "description": "Track the status of your research opportunity applications and response commitments.",
       "emptyTitle": "No applications yet",
       "emptyMessage": "You have not applied to any research opportunities yet.",
-      "deadline": "Deadline: {date}",
-      "countdown": "{seconds}s remaining",
-      "countdownOverdue": "Overdue",
       "withdraw": "Withdraw application",
       "withdrawing": "Withdrawing…",
       "withdrawSuccess": "Application withdrawn successfully.",
+      "withdrawError": "Could not withdraw the application. Please try again.",
+      "appliedOn": "Applied on {date}",
+      "remaining": "Deadline in {time}",
+      "countdownOverdue": "Overdue",
+      "confirmWithdrawTitle": "Withdraw this application?",
+      "confirmWithdrawDesc": "Withdrawing notifies the opportunity owner. You can apply again later while the opportunity stays open.",
       "noteLabel": "Your note:",
       "responseNoteLabel": "Response note:"
     },
@@ -132,8 +152,13 @@
       "emptyTitle": "No research interests declared",
       "emptyMessage": "No research interests have been added yet.",
       "removeInterest": "Remove",
+      "acceptInterest": "Accept",
+      "rejectInterest": "Reject",
       "interestAdded": "Research interest added successfully.",
+      "interestAddError": "Could not add the interest. Please try again.",
       "interestRemoved": "Research interest removed.",
+      "interestAccepted": "Research interest accepted.",
+      "interestRejected": "Research interest rejected.",
       "selectTopic": "Select Research Topic",
       "declared": "Declared",
       "inferred": "Inferred",

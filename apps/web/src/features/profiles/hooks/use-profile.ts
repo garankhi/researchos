@@ -40,6 +40,21 @@ export function useProfile({
   const isForbidden = statusCode === 403;
   const isNotFound = statusCode === 404;
 
+  /**
+   * Whether the request succeeded but carried no profile.
+   *
+   * This is **not** the same as a failure. A failure means the request
+   * never produced an answer — the API is down, the session expired — and
+   * it has to be shown as an error the reader can retry. An answer that
+   * simply says "this researcher has no profile yet" is a valid, empty
+   * state.
+   *
+   * The distinction is why `isFailed` is checked first by the screen: a
+   * failed request must never be rendered as "not found", or a transient
+   * failure would read as a fact about the researcher.
+   */
+  const isEmpty = !isFailed && !isLoading && data === undefined;
+
   return {
     profile: data,
     isLoading,
@@ -47,6 +62,7 @@ export function useProfile({
     isFailed,
     isForbidden,
     isNotFound,
+    isEmpty,
     error: activeQuery.error,
     refetch: activeQuery.refetch,
   };

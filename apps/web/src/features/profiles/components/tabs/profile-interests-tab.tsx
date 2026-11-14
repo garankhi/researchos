@@ -2,26 +2,19 @@
 
 import { useState } from 'react';
 import {
-  Autocomplete,
+  Badge,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
+  Flex,
+  Heading,
   IconButton,
+  Input,
+  Portal,
   Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
+  Text,
+} from '@chakra-ui/react';
+import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import {
@@ -57,14 +50,12 @@ export function ProfileInterestsTab({
     removeInterest,
   } = useProfileInterests({ userId });
 
-  // Add Interest Dialog State
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [topicSearchInput, setTopicSearchInput] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<TopicResponseDto | null>(
     null,
   );
 
-  // Taxonomy topics query for Autocomplete
   const topicsQuery = useTaxonomyControllerFindAllTopics(
     {
       search: topicSearchInput.trim() || undefined,
@@ -84,12 +75,18 @@ export function ProfileInterestsTab({
     if (!selectedTopic) return;
     try {
       await createInterest(selectedTopic.id);
-      showSnackbar({ message: t('interestAdded'), severity: 'success' });
+      showSnackbar({
+        message: t('interestsTab.interestAdded'),
+        severity: 'success',
+      });
       setOpenAddDialog(false);
       setSelectedTopic(null);
       setTopicSearchInput('');
     } catch {
-      showSnackbar({ message: t('interestAddError'), severity: 'error' });
+      showSnackbar({
+        message: t('interestsTab.interestAddError'),
+        severity: 'error',
+      });
     }
   };
 
@@ -101,7 +98,9 @@ export function ProfileInterestsTab({
       await updateStatus(interest.id, status);
       showSnackbar({
         message:
-          status === 'ACTIVE' ? t('interestAccepted') : t('interestRejected'),
+          status === 'ACTIVE'
+            ? t('interestsTab.interestAccepted')
+            : t('interestsTab.interestRejected'),
         severity: 'success',
       });
     } catch {
@@ -112,7 +111,10 @@ export function ProfileInterestsTab({
   const handleRemoveInterest = async (interest: ProfileInterestResponseDto) => {
     try {
       await removeInterest(interest.id);
-      showSnackbar({ message: t('interestRemoved'), severity: 'success' });
+      showSnackbar({
+        message: t('interestsTab.interestRemoved'),
+        severity: 'success',
+      });
     } catch {
       showSnackbar({ message: t('updateError'), severity: 'error' });
     }
@@ -120,7 +122,7 @@ export function ProfileInterestsTab({
 
   if (isLoading) {
     return (
-      <Stack spacing={2} sx={{ py: 2 }}>
+      <Stack gap="4" py="2">
         <LoadingSkeleton variant="rectangular" height={80} count={3} />
       </Stack>
     );
@@ -130,202 +132,210 @@ export function ProfileInterestsTab({
     return <ErrorState title={t('loadError')} onRetry={refetch} />;
   }
 
-  // Filter out REJECTED interests for non-owners
   const displayInterests = isOwner
     ? interests
     : interests.filter((item) => item.status === 'ACTIVE');
 
   return (
-    <Stack spacing={2.5} sx={{ py: 1 }}>
+    <Stack gap="5" py="1">
       {isOwner ? (
-        <Stack
-          direction="row"
-          sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            {t('interestsTitle')} ({displayInterests.length})
-          </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenAddDialog(true)}
-          >
-            {t('addInterest')}
+        <Flex justify="space-between" align="center" gap="3" flexWrap="wrap">
+          <Heading as="h3" size="sm" fontWeight="semibold">
+            {t('interestsTab.title')} ({displayInterests.length})
+          </Heading>
+          <Button size="sm" onClick={() => setOpenAddDialog(true)}>
+            <Plus />
+            {t('interestsTab.addInterest')}
           </Button>
-        </Stack>
+        </Flex>
       ) : null}
 
       {displayInterests.length === 0 ? (
         <EmptyState
-          title={t('tabs.interestsEmpty')}
-          message={t('tabs.interestsEmptyDesc')}
+          title={t('interestsTab.emptyTitle')}
+          message={t('interestsTab.emptyMessage')}
         />
       ) : (
-        <Stack spacing={1.5}>
+        <Stack gap="3">
           {displayInterests.map((interest) => {
             const { field, subfield, topic } = interest.topicPath;
             const fullPath = `${field?.name ?? ''} › ${subfield?.name ?? ''} › ${topic?.name ?? ''}`;
 
             return (
-              <Card
+              <Box
                 key={interest.id}
-                variant="outlined"
-                sx={{ borderRadius: 2 }}
+                bg="bg.panel"
+                borderWidth="1px"
+                borderRadius="lg"
+                p="4"
               >
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1.5}
-                    sx={{
-                      justifyContent: 'space-between',
-                      alignItems: { xs: 'flex-start', sm: 'center' },
-                    }}
-                  >
-                    <Box sx={{ flex: 1 }}>
-                      <Typography
-                        variant="body1"
-                        sx={{ fontWeight: 600, color: 'text.primary' }}
-                      >
-                        {topic?.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {fullPath}
-                      </Typography>
+                <Flex
+                  direction={{ base: 'column', sm: 'row' }}
+                  gap="3"
+                  justify="space-between"
+                  align={{ base: 'flex-start', sm: 'center' }}
+                >
+                  <Box flex="1" minW="0">
+                    <Text textStyle="sm" fontWeight="semibold">
+                      {topic?.name}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      {fullPath}
+                    </Text>
 
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                          mt: 0.75,
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: 0.5,
-                        }}
+                    <Flex mt="2" gap="2" align="center" flexWrap="wrap">
+                      <Badge
+                        variant="outline"
+                        colorPalette={
+                          interest.status === 'ACTIVE'
+                            ? 'green'
+                            : interest.status === 'SUGGESTED'
+                              ? 'blue'
+                              : 'gray'
+                        }
                       >
-                        <Chip
-                          size="small"
-                          label={tInterestStatus(interest.status)}
-                          color={
-                            interest.status === 'ACTIVE'
-                              ? 'success'
-                              : interest.status === 'SUGGESTED'
-                                ? 'info'
-                                : 'default'
-                          }
-                          variant="outlined"
-                          sx={{ height: 22, fontSize: '0.75rem' }}
-                        />
+                        {tInterestStatus(interest.status)}
+                      </Badge>
 
-                        {interest.sourceType ? (
-                          <Chip
-                            size="small"
-                            label={interest.sourceType}
-                            variant="outlined"
-                            sx={{ height: 22, fontSize: '0.75rem' }}
-                          />
-                        ) : null}
-                      </Stack>
-                    </Box>
+                      {interest.sourceType ? (
+                        <Badge variant="outline" colorPalette="gray">
+                          {interest.sourceType}
+                        </Badge>
+                      ) : null}
+                    </Flex>
+                  </Box>
 
-                    {isOwner ? (
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        sx={{ alignSelf: { xs: 'flex-end', sm: 'center' } }}
-                      >
-                        {interest.status === 'SUGGESTED' ? (
-                          <>
-                            <Tooltip title={t('acceptInterest')}>
-                              <IconButton
-                                size="small"
-                                color="success"
-                                onClick={() =>
-                                  handleUpdateStatus(interest, 'ACTIVE')
-                                }
-                              >
-                                <CheckIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title={t('rejectInterest')}>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() =>
-                                  handleUpdateStatus(interest, 'REJECTED')
-                                }
-                              >
-                                <CloseIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        ) : (
-                          <Tooltip title={t('removeInterest')}>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveInterest(interest)}
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    ) : null}
-                  </Stack>
-                </CardContent>
-              </Card>
+                  {isOwner ? (
+                    <Flex gap="1" align="center">
+                      {interest.status === 'SUGGESTED' ? (
+                        <>
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            colorPalette="green"
+                            aria-label={t('interestsTab.acceptInterest')}
+                            onClick={() =>
+                              handleUpdateStatus(interest, 'ACTIVE')
+                            }
+                          >
+                            <Check />
+                          </IconButton>
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            colorPalette="red"
+                            aria-label={t('interestsTab.rejectInterest')}
+                            onClick={() =>
+                              handleUpdateStatus(interest, 'REJECTED')
+                            }
+                          >
+                            <X />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <IconButton
+                          size="sm"
+                          variant="ghost"
+                          colorPalette="red"
+                          aria-label={t('interestsTab.removeInterest')}
+                          onClick={() => handleRemoveInterest(interest)}
+                        >
+                          <Trash2 />
+                        </IconButton>
+                      )}
+                    </Flex>
+                  ) : null}
+                </Flex>
+              </Box>
             );
           })}
         </Stack>
       )}
 
-      {/* Add Interest Taxonomy Dialog */}
-      <Dialog
+      <Dialog.Root
         open={openAddDialog}
-        onClose={() => setOpenAddDialog(false)}
-        maxWidth="sm"
-        fullWidth
+        onOpenChange={(details) => {
+          if (!details.open) setOpenAddDialog(false);
+        }}
+        size="lg"
+        placement="center"
+        motionPreset="scale"
       >
-        <DialogTitle>{t('addInterest')}</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              {t('addInterestDesc')}
-            </Typography>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>
+                  {t('interestsTab.addInterestDialogTitle')}
+                </Dialog.Title>
+                <Dialog.Description textStyle="sm" color="fg.muted">
+                  {t('interestsTab.addInterestDialogDesc')}
+                </Dialog.Description>
+              </Dialog.Header>
 
-            <Autocomplete
-              options={searchedTopics}
-              getOptionLabel={(option) => option.name}
-              value={selectedTopic}
-              onChange={(_, value) => setSelectedTopic(value)}
-              inputValue={topicSearchInput}
-              onInputChange={(_, value) => setTopicSearchInput(value)}
-              loading={topicsQuery.isLoading}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label={t('searchTopicPlaceholder')}
-                  fullWidth
-                />
-              )}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setOpenAddDialog(false)} color="inherit">
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            onClick={handleAddInterest}
-            variant="contained"
-            disabled={!selectedTopic || isCreating}
-            loading={isCreating}
-          >
-            {tCommon('add')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+              <Dialog.Body>
+                <Stack gap="3">
+                  <Input
+                    value={topicSearchInput}
+                    onChange={(event) =>
+                      setTopicSearchInput(event.target.value)
+                    }
+                    placeholder={t('interestsTab.selectTopic')}
+                    aria-label={t('interestsTab.selectTopic')}
+                  />
+
+                  {topicsQuery.isLoading ? (
+                    <LoadingSkeleton
+                      variant="rectangular"
+                      height={80}
+                      count={3}
+                    />
+                  ) : searchedTopics.length === 0 ? (
+                    <Text textStyle="sm" color="fg.muted">
+                      {t('interestsTab.emptyMessage')}
+                    </Text>
+                  ) : (
+                    <Stack gap="2" maxH="60" overflowY="auto">
+                      {searchedTopics.map((topic) => {
+                        const isSelected = selectedTopic?.id === topic.id;
+                        return (
+                          <Button
+                            key={topic.id}
+                            variant={isSelected ? 'solid' : 'outline'}
+                            justifyContent="flex-start"
+                            onClick={() => setSelectedTopic(topic)}
+                          >
+                            {topic.name}
+                          </Button>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Stack>
+              </Dialog.Body>
+
+              <Dialog.Footer>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpenAddDialog(false)}
+                  disabled={isCreating}
+                >
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  onClick={handleAddInterest}
+                  disabled={!selectedTopic}
+                  loading={isCreating}
+                >
+                  {tCommon('add')}
+                </Button>
+              </Dialog.Footer>
+              <Dialog.CloseTrigger />
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </Stack>
   );
 }

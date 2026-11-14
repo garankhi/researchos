@@ -1,18 +1,9 @@
 'use client';
 
-import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Link as MuiLink,
-  Stack,
-  Typography,
-} from '@mui/material';
-import ArticleIcon from '@mui/icons-material/Article';
-import LaunchIcon from '@mui/icons-material/Launch';
+import { Badge, Box, Flex, Heading, Link, Stack, Text } from '@chakra-ui/react';
+import { FileText, ExternalLink } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from 'next/link';
+import NextLink from '@/components/ui/link';
 import {
   EmptyState,
   ErrorState,
@@ -34,7 +25,7 @@ export function ProfileOutputsTab({
 
   if (isLoading) {
     return (
-      <Stack spacing={2} sx={{ py: 2 }}>
+      <Stack gap="4" py="2">
         <LoadingSkeleton variant="rectangular" height={120} count={3} />
       </Stack>
     );
@@ -47,14 +38,14 @@ export function ProfileOutputsTab({
   if (allOutputs.length === 0) {
     return (
       <EmptyState
-        title={t('tabs.outputsEmpty')}
-        message={t('tabs.outputsEmptyDesc')}
+        title={t('outputsTab.emptyTitle')}
+        message={t('outputsTab.emptyMessage')}
       />
     );
   }
 
   return (
-    <Stack spacing={2} sx={{ py: 1 }}>
+    <Stack gap="4" py="1">
       {allOutputs.map((output: OutputResponseDto) => {
         const rev = output.currentRevision;
         const title = rev?.title || `Output #${output.id.slice(0, 8)}`;
@@ -71,131 +62,93 @@ export function ProfileOutputsTab({
             : null;
 
         return (
-          <Card key={output.id} variant="outlined" sx={{ borderRadius: 2 }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Stack spacing={1}>
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1}
-                  sx={{
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'flex-start', sm: 'flex-start' },
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="h6"
-                      component="h3"
-                      sx={{
-                        fontSize: '1.05rem',
-                        fontWeight: 600,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      <MuiLink
-                        component={NextLink}
-                        href={`/outputs/${output.id}`}
-                        underline="hover"
-                        color="text.primary"
-                      >
+          <Box
+            key={output.id}
+            bg="bg.panel"
+            borderWidth="1px"
+            borderRadius="lg"
+            p="5"
+          >
+            <Stack gap="3">
+              <Flex
+                direction={{ base: 'column', sm: 'row' }}
+                gap="2"
+                justify="space-between"
+                align="flex-start"
+              >
+                <Box flex="1" minW="0">
+                  <Heading
+                    as="h3"
+                    size="sm"
+                    fontWeight="semibold"
+                    lineHeight="1.4"
+                  >
+                    <Link asChild color="fg">
+                      <NextLink href={`/outputs/${output.id}`}>
                         {title}
-                      </MuiLink>
-                    </Typography>
+                      </NextLink>
+                    </Link>
+                  </Heading>
 
-                    {authorsList ? (
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        {authorsList}
-                      </Typography>
-                    ) : null}
-                  </Box>
-
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ mt: { xs: 1, sm: 0 }, flexShrink: 0 }}
-                  >
-                    {output.visibility ? (
-                      <Chip
-                        size="small"
-                        label={output.visibility}
-                        variant="outlined"
-                        color="default"
-                      />
-                    ) : null}
-                  </Stack>
-                </Stack>
-
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  sx={{
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 1,
-                    fontSize: '0.85rem',
-                    color: 'text.secondary',
-                  }}
-                >
-                  {venueStr ? (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ fontStyle: 'italic' }}
-                    >
-                      {venueStr}
-                    </Typography>
+                  {authorsList ? (
+                    <Text textStyle="sm" color="fg.muted" mt="1">
+                      {authorsList}
+                    </Text>
                   ) : null}
+                </Box>
 
-                  {yearStr ? (
-                    <Typography variant="body2" color="text.secondary">
-                      ({yearStr})
-                    </Typography>
-                  ) : null}
-
-                  {doiStr ? (
-                    <MuiLink
-                      href={`https://doi.org/${doiStr}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      underline="hover"
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        fontSize: '0.8125rem',
-                      }}
-                    >
-                      <ArticleIcon fontSize="inherit" />
-                      DOI: {doiStr}
-                      <LaunchIcon sx={{ fontSize: '0.75rem' }} />
-                    </MuiLink>
-                  ) : null}
-                </Stack>
-
-                {output.topics && output.topics.length > 0 ? (
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    sx={{ flexWrap: 'wrap', gap: 0.75, pt: 0.5 }}
-                  >
-                    {output.topics.map((t) => (
-                      <Chip
-                        key={t.topicId}
-                        label={t.topicName}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: '0.75rem', height: 22 }}
-                      />
-                    ))}
-                  </Stack>
+                {output.visibility ? (
+                  <Badge variant="outline" colorPalette="gray" flexShrink={0}>
+                    {output.visibility}
+                  </Badge>
                 ) : null}
-              </Stack>
-            </CardContent>
-          </Card>
+              </Flex>
+
+              <Flex gap="3" align="center" flexWrap="wrap">
+                {venueStr ? (
+                  <Text textStyle="sm" color="fg.muted" fontStyle="italic">
+                    {venueStr}
+                  </Text>
+                ) : null}
+
+                {yearStr ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    ({yearStr})
+                  </Text>
+                ) : null}
+
+                {doiStr ? (
+                  <Link
+                    href={`https://doi.org/${doiStr}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    display="inline-flex"
+                    alignItems="center"
+                    gap="1"
+                    textStyle="xs"
+                  >
+                    <FileText />
+                    {`DOI: ${doiStr}`}
+                    <ExternalLink />
+                  </Link>
+                ) : null}
+              </Flex>
+
+              {output.topics && output.topics.length > 0 ? (
+                <Flex gap="2" flexWrap="wrap">
+                  {output.topics.map((topic) => (
+                    <Badge
+                      key={topic.topicId}
+                      variant="outline"
+                      colorPalette="gray"
+                    >
+                      {topic.topicName}
+                    </Badge>
+                  ))}
+                </Flex>
+              ) : null}
+            </Stack>
+          </Box>
         );
       })}
     </Stack>
