@@ -14,9 +14,11 @@ import {
   ResearchUpdateProcessor,
 } from '../../processors/background-job.processor.js';
 import { OutboxService } from './outbox.service.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
+    NotificationsModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>

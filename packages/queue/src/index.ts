@@ -4,14 +4,45 @@ import type { RedisOptions } from 'ioredis';
 export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
+export const DIGEST_QUEUE = 'digest-jobs';
 export const RESEARCH_UPDATES_QUEUE = 'research-updates';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
+export const DIGEST_SEND_JOB = 'digest-send';
+export const DIGEST_MAX_ATTEMPTS = 5;
 export const JOB_ATTEMPTS = 3;
+
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+export function isJobUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID.test(value);
+}
+
+export function digestDeliveryId(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object' || !('deliveryId' in payload)) {
+    return undefined;
+  }
+  return isJobUuid(payload.deliveryId) ? payload.deliveryId : undefined;
+}
 
 export interface BackgroundJobPayload {
   jobId: string;
   generation: number;
+}
+
+export function isBackgroundJobPayload(
+  value: unknown,
+): value is BackgroundJobPayload {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'jobId' in value &&
+    isJobUuid(value.jobId) &&
+    'generation' in value &&
+    typeof value.generation === 'number' &&
+    Number.isSafeInteger(value.generation) &&
+    value.generation >= 0
+  );
 }
 
 export function backgroundTransportId(

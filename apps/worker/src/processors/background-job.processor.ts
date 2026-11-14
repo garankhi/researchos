@@ -8,9 +8,11 @@ import {
 } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
+  DIGEST_SEND_JOB,
   DURABLE_PROBE_JOB,
   JOB_ATTEMPTS,
   RESEARCH_UPDATES_QUEUE,
+  isBackgroundJobPayload,
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
@@ -106,11 +108,7 @@ export class BackgroundJobRunner {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async process(job: Job<BackgroundJobPayload>, scope: string): Promise<void> {
-    if (
-      !/^[0-9a-f-]{36}$/i.test(job.data?.jobId ?? '') ||
-      !Number.isSafeInteger(job.data?.generation) ||
-      job.data.generation < 0
-    ) {
+    if (!isBackgroundJobPayload(job.data)) {
       throw new UnrecoverableError('Invalid background job reference');
     }
     const failure = await this.prisma.$transaction(async (tx) => {
@@ -129,6 +127,10 @@ export class BackgroundJobRunner {
         stored.status !== 'PENDING'
       )
         return null;
+      // An old digest wake-up may still be on this queue during deployment.
+      // Its durable outbox entry will be dispatched to the digest queue.
+      if (stored.kind === DIGEST_SEND_JOB) return null;
+
       const attempts = Math.min(
         Math.max(stored.attempts, job.attemptsMade) + 1,
         JOB_ATTEMPTS,

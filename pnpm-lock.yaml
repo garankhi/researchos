@@ -457,6 +457,9 @@ importers:
       ioredis:
         specifier: 5.9.3
         version: 5.9.3(supports-color@7.2.0)
+      nodemailer:
+        specifier: ^10.4.0
+        version: 10.4.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -5665,6 +5668,10 @@ packages:
   node-releases@2.0.60:
     resolution: {integrity: sha512-OmO8+GM1JUZqXET720VrJCwkjUCXmCMQm0Z3UDDRbfNLHS4NEAvY60j5jiFv0tkKw2PNNlqOLhahVmwJIOLDIQ==}
     engines: {node: '>=18'}
+
+  nodemailer@10.4.0:
+    resolution: {integrity: sha512-fyy6r4Q5euRJ9Qr3Cts9K7SZrfe9zmz9oLOYiAR02MEJRDRci+99y0OoYBYBgpLffOqkkjXrB/d26VfiMje/kA==}
+    engines: {node: '>=20.0.0'}
 
   npm-run-path@6.0.0:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
@@ -12245,6 +12252,8 @@ snapshots:
     optional: true
 
   node-releases@2.0.60: {}
+
+  nodemailer@10.4.0: {}
 
   npm-run-path@6.0.0:
     dependencies:
