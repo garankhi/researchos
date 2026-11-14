@@ -6,9 +6,12 @@ import {
   Field,
   Input,
   NativeSelect,
+  Textarea,
   type ButtonProps,
+  type FieldRootProps,
   type InputProps,
   type NativeSelectFieldProps,
+  type TextareaProps,
 } from '@chakra-ui/react';
 import {
   useController,
@@ -84,10 +87,68 @@ export function FormTextField<
   control,
   disabled,
   required,
+  wrapperProps,
   ...inputProps
 }: FieldProps<TValues, TName> &
   Omit<
     InputProps,
+    'name' | 'value' | 'defaultValue' | 'onChange' | 'onBlur' | 'ref'
+  > & {
+    /**
+     * Props for the `Field.Root` wrapper.
+     *
+     * The wrapper is what carries the layout of the field, so a caller that
+     * puts two fields next to each other needs to style the wrapper rather
+     * than the input. The input always keeps the shared control height.
+     */
+    wrapperProps?: FieldRootProps;
+  }) {
+  const { invalid, errorMessage, ...field } = useFormField({
+    name,
+    control,
+    disabled,
+  });
+
+  return (
+    <Field.Root
+      id={id}
+      invalid={invalid}
+      disabled={field.disabled}
+      required={required}
+      {...wrapperProps}
+    >
+      <Field.Label>{label}</Field.Label>
+      {/*
+       * The input keeps the shared control height. `flexShrink: 0` stops a
+       * flex parent from compressing it — a field that sits next to another
+       * one would otherwise end up shorter than a field on its own.
+       */}
+      <Input
+        flexShrink={0}
+        {...inputProps}
+        {...field}
+        value={field.value ?? ''}
+      />
+      <FieldMessage error={errorMessage} helperText={helperText} />
+    </Field.Root>
+  );
+}
+
+export function FormTextarea<
+  TValues extends FieldValues,
+  TName extends FieldPath<TValues>,
+>({
+  id,
+  name,
+  label,
+  helperText,
+  control,
+  disabled,
+  required,
+  ...textareaProps
+}: FieldProps<TValues, TName> &
+  Omit<
+    TextareaProps,
     'name' | 'value' | 'defaultValue' | 'onChange' | 'onBlur' | 'ref'
   >) {
   const { invalid, errorMessage, ...field } = useFormField({
@@ -104,7 +165,7 @@ export function FormTextField<
       required={required}
     >
       <Field.Label>{label}</Field.Label>
-      <Input {...inputProps} {...field} value={field.value ?? ''} />
+      <Textarea {...textareaProps} {...field} value={field.value ?? ''} />
       <FieldMessage error={errorMessage} helperText={helperText} />
     </Field.Root>
   );

@@ -958,7 +958,7 @@ Table digest_preferences {
   user_id uuid [pk]
   enabled boolean [not null, default: false]
   timezone varchar(100) [not null, default: 'Asia/Ho_Chi_Minh']
-  language varchar(10) [not null, default: 'vi']
+  language varchar(10) [not null, default: 'en']
   updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   Note: 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.'
 }
@@ -1031,7 +1031,7 @@ Table digest_deliveries {
     `(status = 'SENT' AND sent_at IS NOT NULL) OR (status <> 'SENT' AND sent_at IS NULL)` [name: 'ck_digest_sent']
   }
   indexes { (user_id, period_start, period_end) [unique] }
-  Note: 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs; DB ledger persists attempts (max 5), leases and delivery result. id is provider idempotency key. SENT is terminal; unknown provider outcome requires reconciliation, not blind resend. Transactional application responses are independent.'
+  Note: 'One weekly delivery per recipient/window. Only create if eligible items exist. BullMQ coordinates jobs. The ledger records up to five attempts, leases and delivery results. SENT and CANCELLED are terminal. The Gmail SMTP demo retries unknown outcomes within the attempt cap and may send duplicates. Transactional application responses are independent.'
 }
 Table digest_items {
   delivery_id uuid [not null]

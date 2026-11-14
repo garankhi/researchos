@@ -24,7 +24,7 @@ import type { CurrentUser } from '../types';
  * asks for it.
  */
 export function useSession() {
-  const { isFetching, isFailed } = useMe();
+  const { isFetching, isFailed, refetch } = useMe();
 
   const user = useSessionStore((state) => state.user);
   const isResolved = useSessionStore((state) => state.isResolved);
@@ -54,6 +54,15 @@ export function useSession() {
     isFetching,
     /** The last attempt failed for a reason other than "not signed in". */
     isFailed,
+    /**
+     * Checks the session again.
+     *
+     * A guard needs this: when the check fails because the API was
+     * unreachable, the visitor has to be able to ask again once it is
+     * back. The `GET /me` request is deduplicated by TanStack Query, so
+     * calling this while a request is already in flight is cheap.
+     */
+    refetch,
   };
 }
 

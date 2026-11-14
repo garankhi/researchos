@@ -268,6 +268,9 @@ describe('Applications HTTP contract', () => {
     expect(response.body.items[0].opportunityId).toBe(opportunityId);
     expect(tx.opportunity_applications.findMany).toHaveBeenCalledWith({
       where: { opportunity_id: opportunityId },
+      include: {
+        research_opportunities: { select: { title: true } },
+      },
       orderBy: [{ response_due_at: 'asc' }, { id: 'asc' }],
       skip: 1,
       take: 1,

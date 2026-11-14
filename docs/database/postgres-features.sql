@@ -633,7 +633,8 @@ BEGIN
      RAISE EXCEPTION 'Each processing lease increments attempts' USING ERRCODE='23514'; END IF;
  END IF;
  IF NEW.status='PROCESSING' AND (NEW.locked_until IS NULL OR NEW.locked_until<=clock_timestamp()) THEN RAISE EXCEPTION 'Processing requires a future lease' USING ERRCODE='23514'; END IF;
- IF NEW.status IN ('PROCESSING','SENT') THEN
+ -- Eligibility gates attempts. SENT records acceptance of an earlier submission.
+ IF NEW.status='PROCESSING' THEN
    IF NOT is_researcher(NEW.user_id) OR NOT EXISTS (SELECT 1 FROM digest_preferences WHERE user_id=NEW.user_id AND enabled)
    OR NOT EXISTS (SELECT 1 FROM digest_items WHERE delivery_id=NEW.id) THEN
      RAISE EXCEPTION 'Dispatch requires eligible opted-in researcher and nonempty items' USING ERRCODE='23514'; END IF;

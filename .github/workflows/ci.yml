@@ -68,6 +68,38 @@ jobs:
       - name: Check the skill links
         run: node scripts/check-skill-links.mjs
 
+  # Storybook is the executable UI spec: the `play` functions assert
+  # component behaviour in a real browser and `a11y: { test: 'error' }`
+  # fails on accessibility violations. It runs as its own job because it
+  # needs Playwright browsers, which the hermetic `checks` job above
+  # deliberately avoids.
+  storybook:
+    name: storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 12.15.0
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Build Storybook
+        run: pnpm --filter web build-storybook
+      - name: Test Storybook
+        run: pnpm --filter web test:storybook
+
   # The end-to-end suites need a database and a Redis, so they cannot live
   # in the `checks` job above — that one stays fast and hermetic on purpose.
   #

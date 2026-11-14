@@ -10,6 +10,8 @@ import { PrismaService } from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
+  DIGEST_QUEUE,
+  DIGEST_SEND_JOB,
   RESEARCH_UPDATES_QUEUE,
   backgroundTransportId,
   createQueueOptions,
@@ -31,6 +33,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly researchUpdates: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
+  private readonly digestWork?: Queue;
   private readonly researchScope: string;
 
   constructor(
@@ -48,8 +51,16 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     this.work = new Queue(BACKGROUND_QUEUE, queueOptions);
     this.researchUpdates = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
     this.deadLetters = new Queue(DEAD_LETTER_QUEUE, queueOptions);
-    for (const queue of [this.work, this.researchUpdates, this.deadLetters]) {
-      queue.on('error', (error: Error) => this.logger.error(error.message));
+    if (config.get<string>('DIGEST_SMTP_ENABLED') === 'true') {
+      this.digestWork = new Queue(DIGEST_QUEUE, queueOptions);
+    }
+    for (const queue of [
+      this.work,
+      this.researchUpdates,
+      this.deadLetters,
+      this.digestWork,
+    ]) {
+      queue?.on('error', (error: Error) => this.logger.error(error.message));
     }
   }
 
@@ -81,6 +92,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
           this.work.waitUntilReady(),
           this.researchUpdates.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
+          this.digestWork?.waitUntilReady(),
         ]),
         new Promise<never>((_, reject) => {
           timeout = setTimeout(
@@ -104,11 +116,16 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
             generation: number;
             destination: string;
             dispatched_at: Date | null;
+            kind: string;
             queue_prefix: string;
           }[]
         >`
-        SELECT o.*, j.queue_prefix
+        SELECT o.*, j.kind, j.queue_prefix
         FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+        LEFT JOIN digest_deliveries d ON d.id = CASE
+          WHEN j.kind = ${DIGEST_SEND_JOB} AND j.payload->>'deliveryId' ~*
+            '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+          THEN (j.payload->>'deliveryId')::uuid END AND d.user_id = j.owner_id
         WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope})
           AND o.available_at <= now() AND (
           o.dispatched_at IS NULL OR (
@@ -116,18 +133,33 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
             AND o.generation = j.generation
             AND o.dispatched_at < now() - interval '30 seconds'
           )
+        ) AND (
+          o.destination <> 'WORK' OR j.kind <> ${DIGEST_SEND_JOB} OR (
+            j.queue_prefix = ${this.prefix} AND ${this.digestWork !== undefined}
+            AND (d.id IS NULL OR d.status IN ('SENT', 'CANCELLED') OR (
+              d.next_attempt_at <= now() AND (d.locked_until IS NULL OR d.locked_until <= now())
+            ))
+          )
         ) ORDER BY o.available_at LIMIT 10 FOR UPDATE OF o SKIP LOCKED
       `;
         for (const row of rows) {
+          const digest = row.kind === DIGEST_SEND_JOB;
           const work =
             row.queue_prefix === this.researchScope
               ? this.researchUpdates
               : this.work;
-          const queue = row.destination === 'DLQ' ? this.deadLetters : work;
+          const queue =
+            row.destination === 'DLQ'
+              ? this.deadLetters
+              : digest
+                ? this.digestWork
+                : work;
+          if (!queue) continue;
           const transportId = backgroundTransportId(row.job_id, row.generation);
           const existing = await queue.getJob(transportId);
           if (
             row.destination === 'WORK' &&
+            !digest &&
             existing &&
             (await existing.getState()) === 'failed'
           ) {
@@ -167,7 +199,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
                 jobId: transportId,
                 ...(row.destination === 'DLQ'
                   ? { removeOnComplete: false, removeOnFail: false }
-                  : {}),
+                  : digest
+                    ? {
+                        attempts: 1,
+                        removeOnComplete: true,
+                        removeOnFail: true,
+                      }
+                    : {}),
               },
             );
           }
@@ -190,6 +228,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       this.work.close(),
       this.researchUpdates.close(),
       this.deadLetters.close(),
+      this.digestWork?.close(),
     ]);
   }
 }

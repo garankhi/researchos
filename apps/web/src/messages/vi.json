@@ -7,7 +7,8 @@
     "save": "Lưu",
     "close": "Đóng",
     "notifications": "Thông báo",
-    "backToHome": "Về trang chủ"
+    "backToHome": "Về trang chủ",
+    "add": "Thêm"
   },
   "nav": {
     "products": "Sản phẩm",
@@ -17,6 +18,7 @@
     "account": "Tài khoản",
     "dashboard": "Bảng điều khiển",
     "logout": "Đăng xuất",
+    "myProfile": "Hồ sơ của tôi",
     "openSettings": "Mở cài đặt",
     "openMenu": "Mở menu",
     "accountOfCurrentUser": "Menu tài khoản của {name}"
@@ -57,6 +59,125 @@
     "signInAction": "Đăng nhập",
     "signOut": "Đăng xuất",
     "welcome": "Chào mừng, {name}."
+  },
+  "profile": {
+    "title": "Hồ sơ Nhà nghiên cứu",
+    "myProfile": "Hồ sơ của tôi",
+    "editProfile": "Chỉnh sửa hồ sơ",
+    "editProfileDialogTitle": "Chỉnh sửa thông tin hồ sơ",
+    "editProfileDialogDesc": "Cập nhật thông tin cá nhân, học hàm, học vị, tiểu sử nghiên cứu và trạng thái hợp tác.",
+    "fullName": "Họ và tên",
+    "bio": "Tiểu sử / Định hướng nghiên cứu",
+    "departmentUnit": "Khoa / Bộ môn / Đơn vị",
+    "academicTitle": "Học hàm",
+    "academicDegree": "Học vị",
+    "availabilityStatus": "Trạng thái hợp tác",
+    "googleScholarUrl": "Đường dẫn Google Scholar",
+    "scopusAuthorId": "Mã tác giả Scopus",
+    "orcidId": "Mã ORCID",
+    "profileUpdated": "Cập nhật hồ sơ thành công.",
+    "loadError": "Không tải được dữ liệu. Vui lòng thử lại.",
+    "updateError": "Không lưu được thay đổi. Vui lòng thử lại.",
+    "profileAccessDenied": "Hồ sơ này chưa được xác nhận và chỉ chủ sở hữu mới có thể xem.",
+    "profileNotFound": "Không tìm thấy hồ sơ nhà nghiên cứu.",
+    "profileEmpty": "Chưa có hồ sơ",
+    "profileEmptyDesc": "Nhà nghiên cứu này chưa thiết lập hồ sơ.",
+    "unauthenticatedNotice": "Vui lòng đăng nhập để xem hồ sơ của bạn.",
+    "tabs": {
+      "applications": "Đơn ứng tuyển",
+      "groups": "Nhóm nghiên cứu",
+      "outputs": "Công bố khoa học",
+      "interests": "Sở thích nghiên cứu",
+      "openalex": "Hàng đợi OpenAlex"
+    },
+    "availability": {
+      "OPEN_FOR_COLLABORATION": "Sẵn sàng hợp tác",
+      "SEEKING_GROUP": "Đang tìm nhóm nghiên cứu",
+      "MENTORING_ONLY": "Chỉ nhận hướng dẫn",
+      "LIMITED_AVAILABILITY": "Khả năng tham gia hạn chế",
+      "NOT_AVAILABLE": "Không sẵn sàng"
+    },
+    "applicationStatus": {
+      "PENDING": "Đang chờ",
+      "INVITED_TO_DISCUSS": "Được mời trao đổi",
+      "DECLINED": "Đã từ chối",
+      "WITHDRAWN": "Đã rút"
+    },
+    "interestStatus": {
+      "SUGGESTED": "Được đề xuất",
+      "ACTIVE": "Đang hoạt động",
+      "REJECTED": "Đã từ chối"
+    },
+    "applicationsTab": {
+      "title": "Đơn ứng tuyển đã nộp",
+      "description": "Theo dõi tiến độ đơn ứng tuyển cơ hội nghiên cứu và cam kết thời gian phản hồi.",
+      "emptyTitle": "Chưa có đơn ứng tuyển",
+      "emptyMessage": "Bạn chưa nộp đơn ứng tuyển cho cơ hội nghiên cứu nào.",
+      "withdraw": "Rút đơn",
+      "withdrawing": "Đang rút đơn…",
+      "withdrawSuccess": "Đã rút đơn ứng tuyển thành công.",
+      "withdrawError": "Không thể rút đơn. Vui lòng thử lại.",
+      "appliedOn": "Đã nộp ngày {date}",
+      "remaining": "Còn {time}",
+      "countdownOverdue": "Đã quá hạn",
+      "confirmWithdrawTitle": "Rút đơn ứng tuyển này?",
+      "confirmWithdrawDesc": "Việc rút đơn sẽ thông báo tới chủ quản. Bạn có thể nộp lại khi cơ hội còn mở.",
+      "noteLabel": "Lời nhắn của bạn:",
+      "responseNoteLabel": "Phản hồi từ chủ quản:"
+    },
+    "groupsTab": {
+      "title": "Nhóm nghiên cứu",
+      "ledTitle": "Nhóm phụ trách",
+      "memberTitle": "Nhóm tham gia",
+      "emptyTitle": "Chưa có nhóm nghiên cứu",
+      "emptyMessage": "Nhà nghiên cứu này chưa tham gia nhóm nghiên cứu nào.",
+      "leaderBadge": "Trưởng nhóm",
+      "memberBadge": "Thành viên",
+      "viewHub": "Xem Group Hub"
+    },
+    "outputsTab": {
+      "title": "Công bố khoa học",
+      "emptyTitle": "Chưa có công bố khoa học",
+      "emptyMessage": "Chưa có bài báo hay công bố khoa học nào được ghi nhận cho hồ sơ này.",
+      "year": "Năm: {year}",
+      "venue": "Nơi xuất bản / Kỷ yếu: {venue}",
+      "doi": "DOI: {doi}",
+      "authors": "Tác giả: {authors}"
+    },
+    "interestsTab": {
+      "title": "Sở thích nghiên cứu",
+      "addInterest": "Thêm sở thích",
+      "addInterestDialogTitle": "Thêm sở thích nghiên cứu",
+      "addInterestDialogDesc": "Chọn chủ đề nghiên cứu từ cây phân cấp Taxonomy để thêm vào sở thích của bạn.",
+      "emptyTitle": "Chưa có sở thích nghiên cứu",
+      "emptyMessage": "Chưa có chủ đề nghiên cứu nào được thêm.",
+      "removeInterest": "Xóa",
+      "acceptInterest": "Chấp nhận",
+      "rejectInterest": "Từ chối",
+      "interestAdded": "Đã thêm sở thích nghiên cứu thành công.",
+      "interestAddError": "Không thể thêm sở thích. Vui lòng thử lại.",
+      "interestRemoved": "Đã xóa sở thích nghiên cứu.",
+      "interestAccepted": "Đã chấp nhận sở thích.",
+      "interestRejected": "Đã từ chối sở thích.",
+      "selectTopic": "Chọn chủ đề nghiên cứu",
+      "declared": "Tự khai",
+      "inferred": "Gợi ý",
+      "active": "Đang hoạt động",
+      "suggested": "Được đề xuất",
+      "rejected": "Đã từ chối"
+    },
+    "openalexTab": {
+      "title": "Hàng đợi ứng viên OpenAlex",
+      "description": "Các bài báo và công bố ứng viên được tìm thấy từ OpenAlex chờ bạn xác nhận.",
+      "emptyTitle": "Hàng đợi trống",
+      "emptyMessage": "Bạn không có bài báo ứng viên nào cần xử lý từ OpenAlex.",
+      "accept": "Xác nhận bài báo",
+      "accepting": "Đang xác nhận…",
+      "reject": "Từ chối",
+      "rejecting": "Đang từ chối…",
+      "workAccepted": "Đã xác nhận và thêm bài báo vào danh sách công bố của bạn.",
+      "workRejected": "Đã từ chối bài báo ứng viên."
+    }
   },
   "errors": {
     "title": "Đã xảy ra lỗi khi tải trang",

@@ -1,8 +1,9 @@
 'use client';
 
-import { Avatar, Button, Menu, Portal, Text } from '@chakra-ui/react';
+import { Avatar, Button, Link, Menu, Portal, Text } from '@chakra-ui/react';
 import { LogOut, UserRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import NextLink from '@/components/ui/link';
 import type { CurrentUser } from '../types';
 import { initialsOf } from '../utils/initials';
 
@@ -52,6 +53,19 @@ export function AccountMenuView({
                 </Text>
               </Menu.ItemGroupLabel>
               <Menu.Separator />
+              {/*
+               * The profile link is a real link, not an `onSelect` handler,
+               * so it can be opened in a new tab and the browser shows the
+               * destination on hover. The locale prefix is kept by the
+               * shared link, so the menu does not switch the language.
+               */}
+              <Menu.Item value="my-profile" asChild>
+                <Link asChild>
+                  <NextLink href="/profile/my-profile">
+                    {t('myProfile')}
+                  </NextLink>
+                </Link>
+              </Menu.Item>
               <Menu.Item
                 value="logout"
                 disabled={isLoggingOut}

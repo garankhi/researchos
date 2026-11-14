@@ -12,6 +12,11 @@ export interface GroupApplicationResponseDto {
   id: string;
   /** Opportunity receiving the application. */
   opportunityId: string;
+  /**
+   * Title of the opportunity the application targets.
+   * @nullable
+   */
+  opportunityTitle?: string | null;
   /** Researcher submitting the application. */
   applicantId: string;
   /** Researcher application note. */
@@ -51,6 +56,4 @@ export interface GroupApplicationResponseDto {
   remainingSeconds: number | null;
   /** Whether this pending application has reached its response deadline. */
   isOverdue: boolean;
-  /** Title of the opportunity the application targets. */
-  opportunityTitle: string;
 }

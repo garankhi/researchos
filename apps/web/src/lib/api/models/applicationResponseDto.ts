@@ -12,6 +12,11 @@ export interface ApplicationResponseDto {
   id: string;
   /** Opportunity receiving the application. */
   opportunityId: string;
+  /**
+   * Title of the opportunity the application targets, if available.
+   * @nullable
+   */
+  opportunityTitle?: string | null;
   /** Researcher submitting the application. */
   applicantId: string;
   /** Researcher application note. */

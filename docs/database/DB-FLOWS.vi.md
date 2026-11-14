@@ -496,7 +496,7 @@ Researcher có thể follow researcher, group, Topic, project hoặc công trìn
 
 Một thay đổi `updated_at` thông thường hoặc một lần sync metadata không tự thành thông báo. Các sự kiện có ý nghĩa gồm chia sẻ bài lần đầu, phát hành revision mới, chấp nhận bài vào group, mở opportunity, đăng seminar và cập nhật project có ý nghĩa ở phase sau.
 
-`digest_deliveries` lưu số lần thử, hạn giữ job, lỗi và kết quả provider để phục hồi khi worker gián đoạn. Schema giới hạn tối đa 5 lần thử. Worker vẫn phải quản lý retry và đối soát với nhà cung cấp; chỉ có bảng này chưa bảo đảm email không thể bị gửi trùng trong mọi lỗi mạng.
+`digest_deliveries` lưu số lần thử, hạn giữ job, lỗi và kết quả SMTP để phục hồi khi worker gián đoạn. Schema giới hạn tối đa 5 lượt. Gmail SMTP demo thử lại khi kết quả chưa rõ, nên người nhận có thể nhận thư trùng nếu Gmail đã chấp nhận lần gửi trước.
 
 `digest_items.content_snapshot` lưu nội dung đã chọn cho email để truy vết. Snapshot phải được dựng từ nội dung được phép và kiểm tra lại trước gửi, không lấy bản nháp hoặc file riêng tư.
 
@@ -604,6 +604,6 @@ Backend phải dùng thao tác INSERT này cho bàn giao một người phụ tr
 | Chống trùng Topic LOCAL và ID nguồn | Đồng bộ OpenAlex đúng ID cha, không ghi đè LOCAL, hiển thị rõ nguồn |
 | Chống đơn trùng, chụp SLA, khóa chuyển trạng thái application | Chỉ applicant được rút; chỉ người có quyền được phản hồi; thông báo kết quả |
 | Các hàm hỗ trợ đọc bài/file/application theo actor | Dùng đúng hàm/policy trong search, API và tải file; không expose bảng gốc bỏ qua quyền |
-| Ledger sự kiện/email, chống trùng item và giới hạn attempts | Lịch gửi, matching, kiểm tra visibility lần cuối, retry và đối soát provider |
+| Ledger sự kiện/email, chống trùng item và giới hạn attempts | Lịch gửi, matching, kiểm tra visibility lần cuối và retry SMTP |
 
 Các sơ đồ và tên bảng giúp đọc thiết kế; chúng không thay thế việc triển khai và kiểm thử API. Khi cần viết code hoặc đối chiếu chính xác cột/ràng buộc, xem [schema DBML](ResearchOS.dbml), [SQL đầy đủ](ResearchOS.sql) và [README kỹ thuật](README.md).

@@ -412,6 +412,9 @@ export class ApplicationsService {
       throw new BadRequestException('Unsupported application sort field');
     const rows = await tx.opportunity_applications.findMany({
       where,
+      include: {
+        research_opportunities: { select: { title: true } },
+      },
       orderBy: [orderBy, { id: 'asc' }],
       skip: (query.page - 1) * query.limit,
       take: query.limit,
@@ -419,7 +422,10 @@ export class ApplicationsService {
     const total = await tx.opportunity_applications.count({ where });
     const now = await this.now(tx);
     return {
-      items: rows.map((row) => this.response(row, now)),
+      items: rows.map((row) => ({
+        ...this.response(row, now),
+        opportunityTitle: row.research_opportunities?.title ?? null,
+      })),
       meta: buildPaginationMeta(query, rows.length, total),
     };
   }

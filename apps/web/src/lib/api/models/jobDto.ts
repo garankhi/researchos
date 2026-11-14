@@ -13,9 +13,9 @@ export interface JobDto {
   /** PENDING includes queued, running and retrying work; terminal states are persisted in PostgreSQL. */
   status: JobDtoStatus;
   /**
-   * Execution attempts in the current generation.
+   * Lifetime processing attempts for digest jobs. For other jobs, execution attempts in the current generation.
    * @minimum 0
-   * @maximum 3
+   * @maximum 5
    */
   attempts: number;
   /** Owner-scoped URL to poll for this job. */
