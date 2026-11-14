@@ -67,33 +67,40 @@ export function OutputHeader({
       ? authors
       : authors.slice(0, VISIBLE_AUTHORS);
 
+  /*
+   * The group block renders only for affiliated works. A work with no
+   * `accessGroupId` shows no eyebrow and no group row — an "independent
+   * work" label would state a fact nobody asked for on every unaffiliated
+   * page.
+   */
   const groupLabel = groupLoading
     ? t('detail.groupLoading')
-    : (groupName ?? t('detail.independentWork'));
+    : (groupName ?? null);
+  const hasGroupLabel = groupLabel !== null;
 
   return (
     <Stack gap="4" minW="0">
-      <Flex
-        direction={{ base: 'column', sm: 'row' }}
-        gap="2"
-        align={{ base: 'flex-start', sm: 'center' }}
-        justify="space-between"
-      >
-        <Box minW="0">
-          {groupId ? (
-            <Link asChild fontWeight="semibold" textStyle="sm" truncate display="block">
-              <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
-            </Link>
-          ) : (
-            <Text fontWeight="semibold" textStyle="sm" truncate>
-              {groupLabel}
-            </Text>
-          )}
-        </Box>
-        {followSlot}
-      </Flex>
+      {groupId ? (
+        <>
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap="2"
+            align={{ base: 'flex-start', sm: 'center' }}
+            justify="space-between"
+          >
+            {hasGroupLabel ? (
+              <Box minW="0">
+                <Link asChild fontWeight="semibold" textStyle="sm" truncate display="block">
+                  <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
+                </Link>
+              </Box>
+            ) : null}
+            {followSlot}
+          </Flex>
 
-      <Separator />
+          <Separator />
+        </>
+      ) : null}
 
       {outputType ? (
         <Flex gap="2" align="center" flexWrap="wrap">
@@ -124,20 +131,18 @@ export function OutputHeader({
           </Flex>
         ) : null}
 
-        <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
-          <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
-            {t('detail.groupRowLabel')}
-          </Text>
-          <Box minW="0">
-            {groupId ? (
+        {groupId && hasGroupLabel ? (
+          <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
+            <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
+              {t('detail.groupRowLabel')}
+            </Text>
+            <Box minW="0">
               <Link asChild textStyle="sm">
                 <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
               </Link>
-            ) : (
-              <Text textStyle="sm">{groupLabel}</Text>
-            )}
-          </Box>
-        </Flex>
+            </Box>
+          </Flex>
+        ) : null}
 
         {doi ? (
           <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>

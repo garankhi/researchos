@@ -51,6 +51,8 @@ export interface OutputRevisionSummary {
 export interface OutputDetail {
   id: string;
   doi: string | null;
+  ownerId: string | null;
+  sharingStatus: OutputResponseDto['sharingStatus'];
   visibility: OutputResponseDto['visibility'];
   accessGroupId: string | null;
   firstSharedAt: string | null;
@@ -93,6 +95,8 @@ export function mapOutputDetail(dto: OutputResponseDto): OutputDetail {
   return {
     id: dto.id,
     doi: asString(dto.doi),
+    ownerId: asString(dto.ownerId),
+    sharingStatus: dto.sharingStatus,
     visibility: dto.visibility,
     accessGroupId: asString(dto.accessGroupId),
     firstSharedAt: asString(dto.firstSharedAt),

@@ -12,6 +12,7 @@ import {
 import { useOutput } from '../hooks/use-output';
 import { useOutputFiles } from '../hooks/use-output-files';
 import { useOutputGroup } from '../hooks/use-output-group';
+import { useOutputOwner } from '../hooks/use-output-owner';
 import { OutputAbstract } from './output-abstract';
 import {
   OutputDownloadPrimaryButton,
@@ -19,6 +20,7 @@ import {
   OutputFollowButton,
   OutputShareButton,
 } from './output-actions';
+import { OutputDetailActionsMenu } from './output-detail-actions-menu';
 import { OutputHeader } from './output-header';
 import { OutputReferences } from './output-references';
 
@@ -36,6 +38,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
   } = useOutput({ outputId });
   const filesQuery = useOutputFiles({ outputId });
   const groupQuery = useOutputGroup({ groupId: output?.accessGroupId });
+  const { isOwner } = useOutputOwner({ ownerId: output?.ownerId });
 
   if (isLoading) {
     return (
@@ -117,9 +120,10 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                     {t('detail.tabsReferences')}
                   </Tabs.Trigger>
                 </Tabs.List>
-                <Flex gap="2" flexShrink={0}>
+                <Flex gap="2" flexShrink={0} alignItems="center">
                   <OutputDownloadPrimaryButton file={primaryFile} />
                   <OutputShareButton />
+                  {isOwner ? <OutputDetailActionsMenu output={output} /> : null}
                 </Flex>
               </Flex>
             </Stack>
