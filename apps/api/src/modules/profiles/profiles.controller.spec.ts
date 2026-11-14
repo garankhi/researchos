@@ -33,7 +33,13 @@ describe('ProfilesController', () => {
     is_active: true,
   };
 
-  const mockConfirmedProfile = {
+  /**
+   * The profile row of a confirmed researcher.
+   *
+   * It is attached to the account as `researcher_profiles`, because that
+   * is the optional one-to-one relation the service reads.
+   */
+  const confirmedProfile = {
     user_id: callerId,
     orcid_id: '0000-0002-1825-0097',
     scopus_author_id: '57193294821',
@@ -47,10 +53,9 @@ describe('ProfilesController', () => {
     last_synced_at: null,
     llkh_last_exported_at: null,
     updated_at: new Date('2026-11-06T11:00:00.000Z'),
-    users: mockUser,
   };
 
-  const mockUnconfirmedProfile = {
+  const unconfirmedProfile = {
     user_id: otherUserId,
     orcid_id: null,
     scopus_author_id: null,
@@ -64,17 +69,39 @@ describe('ProfilesController', () => {
     last_synced_at: null,
     llkh_last_exported_at: null,
     updated_at: new Date('2026-11-06T11:00:00.000Z'),
-    users: mockOtherUser,
+  };
+
+  const mockConfirmedUser = {
+    ...mockUser,
+    researcher_profiles: confirmedProfile,
+  };
+
+  const mockUnconfirmedUser = {
+    ...mockOtherUser,
+    researcher_profiles: unconfirmedProfile,
+  };
+
+  /**
+   * An account that has never had a profile row.
+   *
+   * The relation is optional, so this is a valid account — and the one
+   * the seed leaves every dev account in.
+   */
+  const mockUserWithoutProfile = {
+    ...mockUser,
+    researcher_profiles: null,
   };
 
   const createPrismaMock = () => {
     const prismaMock = {
-      researcher_profiles: {
+      users: {
         findUnique: vi.fn(),
+        findUniqueOrThrow: vi.fn(),
         update: vi.fn(),
       },
-      users: {
-        update: vi.fn(),
+      researcher_profiles: {
+        findUnique: vi.fn(),
+        upsert: vi.fn(),
       },
       research_interests: {
         findMany: vi.fn(),
@@ -107,10 +134,9 @@ describe('ProfilesController', () => {
   describe('getMyProfile', () => {
     it('returns caller profile even if unconfirmed', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
-        ...mockUnconfirmedProfile,
-        user_id: callerId,
-        users: mockUser,
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockUser,
+        researcher_profiles: { ...unconfirmedProfile, user_id: callerId },
       });
 
       const controller = await setupController(prismaMock);
@@ -124,9 +150,37 @@ describe('ProfilesController', () => {
       );
     });
 
-    it('throws 404 when profile does not exist', async () => {
+    it('returns the account fields when the user has no profile row', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(mockUserWithoutProfile);
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getMyProfile(callerId);
+
+      // The account is enough to answer: the name, the email and the
+      // department come from `users`.
+      expect(result.userId).toBe(callerId);
+      expect(result.fullName).toBe('Nguyễn Văn A');
+      expect(result.email).toBe('nguyenvana@fpt.edu.vn');
+      expect(result.departmentUnit).toBe('Software Engineering');
+      expect(result.academicTitle).toBe('PGS');
+      expect(result.academicDegree).toBe('TS');
+      expect(result.userType).toBe('FACULTY');
+
+      // The profile-only fields are empty rather than missing.
+      expect(result.bio).toBeNull();
+      expect(result.orcidId).toBeNull();
+      expect(result.googleScholarUrl).toBeNull();
+      expect(result.scopusAuthorId).toBeNull();
+      expect(result.profileConfirmedAt).toBeNull();
+      expect(result.availabilityStatus).toBe(
+        AvailabilityStatusEnum.NOT_AVAILABLE,
+      );
+    });
+
+    it('throws 404 when the account does not exist', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(null);
 
       const controller = await setupController(prismaMock);
 
@@ -142,15 +196,15 @@ describe('ProfilesController', () => {
   describe('getProfileById', () => {
     it('returns confirmed profile to any authenticated user', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockConfirmedProfile,
-      );
+      prismaMock.users.findUnique.mockResolvedValue(mockConfirmedUser);
 
       const controller = await setupController(prismaMock);
       const result = await controller.getProfileById(callerId, otherUserId);
 
       expect(result.userId).toBe(callerId);
       expect(result.fullName).toBe('Nguyễn Văn A');
+      expect(result.bio).toBe('Distributed systems researcher.');
+      expect(result.orcidId).toBe('0000-0002-1825-0097');
       expect(result.profileConfirmedAt).toBe('2026-11-06T10:00:00.000Z');
       expect(result.availabilityStatus).toBe(
         AvailabilityStatusEnum.OPEN_FOR_COLLABORATION,
@@ -159,9 +213,7 @@ describe('ProfilesController', () => {
 
     it('allows owner to view their own unconfirmed profile', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockUnconfirmedProfile,
-      );
+      prismaMock.users.findUnique.mockResolvedValue(mockUnconfirmedUser);
 
       const controller = await setupController(prismaMock);
       const result = await controller.getProfileById(otherUserId, otherUserId);
@@ -172,9 +224,7 @@ describe('ProfilesController', () => {
 
     it('throws 403 when non-owner requests unconfirmed profile', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockUnconfirmedProfile,
-      );
+      prismaMock.users.findUnique.mockResolvedValue(mockUnconfirmedUser);
 
       const controller = await setupController(prismaMock);
 
@@ -185,9 +235,40 @@ describe('ProfilesController', () => {
       );
     });
 
-    it('throws 404 when target profile does not exist', async () => {
+    it('throws 403 when non-owner requests a user without a profile row', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockOtherUser,
+        researcher_profiles: null,
+      });
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.getProfileById(otherUserId, callerId),
+      ).rejects.toThrow(
+        expect.objectContaining({ status: HttpStatus.FORBIDDEN }),
+      );
+    });
+
+    it('lets the owner read a user that has no profile row', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockOtherUser,
+        researcher_profiles: null,
+      });
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getProfileById(otherUserId, otherUserId);
+
+      expect(result.userId).toBe(otherUserId);
+      expect(result.fullName).toBe('Trần Thị B');
+      expect(result.bio).toBeNull();
+    });
+
+    it('throws 404 when target user does not exist', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue(null);
 
       const controller = await setupController(prismaMock);
 
@@ -205,13 +286,17 @@ describe('ProfilesController', () => {
   describe('updateMyProfile', () => {
     it('updates editable fields and returns updated profile', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockConfirmedProfile,
-      );
-      prismaMock.researcher_profiles.update.mockResolvedValue({
-        ...mockConfirmedProfile,
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue({
+        ...mockConfirmedUser,
+        researcher_profiles: {
+          ...confirmedProfile,
+          bio: 'Updated research focus.',
+          availability_status: 'MENTORING_ONLY',
+        },
+      });
+      prismaMock.researcher_profiles.upsert.mockResolvedValue({
+        ...confirmedProfile,
         bio: 'Updated research focus.',
-        availability_status: 'MENTORING_ONLY',
       });
 
       const controller = await setupController(prismaMock);
@@ -224,44 +309,54 @@ describe('ProfilesController', () => {
       expect(result.availabilityStatus).toBe(
         AvailabilityStatusEnum.MENTORING_ONLY,
       );
-      expect(prismaMock.researcher_profiles.update).toHaveBeenCalledWith(
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { user_id: callerId },
-          data: expect.objectContaining({
+          create: expect.objectContaining({
+            user_id: callerId,
             bio: 'Updated research focus.',
-            availability_status: 'MENTORING_ONLY',
+          }),
+          update: expect.objectContaining({
+            bio: 'Updated research focus.',
+            availability_status: AvailabilityStatusEnum.MENTORING_ONLY,
           }),
         }),
       );
     });
 
-    it('throws 404 when updating non-existent profile', async () => {
+    it('creates the profile row when the user has none', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(null);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue({
+        ...mockUserWithoutProfile,
+        researcher_profiles: {
+          ...confirmedProfile,
+          bio: 'A first bio.',
+        },
+      });
+      prismaMock.researcher_profiles.upsert.mockResolvedValue({
+        ...confirmedProfile,
+        bio: 'A first bio.',
+      });
 
       const controller = await setupController(prismaMock);
+      await controller.updateMyProfile(callerId, { bio: 'A first bio.' });
 
-      await expect(
-        controller.updateMyProfile('missing-id', {
-          bio: 'Test',
-        }),
-      ).rejects.toThrow(
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: HttpStatus.NOT_FOUND,
-          code: domainErrorCodes.profiles.profileNotFound,
+          create: expect.objectContaining({
+            user_id: callerId,
+            bio: 'A first bio.',
+          }),
         }),
       );
     });
 
     it('writes the account fields to users, not to the profile', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockConfirmedProfile,
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(mockConfirmedUser);
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(
+        confirmedProfile,
       );
-      prismaMock.researcher_profiles.update.mockResolvedValue({
-        ...mockConfirmedProfile,
-        users: { ...mockUser, full_name: 'Nguyễn Văn A' },
-      });
 
       const controller = await setupController(prismaMock);
       await controller.updateMyProfile(callerId, {
@@ -280,29 +375,31 @@ describe('ProfilesController', () => {
           academic_degree: null,
         },
       });
-      // The profile write stays on the profile table.
-      expect(prismaMock.researcher_profiles.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.not.objectContaining({
-            full_name: expect.anything(),
-          }),
-        }),
-      );
+      // The account fields never reach the profile table.
+      expect(prismaMock.researcher_profiles.upsert).not.toHaveBeenCalled();
     });
 
     it('skips the users write when the payload carries no account field', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(
-        mockConfirmedProfile,
-      );
-      prismaMock.researcher_profiles.update.mockResolvedValue(
-        mockConfirmedProfile,
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(mockConfirmedUser);
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(
+        confirmedProfile,
       );
 
       const controller = await setupController(prismaMock);
       await controller.updateMyProfile(callerId, { bio: 'Only a bio.' });
 
       expect(prismaMock.users.update).not.toHaveBeenCalled();
+    });
+
+    it('skips the profile write when the payload carries no profile field', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(mockConfirmedUser);
+
+      const controller = await setupController(prismaMock);
+      await controller.updateMyProfile(callerId, { fullName: 'New Name' });
+
+      expect(prismaMock.researcher_profiles.upsert).not.toHaveBeenCalled();
     });
   });
 
@@ -333,9 +430,12 @@ describe('ProfilesController', () => {
 
     it('returns the interests with their taxonomy path', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
-        user_id: otherUserId,
-        profile_confirmed_at: new Date('2026-11-01T09:00:00.000Z'),
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockOtherUser,
+        researcher_profiles: {
+          ...unconfirmedProfile,
+          profile_confirmed_at: new Date('2026-11-01T09:00:00.000Z'),
+        },
       });
       prismaMock.research_interests.findMany.mockResolvedValue([mockInterest]);
 
@@ -371,10 +471,7 @@ describe('ProfilesController', () => {
 
     it('refuses a non-owner when the profile is unconfirmed', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
-        user_id: otherUserId,
-        profile_confirmed_at: null,
-      });
+      prismaMock.users.findUnique.mockResolvedValue(mockUnconfirmedUser);
 
       const controller = await setupController(prismaMock);
 
@@ -391,10 +488,7 @@ describe('ProfilesController', () => {
 
     it('lets the owner read the interests of their own unconfirmed profile', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue({
-        user_id: otherUserId,
-        profile_confirmed_at: null,
-      });
+      prismaMock.users.findUnique.mockResolvedValue(mockUnconfirmedUser);
       prismaMock.research_interests.findMany.mockResolvedValue([]);
 
       const controller = await setupController(prismaMock);
@@ -404,9 +498,9 @@ describe('ProfilesController', () => {
       ).resolves.toEqual([]);
     });
 
-    it('throws 404 when the target profile does not exist', async () => {
+    it('throws 404 when the target user does not exist', async () => {
       const prismaMock = createPrismaMock();
-      prismaMock.researcher_profiles.findUnique.mockResolvedValue(null);
+      prismaMock.users.findUnique.mockResolvedValue(null);
 
       const controller = await setupController(prismaMock);
 

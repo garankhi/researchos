@@ -7,15 +7,22 @@ import type { ProfileInterestResponseDto } from './dto/profile-interest-response
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
 
-type ProfileWithUser = Prisma.researcher_profilesGetPayload<{
-  include: { users: true };
+/**
+ * The account row, with its optional profile attached.
+ *
+ * The account is the primary row: every account has one. The profile row
+ * is optional — `users.researcher_profiles` is a one-to-one relation that
+ * may be absent — so it is joined in rather than assumed.
+ */
+type UserWithProfile = Prisma.usersGetPayload<{
+  include: { researcher_profiles: true };
 }>;
 
 /**
  * Service managing researcher profiles.
  *
  * Enforces state-derived visibility: confirmed profiles are public to the
- * university community, while unconfirmed profiles return 404 to non-owners.
+ * university community, while unconfirmed profiles return 403 to non-owners.
  */
 @Injectable()
 export class ProfilesService {
@@ -23,49 +30,59 @@ export class ProfilesService {
 
   /**
    * Retrieves the caller's own researcher profile.
+   *
+   * The account alone is enough to answer this. A user without a
+   * `researcher_profiles` row still has a name, an email and a department,
+   * so the profile is returned with the profile-only fields left empty
+   * rather than refusing the request.
    */
   async findMyProfile(userId: string): Promise<ProfileResponseDto> {
-    const profile = await this.prisma.researcher_profiles.findUnique({
-      where: { user_id: userId },
-      include: { users: true },
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      include: { researcher_profiles: true },
     });
 
-    if (!profile) {
+    if (!user) {
       throw new CodedHttpException(
         domainErrorCodes.profiles.profileNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
 
-    return this.mapToResponse(profile);
+    return this.mapToResponse(user);
   }
 
   /**
    * Retrieves a target user's researcher profile.
    *
-   * Non-owners receive 404 if the profile is unconfirmed.
+   * Non-owners receive 403 if the profile is unconfirmed.
    */
   async findProfileById(
     targetUserId: string,
     callerId: string,
   ): Promise<ProfileResponseDto> {
-    const profile = await this.prisma.researcher_profiles.findUnique({
-      where: { user_id: targetUserId },
-      include: { users: true },
+    const user = await this.prisma.users.findUnique({
+      where: { id: targetUserId },
+      include: { researcher_profiles: true },
     });
 
-    if (!profile) {
+    if (!user) {
       throw new CodedHttpException(
         domainErrorCodes.profiles.profileNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
 
-    // Unconfirmed profiles are visible to the owner only; non-owners are
-    // refused with 403 rather than a 404 that would hide the denial.
-    this.assertProfileReadable(targetUserId, callerId, profile);
+    /*
+     * Unconfirmed profiles are visible to the owner only; non-owners are
+     * refused with 403 rather than a 404 that would hide the denial.
+     *
+     * A user without a profile row has not been confirmed either, so the
+     * same rule applies to them.
+     */
+    this.assertProfileReadable(targetUserId, callerId, user.researcher_profiles);
 
-    return this.mapToResponse(profile);
+    return this.mapToResponse(user);
   }
 
   /**
@@ -80,19 +97,19 @@ export class ProfilesService {
     targetUserId: string,
     callerId: string,
   ): Promise<ProfileInterestResponseDto[]> {
-    const profile = await this.prisma.researcher_profiles.findUnique({
-      where: { user_id: targetUserId },
-      select: { user_id: true, profile_confirmed_at: true },
+    const user = await this.prisma.users.findUnique({
+      where: { id: targetUserId },
+      include: { researcher_profiles: true },
     });
 
-    if (!profile) {
+    if (!user) {
       throw new CodedHttpException(
         domainErrorCodes.profiles.profileNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
 
-    this.assertProfileReadable(targetUserId, callerId, profile);
+    this.assertProfileReadable(targetUserId, callerId, user.researcher_profiles);
 
     const rows = await this.prisma.research_interests.findMany({
       where: { user_id: targetUserId },
@@ -136,13 +153,21 @@ export class ProfilesService {
    * A confirmed profile is readable by any authenticated user; an
    * unconfirmed one only by its owner. A non-owner is refused with 403
    * rather than a 404 that would hide the denial.
+   *
+   * A missing profile row counts as unconfirmed: the account exists, but
+   * nobody has confirmed the researcher behind it yet.
    */
   private assertProfileReadable(
     targetUserId: string,
     callerId: string,
-    profile: { profile_confirmed_at: Date | null },
+    profile: { profile_confirmed_at: Date | null } | null,
   ): void {
-    if (targetUserId !== callerId && profile.profile_confirmed_at === null) {
+    // A missing profile row counts as unconfirmed: the account exists, but
+    // nobody has confirmed the researcher behind it yet.
+    const confirmed =
+      profile !== null && profile.profile_confirmed_at !== null;
+
+    if (targetUserId !== callerId && !confirmed) {
       throw new CodedHttpException(
         domainErrorCodes.profiles.profileAccessDenied,
         HttpStatus.FORBIDDEN,
@@ -162,32 +187,15 @@ export class ProfilesService {
     userId: string,
     dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
-    const existing = await this.prisma.researcher_profiles.findUnique({
-      where: { user_id: userId },
-    });
-
-    if (!existing) {
-      throw new CodedHttpException(
-        domainErrorCodes.profiles.profileNotFound,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const data: Prisma.researcher_profilesUpdateInput = {};
-    if (dto.bio !== undefined) {
-      data.bio = dto.bio?.trim() || null;
-    }
-    if (dto.availabilityStatus !== undefined) {
-      data.availability_status = dto.availabilityStatus;
-    }
-    if (dto.googleScholarUrl !== undefined) {
-      data.google_scholar_url = dto.googleScholarUrl?.trim() || null;
-    }
-    if (dto.scopusAuthorId !== undefined) {
-      data.scopus_author_id = dto.scopusAuthorId?.trim() || null;
-    }
-
     const account = this.accountData(dto);
+
+    /*
+     * The profile row is optional, so it is created on the first write.
+     * A caller who has never had a profile row still has to be able to
+     * fill one in — refusing the update would leave the profile page
+     * permanently read-only for anyone the seed did not provision.
+     */
+    const profileData = this.profileData(dto);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (Object.keys(account).length > 0) {
@@ -197,10 +205,19 @@ export class ProfilesService {
         });
       }
 
-      return tx.researcher_profiles.update({
-        where: { user_id: userId },
-        data,
-        include: { users: true },
+      if (Object.keys(profileData).length > 0) {
+        await tx.researcher_profiles.upsert({
+          where: { user_id: userId },
+          create: {
+            user_id: userId,
+            ...profileData,
+          },
+          update: profileData,
+        });
+      }
+      return tx.users.findUniqueOrThrow({
+        where: { id: userId },
+        include: { researcher_profiles: true },
       });
     });
 
@@ -232,25 +249,73 @@ export class ProfilesService {
     return data;
   }
 
-  private mapToResponse(profile: ProfileWithUser): ProfileResponseDto {
+  /**
+   * The profile columns the caller asked to change.
+   *
+   * These live on `researcher_profiles`. An empty object means the
+   * payload carried no profile field, and the caller skips the profile
+   * write entirely.
+   *
+   * The shape is plain rather than a Prisma input type, because the same
+   * values are used for the `create` and the `update` of the upsert, and
+   * the two Prisma input types do not overlap.
+   */
+  private profileData(dto: UpdateProfileDto): {
+    bio?: string | null;
+    availability_status?: AvailabilityStatusEnum;
+    google_scholar_url?: string | null;
+    scopus_author_id?: string | null;
+  } {
+    const data: {
+      bio?: string | null;
+      availability_status?: AvailabilityStatusEnum;
+      google_scholar_url?: string | null;
+      scopus_author_id?: string | null;
+    } = {};
+    if (dto.bio !== undefined) {
+      data.bio = dto.bio?.trim() || null;
+    }
+    if (dto.availabilityStatus !== undefined) {
+      data.availability_status = dto.availabilityStatus;
+    }
+    if (dto.googleScholarUrl !== undefined) {
+      data.google_scholar_url = dto.googleScholarUrl?.trim() || null;
+    }
+    if (dto.scopusAuthorId !== undefined) {
+      data.scopus_author_id = dto.scopusAuthorId?.trim() || null;
+    }
+    return data;
+  }
+
+  /**
+   * Merges the account and the profile into one response.
+   *
+   * The account fields are always present. The profile fields are only
+   * there when the researcher has a profile row — an account without one
+   * reports the profile-only fields as empty rather than being refused.
+   */
+  private mapToResponse(user: UserWithProfile): ProfileResponseDto {
+    const profile = user.researcher_profiles;
+
     return {
-      userId: profile.user_id,
-      fullName: profile.users.full_name,
-      email: profile.users.email,
-      departmentUnit: profile.users.department_unit,
-      academicTitle: profile.users.academic_title,
-      academicDegree: profile.users.academic_degree,
-      userType: profile.users.user_type,
-      bio: profile.bio,
-      availabilityStatus: profile.availability_status as AvailabilityStatusEnum,
-      orcidId: profile.orcid_id,
-      googleScholarUrl: profile.google_scholar_url,
-      scopusAuthorId: profile.scopus_author_id,
-      avatarStorageKey: profile.avatar_storage_key,
-      profileConfirmedAt: profile.profile_confirmed_at?.toISOString() ?? null,
-      papersReviewedAt: profile.papers_reviewed_at?.toISOString() ?? null,
+      userId: user.id,
+      fullName: user.full_name,
+      email: user.email,
+      departmentUnit: user.department_unit,
+      academicTitle: user.academic_title,
+      academicDegree: user.academic_degree,
+      userType: user.user_type,
+      bio: profile?.bio ?? null,
+      availabilityStatus: (profile?.availability_status ??
+        AvailabilityStatusEnum.NOT_AVAILABLE) as AvailabilityStatusEnum,
+      orcidId: profile?.orcid_id ?? null,
+      googleScholarUrl: profile?.google_scholar_url ?? null,
+      scopusAuthorId: profile?.scopus_author_id ?? null,
+      avatarStorageKey: profile?.avatar_storage_key ?? null,
+      profileConfirmedAt: profile?.profile_confirmed_at?.toISOString() ?? null,
+      papersReviewedAt: profile?.papers_reviewed_at?.toISOString() ?? null,
       onboardingCompletedAt:
-        profile.onboarding_completed_at?.toISOString() ?? null,
+        profile?.onboarding_completed_at?.toISOString() ?? null,
     };
   }
 }
