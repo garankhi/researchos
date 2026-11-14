@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { EmotionRegistry } from '@/components/providers/emotion-registry';
@@ -72,8 +73,17 @@ export default async function RootLayout({
                       about a domain, so the account area is passed in as a
                       slot. The dependency runs the other way: the identity
                       feature knows about the header's slot, not the
-                      reverse. */}
-                  <Header accountSlot={<AccountSlot />} />
+                      reverse.
+
+                      The header reads the current path — the account area
+                      carries it into the sign-in link as `returnTo` — so it
+                      is wrapped in a `<Suspense>` boundary. Next.js cannot
+                      prerender a component that reads URL data, and the
+                      header sits above every route, so the boundary belongs
+                      here rather than in each page. */}
+                  <Suspense fallback={null}>
+                    <Header accountSlot={<AccountSlot />} />
+                  </Suspense>
                   {children}
                 </SnackbarProvider>
               </NextIntlClientProvider>
