@@ -31,6 +31,7 @@ import type {
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
   UpdateOutputRevisionDto,
+  UpdateOutputVisibilityDto,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -1024,6 +1025,109 @@ export const useOutputsControllerArchive = <
 > => {
   return useMutation(
     getOutputsControllerArchiveMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.
+ * @summary Changes who may see a shared work
+ */
+export const outputsControllerUpdateVisibility = (
+  outputId: string,
+  updateOutputVisibilityDto: UpdateOutputVisibilityDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/visibility`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateOutputVisibilityDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateVisibilityMutationKey = () =>
+  ['outputsControllerUpdateVisibility'] as const;
+
+export const getOutputsControllerUpdateVisibilityMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+    TError,
+    OutputsControllerUpdateVisibilityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+  TError,
+  OutputsControllerUpdateVisibilityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerUpdateVisibilityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+    OutputsControllerUpdateVisibilityMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerUpdateVisibility(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateVisibilityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>
+>;
+export type OutputsControllerUpdateVisibilityMutationBody =
+  UpdateOutputVisibilityDto;
+export type OutputsControllerUpdateVisibilityMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerUpdateVisibilityMutationVariables = {
+  outputId: string;
+  data: UpdateOutputVisibilityDto;
+};
+
+/**
+ * @summary Changes who may see a shared work
+ */
+export const useOutputsControllerUpdateVisibility = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+      TError,
+      OutputsControllerUpdateVisibilityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+  TError,
+  OutputsControllerUpdateVisibilityMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateVisibilityMutationOptions(options),
     queryClient,
   );
 };

@@ -44,6 +44,8 @@ export interface OutputRevisionSummary {
   publisher: string | null;
   publicationYear: number | null;
   externalUrl: string | null;
+  outputType: string;
+  releasedAt: string | null;
 }
 
 export interface OutputDetail {
@@ -103,6 +105,8 @@ export function mapOutputDetail(dto: OutputResponseDto): OutputDetail {
           publisher: asString(rev.publisher),
           publicationYear: asNumber(rev.publicationYear),
           externalUrl: asString(rev.externalUrl),
+          outputType: rev.outputType,
+          releasedAt: asString(rev.releasedAt),
         }
       : null,
     authors: [...(dto.authors ?? [])]

@@ -142,7 +142,20 @@
       "year": "Năm: {year}",
       "venue": "Nơi xuất bản / Kỷ yếu: {venue}",
       "doi": "DOI: {doi}",
-      "authors": "Tác giả: {authors}"
+      "authors": "Tác giả: {authors}",
+      "actionsMenuLabel": "Thao tác với công trình",
+      "visibilityAction": "Phạm vi hiển thị",
+      "visibilityDialogTitle": "Ai có thể xem công trình này",
+      "visibilityDialogDesc": "Công trình cộng đồng vẫn hiển thị ngay cả khi mang tên nhóm liên kết.",
+      "visibilityPublicOption": "Cộng đồng FPTU",
+      "visibilityPublicDesc": "Mọi người trong cộng đồng FPTU đều có thể xem công trình.",
+      "visibilityGroupOption": "Chỉ nhóm liên kết",
+      "visibilityGroupDesc": "Chỉ thành viên của nhóm liên kết mới xem được công trình.",
+      "visibilityNoGroupHint": "Công trình này chưa có nhóm liên kết nên không thể giới hạn theo nhóm.",
+      "visibilityUpdated": "Đã cập nhật phạm vi hiển thị.",
+      "visibilityUpdateError": "Không thể cập nhật phạm vi hiển thị. Vui lòng thử lại.",
+      "visibilityPublic": "Cộng đồng FPTU",
+      "visibilityGroupOnly": "Chỉ nhóm"
     },
     "interestsTab": {
       "title": "Sở thích nghiên cứu",
@@ -182,8 +195,14 @@
   "outputs": {
     "detail": {
       "untitled": "Công trình chưa có tiêu đề",
-      "publishedYear": "Xuất bản năm {year}",
-      "doiLabel": "DOI: {doi}",
+      "fullTextAvailable": "Có toàn văn",
+      "groupLoading": "Đang tải nhóm…",
+      "independentWork": "Công trình độc lập",
+      "dateRowLabel": "Ngày",
+      "groupRowLabel": "Nhóm",
+      "doiRowLabel": "DOI",
+      "tabsOverview": "Tổng quan",
+      "tabsReferences": "Tài liệu tham khảo",
       "externalLink": "Trang nhà xuất bản",
       "authorsLabel": "Tác giả",
       "correspondingAuthorBadge": "tác giả liên hệ",

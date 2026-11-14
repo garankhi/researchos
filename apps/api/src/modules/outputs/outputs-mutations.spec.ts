@@ -407,9 +407,50 @@ describe('OutputsController mutations', () => {
       });
     });
 
-    it('refuses an access group with a community visibility', async () => {
+    it('accepts an access group with a community visibility when the caller is a member', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
+        mockDraftOutput,
+      );
+      prismaMock.tx.output_revisions.findFirst.mockResolvedValue(
+        mockDraftRevision,
+      );
+      prismaMock.tx.output_revisions.update.mockResolvedValue({
+        ...mockDraftRevision,
+        released_at: now,
+      });
+      prismaMock.tx.research_outputs.update.mockResolvedValue(mockDraftOutput);
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ allowed: true }])
+        .mockResolvedValueOnce([{ now }]);
+      prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
+        mockDraftRevision,
+      );
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const controller = await setupController(prismaMock, provenanceMock);
+      await controller.publish(outputId, ownerId, {
+        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        accessGroupId: groupId,
+      });
+
+      expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
+        where: { id: outputId },
+        data: expect.objectContaining({
+          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          access_group_id: groupId,
+        }),
+      });
+    });
+
+    it('refuses a community-affiliated work scoped to a group the caller is not a member of', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
+        mockDraftOutput,
+      );
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: false }]);
 
       const controller = await setupController(prismaMock, provenanceMock);
 
@@ -420,7 +461,7 @@ describe('OutputsController mutations', () => {
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.BAD_REQUEST,
-        code: domainErrorCodes.outputs.outputVisibilityInvalid,
+        code: domainErrorCodes.outputs.outputAccessGroupInvalid,
       });
     });
 
@@ -481,6 +522,136 @@ describe('OutputsController mutations', () => {
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
         code: domainErrorCodes.outputs.outputNotPublishable,
+      });
+    });
+  });
+
+  describe('updateVisibility', () => {
+    const mockSharedOutput = {
+      ...mockDraftOutput,
+      sharing_status: OutputSharingStatus.SHARED,
+      current_release_id: draftRevId,
+      visibility: OutputFileVisibility.RESEARCH_GROUP,
+      access_group_id: groupId,
+      output_authors: [],
+    };
+
+    const mockLoadedOutput = {
+      ...mockSharedOutput,
+      visibility: OutputFileVisibility.FPTU_COMMUNITY,
+      output_authors: [],
+    };
+
+    it('lets the owner open an affiliated work to the community while keeping the group', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique
+        .mockResolvedValueOnce(mockSharedOutput)
+        .mockResolvedValueOnce(mockLoadedOutput);
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
+      prismaMock.tx.research_outputs.update.mockResolvedValue(
+        mockLoadedOutput,
+      );
+      prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
+        mockDraftRevision,
+      );
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const controller = await setupController(prismaMock, provenanceMock);
+      const result = await controller.updateVisibility(outputId, ownerId, {
+        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+      });
+
+      expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
+        where: { id: outputId },
+        data: {
+          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          access_group_id: groupId,
+        },
+      });
+      expect(result.visibility).toBe(OutputFileVisibility.FPTU_COMMUNITY);
+      expect(result.accessGroupId).toBe(groupId);
+    });
+
+    it('lets the lead of the affiliated group change visibility', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique
+        .mockResolvedValueOnce(mockSharedOutput)
+        .mockResolvedValueOnce(mockLoadedOutput);
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
+      prismaMock.tx.research_outputs.update.mockResolvedValue(
+        mockLoadedOutput,
+      );
+      prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
+        mockDraftRevision,
+      );
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const controller = await setupController(prismaMock, provenanceMock);
+      await controller.updateVisibility(outputId, otherUserId, {
+        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+      });
+
+      expect(prismaMock.tx.research_outputs.update).toHaveBeenCalled();
+    });
+
+    it('refuses a caller who is neither owner nor group lead', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
+        mockSharedOutput,
+      );
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: false }]);
+
+      const controller = await setupController(prismaMock, provenanceMock);
+
+      await expect(
+        controller.updateVisibility(outputId, otherUserId, {
+          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.FORBIDDEN,
+        code: domainErrorCodes.outputs.outputAccessDenied,
+      });
+    });
+
+    it('refuses a group visibility with no affiliated group', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
+        ...mockSharedOutput,
+        access_group_id: null,
+      });
+
+      const controller = await setupController(prismaMock, provenanceMock);
+
+      await expect(
+        controller.updateVisibility(outputId, ownerId, {
+          visibility: OutputFileVisibility.RESEARCH_GROUP,
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        code: domainErrorCodes.outputs.outputVisibilityInvalid,
+      });
+    });
+
+    it('refuses to change visibility of an unpublished work', async () => {
+      const prismaMock = createPrismaMock();
+      const provenanceMock = createProvenanceMock();
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
+        mockDraftOutput,
+      );
+
+      const controller = await setupController(prismaMock, provenanceMock);
+
+      await expect(
+        controller.updateVisibility(outputId, ownerId, {
+          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        code: domainErrorCodes.outputs.outputNotArchived,
       });
     });
   });

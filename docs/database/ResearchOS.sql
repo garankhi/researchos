@@ -500,7 +500,7 @@ CREATE TABLE "research_outputs" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_shared_output" CHECK (sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)),
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
-  CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)),
+  CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
   CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL)
 );
 
@@ -599,7 +599,7 @@ CREATE TABLE "output_files" (
   "is_available" boolean NOT NULL DEFAULT true,
   "uploaded_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_file_size" CHECK (size_bytes > 0),
-  CONSTRAINT "ck_file_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL))
+  CONSTRAINT "ck_file_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL))
 );
 
 CREATE TABLE "output_revision_files" (
@@ -855,7 +855,7 @@ CREATE TABLE "search_index" (
   "doc" tsvector NOT NULL,
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_search_index_entity_type" CHECK (entity_type IN ('OUTPUT','RESEARCHER','GROUP','OPPORTUNITY')),
-  CONSTRAINT "ck_search_index_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)),
+  CONSTRAINT "ck_search_index_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
   PRIMARY KEY ("entity_type", "entity_id")
 );
 
@@ -1413,6 +1413,14 @@ CREATE FUNCTION can_manage_group(actor uuid, target uuid) RETURNS boolean LANGUA
 $$;
 CREATE FUNCTION can_manage_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs WHERE id=target AND owner_id=actor);
+$$;
+-- Who may change the visibility of a work. The owner always may. The lead
+-- of the affiliated group may too, so a group keeps control of works that
+-- carry its banner even when they are public. When the work has no
+-- affiliation only the owner may change it.
+CREATE FUNCTION can_change_output_visibility(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+ SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs o WHERE o.id=target
+ AND (o.owner_id=actor OR (o.access_group_id IS NOT NULL AND can_manage_group(actor,o.access_group_id))));
 $$;
 CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_outputs o JOIN users u ON u.id=actor AND u.is_active

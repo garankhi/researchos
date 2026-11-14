@@ -24,6 +24,17 @@ function fileSizeLabel(bytes: number): string {
   return `${(kb / 1024).toFixed(2)} MB`;
 }
 
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName || 'download';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function OutputFiles({
   files,
   isLoading,
@@ -75,14 +86,7 @@ export function OutputFiles({
     setDownloadError(null);
     try {
       const blob = await outputDownloadControllerDownloadFile(file.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = file.fileName || 'download';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, file.fileName);
       showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
     } catch (error) {
       setDownloadError(
@@ -103,8 +107,10 @@ export function OutputFiles({
           align={{ base: 'flex-start', sm: 'center' }}
           justify="space-between"
           borderWidth="1px"
+          borderColor="border"
           borderRadius="md"
           p="3"
+          bg="bg.subtle"
         >
           <Flex direction="column" gap="0.5" minW="0">
             <Text textStyle="sm" fontWeight="medium" truncate>
@@ -134,18 +140,90 @@ export function OutputFiles({
   );
 }
 
-export function OutputActions({
-  output,
-  primaryFile,
+export function OutputDownloadPrimaryButton({
+  file,
 }: {
-  output: OutputDetail;
-  primaryFile?: OutputFile;
+  file?: OutputFile;
 }) {
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  if (!file) return null;
+
+  async function handleDownload() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const blob = await outputDownloadControllerDownloadFile(file.id);
+      downloadBlob(blob, file.fileName);
+      showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
+    } catch (error) {
+      setDownloadError(
+        resolveErrorCode(tError, apiErrorCode(error), t('detail.downloadError')),
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Flex direction="column" gap="1" align="flex-end">
+      <Button
+        variant="solid"
+        size="sm"
+        loading={downloading}
+        loadingText={t('detail.downloading')}
+        onClick={() => void handleDownload()}
+      >
+        {t('detail.downloadPrimary')}
+      </Button>
+      {downloadError ? (
+        <Text textStyle="xs" color="fg.error" role="alert">
+          {downloadError}
+        </Text>
+      ) : null}
+    </Flex>
+  );
+}
+
+export function OutputShareButton() {
+  const t = useTranslations('outputs');
+  const { showSnackbar } = useSnackbar();
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  async function handleShare() {
+    setShareError(null);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showSnackbar({ severity: 'success', message: t('detail.linkCopied') });
+    } catch {
+      setShareError(t('detail.shareError'));
+    }
+  }
+
+  return (
+    <Flex direction="column" gap="1" align="flex-end">
+      <Button variant="outline" size="sm" onClick={() => void handleShare()}>
+        <Share2 />
+        {t('detail.shareAction')}
+      </Button>
+      {shareError ? (
+        <Text textStyle="xs" color="fg.error" role="alert">
+          {shareError}
+        </Text>
+      ) : null}
+    </Flex>
+  );
+}
+
+export function OutputFollowButton({ output }: { output: OutputDetail }) {
+  const t = useTranslations('outputs');
+  const tError = useTranslations('errors');
+  const { showSnackbar } = useSnackbar();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const groupId = output.accessGroupId;
 
@@ -164,42 +242,9 @@ export function OutputActions({
   const createFollow = useFollowControllerCreate();
   const removeFollow = useFollowControllerRemove();
 
-  async function handleDownloadPrimary() {
-    if (!primaryFile) return;
-    setDownloading(true);
-    setActionError(null);
-    try {
-      const blob = await outputDownloadControllerDownloadFile(primaryFile.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = primaryFile.fileName || 'download';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-      showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
-    } catch (error) {
-      setActionError(
-        resolveErrorCode(tError, apiErrorCode(error), t('detail.downloadError')),
-      );
-    } finally {
-      setDownloading(false);
-    }
-  }
-
-  async function handleShare() {
-    setActionError(null);
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      showSnackbar({ severity: 'success', message: t('detail.linkCopied') });
-    } catch {
-      setActionError(t('detail.shareError'));
-    }
-  }
+  if (!groupId) return null;
 
   async function handleToggleFollow() {
-    if (!groupId) return;
     setActionError(null);
     try {
       if (isFollowing) {
@@ -225,38 +270,19 @@ export function OutputActions({
   const followPending = createFollow.isPending || removeFollow.isPending;
 
   return (
-    <Flex direction="column" gap="2">
-      <Flex gap="2" flexWrap="wrap">
-        {primaryFile ? (
-          <Button
-            variant="solid"
-            size="sm"
-            loading={downloading}
-            loadingText={t('detail.downloading')}
-            onClick={() => void handleDownloadPrimary()}
-          >
-            {t('detail.downloadPrimary')}
-          </Button>
-        ) : null}
-        <Button variant="outline" size="sm" onClick={() => void handleShare()}>
-          <Share2 />
-          {t('detail.shareAction')}
-        </Button>
-        {groupId ? (
-          <Button
-            variant={isFollowing ? 'solid' : 'outline'}
-            size="sm"
-            loading={followPending}
-            loadingText={t('detail.followLoading')}
-            onClick={() => void handleToggleFollow()}
-          >
-            {isFollowing ? <Check /> : <Link2 />}
-            {isFollowing ? t('detail.followingAction') : t('detail.followAction')}
-          </Button>
-        ) : null}
-      </Flex>
+    <Flex direction="column" gap="1" align="flex-end" flexShrink={0}>
+      <Button
+        variant={isFollowing ? 'solid' : 'outline'}
+        size="sm"
+        loading={followPending}
+        loadingText={t('detail.followLoading')}
+        onClick={() => void handleToggleFollow()}
+      >
+        {isFollowing ? <Check /> : <Link2 />}
+        {isFollowing ? t('detail.followingAction') : t('detail.followAction')}
+      </Button>
       {actionError ? (
-        <Text textStyle="sm" color="fg.error" role="alert">
+        <Text textStyle="xs" color="fg.error" role="alert">
           {actionError}
         </Text>
       ) : null}

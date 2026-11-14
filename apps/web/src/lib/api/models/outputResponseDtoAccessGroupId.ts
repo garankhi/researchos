@@ -7,7 +7,7 @@
  */
 
 /**
- * Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.
+ * Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.
  * @nullable
  */
 export type OutputResponseDtoAccessGroupId = { [key: string]: unknown } | null;

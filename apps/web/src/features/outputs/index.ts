@@ -6,11 +6,17 @@
 
 export { useOutput } from './hooks/use-output';
 export { useOutputFiles } from './hooks/use-output-files';
+export { useOutputGroup } from './hooks/use-output-group';
 export { OutputDetailShell } from './components/output-detail-shell';
 export { OutputHeader } from './components/output-header';
 export { OutputAbstract } from './components/output-abstract';
 export { OutputReferences } from './components/output-references';
-export { OutputActions, OutputFiles } from './components/output-actions';
+export {
+  OutputDownloadPrimaryButton,
+  OutputFiles,
+  OutputFollowButton,
+  OutputShareButton,
+} from './components/output-actions';
 export type {
   OutputAuthor,
   OutputDetail,

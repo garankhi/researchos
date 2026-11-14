@@ -1,22 +1,30 @@
 'use client';
 
-import { Box, Container, Heading, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, Button, Container, Flex, Stack, Tabs, Text } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import NextLink from '@/components/ui/link';
 import {
-  EmptyState,
   ErrorState,
   LoadingSkeleton,
+  RouteFeedback,
 } from '@/components/ui/feedback';
 import { useOutput } from '../hooks/use-output';
 import { useOutputFiles } from '../hooks/use-output-files';
+import { useOutputGroup } from '../hooks/use-output-group';
 import { OutputAbstract } from './output-abstract';
-import { OutputActions, OutputFiles } from './output-actions';
+import {
+  OutputDownloadPrimaryButton,
+  OutputFiles,
+  OutputFollowButton,
+  OutputShareButton,
+} from './output-actions';
 import { OutputHeader } from './output-header';
 import { OutputReferences } from './output-references';
 
 export function OutputDetailShell({ outputId }: { outputId?: string }) {
   const t = useTranslations('outputs');
+  const common = useTranslations('common');
   const {
     output,
     isLoading,
@@ -27,6 +35,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
     refetch,
   } = useOutput({ outputId });
   const filesQuery = useOutputFiles({ outputId });
+  const groupQuery = useOutputGroup({ groupId: output?.accessGroupId });
 
   if (isLoading) {
     return (
@@ -49,67 +58,118 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
 
   if (isForbidden) {
     return (
-      <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <Stack gap="3" align="center" textAlign="center" py="6">
-          <Icon size="2xl" color="fg.muted">
-            <LockKeyhole />
-          </Icon>
-          <Heading as="h2" size="md">
-            {t('detail.accessDeniedTitle')}
-          </Heading>
-          <Text textStyle="sm" color="fg.muted">
-            {t('detail.accessDeniedMessage')}
-          </Text>
-        </Stack>
-      </Container>
+      <RouteFeedback
+        icon={<LockKeyhole aria-hidden />}
+        title={t('detail.accessDeniedTitle')}
+        description={t('detail.accessDeniedMessage')}
+        action={
+          <Button asChild>
+            <NextLink href="/">{common('backToHome')}</NextLink>
+          </Button>
+        }
+      />
     );
   }
 
   if (isEmpty || isNotFound || !output) {
     return (
-      <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <Stack gap="3" align="center" textAlign="center" py="6">
-          <Icon size="2xl" color="fg.muted">
-            <SearchX />
-          </Icon>
-          <Heading as="h2" size="md">
-            {t('detail.notFoundTitle')}
-          </Heading>
-          <Text textStyle="sm" color="fg.muted">
-            {t('detail.notFoundMessage')}
-          </Text>
-        </Stack>
-      </Container>
+      <RouteFeedback
+        icon={<SearchX aria-hidden />}
+        title={t('detail.notFoundTitle')}
+        description={t('detail.notFoundMessage')}
+        action={
+          <Button asChild>
+            <NextLink href="/">{common('backToHome')}</NextLink>
+          </Button>
+        }
+      />
     );
   }
 
-  const primaryFile = filesQuery.files?.[0];
+  const files = filesQuery.files;
+  const primaryFile = files?.[0];
 
   return (
-    <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-      <Stack gap="4">
-        <OutputHeader output={output} />
-        <OutputActions output={output} primaryFile={primaryFile} />
-        <OutputAbstract abstract={output.revision?.abstract ?? null} />
-        <Box bg="bg.panel" borderWidth="1px" borderRadius="lg" p={{ base: '4', md: '6' }}>
-          <Text fontWeight="semibold" mb="2">
-            {t('detail.filesTitle')}
-          </Text>
-          <OutputFiles
-            files={filesQuery.files}
-            isLoading={filesQuery.isLoading}
-            isFailed={filesQuery.isFailed}
-            onRetry={() => void filesQuery.refetch()}
-          />
+    <Tabs.Root defaultValue="overview" variant="line">
+      <Stack gap="0">
+        <Box w="full" bg="bg">
+          <Container maxW="6xl" pt={{ base: '4', md: '8' }} pb="4">
+            <Stack gap="4" minW="0">
+              <OutputHeader
+                output={output}
+                groupName={groupQuery.groupName}
+                groupLoading={groupQuery.isLoading}
+                hasFullText={Boolean(files && files.length > 0)}
+                followSlot={<OutputFollowButton output={output} />}
+              />
+
+              <Flex
+                direction={{ base: 'column', sm: 'row' }}
+                gap="3"
+                align={{ base: 'stretch', sm: 'center' }}
+                justify="space-between"
+              >
+                <Tabs.List flex="1" overflowX="auto">
+                  <Tabs.Trigger value="overview">
+                    {t('detail.tabsOverview')}
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="references">
+                    {t('detail.tabsReferences')}
+                  </Tabs.Trigger>
+                </Tabs.List>
+                <Flex gap="2" flexShrink={0}>
+                  <OutputDownloadPrimaryButton file={primaryFile} />
+                  <OutputShareButton />
+                </Flex>
+              </Flex>
+            </Stack>
+          </Container>
         </Box>
-        <OutputReferences />
+
+        <Box w="full" bg="bg.subtle">
+          <Container maxW="6xl" py={{ base: '4', md: '6' }}>
+            <Tabs.Content value="overview">
+              <Stack gap="4">
+                <Box
+                  bg="bg.panel"
+                  borderWidth="1px"
+                  borderRadius="md"
+                  p={{ base: '4', md: '5' }}
+                >
+                  <OutputAbstract abstract={output.revision?.abstract ?? null} />
+                </Box>
+                <Box
+                  bg="bg.panel"
+                  borderWidth="1px"
+                  borderRadius="md"
+                  p={{ base: '4', md: '5' }}
+                >
+                  <Stack gap="2">
+                    <Text fontWeight="semibold">{t('detail.filesTitle')}</Text>
+                    <OutputFiles
+                      files={files}
+                      isLoading={filesQuery.isLoading}
+                      isFailed={filesQuery.isFailed}
+                      onRetry={() => void filesQuery.refetch()}
+                    />
+                  </Stack>
+                </Box>
+              </Stack>
+            </Tabs.Content>
+
+            <Tabs.Content value="references">
+              <Box
+                bg="bg.panel"
+                borderWidth="1px"
+                borderRadius="md"
+                p={{ base: '4', md: '5' }}
+              >
+                <OutputReferences />
+              </Box>
+            </Tabs.Content>
+          </Container>
+        </Box>
       </Stack>
-      {output.revision ? null : (
-        <EmptyState
-          title={t('detail.noRevisionTitle')}
-          message={t('detail.noRevisionMessage')}
-        />
-      )}
-    </Container>
+    </Tabs.Root>
   );
 }

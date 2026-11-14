@@ -142,7 +142,20 @@
       "year": "Year: {year}",
       "venue": "Venue / Publisher: {venue}",
       "doi": "DOI: {doi}",
-      "authors": "Authors: {authors}"
+      "authors": "Authors: {authors}",
+      "actionsMenuLabel": "Work actions",
+      "visibilityAction": "Visibility",
+      "visibilityDialogTitle": "Who may see this work",
+      "visibilityDialogDesc": "Community-wide works stay visible even when they carry a group affiliation.",
+      "visibilityPublicOption": "FPTU community",
+      "visibilityPublicDesc": "Everyone in the FPTU community may see the work.",
+      "visibilityGroupOption": "Affiliated group only",
+      "visibilityGroupDesc": "Only members of the affiliated group may see the work.",
+      "visibilityNoGroupHint": "This work has no affiliated group, so it cannot be restricted to one.",
+      "visibilityUpdated": "Visibility updated.",
+      "visibilityUpdateError": "Could not update the visibility. Please try again.",
+      "visibilityPublic": "FPTU community",
+      "visibilityGroupOnly": "Group only"
     },
     "interestsTab": {
       "title": "Research Interests",
@@ -182,8 +195,14 @@
   "outputs": {
     "detail": {
       "untitled": "Untitled output",
-      "publishedYear": "Published {year}",
-      "doiLabel": "DOI: {doi}",
+      "fullTextAvailable": "Full text available",
+      "groupLoading": "Loading group…",
+      "independentWork": "Independent work",
+      "dateRowLabel": "Date",
+      "groupRowLabel": "Group",
+      "doiRowLabel": "DOI",
+      "tabsOverview": "Overview",
+      "tabsReferences": "References",
       "externalLink": "Publisher page",
       "authorsLabel": "Authors",
       "correspondingAuthorBadge": "corresponding",

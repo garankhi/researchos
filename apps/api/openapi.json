@@ -4997,6 +4997,105 @@
         ]
       }
     },
+    "/outputs/{outputId}/visibility": {
+      "patch": {
+        "description": "Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.",
+        "operationId": "OutputsController_updateVisibility",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOutputVisibilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The work with its updated visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, an unsupported visibility, or a group the caller is not a member of.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or is neither the owner nor the lead of the affiliated group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is not published, so its visibility cannot change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changes who may see a shared work",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/profiles/me": {
       "get": {
         "description": "Returns the researcher profile belonging to the authenticated caller, confirmed or not.",
@@ -8659,7 +8758,7 @@
           },
           "accessGroupId": {
             "type": "object",
-            "description": "Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.",
+            "description": "Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.",
             "format": "uuid",
             "nullable": true,
             "example": null
@@ -8862,8 +8961,32 @@
           },
           "accessGroupId": {
             "type": "string",
-            "description": "The research group that gains access. Required when visibility is RESEARCH_GROUP and rejected otherwise. The group must be one the caller is a member of.",
+            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and must be a group the caller is a member of.",
             "format": "uuid",
+            "example": "55555555-5555-4555-8555-555555555555"
+          }
+        },
+        "required": [
+          "visibility"
+        ]
+      },
+      "UpdateOutputVisibilityDto": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Who may see the work. FPTU_COMMUNITY opens it to the whole FPTU community even when the work carries a group affiliation; RESEARCH_GROUP restricts it to the members of the access group.",
+            "enum": [
+              "FPTU_COMMUNITY",
+              "RESEARCH_GROUP"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "object",
+            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and rejected when visibility is PRIVATE. Send null to clear the affiliation; omit it to keep the stored one. The group must be one the caller is a member of.",
+            "format": "uuid",
+            "nullable": true,
             "example": "55555555-5555-4555-8555-555555555555"
           }
         },

@@ -1,6 +1,15 @@
 'use client';
 
-import { Badge, Box, Flex, Heading, Link, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  Flex,
+  Heading,
+  HStack,
+  Link,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { FileText, ExternalLink } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
@@ -10,10 +19,12 @@ import {
   LoadingSkeleton,
 } from '@/components/ui/feedback';
 import { useProfileOutputs } from '../../hooks/use-profile-outputs';
+import { ProfileOutputActionsMenu } from '../profile-output-actions-menu';
 import type { OutputResponseDto } from '../../types';
 
 export function ProfileOutputsTab({
   userId,
+  isOwner = false,
 }: {
   userId?: string;
   isOwner?: boolean;
@@ -98,9 +109,20 @@ export function ProfileOutputsTab({
                 </Box>
 
                 {output.visibility ? (
-                  <Badge variant="outline" colorPalette="gray" flexShrink={0}>
-                    {output.visibility}
-                  </Badge>
+                  <HStack gap="1" flexShrink={0} align="center">
+                    <Badge variant="outline" colorPalette="gray">
+                      {output.visibility === 'FPTU_COMMUNITY'
+                        ? t('outputsTab.visibilityPublic')
+                        : output.visibility === 'RESEARCH_GROUP'
+                          ? t('outputsTab.visibilityGroupOnly')
+                          : output.visibility}
+                    </Badge>
+                    {isOwner ? (
+                      <ProfileOutputActionsMenu output={output} />
+                    ) : null}
+                  </HStack>
+                ) : isOwner ? (
+                  <ProfileOutputActionsMenu output={output} />
                 ) : null}
               </Flex>
 

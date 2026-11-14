@@ -1,22 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Badge,
-  Box,
-  Container,
-  Heading,
-  Icon,
-  Stack,
-  Tabs,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, Button, Container, Stack, Tabs } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import NextLink from '@/components/ui/link';
 import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
+  RouteFeedback,
 } from '@/components/ui/feedback';
 import { useOpenAlexCandidates } from '../hooks/use-openalex-candidates';
 import { useProfile } from '../hooks/use-profile';
@@ -37,6 +30,7 @@ export function ProfileShell({
   isOwner?: boolean;
 }) {
   const t = useTranslations('profile');
+  const common = useTranslations('common');
   const [editOpen, setEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab | PublicProfileTab>(
     isOwner ? 'applications' : 'groups',
@@ -95,17 +89,16 @@ export function ProfileShell({
 
     if (isForbidden) {
       return (
-        <Stack gap="3" align="center" textAlign="center" py="6">
-          <Icon size="2xl" color="fg.muted">
-            <LockKeyhole />
-          </Icon>
-          <Heading as="h2" size="md">
-            {t('profileAccessDenied')}
-          </Heading>
-          <Text textStyle="sm" color="fg.muted">
-            {t('unauthenticatedNotice')}
-          </Text>
-        </Stack>
+        <RouteFeedback
+          icon={<LockKeyhole aria-hidden />}
+          title={t('profileAccessDenied')}
+          description={t('unauthenticatedNotice')}
+          action={
+            <Button asChild>
+              <NextLink href="/">{common('backToHome')}</NextLink>
+            </Button>
+          }
+        />
       );
     }
 
@@ -117,14 +110,16 @@ export function ProfileShell({
 
     if (isNotFound) {
       return (
-        <Stack gap="3" align="center" textAlign="center" py="6">
-          <Icon size="2xl" color="fg.muted">
-            <SearchX />
-          </Icon>
-          <Heading as="h2" size="md">
-            {t('profileNotFound')}
-          </Heading>
-        </Stack>
+        <RouteFeedback
+          icon={<SearchX aria-hidden />}
+          title={t('profileNotFound')}
+          description={t('profileEmptyDesc')}
+          action={
+            <Button asChild>
+              <NextLink href="/">{common('backToHome')}</NextLink>
+            </Button>
+          }
+        />
       );
     }
 

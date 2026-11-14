@@ -33,6 +33,7 @@ import {
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
+import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
 import { OutputsService } from './outputs.service.js';
 
 /**
@@ -294,5 +295,46 @@ export class OutputsController {
     @CurrentUserId() callerId: string,
   ): Promise<OutputResponseDto> {
     return this.outputsService.archive(outputId, callerId);
+  }
+
+  @Patch(':outputId/visibility')
+  @Roles('RESEARCHER')
+  @ApiOperation({
+    summary: 'Changes who may see a shared work',
+    description:
+      'Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.',
+  })
+  @ApiParam({
+    name: 'outputId',
+    description: 'Unique identifier of the research output (UUID).',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'The work with its updated visibility.',
+    type: OutputResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid UUID format for outputId, an unsupported visibility, or a group the caller is not a member of.',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Caller is not authenticated.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Caller is not an active researcher, or is neither the owner nor the lead of the affiliated group.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The research output was not found.',
+  })
+  @ApiConflictResponse({
+    description: 'The work is not published, so its visibility cannot change.',
+  })
+  async updateVisibility(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @CurrentUserId() callerId: string,
+    @Body() dto: UpdateOutputVisibilityDto,
+  ): Promise<OutputResponseDto> {
+    return this.outputsService.updateVisibility(outputId, callerId, dto);
   }
 }

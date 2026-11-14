@@ -24,6 +24,7 @@ import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
+import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
 
 const OUTPUT_SORT_FIELDS = {
   firstSharedAt: 'first_shared_at',
@@ -548,10 +549,11 @@ export class OutputsService {
    * `publication_status` is untouched too: a preprint shared internally
    * is still unpublished in its journal.
    *
-   * The visibility decision is the caller's, but the access group is
-   * checked: the caller has to be a member of the group it scopes the
-   * work to, so a work cannot be pointed at a group the caller does not
-   * belong to.
+   * The visibility decision is the caller's, but the affiliation is
+   * checked: the caller has to be a member of the group the work carries,
+   * so a work cannot be pointed at a group the caller does not
+   * belong to. Affiliation no longer decides who may read: a
+   * FPTU_COMMUNITY work may keep its group and stays public.
    */
   async publish(
     outputId: string,
@@ -561,12 +563,6 @@ export class OutputsService {
     const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
 
     if (isGroupScope && !dto.accessGroupId) {
-      throw new CodedHttpException(
-        domainErrorCodes.outputs.outputVisibilityInvalid,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    if (!isGroupScope && dto.accessGroupId) {
       throw new CodedHttpException(
         domainErrorCodes.outputs.outputVisibilityInvalid,
         HttpStatus.BAD_REQUEST,
@@ -605,7 +601,7 @@ export class OutputsService {
         );
       }
 
-      if (isGroupScope) {
+      if (dto.accessGroupId) {
         const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
           SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
         `;
@@ -649,7 +645,96 @@ export class OutputsService {
           sharing_status: OutputSharingStatus.SHARED,
           first_shared_at: now,
           visibility: dto.visibility,
-          access_group_id: isGroupScope ? dto.accessGroupId : null,
+          access_group_id: dto.accessGroupId ?? null,
+        },
+      });
+
+      return this.loadResponse(tx, outputId);
+    });
+  }
+
+  /**
+   * Changes the visibility (and optionally the affiliation) of a shared work.
+   *
+   * The owner may always change it. The lead of the affiliated group may
+   * too, so a group keeps control of works carrying its banner. The check
+   * reads the stored affiliation, so a lead keeps control even when
+   * switching the work between public and group-only.
+   */
+  async updateVisibility(
+    outputId: string,
+    callerId: string,
+    dto: UpdateOutputVisibilityDto,
+  ): Promise<OutputResponseDto> {
+    const isGroupScope =
+      dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
+
+    return this.prisma.$transaction(async (tx) => {
+      const output = await tx.research_outputs.findUnique({
+        where: { id: outputId },
+        select: {
+          id: true,
+          sharing_status: true,
+          access_group_id: true,
+        },
+      });
+
+      if (!output) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (output.sharing_status !== OutputSharingStatus.SHARED) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotArchived,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const effectiveGroupId =
+        dto.accessGroupId !== undefined
+          ? dto.accessGroupId
+          : output.access_group_id;
+
+      if (isGroupScope && !effectiveGroupId) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputVisibilityInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const [allowed] = await tx.$queryRaw<{ allowed: boolean }[]>`
+        SELECT can_change_output_visibility(${callerId}::uuid, ${outputId}::uuid) AS allowed
+      `;
+      if (!allowed?.allowed) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputAccessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      if (dto.accessGroupId) {
+        const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
+          SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
+        `;
+        if (!member?.allowed) {
+          throw new CodedHttpException(
+            domainErrorCodes.outputs.outputAccessGroupInvalid,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      await tx.research_outputs.update({
+        where: { id: outputId },
+        data: {
+          visibility: dto.visibility,
+          access_group_id:
+            dto.accessGroupId !== undefined
+              ? dto.accessGroupId
+              : output.access_group_id,
         },
       });
 
