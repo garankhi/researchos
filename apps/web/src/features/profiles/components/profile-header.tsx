@@ -7,7 +7,6 @@ import {
   Flex,
   Heading,
   Link,
-  Skeleton,
   Stack,
   Text,
 } from '@chakra-ui/react';
@@ -48,66 +47,19 @@ export function ProfileHeader({
   isOwner,
   onEdit,
 }: {
-  /**
-   * The profile, or `undefined` while it is still being fetched or when
-   * the request did not produce one.
-   *
-   * The header is part of the page's permanent chrome, so it has to be
-   * renderable without a profile: the shell keeps the header in place
-   * while the content area reports what happened. A missing profile
-   * therefore draws a placeholder rather than taking the header — and
-   * with it the page layout — down.
-   */
-  profile?: ProfileResponseDto;
+  profile: ProfileResponseDto;
   isOwner?: boolean;
   onEdit?: () => void;
 }) {
   const t = useTranslations('profile');
   const tAvailability = useTranslations('profile.availability');
 
-  if (!profile) {
-    return (
-      <Box
-        bg="bg.panel"
-        borderWidth="1px"
-        borderRadius="lg"
-        p={{ base: '4', md: '6' }}
-        mb="6"
-      >
-        <Flex
-          direction={{ base: 'column', sm: 'row' }}
-          gap="6"
-          align={{ base: 'center', sm: 'flex-start' }}
-        >
-          <Skeleton
-            w={{ base: '20', sm: '25' }}
-            h={{ base: '20', sm: '25' }}
-            borderRadius="full"
-            flexShrink={0}
-          />
-
-          <Stack gap="3" flex="1" minW="0">
-            <Skeleton h="6" w="48" maxW="full" />
-            <Skeleton h="4" w="72" maxW="full" />
-            <Skeleton h="4" w="40" maxW="full" />
-          </Stack>
-        </Flex>
-      </Box>
-    );
-  }
-
   const titlesAndDegrees = [profile.academicTitle, profile.academicDegree]
     .filter(Boolean)
     .join(', ');
 
   return (
-    <Box
-      bg="bg.panel"
-      borderWidth="1px"
-      borderRadius="lg"
-      p={{ base: '4', md: '6' }}
-      mb="6"
-    >
+    <Box bg="bg.panel" borderWidth="1px" p={{ base: '4', md: '6' }}>
       <Flex
         direction={{ base: 'column', sm: 'row' }}
         gap="6"
@@ -119,7 +71,6 @@ export function ProfileHeader({
           w={{ base: '20', sm: '25' }}
           h={{ base: '20', sm: '25' }}
           flexShrink={0}
-          borderRadius="full"
           bg="colorPalette.solid"
           color="colorPalette.contrast"
           fontSize={{ base: 'xl', sm: '2xl' }}

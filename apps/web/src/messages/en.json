@@ -334,6 +334,7 @@
   },
   "storybook": {
     "feedback": {
+      "finishLoading": "Finish loading",
       "emptyTitle": "No research results",
       "emptyMessage": "Try a different keyword.",
       "errorTitle": "Could not load research results",

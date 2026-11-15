@@ -14,13 +14,10 @@ import {
 import { Check, ExternalLink, GraduationCap, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useOpenAlexCandidates } from '../../hooks/use-openalex-candidates';
 import type { CandidateWorkDto } from '../../types';
+import { ProfileTabSkeleton } from '../profile-skeletons';
 
 export function ProfileOpenAlexTab() {
   const t = useTranslations('profile');
@@ -76,11 +73,7 @@ export function ProfileOpenAlexTab() {
   };
 
   if (isLoading) {
-    return (
-      <Stack gap="4" py="2">
-        <LoadingSkeleton variant="rectangular" height={130} count={3} />
-      </Stack>
-    );
+    return <ProfileTabSkeleton tab="openalex" />;
   }
 
   if (isFailed) {
@@ -110,13 +103,7 @@ export function ProfileOpenAlexTab() {
           const authorsStr = work.authors?.join(', ');
 
           return (
-            <Box
-              key={work.id}
-              bg="bg.panel"
-              borderWidth="1px"
-              borderRadius="lg"
-              p="5"
-            >
+            <Box key={work.id} bg="bg.panel" borderWidth="1px" p="5">
               <Flex
                 direction={{ base: 'column', md: 'row' }}
                 gap="4"

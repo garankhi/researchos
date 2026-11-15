@@ -4,13 +4,10 @@ import { Badge, Box, Flex, Heading, Link, Stack, Text } from '@chakra-ui/react';
 import { FileText, ExternalLink } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useProfileOutputs } from '../../hooks/use-profile-outputs';
 import type { OutputResponseDto } from '../../types';
+import { ProfileTabSkeleton } from '../profile-skeletons';
 
 export function ProfileOutputsTab({
   userId,
@@ -24,11 +21,7 @@ export function ProfileOutputsTab({
   });
 
   if (isLoading) {
-    return (
-      <Stack gap="4" py="2">
-        <LoadingSkeleton variant="rectangular" height={120} count={3} />
-      </Stack>
-    );
+    return <ProfileTabSkeleton tab="outputs" />;
   }
 
   if (isFailed) {
@@ -62,13 +55,7 @@ export function ProfileOutputsTab({
             : null;
 
         return (
-          <Box
-            key={output.id}
-            bg="bg.panel"
-            borderWidth="1px"
-            borderRadius="lg"
-            p="5"
-          >
+          <Box key={output.id} bg="bg.panel" borderWidth="1px" p="5">
             <Stack gap="3">
               <Flex
                 direction={{ base: 'column', sm: 'row' }}

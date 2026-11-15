@@ -12,10 +12,10 @@ import {
 } from '@chakra-ui/react';
 import { LogIn } from 'lucide-react';
 import NextLink from '@/components/ui/link';
-import { LoadingSkeleton } from '@/components/ui/feedback';
 import { usePathname } from '@/i18n/navigation';
 import { useSession } from '../hooks/use-session';
 import { buildLoginHref } from '../utils/return-to';
+import { SessionCheckSkeleton } from './identity-skeletons';
 
 /**
  * The front-end guard for a page that only a signed-in user may see.
@@ -61,14 +61,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, isChecking, isFailed, refetch } = useSession();
 
   if (isChecking) {
-    return (
-      <Container as="main" maxW="lg" py="8">
-        <Stack gap="4">
-          <LoadingSkeleton variant="rectangular" height={120} />
-          <LoadingSkeleton variant="text" count={3} />
-        </Stack>
-      </Container>
-    );
+    return <SessionCheckSkeleton />;
   }
 
   /*
