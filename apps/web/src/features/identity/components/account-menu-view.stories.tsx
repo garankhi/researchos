@@ -34,6 +34,10 @@ export const HoverMenu: Story = {
     await expect(menu).toHaveStyle({ borderRadius: '0px' });
     await userEvent.click(trigger);
     await expect(menu).toBeVisible();
+
+    await userEvent.unhover(trigger);
+    await userEvent.keyboard('{Escape}');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   },
 };
 
@@ -47,6 +51,8 @@ function menuItem(container: HTMLElement, name: string) {
 
 export const KeyboardNavigation: Story = {
   globals: { colorMode: 'light' },
+  // Keep the trigger away from the pointer position used by the hover story.
+  parameters: { layout: 'centered' },
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
     const trigger = canvas.getByRole('button', {
@@ -72,6 +78,7 @@ export const KeyboardNavigation: Story = {
 
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await openMenuWithKeyboard();
 
     await userEvent.keyboard('{Escape}');
