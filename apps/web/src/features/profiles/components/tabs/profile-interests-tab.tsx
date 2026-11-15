@@ -14,7 +14,6 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import type { SkeletonResult } from 'boneyard-js';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
@@ -24,19 +23,7 @@ import { useTaxonomyControllerFindAllTopics } from '@/lib/api';
 import type { TopicResponseDto } from '@/lib/api/models';
 import { useProfileInterests } from '../../hooks/use-profile-interests';
 import type { ProfileInterestResponseDto } from '../../types';
-import { ProfileTabSkeleton } from '../profile-skeletons';
-
-const topicOptionsLayout: SkeletonResult = {
-  name: 'profile-topic-options',
-  viewportWidth: 390,
-  width: 448,
-  height: 136,
-  bones: [
-    [0, 0, 100, 40, 0],
-    [0, 48, 100, 40, 0],
-    [0, 96, 100, 40, 0],
-  ],
-};
+import { ProfileTabSkeleton, topicOptions } from '../profile-skeletons';
 
 export function ProfileInterestsTab({
   userId,
@@ -287,7 +274,7 @@ export function ProfileInterestsTab({
                   />
 
                   {topicsQuery.isLoading ? (
-                    <DelayedSkeleton layout={topicOptionsLayout} />
+                    <DelayedSkeleton layout={topicOptions} />
                   ) : searchedTopics.length === 0 ? (
                     <Text textStyle="sm" color="fg.muted">
                       {t('interestsTab.emptyMessage')}

@@ -161,6 +161,17 @@ config's `packageJson` is not set.
 | Spinner bound to `isPending` on an `enabled: false` query | Spinner never stops; button can never be clicked |
 | `loading={query.isPending}` on a submit button | Same trap, on the button this time — bind the mutation's flag |
 | A page-level spinner while a block of content loads | The layout jumps when the data arrives; use a skeleton |
+| A generic rectangle skeleton where the real layout is known | The reserved box does not match the content that replaces it — the page still jumps. Use `DelayedSkeleton` with an authored `SkeletonResult` |
+| One `SkeletonResult` used at every breakpoint | The layout is wrong on one of them. Author a layout per viewport and swap it with `hideFrom` / `hideBelow` |
+| Bone coordinates written in pixels | They are percentages of the box — `[x, y, w, h, r]`, where `w: 100` is the full width |
+| A `SkeletonResult` defined inside the component that uses it | The layout drifts away from the screen's other regions. The module's layouts belong in its one `<module>-skeletons.tsx` |
+| A module's layouts split into a separate `-skeleton-layouts.ts` | Doubles the files for no gain — the layouts are only meaningful next to the markup that draws them |
+| A consumer using `DelayedSkeleton` with a raw layout | The layout leaks out of the module. Use the module's skeleton component |
+| A skeleton rendered during a refetch | The screen the user is reading goes blank for a request they did not trigger. Keep the ready data visible |
+| A skeleton that never resolves to an empty or error state | The user waits forever. The outcome must appear as soon as the request settles |
+| `role="status"` on every bone in a region | A screen reader reads every announcement before the content. One per region; `announce={false}` on the rest |
+| A profile-shaped skeleton in `components/ui/` | Breaks the shared-primitive boundary. It belongs to the feature, next to the content it mirrors |
+| An inline `Container` + a rectangle skeleton as a Suspense fallback | The fallback drifts from the real layout. Reference a named skeleton component instead |
 | A mutation with no success feedback | The user cannot tell the click registered |
 | A mutation with no error feedback | The user retries blindly against a failure they never saw |
 | A snackbar for an error that has a local anchor | The message auto-hides and points at nothing |

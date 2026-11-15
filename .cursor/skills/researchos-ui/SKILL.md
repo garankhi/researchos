@@ -1,6 +1,6 @@
 ---
 name: researchos-ui
-description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, Zustand client state, loading skeletons, error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, when deciding between the query cache and a Zustand store, or when the user mentions loading states, error states, React Query, Zustand, Orval, Chakra UI, dark mode, responsive design, breakpoints, or Next.js route conventions.
+description: Builds Next.js App Router screens in the ResearchOS web app — folder boundaries, the Orval-generated API client, TanStack Query state handling, Zustand client state, loading skeletons (Boneyard `SkeletonResult` + `DelayedSkeleton`), error boundaries, responsive layout conventions, and the 404/401/403 route conventions. Use when creating or changing a page, feature, hook, or component in apps/web, when consuming an API endpoint, when deciding between the query cache and a Zustand store, or when the user mentions loading states, skeletons, error states, React Query, Zustand, Orval, Chakra UI, Boneyard, dark mode, responsive design, breakpoints, or Next.js route conventions.
 ---
 
 # ResearchOS UI
@@ -31,7 +31,7 @@ owns the words it carries.
 
 ## Non-negotiables
 
-Eight rules account for most of the mistakes in this codebase. Each one is
+Twelve rules account for most of the mistakes in this codebase. Each one is
 counter-intuitive enough to be worth stating once, up front.
 
 1. **`query.data` is already the payload — never `query.data.data`.** The
@@ -78,6 +78,36 @@ counter-intuitive enough to be worth stating once, up front.
    that owns it. Use `mutateAsync().then()`.
    *Why:* the redirect silently never happens.
    → [client-state.md](reference/client-state.md#clearing-a-store-from-a-mutation--the-unmount-trap)
+
+9. **A skeleton matches the content it replaces, per breakpoint.**
+   `DelayedSkeleton` takes a Boneyard `SkeletonResult`; author one layout
+   per viewport the region actually renders at, and swap it with
+   `hideFrom` / `hideBelow`.
+   *Why:* one generic rectangle for a mobile and a desktop layout reserves
+   the wrong space, and the page jumps when the data lands.
+   → [loading-and-feedback.md](reference/loading-and-feedback.md#skeletons-that-match-the-layout)
+
+10. **A module's skeletons live in one file.**
+    `features/<module>/components/<module>-skeletons.tsx` holds that
+    module's `SkeletonResult` layouts **and** the components that draw
+    them.
+    *Why:* the layouts are only meaningful next to the markup that draws
+    them — splitting them into a second file doubles the files and makes
+    a reader open both to see one screen's skeleton.
+    → [loading-and-feedback.md](reference/loading-and-feedback.md#authoring-a-skeletonresult)
+
+11. **A skeleton is for the initial fetch. Ready data stays visible during
+    a refetch.** Only render the skeleton when there is no usable data yet;
+    once there is, keep the content and let the request settle behind it.
+    *Why:* blanking a screen the user is already reading looks like a crash.
+    → [loading-and-feedback.md](reference/loading-and-feedback.md#initial-fetch-versus-refetch)
+
+12. **One translated loading announcement per region.** `DelayedSkeleton`
+    renders `role="status"`; pass `announce={false}` for every decorative
+    bone inside that region.
+    *Why:* several announcements fire at once and a screen reader reads
+    them all out before the content.
+    → [loading-and-feedback.md](reference/loading-and-feedback.md#announcing-the-loading-state)
 
 ## Checklist
 
@@ -144,6 +174,31 @@ Each row links to the section that shows the how.
 - [ ] Block loading uses a skeleton sized like the real content — no
       page-level spinner
       → [loading-and-feedback.md](reference/loading-and-feedback.md#loading-states)
+- [ ] The skeleton is a `DelayedSkeleton` with a named Boneyard
+      `SkeletonResult` authored next to the content it mirrors
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#skeletons-that-match-the-layout)
+- [ ] The module's skeletons live in
+      `components/<module>-skeletons.tsx` — the layouts and the components
+      that draw them, in one file
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#authoring-a-skeletonresult)
+- [ ] A consumer uses the module's skeleton component, not
+      `DelayedSkeleton` with a raw layout
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#authoring-a-skeletonresult)
+- [ ] A route that renders a domain screen imports its skeleton from that
+      module's barrel, not a deep path
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#a-routes-skeleton-belongs-to-the-module-that-owns-the-screen)
+- [ ] One `SkeletonResult` per breakpoint the region renders at, swapped
+      with `hideFrom` / `hideBelow`
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#skeletons-that-match-the-layout)
+- [ ] The skeleton renders only while there is no usable data; a refetch
+      keeps the ready content on screen
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#initial-fetch-versus-refetch)
+- [ ] Exactly one `role="status"` announcement per region — the other
+      bones pass `announce={false}`
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#announcing-the-loading-state)
+- [ ] The empty or error state appears as soon as the request settles —
+      the skeleton never masks the outcome
+      → [loading-and-feedback.md](reference/loading-and-feedback.md#initial-fetch-versus-refetch)
 - [ ] Mutations show a spinner in the button, bound to the **mutation's**
       `isPending`
       → [loading-and-feedback.md](reference/loading-and-feedback.md#spinners-for-mutations)
@@ -229,7 +284,7 @@ Read the file you need; do not read them all.
 | [reference/features.md](reference/features.md) | Folder boundaries, the five rules, transport → domain → UI, the feature folder and its templates, form rules |
 | [reference/data-and-errors.md](reference/data-and-errors.md) | The response envelope, query flags and the `isPending` trap, error codes and field errors |
 | [reference/client-state.md](reference/client-state.md) | TanStack Query vs Zustand, where a store lives, the store rules, clearing a store from a mutation |
-| [reference/loading-and-feedback.md](reference/loading-and-feedback.md) | Skeletons, mutation indicators, shared primitives, the snackbar provider, mutation feedback |
+| [reference/loading-and-feedback.md](reference/loading-and-feedback.md) | Skeletons (Boneyard `SkeletonResult`, `DelayedSkeleton`, per-breakpoint layouts), mutation indicators, shared primitives, the snackbar provider, mutation feedback |
 | [reference/chakra-and-responsive.md](reference/chakra-and-responsive.md) | Chakra UI v3 tokens, responsive props, links, light and dark mode, portals, Storybook |
 | [reference/routing.md](reference/routing.md) | Error states at each level, route templates, access boundaries, Next.js file conventions, Suspense |
 | [reference/tooling.md](reference/tooling.md) | Orval imports, the eslint boundary rules, commands, query-vs-mutation hooks, the common-mistakes table |

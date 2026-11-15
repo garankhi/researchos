@@ -10,26 +10,12 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import type { SkeletonResult } from 'boneyard-js';
 import { LogIn } from 'lucide-react';
-import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 import NextLink from '@/components/ui/link';
 import { usePathname } from '@/i18n/navigation';
 import { useSession } from '../hooks/use-session';
 import { buildLoginHref } from '../utils/return-to';
-
-const sessionCheckLayout: SkeletonResult = {
-  name: 'require-auth-session-check',
-  viewportWidth: 390,
-  width: 480,
-  height: 164,
-  bones: [
-    [46, 0, 8, 32, 0],
-    [25, 46, 50, 28, 0],
-    [8, 88, 84, 16, 0],
-    [33, 122, 34, 40, 0],
-  ],
-};
+import { SessionCheckSkeleton } from './identity-skeletons';
 
 /**
  * The front-end guard for a page that only a signed-in user may see.
@@ -75,11 +61,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, isChecking, isFailed, refetch } = useSession();
 
   if (isChecking) {
-    return (
-      <Container as="main" maxW="lg" py="8">
-        <DelayedSkeleton layout={sessionCheckLayout} />
-      </Container>
-    );
+    return <SessionCheckSkeleton />;
   }
 
   /*

@@ -1,8 +1,7 @@
 import { Suspense } from 'react';
 import { Box, Container, Heading, Stack, Text } from '@chakra-ui/react';
 import { getTranslations } from 'next-intl/server';
-import { LoginForm } from '@/features/identity';
-import { LoadingSkeleton } from '@/components/ui/feedback';
+import { LoginForm, LoginFormSkeleton } from '@/features/identity';
 
 /**
  * The login screen.
@@ -34,9 +33,7 @@ export default async function LoginPage() {
         </Box>
 
         <Box p="4" w="full" bg="bg.panel" borderWidth="1px" borderRadius="lg">
-          <Suspense
-            fallback={<LoadingSkeleton variant="rectangular" height={120} />}
-          >
+          <Suspense fallback={<LoginFormSkeleton />}>
             <LoginForm />
           </Suspense>
         </Box>

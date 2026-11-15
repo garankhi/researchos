@@ -9,6 +9,26 @@ import { useEffect, useState } from 'react';
 const SKELETON_DELAY_MS = 200;
 const BONE_COLOR = 'var(--chakra-colors-bg-emphasized)';
 
+/**
+ * The layout of a route that is still resolving.
+ *
+ * It mirrors the shape of a page that has a heading, a paragraph and a
+ * panel of content, so the space is already reserved when the route
+ * arrives. It is the fallback for the app shell's `loading.tsx`, so it is
+ * deliberately generic — a domain route uses its own layout.
+ */
+const routeLoading: SkeletonResult = {
+  name: 'app-route-loading',
+  viewportWidth: 768,
+  width: 640,
+  height: 280,
+  bones: [
+    [0, 0, 46, 24, 0],
+    [0, 38, 72, 14, 0],
+    [0, 72, 100, 200, 0],
+  ],
+};
+
 /** Mount only while waiting for initial content or as a Suspense fallback. */
 export function DelayedSkeleton({
   layout,
@@ -48,4 +68,9 @@ export function DelayedSkeleton({
       )}
     </Box>
   );
+}
+
+/** The fallback shown while a route in the app shell is still resolving. */
+export function RouteLoadingSkeleton() {
+  return <DelayedSkeleton layout={routeLoading} />;
 }

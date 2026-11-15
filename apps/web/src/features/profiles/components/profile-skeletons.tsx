@@ -173,6 +173,19 @@ const sectionHeading: SkeletonResult = {
   bones: [[0, 2, 84, 16, 0]],
 };
 
+/** The rows of the topic picker in the interest dialog. */
+export const topicOptions: SkeletonResult = {
+  name: 'profile-topic-options',
+  viewportWidth: 390,
+  width: 448,
+  height: 136,
+  bones: [
+    [0, 0, 100, 40, 0],
+    [0, 48, 100, 40, 0],
+    [0, 96, 100, 40, 0],
+  ],
+};
+
 export function ProfileHeaderSkeleton({
   announce = true,
 }: {

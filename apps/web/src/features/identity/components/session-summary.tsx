@@ -2,11 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { Badge, Box, Button, Stack, Text } from '@chakra-ui/react';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
+import { ErrorState } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { useLogout } from '../hooks/use-logout';
 import { useSession } from '../hooks/use-session';
+import { SessionSummarySkeleton } from './identity-skeletons';
 
 /**
  * The signed-in landing state.
@@ -34,7 +35,7 @@ export function SessionSummary() {
   const logout = useLogout();
 
   if (isFetching && !user) {
-    return <LoadingSkeleton variant="text" width={260} />;
+    return <SessionSummarySkeleton />;
   }
 
   if (isFailed) {
