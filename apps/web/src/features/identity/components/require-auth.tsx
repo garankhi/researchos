@@ -52,7 +52,13 @@ import { SessionCheckSkeleton } from './identity-skeletons';
  * of a transient error would be wrong, and so would pretending they are
  * signed in. The guard shows the error and lets the reader retry.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({
+  children,
+  returnTo,
+}: {
+  children: ReactNode;
+  returnTo?: string;
+}) {
   const t = useTranslations('unauthorized');
   const tErrors = useTranslations('errors');
   const tCommon = useTranslations('common');
@@ -99,7 +105,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
           </Heading>
           <Text color="fg.muted">{t('description')}</Text>
           <Button asChild>
-            <NextLink href={buildLoginHref(pathname)}>{t('action')}</NextLink>
+            <NextLink href={buildLoginHref(returnTo ?? pathname)}>
+              {t('action')}
+            </NextLink>
           </Button>
         </Stack>
       </Container>

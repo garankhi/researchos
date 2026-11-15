@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, waitFor, within } from 'storybook/test';
 import { AccountMenuView } from './account-menu-view';
 
 const meta = {
@@ -8,7 +8,6 @@ const meta = {
   args: {
     user: {
       fullName: 'Nguyễn Minh Anh',
-      email: 'minh.anh@example.test',
     },
     isLoggingOut: false,
     onLogout: fn(),
@@ -21,6 +20,27 @@ type Story = StoryObj<typeof meta>;
 
 export const SignedIn: Story = {};
 
+export const HoverMenu: Story = {
+  globals: { locale: 'en' },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    const trigger = canvas.getByRole('button', { name: /Account menu/ });
+    await userEvent.hover(trigger);
+    const menu = await within(canvasElement.ownerDocument.body).findByRole(
+      'menu',
+    );
+    await expect(
+      within(menu).getByRole('menuitem', { name: 'Your profile' }),
+    ).toHaveAttribute('href', '/en/profile/my-profile');
+    await expect(menu).toHaveStyle({ borderRadius: '0px' });
+    await userEvent.click(trigger);
+    await expect(menu).toBeVisible();
+
+    await userEvent.unhover(trigger);
+    await userEvent.keyboard('{Escape}');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
 /**
  * The menu holds more than one item, so an item is addressed by its label
  * rather than by its role alone.
@@ -30,6 +50,7 @@ function menuItem(container: HTMLElement, name: string) {
 }
 
 export const KeyboardNavigation: Story = {
+  globals: { colorMode: 'light' },
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
     const trigger = canvas.getByRole('button', {
@@ -39,16 +60,27 @@ export const KeyboardNavigation: Story = {
     async function openMenuWithKeyboard() {
       await userEvent.keyboard('{Enter}');
       const menu = await body.findByRole('menu');
-      const first = within(menu).getAllByRole('menuitem')[0];
+      const first = within(menu).getByRole('menuitem', {
+        name: /Your profile|Hồ sơ của bạn/,
+      });
       await waitFor(() => {
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
         expect(menu).toHaveFocus();
         expect(menu).toHaveAttribute('aria-activedescendant', first.id);
+        expect(first).toHaveStyle({ backgroundColor: '#e8e8e8' });
       });
+      const indicator = window.getComputedStyle(first, '::before');
+      expect(indicator.width).toBe('2px');
+      expect(indicator.backgroundColor).toBe('rgb(115, 115, 115)');
     }
 
+    // A trigger rendered under a stationary mouse receives pointerover
+    // without a pointermove. It should stay closed for keyboard users.
+    await fireEvent.pointerOver(trigger, { pointerType: 'mouse' });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await openMenuWithKeyboard();
 
     await userEvent.keyboard('{Escape}');
