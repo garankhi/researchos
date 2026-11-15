@@ -17,21 +17,32 @@ import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
+import type { OutputCapability } from '@/utils/output-capability';
 import { useOutputVisibility } from '../hooks/use-output-visibility';
 import type { OutputDetail } from '../types';
 
 type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
 
 /**
- * Owner action menu on the output detail page.
+ * Action menu on the output detail page.
  *
- * Mirrors `ProfileOutputActionsMenu`: the menu owns the work's operations
- * and visibility is the first of them — one entry that opens a dialog with
- * the two audiences. The affiliation itself is left untouched: the request
- * omits `accessGroupId`, so the backend keeps the stored group. A work with
- * no stored group cannot become group-only, so that option stays disabled.
+ * The menu is the work's operation container, so it stays mounted — more
+ * operations will live here. Each entry carries its own permission: the
+ * Visibility entry is disabled when the viewer may not change the
+ * visibility, and says why, rather than opening an editable dialog that
+ * would fail on save with a 403.
+ *
+ * The affiliation itself is left untouched: the request omits
+ * `accessGroupId`, so the backend keeps the stored group. A work with no
+ * stored group cannot become group-only, so that option stays disabled.
  */
-export function OutputDetailActionsMenu({ output }: { output: OutputDetail }) {
+export function OutputDetailActionsMenu({
+  output,
+  capability,
+}: {
+  output: OutputDetail;
+  capability: OutputCapability;
+}) {
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
   const tCommon = useTranslations('common');
@@ -47,11 +58,11 @@ export function OutputDetailActionsMenu({ output }: { output: OutputDetail }) {
   const [inlineError, setInlineError] = useState<string | null>(null);
 
   const hasGroup = Boolean(output.accessGroupId);
-  const canEdit = output.sharingStatus === 'SHARED';
-
-  if (!canEdit) return null;
+  const isShared = output.sharingStatus === 'SHARED';
+  const canChangeVisibility = isShared && capability.canChangeVisibility;
 
   const openDialog = () => {
+    if (!canChangeVisibility) return;
     setSelection(
       output.visibility === 'RESEARCH_GROUP'
         ? 'RESEARCH_GROUP'
@@ -101,9 +112,18 @@ export function OutputDetailActionsMenu({ output }: { output: OutputDetail }) {
         <Portal>
           <Menu.Positioner>
             <Menu.Content>
-              <Menu.Item value="visibility" onSelect={openDialog}>
+              <Menu.Item
+                value="visibility"
+                onSelect={openDialog}
+                disabled={!canChangeVisibility}
+              >
                 <Eye />
                 {t('detail.visibilityAction')}
+                {canChangeVisibility ? null : (
+                  <Text textStyle="xs" color="fg.muted">
+                    {t('detail.visibilityLockedReason')}
+                  </Text>
+                )}
               </Menu.Item>
             </Menu.Content>
           </Menu.Positioner>

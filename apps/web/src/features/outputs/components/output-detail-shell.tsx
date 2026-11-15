@@ -14,9 +14,9 @@ import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { ErrorState, RouteFeedback } from '@/components/ui/feedback';
 import { useOutput } from '../hooks/use-output';
+import { useOutputCapability } from '../hooks/use-output-capability';
 import { useOutputFiles } from '../hooks/use-output-files';
 import { useOutputGroup } from '../hooks/use-output-group';
-import { useOutputOwner } from '../hooks/use-output-owner';
 import { OutputAbstract } from './output-abstract';
 import {
   OutputDownloadPrimaryButton,
@@ -43,7 +43,13 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
   } = useOutput({ outputId });
   const filesQuery = useOutputFiles({ outputId });
   const groupQuery = useOutputGroup({ groupId: output?.accessGroupId });
-  const { isOwner } = useOutputOwner({ ownerId: output?.ownerId });
+  const capability = useOutputCapability({
+    ownerId: output?.ownerId,
+    authorUserIds: output?.authors
+      .map((author) => author.userId)
+      .filter((id): id is string => Boolean(id)),
+    groupLeadId: groupQuery.groupLeadId,
+  });
 
   if (isLoading) {
     return (
@@ -128,7 +134,10 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                 <Flex gap="2" flexShrink={0} alignItems="center">
                   <OutputDownloadPrimaryButton file={primaryFile} />
                   <OutputShareButton />
-                  {isOwner ? <OutputDetailActionsMenu output={output} /> : null}
+                  <OutputDetailActionsMenu
+                    output={output}
+                    capability={capability}
+                  />
                 </Flex>
               </Flex>
             </Stack>

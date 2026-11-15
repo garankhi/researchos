@@ -32,8 +32,7 @@ function downloadBlob(blob: Blob, fileName: string) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  // Give the browser time to open the blob before releasing its URL.
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  URL.revokeObjectURL(url);
 }
 
 export function OutputFiles({
@@ -44,6 +43,11 @@ export function OutputFiles({
   onRetry,
 }: {
   files?: OutputFile[];
+  /**
+   * The current release has a PDF the caller may not download. The
+   * request-file action stays visible but disabled, so the reader knows
+   * the file exists and that access has to be asked for.
+   */
   hasRestrictedPdf?: boolean;
   isLoading: boolean;
   isFailed: boolean;
@@ -146,7 +150,7 @@ export function OutputFiles({
           </Button>
         </Flex>
       ))}
-      {hasRestrictedPdf && (
+      {hasRestrictedPdf ? (
         <Flex direction="column" gap="2" align="start">
           <Text textStyle="sm" color="fg.muted">
             {t('detail.requestFileUnavailable')}
@@ -160,7 +164,7 @@ export function OutputFiles({
             {t('detail.requestFile')}
           </Button>
         </Flex>
-      )}
+      ) : null}
       {downloadError ? (
         <Text textStyle="sm" color="fg.error" role="alert">
           {downloadError}
@@ -175,6 +179,11 @@ export function OutputDownloadPrimaryButton({
   label,
   buttonProps,
 }: {
+  /**
+   * The file to download. The download endpoint only needs the id and the
+   * file name, so the home feed's `DownloadablePdfDto` and the detail
+   * page's `OutputFile` both satisfy it.
+   */
   file?: Pick<OutputFile, 'id' | 'fileName'>;
   label?: string;
   buttonProps?: Pick<ButtonProps, 'variant' | 'size' | 'layerStyle'>;
@@ -187,14 +196,17 @@ export function OutputDownloadPrimaryButton({
 
   if (!file) return null;
 
-  async function handleDownload(
-    selectedFile: Pick<OutputFile, 'id' | 'fileName'>,
-  ) {
+  // Captured into a local so the narrowing survives into the closure
+  // below: TypeScript does not keep a narrowing of a parameter across an
+  // `async` function boundary.
+  const target = file;
+
+  async function handleDownload() {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const blob = await outputDownloadControllerDownloadFile(selectedFile.id);
-      downloadBlob(blob, selectedFile.fileName);
+      const blob = await outputDownloadControllerDownloadFile(target.id);
+      downloadBlob(blob, target.fileName);
       showSnackbar({
         severity: 'success',
         message: t('detail.downloadStarted'),
@@ -220,7 +232,7 @@ export function OutputDownloadPrimaryButton({
         {...buttonProps}
         loading={downloading}
         loadingText={t('detail.downloading')}
-        onClick={() => void handleDownload(file)}
+        onClick={() => void handleDownload()}
       >
         {label ?? t('detail.downloadPrimary')}
       </Button>
@@ -288,7 +300,12 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
 
   if (!groupId) return null;
 
-  async function handleToggleFollow(targetGroupId: string) {
+  // Captured into a local so the narrowing survives into the closure
+  // below: TypeScript does not keep a narrowing of a `const` initialized
+  // from a nullable property across an `async` function boundary.
+  const targetGroupId = groupId;
+
+  async function handleToggleFollow() {
     setActionError(null);
     try {
       if (isFollowing) {
@@ -320,7 +337,7 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
         size="sm"
         loading={followPending}
         loadingText={t('detail.followLoading')}
-        onClick={() => void handleToggleFollow(groupId)}
+        onClick={() => void handleToggleFollow()}
       >
         {isFollowing ? <Check /> : <Link2 />}
         {isFollowing ? t('detail.followingAction') : t('detail.followAction')}

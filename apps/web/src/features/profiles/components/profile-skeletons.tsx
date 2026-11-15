@@ -99,6 +99,24 @@ const outputVisibility: SkeletonResult = {
   bones: [[0, 0, 100, 20, 0]],
 };
 
+/**
+ * The layout of the outputs list while it loads.
+ *
+ * The list is a stack of work cards, so the fallback reserves three of
+ * them and the space is already taken when the works arrive.
+ */
+const outputsList: SkeletonResult = {
+  name: 'profile-outputs-list',
+  viewportWidth: 768,
+  width: 1152,
+  height: 292,
+  bones: [
+    [0, 0, 100, 92, 0],
+    [0, 100, 100, 92, 0],
+    [0, 200, 100, 92, 0],
+  ],
+};
+
 const interestCard: SkeletonResult = {
   name: 'profile-interest-card',
   viewportWidth: 768,
@@ -313,6 +331,15 @@ export function ProfileTabSkeleton({
           </Flex>
         </Box>
       ))}
+    </Stack>
+  );
+}
+
+/** The skeleton shown while the profile's outputs list is loading. */
+export function ProfileOutputsSkeleton() {
+  return (
+    <Stack gap="4" py="1">
+      <DelayedSkeleton layout={outputsList} />
     </Stack>
   );
 }

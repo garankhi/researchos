@@ -256,6 +256,7 @@
       "visibilityNoGroupHint": "This work has no affiliated group, so it cannot be restricted to one.",
       "visibilityUpdated": "Visibility updated.",
       "visibilityUpdateError": "Could not update the visibility. Please try again.",
+      "visibilityLockedReason": "Only the owner can change this",
       "visibilityPublic": "FPTU community",
       "visibilityGroupOnly": "Group only"
     },
@@ -342,6 +343,7 @@
       "visibilityNoGroupHint": "This work has no affiliated group, so it cannot be restricted to one.",
       "visibilityUpdated": "Visibility updated.",
       "visibilityUpdateError": "Could not update the visibility. Please try again.",
+      "visibilityLockedReason": "Only the owner can change this",
       "followed": "You are now following this group.",
       "unfollowed": "You unfollowed this group.",
       "followError": "Could not update the follow. Please try again.",

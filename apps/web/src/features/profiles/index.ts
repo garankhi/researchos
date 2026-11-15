@@ -16,6 +16,7 @@ export * from './hooks/use-profile';
 export * from './hooks/use-update-profile';
 export * from './hooks/use-profile-groups';
 export * from './hooks/use-profile-outputs';
+export * from './hooks/use-profile-output-capability';
 export * from './hooks/use-output-visibility';
 export * from './hooks/use-profile-interests';
 export * from './hooks/use-my-applications';

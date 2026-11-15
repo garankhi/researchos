@@ -262,6 +262,7 @@
       "visibilityNoGroupHint": "Công trình này chưa có nhóm liên kết nên không thể giới hạn theo nhóm.",
       "visibilityUpdated": "Đã cập nhật phạm vi hiển thị.",
       "visibilityUpdateError": "Không thể cập nhật phạm vi hiển thị. Vui lòng thử lại.",
+      "visibilityLockedReason": "Chỉ chủ sở hữu mới có thể thay đổi",
       "visibilityPublic": "Cộng đồng FPTU",
       "visibilityGroupOnly": "Chỉ nhóm"
     },
@@ -348,6 +349,7 @@
       "visibilityNoGroupHint": "Công trình này chưa có nhóm liên kết nên không thể giới hạn theo nhóm.",
       "visibilityUpdated": "Đã cập nhật phạm vi hiển thị.",
       "visibilityUpdateError": "Không thể cập nhật phạm vi hiển thị. Vui lòng thử lại.",
+      "visibilityLockedReason": "Chỉ chủ sở hữu mới có thể thay đổi",
       "followed": "Bạn đang theo dõi nhóm này.",
       "unfollowed": "Bạn đã bỏ theo dõi nhóm này.",
       "followError": "Không thể cập nhật theo dõi. Vui lòng thử lại.",
