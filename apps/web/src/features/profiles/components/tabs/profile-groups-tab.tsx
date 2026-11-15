@@ -12,13 +12,10 @@ import {
 import { Star, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useProfileGroups } from '../../hooks/use-profile-groups';
 import type { ResearchGroupResponseDto } from '../../types';
+import { ProfileTabSkeleton } from '../profile-skeletons';
 
 export function ProfileGroupsTab({
   userId,
@@ -37,13 +34,7 @@ export function ProfileGroupsTab({
   } = useProfileGroups({ userId });
 
   if (isLoading) {
-    return (
-      <SimpleGrid columns={{ base: 1, md: 2 }} gap="4" py="2">
-        {[1, 2, 3, 4].map((i) => (
-          <LoadingSkeleton key={i} variant="rectangular" height={140} />
-        ))}
-      </SimpleGrid>
-    );
+    return <ProfileTabSkeleton tab="groups" />;
   }
 
   if (isFailed) {
@@ -67,7 +58,6 @@ export function ProfileGroupsTab({
       key={group.id}
       bg="bg.panel"
       borderWidth="1px"
-      borderRadius="lg"
       p="5"
       h="full"
       transition="border-color 0.2s ease"

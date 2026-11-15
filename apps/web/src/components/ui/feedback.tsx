@@ -6,64 +6,11 @@ import {
   Container,
   Heading,
   Icon,
-  Skeleton,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-
-export function LoadingSkeleton({
-  variant = 'text',
-  width,
-  height = variant === 'text' ? '1em' : undefined,
-  count = 1,
-}: {
-  variant?: 'text' | 'rectangular' | 'circular';
-  width?: number | string;
-  height?: number | string;
-  count?: number;
-}) {
-  // Chakra treats numbers as size tokens. This component accepts pixels.
-  const cssWidth = typeof width === 'number' ? `${width}px` : width;
-  const cssHeight = typeof height === 'number' ? `${height}px` : height;
-  const items = Array.from({ length: count }, (_, index) => (
-    <Skeleton
-      key={index}
-      w={cssWidth}
-      h={cssHeight}
-      borderRadius={variant === 'circular' ? 'full' : 'l2'}
-      aria-hidden
-      data-testid="loading-skeleton"
-    />
-  ));
-
-  return count === 1 ? (
-    items[0]
-  ) : (
-    <Stack gap="1" aria-busy="true">
-      {items}
-    </Stack>
-  );
-}
-
-export function ListItemSkeleton() {
-  return (
-    <Stack
-      direction="row"
-      gap="2"
-      align="center"
-      aria-busy="true"
-      data-testid="list-item-skeleton"
-    >
-      <LoadingSkeleton variant="circular" width={40} height={40} />
-      <Stack flex="1" gap="1">
-        <LoadingSkeleton />
-        <LoadingSkeleton width="60%" />
-      </Stack>
-    </Stack>
-  );
-}
 
 export function ErrorState({
   title,

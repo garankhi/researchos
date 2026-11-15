@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { Container } from '@chakra-ui/react';
-import { LoadingSkeleton } from '@/components/ui/feedback';
-import { OutputDetailShell } from '@/features/outputs';
+import { OutputDetailShell, OutputDetailSkeleton } from '@/features/outputs';
 
 type OutputPageProps = {
   params: Promise<{
@@ -19,8 +18,8 @@ export default function OutputPage(props: OutputPageProps) {
   return (
     <Suspense
       fallback={
-        <Container maxW="6xl" py="6">
-          <LoadingSkeleton variant="rectangular" height={160} />
+        <Container maxW="6xl" py={{ base: '4', md: '8' }}>
+          <OutputDetailSkeleton />
         </Container>
       }
     >

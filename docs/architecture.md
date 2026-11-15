@@ -107,7 +107,7 @@ apps/web/src/
     _components/            Chỉ dùng trong segment gốc
     <segment>/_components/  Chỉ dùng trong segment đó
   components/
-    ui/                     Primitive dùng chung: LoadingSkeleton, ErrorState, EmptyState
+    ui/                     Primitive dùng chung: DelayedSkeleton, ErrorState, EmptyState
     providers/              Client provider toàn app: theme, query
   features/                 Một thư mục cho mỗi nghiệp vụ
     <nghiệp-vụ>/
@@ -115,6 +115,7 @@ apps/web/src/
       types.ts              Kiểu dữ liệu UI dùng
       hooks/                Hook gọi API và chuẩn hoá trạng thái
       components/           Component riêng của nghiệp vụ
+        <nghiệp-vụ>-skeletons.tsx        Layout Boneyard + component vẽ skeleton
       store/                Trạng thái phía client (Zustand): state không do API sở hữu
   lib/                      Hạ tầng, không có logic nghiệp vụ
     api/                    DO ORVAL SINH RA — không sửa tay

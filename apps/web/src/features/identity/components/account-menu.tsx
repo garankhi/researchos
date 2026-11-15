@@ -10,10 +10,8 @@ import { AccountMenuView } from './account-menu-view';
 /**
  * The account menu in the header.
  *
- * It shows who is signed in and offers the way out. The avatar carries
- * the initials of the display name, because the backend has no avatar
- * field — a name and the initials are enough to tell two accounts apart
- * without a second request or an upload.
+ * The avatar opens the profile and sign-out actions. The signed-in name
+ * labels the trigger for assistive technology.
  *
  * ## Why the menu lives in the feature
  *

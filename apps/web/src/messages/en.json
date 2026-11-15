@@ -11,22 +11,94 @@
     "backToHome": "Back to home"
   },
   "nav": {
-    "products": "Products",
-    "pricing": "Pricing",
-    "blog": "Blog",
+    "home": "Home",
+    "opportunities": "Opportunities",
+    "groups": "Groups",
+    "updates": "Update notifications",
+    "messages": "Messages",
+    "requests": "Request notifications",
+    "primary": "Main navigation",
     "profile": "Profile",
     "account": "Account",
     "dashboard": "Dashboard",
     "logout": "Log out",
     "myProfile": "My profile",
+    "yourProfile": "Your profile",
+    "verifyAffiliation": "Verify your affiliation",
+    "savedList": "Your saved list",
+    "settings": "Settings",
+    "helpCenter": "Help Center",
     "openSettings": "Open settings",
-    "openMenu": "Open menu",
+    "more": "More",
     "accountOfCurrentUser": "Account menu for {name}"
   },
   "search": {
     "open": "Open search",
-    "label": "search",
-    "placeholder": "Search for research, journals, people…"
+    "label": "Search",
+    "placeholder": "Search…",
+    "submit": "Search",
+    "clear": "Clear search",
+    "pageSearch": "Search ResearchOS",
+    "searchFor": "Search for",
+    "searchIn": "<query>{term}</query> in {category}",
+    "showResultsIn": "Show results in",
+    "resultsIn": "Search results in {category}",
+    "startSearching": "Enter a keyword to search ResearchOS.",
+    "exploreTitle": "Search and explore research",
+    "exploreDescription": "Find research opportunities, researchers, published work, and groups. Choose a category to narrow your search.",
+    "minimum": "Enter at least 2 characters.",
+    "maximum": "Enter no more than 200 characters.",
+    "invalid": "Remove invalid characters from the search.",
+    "empty": "No results found",
+    "tryAnother": "Try another search term or tab.",
+    "loadError": "Could not load search results",
+    "countsError": "Could not load result counts",
+    "sort": "Sort by",
+    "rank": "Sort by relevance",
+    "sortTitle": "Sort by title",
+    "updatedAt": "Sort by last update",
+    "tabs": {
+      "people": "People",
+      "research": "Outputs",
+      "group": "Groups",
+      "opportunity": "Opportunities"
+    },
+    "pagination": "Search result pages",
+    "page": "Page {page} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "followed": "Now following {title}",
+    "unfollowed": "Unfollowed {title}",
+    "followError": "Could not update this follow.",
+    "followingLoadError": "Could not load followed accounts and groups."
+  },
+  "addResearch": {
+    "trigger": "Add new",
+    "title": "Add your research",
+    "published": {
+      "label": "Published research",
+      "description": "Articles, books, etc."
+    },
+    "preprint": {
+      "label": "Preprint",
+      "description": "Draft or paper before peer review"
+    },
+    "conference": {
+      "label": "Conference paper",
+      "description": "Add a conference paper"
+    },
+    "presentation": {
+      "label": "Presentation",
+      "description": "Add a presentation"
+    },
+    "poster": { "label": "Poster", "description": "Add a conference poster" },
+    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
+    "other": {
+      "label": "Other",
+      "description": "Methods, proposal, code, etc."
+    }
   },
   "theme": {
     "label": "Toggle light/dark mode",
@@ -440,6 +512,7 @@
   },
   "storybook": {
     "feedback": {
+      "finishLoading": "Finish loading",
       "emptyTitle": "No research results",
       "emptyMessage": "Try a different keyword.",
       "errorTitle": "Could not load research results",

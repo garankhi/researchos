@@ -12,11 +12,7 @@ import {
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
-import {
-  ErrorState,
-  LoadingSkeleton,
-  RouteFeedback,
-} from '@/components/ui/feedback';
+import { ErrorState, RouteFeedback } from '@/components/ui/feedback';
 import { useOutput } from '../hooks/use-output';
 import { useOutputFiles } from '../hooks/use-output-files';
 import { useOutputGroup } from '../hooks/use-output-group';
@@ -31,6 +27,7 @@ import {
 import { OutputDetailActionsMenu } from './output-detail-actions-menu';
 import { OutputHeader } from './output-header';
 import { OutputReferences } from './output-references';
+import { OutputDetailSkeleton } from './output-skeletons';
 
 export function OutputDetailShell({ outputId }: { outputId?: string }) {
   const t = useTranslations('outputs');
@@ -51,10 +48,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
   if (isLoading) {
     return (
       <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <Stack gap="4">
-          <LoadingSkeleton variant="rectangular" height={180} />
-          <LoadingSkeleton variant="rectangular" height={120} count={2} />
-        </Stack>
+        <OutputDetailSkeleton />
       </Container>
     );
   }

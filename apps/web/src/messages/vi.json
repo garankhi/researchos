@@ -11,22 +11,100 @@
     "add": "Thêm"
   },
   "nav": {
-    "products": "Sản phẩm",
-    "pricing": "Bảng giá",
-    "blog": "Blog",
+    "home": "Trang chủ",
+    "opportunities": "Cơ hội",
+    "groups": "Nhóm nghiên cứu",
+    "updates": "Thông báo cập nhật",
+    "messages": "Tin nhắn",
+    "requests": "Thông báo yêu cầu",
+    "primary": "Điều hướng chính",
     "profile": "Hồ sơ",
     "account": "Tài khoản",
     "dashboard": "Bảng điều khiển",
     "logout": "Đăng xuất",
     "myProfile": "Hồ sơ của tôi",
+    "yourProfile": "Hồ sơ của bạn",
+    "verifyAffiliation": "Xác minh đơn vị công tác",
+    "savedList": "Danh sách đã lưu",
+    "settings": "Cài đặt",
+    "helpCenter": "Trung tâm trợ giúp",
     "openSettings": "Mở cài đặt",
-    "openMenu": "Mở menu",
+    "more": "Thêm",
     "accountOfCurrentUser": "Menu tài khoản của {name}"
   },
   "search": {
     "open": "Mở tìm kiếm",
-    "label": "tìm kiếm",
-    "placeholder": "Tìm nghiên cứu, tạp chí, nhà khoa học…"
+    "label": "Tìm kiếm",
+    "placeholder": "Tìm kiếm…",
+    "submit": "Tìm kiếm",
+    "clear": "Xóa từ khóa tìm kiếm",
+    "pageSearch": "Tìm kiếm trên ResearchOS",
+    "searchFor": "Tìm kiếm theo mục",
+    "searchIn": "<query>{term}</query> trong mục {category}",
+    "showResultsIn": "Hiển thị kết quả trong",
+    "resultsIn": "Kết quả tìm kiếm trong mục {category}",
+    "startSearching": "Nhập từ khóa để tìm kiếm trên ResearchOS.",
+    "exploreTitle": "Tìm kiếm và khám phá nghiên cứu",
+    "exploreDescription": "Tìm cơ hội nghiên cứu, nhà nghiên cứu, công trình đã công bố và nhóm. Chọn một mục để thu hẹp kết quả.",
+    "minimum": "Nhập ít nhất 2 ký tự.",
+    "maximum": "Nhập tối đa 200 ký tự.",
+    "invalid": "Xóa ký tự không hợp lệ khỏi từ khóa.",
+    "empty": "Không tìm thấy kết quả",
+    "tryAnother": "Thử từ khóa khác hoặc đổi tab.",
+    "loadError": "Không tải được kết quả tìm kiếm",
+    "countsError": "Không tải được số lượng kết quả",
+    "sort": "Sắp xếp theo",
+    "rank": "Sắp xếp theo mức độ phù hợp",
+    "sortTitle": "Sắp xếp theo tiêu đề",
+    "updatedAt": "Sắp xếp theo lần cập nhật gần nhất",
+    "tabs": {
+      "people": "Nhà nghiên cứu",
+      "research": "Công trình",
+      "group": "Nhóm",
+      "opportunity": "Cơ hội"
+    },
+    "pagination": "Các trang kết quả tìm kiếm",
+    "page": "Trang {page} / {total}",
+    "previous": "Trước",
+    "next": "Tiếp",
+    "follow": "Theo dõi",
+    "unfollow": "Bỏ theo dõi",
+    "followed": "Đã theo dõi {title}",
+    "unfollowed": "Đã bỏ theo dõi {title}",
+    "followError": "Không cập nhật được lượt theo dõi.",
+    "followingLoadError": "Không tải được danh sách đang theo dõi."
+  },
+  "addResearch": {
+    "trigger": "Thêm mới",
+    "title": "Thêm công trình của bạn",
+    "published": {
+      "label": "Công trình đã xuất bản",
+      "description": "Bài báo, sách và các ấn phẩm khác"
+    },
+    "preprint": {
+      "label": "Bản tiền ấn phẩm",
+      "description": "Bản thảo hoặc bài báo chưa qua bình duyệt"
+    },
+    "conference": {
+      "label": "Bài báo hội nghị",
+      "description": "Thêm một bài báo hội nghị"
+    },
+    "presentation": {
+      "label": "Bài trình bày",
+      "description": "Thêm một bài trình bày"
+    },
+    "poster": {
+      "label": "Áp phích",
+      "description": "Thêm một áp phích hội nghị"
+    },
+    "data": {
+      "label": "Dữ liệu",
+      "description": "Bảng, hình ảnh, chuỗi và dữ liệu khác"
+    },
+    "other": {
+      "label": "Khác",
+      "description": "Phương pháp, đề xuất, mã nguồn và các loại khác"
+    }
   },
   "theme": {
     "label": "Đổi giao diện sáng/tối",
@@ -440,6 +518,7 @@
   },
   "storybook": {
     "feedback": {
+      "finishLoading": "Hoàn tất tải",
       "emptyTitle": "Không có kết quả nghiên cứu",
       "emptyMessage": "Hãy thử một từ khóa khác.",
       "errorTitle": "Không tải được kết quả nghiên cứu",

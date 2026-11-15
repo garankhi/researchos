@@ -26,22 +26,24 @@ const { Client } = createRequire(import.meta.resolve('@researchos/database'))(
  * validation pipe rejects a term outside [2, 200], and the four totals are
  * permission filtered exactly like the results they count.
  *
- * The fixtures cover the four entity types and one private work, so the
- * difference between "the owner sees two works" and "an outsider sees one" is
- * what proves the filtering.
+ * The fixtures cover all four tabs and three output visibility levels.
  *
  * The spec runs against its own database, built from the schema source and
  * dropped again afterwards, so it never touches the development data and
  * never leaves fixtures behind.
  */
-describe('GET /search/counts', () => {
+describe('Search API', () => {
   const ownerId = randomUUID();
+  const memberId = randomUUID();
   const outsiderId = randomUUID();
-  const inactiveId = randomUUID();
-  const token = randomUUID();
-  const cookie = `researchos_session=${token}`;
+  const groupId = randomUUID();
   const term = 'quantum materials';
   const encodedTerm = encodeURIComponent(term);
+  const countsUrl = `/search/counts?q=${encodedTerm}`;
+  const resultsUrl = `/search?tab=research&q=${encodedTerm}`;
+  const publicTitle = 'Quantum Materials at Scale';
+  const groupTitle = 'Group Quantum Materials Report';
+  const privateTitle = 'Private Quantum Materials Notes';
 
   const originalDatabaseUrl = process.env.DATABASE_URL;
   let app: INestApplication;
@@ -49,14 +51,22 @@ describe('GET /search/counts', () => {
   let database: InstanceType<typeof Client>;
   let databaseName = '';
   let databaseCreated = false;
-  const { request, close } = createHttpTestClient();
+  let ownerCookie: string;
+  let memberCookie: string;
+  let outsiderCookie: string;
+  const http = createHttpTestClient();
 
   beforeAll(async () => {
     await ConfigModule.forRoot({
       envFilePath: resolveEnvFilePaths(resolve(import.meta.dirname, '..')),
     });
 
-    const source = new URL(process.env.DATABASE_URL);
+    const configuredUrl = process.env.DATABASE_URL;
+    if (!configuredUrl) {
+      throw new Error('DATABASE_URL is required for the search API tests');
+    }
+
+    const source = new URL(configuredUrl);
     source.pathname = '/postgres';
     source.searchParams.delete('schema');
 
@@ -80,6 +90,9 @@ describe('GET /search/counts', () => {
     );
 
     await seed();
+    ownerCookie = await createSession(ownerId);
+    memberCookie = await createSession(memberId);
+    outsiderCookie = await createSession(outsiderId);
 
     process.env.DATABASE_URL = databaseUrl.href;
     const { AppModule } = await import('../dist/app.module.js');
@@ -103,21 +116,14 @@ describe('GET /search/counts', () => {
     await app.listen(0, '127.0.0.1');
   });
 
-  /**
-   * The fixtures: one row per entity type, all matching the term, plus a
-   * private work the owner alone may count.
-   */
   async function seed() {
     await database.query(
       `INSERT INTO users(id, user_type, email, full_name, department_unit)
        VALUES ($1, 'FACULTY', 'owner@example.invalid', 'Counts Owner', 'Testing'),
-              ($2, 'FACULTY', 'outsider@example.invalid', 'Counts Outsider', 'Testing'),
-              ($3, 'FACULTY', 'inactive@example.invalid', 'Counts Inactive', 'Testing')`,
-      [ownerId, outsiderId, inactiveId],
+              ($2, 'FACULTY', 'member@example.invalid', 'Counts Member', 'Testing'),
+              ($3, 'FACULTY', 'outsider@example.invalid', 'Counts Outsider', 'Testing')`,
+      [ownerId, memberId, outsiderId],
     );
-    await database.query(`UPDATE users SET is_active = false WHERE id = $1`, [
-      inactiveId,
-    ]);
 
     // The researcher slice: a confirmed profile.
     await database.query(
@@ -130,17 +136,21 @@ describe('GET /search/counts', () => {
     await database.query(
       `INSERT INTO research_groups(id, code, name, lead_id, description)
        VALUES ($1, $2, 'Quantum Materials Lab', $3, 'Quantum materials and photonics.')`,
-      [randomUUID(), `COUNTS-${ownerId.slice(0, 8)}`, ownerId],
+      [groupId, `COUNTS-${ownerId.slice(0, 8)}`, ownerId],
+    );
+    await database.query(
+      'INSERT INTO group_members(group_id, user_id) VALUES ($1, $2)',
+      [groupId, memberId],
     );
 
     // The opportunity slice. It is created as a draft and published
     // afterwards, because the trigger only allows that transition.
     await database.query(
       `INSERT INTO research_opportunities(
-         id, opportunity_kind, target_audience, creator_id, title, description
-       ) VALUES ($1, 'RESEARCH_COLLABORATION', 'ANY_RESEARCHER', $2,
+         id, group_id, opportunity_kind, target_audience, creator_id, title, description
+       ) VALUES ($1, $3, 'RESEARCH_COLLABORATION', 'ANY_RESEARCHER', $2,
                  'Quantum Fellowship', 'A fellowship on quantum materials.')`,
-      [randomUUID(), ownerId],
+      [randomUUID(), ownerId, groupId],
     );
     await database.query(
       `UPDATE research_opportunities
@@ -150,33 +160,24 @@ describe('GET /search/counts', () => {
        WHERE title = 'Quantum Fellowship'`,
     );
 
-    // The output slice: one community work and one private work, both
-    // matching the term. Only the owner may count the private one.
-    for (const [visibility, title, abstract] of [
-      [
-        'FPTU_COMMUNITY',
-        'Quantum Materials at Scale',
-        'A study of quantum materials at scale',
-      ],
-      [
-        'PRIVATE',
-        'Private Quantum Materials Notes',
-        'Unpublished notes on quantum materials',
-      ],
-    ]) {
+    for (const [visibility, title, accessGroupId] of [
+      ['FPTU_COMMUNITY', publicTitle, null],
+      ['RESEARCH_GROUP', groupTitle, groupId],
+      ['PRIVATE', privateTitle, null],
+    ] as const) {
       const output = randomUUID();
       const revision = randomUUID();
 
       await database.query(
-        `INSERT INTO research_outputs(id, sharing_status, visibility, owner_id, created_by)
-         VALUES ($1, 'DRAFT', $2, $3, $3)`,
-        [output, visibility, ownerId],
+        `INSERT INTO research_outputs(id, sharing_status, visibility, owner_id, created_by, access_group_id)
+         VALUES ($1, 'DRAFT', $2, $3, $3, $4)`,
+        [output, visibility, ownerId, accessGroupId],
       );
       await database.query(
         `INSERT INTO output_revisions(
            id, output_id, revision_no, title, abstract, created_by, released_by, released_at
          ) VALUES ($1, $2, 1, $3, $4, $5, $5, now())`,
-        [revision, output, title, abstract, ownerId],
+        [revision, output, title, 'A study of quantum materials', ownerId],
       );
       await database.query(
         `UPDATE research_outputs
@@ -185,85 +186,138 @@ describe('GET /search/counts', () => {
         [revision, output],
       );
     }
+  }
 
-    // A session for the owner. A LOCAL session needs a credential, and the
-    // credential must not demand a password change — otherwise the guard
-    // refuses with a 403 before the route runs.
+  async function createSession(userId: string): Promise<string> {
+    const token = randomUUID();
     await database.query(
       `INSERT INTO local_credentials(user_id, password_hash, must_change_password)
        VALUES ($1, 'unused-fixture-hash', false)`,
-      [ownerId],
+      [userId],
     );
     await database.query(
       `INSERT INTO user_sessions(
          user_id, auth_method, session_token_hash, authenticated_at,
          last_seen_at, expires_at, idle_expires_at
        ) VALUES ($1, 'LOCAL', $2, now(), now(), now() + interval '1 hour', now() + interval '1 hour')`,
-      [ownerId, createHash('sha256').update(token).digest('hex')],
+      [userId, createHash('sha256').update(token).digest('hex')],
     );
+    return `researchos_session=${token}`;
   }
 
-  it('returns one permission-filtered total per tab', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/search/counts?q=${encodedTerm}`)
-      .set('Cookie', cookie)
-      .expect(200);
+  it.each([
+    {
+      actor: 'owner',
+      getCookie: () => ownerCookie,
+      titles: [groupTitle, privateTitle, publicTitle],
+    },
+    {
+      actor: 'group member',
+      getCookie: () => memberCookie,
+      titles: [groupTitle, publicTitle],
+    },
+    {
+      actor: 'outsider',
+      getCookie: () => outsiderCookie,
+      titles: [publicTitle],
+    },
+  ])(
+    'returns matching counts and results for the $actor',
+    async ({ getCookie, titles }) => {
+      const client = http.request(app.getHttpServer());
+      const cookie = getCookie();
+      const counts = await client
+        .get(countsUrl)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(counts.body).toMatchObject({
+        success: true,
+        data: { research: titles.length, people: 1, group: 1, opportunity: 1 },
+      });
 
-    expect(response.body).toMatchObject({
-      success: true,
-      data: {
-        research: 2,
-        people: 1,
-        group: 1,
-        opportunity: 1,
-      },
-    });
-  });
+      const results = await client
+        .get(`${resultsUrl}&sort=title`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(results.body.data).toMatchObject({
+        items: titles.map((title) => ({ title })),
+        meta: { total: titles.length },
+      });
+    },
+  );
 
-  it('counts the private work for its owner only', async () => {
-    // The owner sees two matching works. The outsider has no session, so
-    // the guard refuses before the route runs.
-    const owner = await request(app.getHttpServer())
-      .get(`/search/counts?q=${encodedTerm}`)
-      .set('Cookie', cookie)
-      .expect(200);
-    expect(owner.body.data.research).toBe(2);
-
-    const outsider = await request(app.getHttpServer())
-      .get(`/search/counts?q=${encodedTerm}`)
+  it.each([countsUrl, resultsUrl])('requires a session for %s', async (url) => {
+    const response = await http
+      .request(app.getHttpServer())
+      .get(url)
       .expect(401);
-    expect(outsider.body).toMatchObject({
+    expect(response.body).toMatchObject({
       success: false,
-      data: null,
       message: 'unauthorized',
     });
   });
 
-  it('rejects a term outside the length bounds', async () => {
-    await request(app.getHttpServer())
-      .get('/search/counts?q=a')
-      .set('Cookie', cookie)
-      .expect(400);
-    await request(app.getHttpServer())
-      .get(`/search/counts?q=${'x'.repeat(201)}`)
-      .set('Cookie', cookie)
-      .expect(400);
-  });
+  it.each(['/search/counts?', '/search?tab=research&'])(
+    'validates search terms for %s',
+    async (prefix) => {
+      const client = http.request(app.getHttpServer());
+      for (const q of [' a ', 'x'.repeat(201), 'a\0b', '😀', '❤️']) {
+        await client
+          .get(`${prefix}q=${encodeURIComponent(q)}`)
+          .set('Cookie', ownerCookie)
+          .expect(400);
+      }
+      for (const q of ['😀'.repeat(200), '❤️'.repeat(101)]) {
+        await client
+          .get(`${prefix}q=${encodeURIComponent(q)}`)
+          .set('Cookie', ownerCookie)
+          .expect(200);
+      }
+    },
+  );
 
-  it('leaves GET /search unchanged', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/search?tab=research&q=${encodedTerm}`)
-      .set('Cookie', cookie)
+  it('returns a sorted page and keeps the total when the page is out of range', async () => {
+    const client = http.request(app.getHttpServer());
+    const page = await client
+      .get(`${resultsUrl}&sort=title&limit=1&page=2`)
+      .set('Cookie', ownerCookie)
       .expect(200);
+    expect(page.body.data).toMatchObject({
+      items: [{ title: privateTitle }],
+      meta: {
+        page: 2,
+        limit: 1,
+        total: 3,
+        totalPages: 3,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      },
+    });
 
-    expect(response.body.data.meta.total).toBe(2);
-    expect(response.body.data.items).toHaveLength(2);
+    const pastEnd = await client
+      .get(`${resultsUrl}&limit=1&page=4`)
+      .set('Cookie', ownerCookie)
+      .expect(200);
+    expect(pastEnd.body.data).toMatchObject({
+      items: [],
+      meta: {
+        page: 4,
+        total: 3,
+        totalPages: 3,
+        hasNextPage: false,
+        hasPreviousPage: true,
+      },
+    });
   });
 
   afterAll(async () => {
-    close();
+    http.close();
     await app?.close();
-    process.env.DATABASE_URL = originalDatabaseUrl;
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
 
     try {
       await database?.end();

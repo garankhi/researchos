@@ -3,19 +3,16 @@
 import { Box, Button, Stack } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import { useSession } from '@/features/identity';
 import { ResearchCard } from './research-card';
 import { exampleResearch } from './research-feed-data';
+import { ResearchFeedSkeleton } from './research-feed-skeletons';
 import { useResearchFeed } from './use-research-feed';
 
 function FeedLoading() {
-  return <LoadingSkeleton variant="rectangular" height={220} count={2} />;
+  return <ResearchFeedSkeleton />;
 }
 
 function SignedInResearchFeed({ userId }: { userId: string }) {

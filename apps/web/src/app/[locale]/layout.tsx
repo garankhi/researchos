@@ -1,29 +1,23 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import { EmotionRegistry } from '@/components/providers/emotion-registry';
 import { AppThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
-import Header from '@/components/ui/header';
+import { DisplaySettings } from '@/components/ui/display-settings';
 import { AccountSlot } from '@/features/identity';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+import { fontVariableClasses } from '@/theme/fonts';
+import { AppHeader } from './_components/app-header';
 
 export const metadata: Metadata = {
   title: 'ResearchOS',
   description: 'Research networking and discovery platform',
+  icons: {
+    icon: { url: '/researchos-mark.svg', type: 'image/svg+xml', sizes: 'any' },
+  },
 };
 
 export default async function RootLayout({
@@ -45,7 +39,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={fontVariableClasses.join(' ')}
       // next-themes writes the color scheme class onto <html> before React
       // hydrates; without this the mismatch is reported as a hydration warning.
       suppressHydrationWarning
@@ -69,22 +63,15 @@ export default async function RootLayout({
                 }}
               >
                 <SnackbarProvider>
-                  {/* The header is a shared primitive and knows nothing
-                      about a domain, so the account area is passed in as a
-                      slot. The dependency runs the other way: the identity
-                      feature knows about the header's slot, not the
-                      reverse.
-
-                      The header reads the current path — the account area
-                      carries it into the sign-in link as `returnTo` — so it
-                      is wrapped in a `<Suspense>` boundary. Next.js cannot
-                      prerender a component that reads URL data, and the
-                      header sits above every route, so the boundary belongs
-                      here rather than in each page. */}
+                  {/* Both controls read the current path. Separate boundaries
+                      let Next.js prerender the rest of the layout. */}
                   <Suspense fallback={null}>
-                    <Header accountSlot={<AccountSlot />} />
+                    <AppHeader accountSlot={<AccountSlot />} />
                   </Suspense>
                   {children}
+                  <Suspense fallback={null}>
+                    <DisplaySettings />
+                  </Suspense>
                 </SnackbarProvider>
               </NextIntlClientProvider>
             </QueryProvider>

@@ -215,3 +215,27 @@ async function CurrentTime() {
 A route that always throws at render time needs `await connection()` from
 `next/server` first, or the throw happens during `next build` and the build
 fails instead of the error boundary rendering at runtime.
+
+### Suspense fallbacks are components
+
+The `fallback` is a **component reference**, not inline markup. The layout
+is defined once, next to the content it mirrors, and the route just points
+at it.
+
+```tsx
+import { Suspense } from 'react';
+import { ProfilePageSkeleton, ProfileShell } from '@/features/profiles';
+
+export default function ProfilePage(props: ProfilePageProps) {
+  return (
+    <Suspense fallback={<ProfilePageSkeleton />}>
+      <ProfileContent {...props} />
+    </Suspense>
+  );
+}
+```
+
+A fallback built inline — a `Container` with a `LoadingSkeleton` in it —
+drifts away from the real layout as soon as the screen changes. Route it
+through the feature's skeleton component instead. See
+[loading-and-feedback.md](loading-and-feedback.md#as-a-suspense-fallback).

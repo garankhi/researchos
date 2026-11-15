@@ -20,6 +20,7 @@ export {
   OutputFollowButton,
   OutputShareButton,
 } from './components/output-actions';
+export { OutputDetailSkeleton } from './components/output-skeletons';
 export type {
   OutputAuthor,
   OutputDetail,

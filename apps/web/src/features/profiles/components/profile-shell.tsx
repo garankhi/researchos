@@ -1,21 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge, Box, Button, Container, Stack, Tabs } from '@chakra-ui/react';
+import { Badge, Box, Button, Container, Tabs } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import {
   EmptyState,
   ErrorState,
-  LoadingSkeleton,
   RouteFeedback,
 } from '@/components/ui/feedback';
+import NextLink from '@/components/ui/link';
 import { useOpenAlexCandidates } from '../hooks/use-openalex-candidates';
 import { useProfile } from '../hooks/use-profile';
 import type { ProfileTab, PublicProfileTab } from '../types';
 import { ProfileHeader } from './profile-header';
 import { ProfileEditDialog } from './profile-edit-dialog';
+import { ProfileHeaderSkeleton, ProfileTabSkeleton } from './profile-skeletons';
 import { ProfileApplicationsTab } from './tabs/profile-applications-tab';
 import { ProfileGroupsTab } from './tabs/profile-groups-tab';
 import { ProfileOutputsTab } from './tabs/profile-outputs-tab';
@@ -49,14 +49,8 @@ export function ProfileShell({
   const { pendingCount } = useOpenAlexCandidates({ enabled: isOwner });
 
   /*
-   * The page never gives up its layout.
-   *
-   * A signed-in reader came here for a profile and a set of tabs, so the
-   * shell — the header, the tab list and the content area — is always
-   * rendered. What changes with the state of the request is the *content*
-   * inside that shell, never the shell itself.
-   *
-   * The states are kept apart on purpose:
+   * The tab list remains visible while the profile loads. The content
+   * area distinguishes these states:
    *
    * - **loading** — the request is in flight, so there is nothing to say
    *   yet; the content area shows a skeleton;
@@ -76,11 +70,7 @@ export function ProfileShell({
 
   const renderContent = () => {
     if (isLoading) {
-      return (
-        <Stack gap="4">
-          <LoadingSkeleton variant="rectangular" height={120} count={2} />
-        </Stack>
-      );
+      return <ProfileTabSkeleton tab={activeTab} isOwner={isOwner} />;
     }
 
     if (isFailed) {
@@ -162,11 +152,19 @@ export function ProfileShell({
 
   return (
     <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-      <ProfileHeader
-        profile={profile}
-        isOwner={isOwner}
-        onEdit={isOwner && profile ? () => setEditOpen(true) : undefined}
-      />
+      {(profile || isLoading) && (
+        <Box mb="6">
+          {profile ? (
+            <ProfileHeader
+              profile={profile}
+              isOwner={isOwner}
+              onEdit={isOwner ? () => setEditOpen(true) : undefined}
+            />
+          ) : (
+            <ProfileHeaderSkeleton announce={false} />
+          )}
+        </Box>
+      )}
 
       {isOwner && profile ? (
         <ProfileEditDialog
@@ -176,7 +174,7 @@ export function ProfileShell({
         />
       ) : null}
 
-      <Box bg="bg.panel" borderWidth="1px" borderRadius="lg" overflow="hidden">
+      <Box bg="bg.panel" borderWidth="1px" overflow="hidden">
         <Tabs.Root
           value={activeTab}
           onValueChange={(details) =>
