@@ -60,7 +60,8 @@ export const OwnerProfile: Story = {
       );
       expect(avatar).toBeVisible();
       expect(details).toBeVisible();
-      if (!avatar || !details) throw new Error('Profile header bones are missing');
+      if (!avatar || !details)
+        throw new Error('Profile header bones are missing');
       expect(details.getBoundingClientRect().top).toBeGreaterThanOrEqual(
         avatar.getBoundingClientRect().bottom + 24,
       );
