@@ -26,7 +26,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('common');
   const [toaster] = useState(() =>
     createToaster({
-      placement: 'bottom-end',
+      placement: 'top',
       pauseOnPageIdle: true,
     }),
   );
@@ -67,7 +67,6 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           toaster={toaster}
           aria-label={t('notifications')}
           aria-keyshortcuts="Alt+T"
-          insetInline={{ base: '3', sm: '6' }}
         >
           {(toast) => (
             <Toast.Root

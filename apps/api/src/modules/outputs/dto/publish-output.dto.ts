@@ -30,9 +30,9 @@ export class PublishOutputDto {
 
   @ApiPropertyOptional({
     description:
-      'The research group that gains access. Required when visibility is ' +
-      'RESEARCH_GROUP and rejected otherwise. The group must be one the ' +
-      'caller is a member of.',
+      'The affiliated research group whose banner the work carries. Required ' +
+      'when visibility is RESEARCH_GROUP; optional when visibility is ' +
+      'FPTU_COMMUNITY and must be a group the caller is a member of.',
     format: 'uuid',
     example: '55555555-5555-4555-8555-555555555555',
   })

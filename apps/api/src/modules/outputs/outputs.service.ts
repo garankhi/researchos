@@ -13,10 +13,12 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { HomeFeedQueryDto, HomeFeedResponseDto } from './dto/home-feed.dto.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputAuthorResponseDto } from './dto/output-author-response.dto.js';
 import { OutputFileResponseDto } from './dto/output-file-response.dto.js';
 import {
+  DownloadablePdfDto,
   OutputResponseDto,
   PaginatedOutputsResponseDto,
 } from './dto/output-response.dto.js';
@@ -24,6 +26,12 @@ import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
+import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
+import {
+  formatHomeFeedCursor,
+  parseHomeFeedCursor,
+  type HomeFeedCursor,
+} from './home-feed-cursor.js';
 
 const OUTPUT_SORT_FIELDS = {
   firstSharedAt: 'first_shared_at',
@@ -47,6 +55,12 @@ interface OutputFileRow {
   visibility: any;
   access_group_id: string | null;
   uploaded_at: Date;
+}
+
+interface FeedPdfRow {
+  output_id: string;
+  id: string;
+  file_name: string;
 }
 
 /**
@@ -92,8 +106,6 @@ export class OutputsService {
   ): Promise<PaginatedOutputsResponseDto> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
-
     const parsedSort = parseSortParam<OutputSortColumn>(
       query.sort,
       OUTPUT_SORT_FIELDS,
@@ -102,21 +114,6 @@ export class OutputsService {
     if (!parsedSort) {
       throw new BadRequestException('validation_failed');
     }
-
-    const sortColumn = Object.keys(parsedSort)[0] as OutputSortColumn;
-    const sortDir = parsedSort[sortColumn] ?? 'desc';
-    const orderBySql =
-      sortColumn === 'first_shared_at'
-        ? sortDir === 'asc'
-          ? Prisma.sql`o.first_shared_at ASC NULLS LAST, o.created_at ASC`
-          : Prisma.sql`o.first_shared_at DESC NULLS LAST, o.created_at DESC`
-        : sortColumn === 'updated_at'
-          ? sortDir === 'asc'
-            ? Prisma.sql`o.updated_at ASC, o.id ASC`
-            : Prisma.sql`o.updated_at DESC, o.id DESC`
-          : sortDir === 'asc'
-            ? Prisma.sql`o.created_at ASC, o.id ASC`
-            : Prisma.sql`o.created_at DESC, o.id DESC`;
 
     const conditions: Prisma.Sql[] = [
       Prisma.sql`can_view_output(${callerId}::uuid, o.id)`,
@@ -149,15 +146,29 @@ export class OutputsService {
 
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
 
-    const [countResult, idsResult] = await this.prisma.$transaction(
-      async (tx) => {
-        const count = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
-          SELECT COUNT(*)::bigint AS total
-          FROM research_outputs o
-          ${whereClause}
-        `);
+    const offset = (page - 1) * limit;
+    const sortColumn = Object.keys(parsedSort)[0] as OutputSortColumn;
+    const sortDir = parsedSort[sortColumn] ?? 'desc';
+    const orderBySql =
+      sortColumn === 'first_shared_at'
+        ? sortDir === 'asc'
+          ? Prisma.sql`o.first_shared_at ASC NULLS LAST, o.created_at ASC, o.id ASC`
+          : Prisma.sql`o.first_shared_at DESC NULLS LAST, o.created_at DESC, o.id DESC`
+        : sortColumn === 'updated_at'
+          ? sortDir === 'asc'
+            ? Prisma.sql`o.updated_at ASC, o.id ASC`
+            : Prisma.sql`o.updated_at DESC, o.id DESC`
+          : sortDir === 'asc'
+            ? Prisma.sql`o.created_at ASC, o.id ASC`
+            : Prisma.sql`o.created_at DESC, o.id DESC`;
 
-        const ids = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+    return this.prisma.$transaction(
+      async (tx) => {
+        const total = await this.countOutputs(tx, whereClause);
+        const ids =
+          total === 0
+            ? []
+            : await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
           SELECT o.id
           FROM research_outputs o
           ${whereClause}
@@ -166,20 +177,92 @@ export class OutputsService {
           OFFSET ${offset}
         `);
 
-        return [count, ids];
+        const outputIds = ids.map((row) => row.id);
+        const items = await this.loadOutputPage(tx, outputIds);
+        return {
+          items,
+          meta: buildPaginationMeta({ page, limit }, items.length, total),
+        };
       },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
 
-    const total = Number(countResult[0]?.total ?? 0n);
-    if (total === 0 || idsResult.length === 0) {
-      return {
-        items: [],
-        meta: buildPaginationMeta({ page, limit }, 0, total),
-      };
-    }
+  async findHomeFeed(
+    callerId: string,
+    query: HomeFeedQueryDto,
+  ): Promise<HomeFeedResponseDto> {
+    const { limit } = query;
+    const cursor =
+      query.cursor === undefined
+        ? undefined
+        : parseHomeFeedCursor(query.cursor);
+    const whereClause = Prisma.sql`
+      WHERE can_view_output(${callerId}::uuid, o.id)
+        AND o.sharing_status = 'SHARED'
+        AND EXISTS (
+          SELECT 1
+          FROM output_revisions release
+          WHERE release.id = o.current_release_id
+            AND release.output_id = o.id
+            AND release.released_at IS NOT NULL
+        )
+    `;
+    const afterCursor = cursor
+      ? Prisma.sql`AND (o.first_shared_at, o.id) < (${cursor.sharedAt}::timestamptz, ${cursor.id}::uuid)`
+      : Prisma.empty;
 
-    const outputIds = idsResult.map((r) => r.id);
-    const outputs = await this.prisma.research_outputs.findMany({
+    return this.prisma.$transaction(
+      async (tx) => {
+        const total = await this.countOutputs(tx, whereClause);
+        // Preserve PostgreSQL's microseconds for the cursor. A JavaScript Date
+        // would truncate the timestamp used for the next page's comparison.
+        const rows = await tx.$queryRaw<HomeFeedCursor[]>(Prisma.sql`
+          SELECT o.id, to_char(o.first_shared_at AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "sharedAt"
+          FROM research_outputs o
+          ${whereClause}
+          ${afterCursor}
+          ORDER BY o.first_shared_at DESC, o.id DESC
+          LIMIT ${limit + 1}
+        `);
+        const pageRows = rows.slice(0, limit);
+        const lastRow = pageRows.at(-1);
+        const nextCursor =
+          lastRow && rows.length > limit
+            ? formatHomeFeedCursor(lastRow)
+            : undefined;
+        const items = await this.loadOutputPage(
+          tx,
+          pageRows.map(({ id }) => id),
+          callerId,
+        );
+        return { items, meta: { total, nextCursor } };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  private async countOutputs(
+    tx: Prisma.TransactionClient,
+    whereClause: Prisma.Sql,
+  ): Promise<number> {
+    const [count] = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM research_outputs o
+      ${whereClause}
+    `);
+    return Number(count?.total ?? 0n);
+  }
+
+  private async loadOutputPage(
+    tx: Prisma.TransactionClient,
+    outputIds: string[],
+    homeReaderId?: string,
+  ): Promise<OutputResponseDto[]> {
+    if (outputIds.length === 0) return [];
+
+    const outputs = await tx.research_outputs.findMany({
       where: { id: { in: outputIds } },
       include: {
         output_authors: {
@@ -202,42 +285,46 @@ export class OutputsService {
       .filter((o) => !o.current_release_id)
       .map((o) => o.id);
 
-    const [pinnedRevisions, draftRevisions, outputTopics] = await Promise.all([
-      pinnedRevisionIds.length > 0
-        ? this.prisma.output_revisions.findMany({
-            where: { id: { in: pinnedRevisionIds } },
-          })
-        : [],
-      draftOutputIds.length > 0
-        ? this.prisma.output_revisions.findMany({
-            where: {
-              output_id: { in: draftOutputIds },
-              released_at: null,
-            },
-          })
-        : [],
-      this.prisma.output_topics.findMany({
-        where: { output_id: { in: outputIds } },
-        include: {
-          research_topics: {
-            include: {
-              research_subfields: {
-                include: {
-                  research_fields: true,
+    const [pinnedRevisions, draftRevisions, outputTopics, pdfs] =
+      await Promise.all([
+        pinnedRevisionIds.length > 0
+          ? tx.output_revisions.findMany({
+              where: { id: { in: pinnedRevisionIds } },
+            })
+          : [],
+        draftOutputIds.length > 0
+          ? tx.output_revisions.findMany({
+              where: {
+                output_id: { in: draftOutputIds },
+                released_at: null,
+              },
+            })
+          : [],
+        tx.output_topics.findMany({
+          where: { output_id: { in: outputIds } },
+          include: {
+            research_topics: {
+              include: {
+                research_subfields: {
+                  include: {
+                    research_fields: true,
+                  },
                 },
               },
             },
           },
-        },
-      }),
-    ]);
+        }),
+        homeReaderId
+          ? this.findFeedPdfs(tx, outputIds, homeReaderId)
+          : new Map<string, DownloadablePdfDto>(),
+      ]);
 
-    const revisionMap = new Map<string, any>();
+    const revisionMap = new Map<string, (typeof pinnedRevisions)[number]>();
     for (const r of pinnedRevisions) {
       revisionMap.set(r.id, r);
     }
 
-    const draftRevisionMap = new Map<string, any>();
+    const draftRevisionMap = new Map<string, (typeof draftRevisions)[number]>();
     for (const r of draftRevisions) {
       draftRevisionMap.set(r.output_id, r);
     }
@@ -260,23 +347,46 @@ export class OutputsService {
       topicMap.set(ot.output_id, list);
     }
 
-    const items = orderedOutputs.map((o) => {
+    return orderedOutputs.map((o) => {
       const pinnedRev = o.current_release_id
         ? revisionMap.get(o.current_release_id)
         : draftRevisionMap.get(o.id);
 
-      return this.mapToOutputResponse(
+      const output = this.mapToOutputResponse(
         o,
         pinnedRev ?? null,
         o.output_authors,
         topicMap.get(o.id) ?? [],
       );
+      const downloadablePdf = pdfs.get(o.id);
+      return downloadablePdf ? { ...output, downloadablePdf } : output;
     });
+  }
 
-    return {
-      items,
-      meta: buildPaginationMeta({ page, limit }, items.length, total),
-    };
+  private async findFeedPdfs(
+    tx: Prisma.TransactionClient,
+    outputIds: string[],
+    callerId: string,
+  ): Promise<Map<string, DownloadablePdfDto>> {
+    const ids = Prisma.join(outputIds.map((id) => Prisma.sql`${id}::uuid`));
+    const files = await tx.$queryRaw<FeedPdfRow[]>`
+      SELECT DISTINCT ON (f.output_id) f.output_id, f.id, f.file_name
+      FROM research_outputs o
+      JOIN output_revision_files rf
+        ON rf.output_id = o.id AND rf.revision_id = o.current_release_id
+      JOIN output_files f ON f.id = rf.file_id AND f.output_id = o.id
+      WHERE o.id IN (${ids})
+        AND lower(f.mime_type) = 'application/pdf'
+        AND can_view_output_file(${callerId}::uuid, f.id)
+      ORDER BY f.output_id, f.uploaded_at DESC, f.id ASC
+    `;
+
+    return new Map(
+      files.map((file) => [
+        file.output_id,
+        { id: file.id, fileName: file.file_name },
+      ]),
+    );
   }
 
   /**
@@ -353,12 +463,33 @@ export class OutputsService {
       fieldName: ot.research_topics.research_subfields.research_fields.name,
     }));
 
-    return this.mapToOutputResponse(
+    const output = this.mapToOutputResponse(
       exists,
       revision,
       exists.output_authors,
       topics,
     );
+    if (!exists.current_release_id || exists.owner_id === callerId)
+      return output;
+
+    const [pdf] = await this.prisma.$queryRaw<{ restricted: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM research_outputs o
+        JOIN output_revision_files rf
+          ON rf.output_id = o.id AND rf.revision_id = o.current_release_id
+        JOIN output_files f ON f.id = rf.file_id AND f.output_id = o.id
+        WHERE o.id = ${outputId}::uuid
+          AND o.current_release_id = ${exists.current_release_id}::uuid
+          AND o.sharing_status = 'SHARED'
+          AND can_view_output(${callerId}::uuid, o.id)
+          AND lower(f.mime_type) = 'application/pdf'
+          AND f.visibility = 'PRIVATE'
+          AND f.is_available
+          AND NOT can_view_output_file(${callerId}::uuid, f.id)
+      ) AS restricted
+    `;
+    return { ...output, hasRestrictedPdf: pdf?.restricted ?? false };
   }
 
   /**
@@ -548,10 +679,11 @@ export class OutputsService {
    * `publication_status` is untouched too: a preprint shared internally
    * is still unpublished in its journal.
    *
-   * The visibility decision is the caller's, but the access group is
-   * checked: the caller has to be a member of the group it scopes the
-   * work to, so a work cannot be pointed at a group the caller does not
-   * belong to.
+   * The visibility decision is the caller's, but the affiliation is
+   * checked: the caller has to be a member of the group the work carries,
+   * so a work cannot be pointed at a group the caller does not
+   * belong to. Affiliation no longer decides who may read: a
+   * FPTU_COMMUNITY work may keep its group and stays public.
    */
   async publish(
     outputId: string,
@@ -561,12 +693,6 @@ export class OutputsService {
     const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
 
     if (isGroupScope && !dto.accessGroupId) {
-      throw new CodedHttpException(
-        domainErrorCodes.outputs.outputVisibilityInvalid,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    if (!isGroupScope && dto.accessGroupId) {
       throw new CodedHttpException(
         domainErrorCodes.outputs.outputVisibilityInvalid,
         HttpStatus.BAD_REQUEST,
@@ -605,7 +731,7 @@ export class OutputsService {
         );
       }
 
-      if (isGroupScope) {
+      if (dto.accessGroupId) {
         const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
           SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
         `;
@@ -649,7 +775,95 @@ export class OutputsService {
           sharing_status: OutputSharingStatus.SHARED,
           first_shared_at: now,
           visibility: dto.visibility,
-          access_group_id: isGroupScope ? dto.accessGroupId : null,
+          access_group_id: dto.accessGroupId ?? null,
+        },
+      });
+
+      return this.loadResponse(tx, outputId);
+    });
+  }
+
+  /**
+   * Changes the visibility (and optionally the affiliation) of a shared work.
+   *
+   * The owner may always change it. The lead of the affiliated group may
+   * too, so a group keeps control of works carrying its banner. The check
+   * reads the stored affiliation, so a lead keeps control even when
+   * switching the work between public and group-only.
+   */
+  async updateVisibility(
+    outputId: string,
+    callerId: string,
+    dto: UpdateOutputVisibilityDto,
+  ): Promise<OutputResponseDto> {
+    const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
+
+    return this.prisma.$transaction(async (tx) => {
+      const output = await tx.research_outputs.findUnique({
+        where: { id: outputId },
+        select: {
+          id: true,
+          sharing_status: true,
+          access_group_id: true,
+        },
+      });
+
+      if (!output) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotFound,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      if (output.sharing_status !== OutputSharingStatus.SHARED) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputNotArchived,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const effectiveGroupId =
+        dto.accessGroupId !== undefined
+          ? dto.accessGroupId
+          : output.access_group_id;
+
+      if (isGroupScope && !effectiveGroupId) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputVisibilityInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const [allowed] = await tx.$queryRaw<{ allowed: boolean }[]>`
+        SELECT can_change_output_visibility(${callerId}::uuid, ${outputId}::uuid) AS allowed
+      `;
+      if (!allowed?.allowed) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputAccessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      if (dto.accessGroupId) {
+        const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
+          SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
+        `;
+        if (!member?.allowed) {
+          throw new CodedHttpException(
+            domainErrorCodes.outputs.outputAccessGroupInvalid,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
+      await tx.research_outputs.update({
+        where: { id: outputId },
+        data: {
+          visibility: dto.visibility,
+          access_group_id:
+            dto.accessGroupId !== undefined
+              ? dto.accessGroupId
+              : output.access_group_id,
         },
       });
 

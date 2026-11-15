@@ -539,7 +539,7 @@ Table research_outputs {
   checks {
     `sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)` [name: 'ck_shared_output']
     `(sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)` [name: 'ck_output_archive']
-    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_output_access_scope']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)` [name: 'ck_output_access_scope']
     `import_state <> 'ACCEPTED' OR owner_id IS NOT NULL` [name: 'ck_output_import_owner']
   }
   indexes { owner_id }
@@ -674,7 +674,7 @@ Table output_files {
   is_available boolean [not null, default: true]
   uploaded_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   checks { `size_bytes > 0` [name: 'ck_file_size']
-    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_file_access_scope']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)` [name: 'ck_file_access_scope']
   }
   indexes { (output_id, id) [unique] }
   Note: 'Immutable payload metadata; visibility/availability may be restricted immediately. Download requires BOTH output access and file access, plus a released revision attachment unless requester is manager. Group approval never grants file access.'
@@ -980,7 +980,7 @@ Table search_index {
   }
   checks {
     `entity_type IN ('OUTPUT','RESEARCHER','GROUP','OPPORTUNITY')` [name: 'ck_search_index_entity_type']
-    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility <> 'RESEARCH_GROUP' AND access_group_id IS NULL)` [name: 'ck_search_index_scope']
+    `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)` [name: 'ck_search_index_scope']
   }
   Note: 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table. The document contains the author names, so a change to output_authors has to rebuild it (trigger sync_search_index_authors); deleting a researcher profile removes its index row even when the account is retained (trigger sync_search_index_profile_del). visible_search_index applies the same active-account requirement as can_view_output, so an unknown, NULL or inactive actor sees nothing.'
 }

@@ -10,6 +10,6 @@ import type { PublishOutputDtoVisibility } from './publishOutputDtoVisibility';
 export interface PublishOutputDto {
   /** Who may see the published work. FPTU_COMMUNITY opens it to the whole FPTU community; RESEARCH_GROUP opens it to the members of the access group. */
   visibility: PublishOutputDtoVisibility;
-  /** The research group that gains access. Required when visibility is RESEARCH_GROUP and rejected otherwise. The group must be one the caller is a member of. */
+  /** The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and must be a group the caller is a member of. */
   accessGroupId?: string;
 }

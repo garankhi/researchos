@@ -67,6 +67,14 @@ $$;
 CREATE FUNCTION can_manage_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs WHERE id=target AND owner_id=actor);
 $$;
+-- Who may change the visibility of a work. The owner always may. The lead
+-- of the affiliated group may too, so a group keeps control of works that
+-- carry its banner even when they are public. When the work has no
+-- affiliation only the owner may change it.
+CREATE FUNCTION can_change_output_visibility(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+ SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs o WHERE o.id=target
+ AND (o.owner_id=actor OR (o.access_group_id IS NOT NULL AND can_manage_group(actor,o.access_group_id))));
+$$;
 CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_outputs o JOIN users u ON u.id=actor AND u.is_active
  WHERE o.id=target AND (o.owner_id=actor OR (o.sharing_status='SHARED' AND

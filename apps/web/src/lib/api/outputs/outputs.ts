@@ -23,14 +23,17 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  HomeFeedResponseDtoEnvelope,
   OutputResponseDtoEnvelope,
   OutputRevisionResponseDtoEnvelope,
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
+  OutputsControllerFindHomeFeedParams,
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
   UpdateOutputRevisionDto,
+  UpdateOutputVisibilityDto,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -210,6 +213,174 @@ export function useOutputsControllerFindAll<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getOutputsControllerFindAllQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the shared releases visible to the caller, newest shared first, with a cursor for loading more.
+ * @summary List shared research for Home
+ */
+export const outputsControllerFindHomeFeed = (
+  params: OutputsControllerFindHomeFeedParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<HomeFeedResponseDtoEnvelope>(
+    { url: `/outputs/home-feed`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getOutputsControllerFindHomeFeedQueryKey = (
+  params?: OutputsControllerFindHomeFeedParams,
+) => {
+  return [`/outputs/home-feed`, ...(params ? [params] : [])] as const;
+};
+
+export const getOutputsControllerFindHomeFeedQueryOptions = <
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getOutputsControllerFindHomeFeedQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+  > = ({ signal }) =>
+    outputsControllerFindHomeFeed(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OutputsControllerFindHomeFeedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+>;
+export type OutputsControllerFindHomeFeedQueryError = ApiErrorResponseDto;
+
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List shared research for Home
+ */
+
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOutputsControllerFindHomeFeedQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -1024,6 +1195,109 @@ export const useOutputsControllerArchive = <
 > => {
   return useMutation(
     getOutputsControllerArchiveMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.
+ * @summary Changes who may see a shared work
+ */
+export const outputsControllerUpdateVisibility = (
+  outputId: string,
+  updateOutputVisibilityDto: UpdateOutputVisibilityDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/visibility`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateOutputVisibilityDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateVisibilityMutationKey = () =>
+  ['outputsControllerUpdateVisibility'] as const;
+
+export const getOutputsControllerUpdateVisibilityMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+    TError,
+    OutputsControllerUpdateVisibilityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+  TError,
+  OutputsControllerUpdateVisibilityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerUpdateVisibilityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+    OutputsControllerUpdateVisibilityMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerUpdateVisibility(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateVisibilityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>
+>;
+export type OutputsControllerUpdateVisibilityMutationBody =
+  UpdateOutputVisibilityDto;
+export type OutputsControllerUpdateVisibilityMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerUpdateVisibilityMutationVariables = {
+  outputId: string;
+  data: UpdateOutputVisibilityDto;
+};
+
+/**
+ * @summary Changes who may see a shared work
+ */
+export const useOutputsControllerUpdateVisibility = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+      TError,
+      OutputsControllerUpdateVisibilityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateVisibility>>,
+  TError,
+  OutputsControllerUpdateVisibilityMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateVisibilityMutationOptions(options),
     queryClient,
   );
 };

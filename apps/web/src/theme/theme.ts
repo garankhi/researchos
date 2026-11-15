@@ -46,6 +46,7 @@ const config = defineConfig({
           solid: { value: '#006DD9' },
           solidHover: { value: '#003971' },
         },
+        researchAccessAccent: { value: '#006DD9' },
       },
       shadows: {
         overlayPanel: {
@@ -65,6 +66,35 @@ const config = defineConfig({
             _hover: highlightedRow,
             _focusVisible: highlightedRow,
             _highlighted: highlightedRow,
+          },
+        },
+      },
+      researchAccess: {
+        value: {
+          borderRadius: '9999px',
+          fontFamily: 'body',
+          fontSize: 'sm',
+          fontWeight: 'normal',
+          px: '3.5',
+          bg: 'white',
+          borderColor: 'researchAccessAccent',
+          color: 'researchAccessAccent',
+          textDecoration: 'none',
+          _hover: { bg: 'researchAccessAccent', color: 'white' },
+        },
+      },
+      researchTextLink: {
+        value: {
+          color: { base: '#000', _dark: 'fg' },
+          _hover: {
+            textDecoration: 'underline',
+            textDecorationColor: 'currentColor',
+            textUnderlineOffset: '3px',
+          },
+          _focusVisible: {
+            textDecoration: 'underline',
+            textDecorationColor: 'currentColor',
+            textUnderlineOffset: '3px',
           },
         },
       },

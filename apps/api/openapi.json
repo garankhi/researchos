@@ -4473,6 +4473,78 @@
         ]
       }
     },
+    "/outputs/home-feed": {
+      "get": {
+        "description": "Returns the shared releases visible to the caller, newest shared first, with a cursor for loading more.",
+        "operationId": "OutputsController_findHomeFeed",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "The previous response’s meta.nextCursor. Omit for the first batch.",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A batch of shared releases with Home feed metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeFeedResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor or limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List shared research for Home",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/outputs/{outputId}": {
       "get": {
         "description": "Returns metadata of the specified research output including its pinned release revision, author list, and linked research topics. Returns 404 if missing, or 403 if unauthorized.",
@@ -4992,6 +5064,105 @@
           }
         ],
         "summary": "Archives a published work",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/visibility": {
+      "patch": {
+        "description": "Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.",
+        "operationId": "OutputsController_updateVisibility",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOutputVisibilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The work with its updated visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId, an unsupported visibility, or a group the caller is not a member of.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active researcher, or is neither the owner nor the lead of the affiliated group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The work is not published, so its visibility cannot change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Changes who may see a shared work",
         "tags": [
           "outputs"
         ]
@@ -8615,6 +8786,24 @@
           "fieldName"
         ]
       },
+      "DownloadablePdfDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier used by the output file download endpoint.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original filename for the downloadable PDF."
+          }
+        },
+        "required": [
+          "id",
+          "fileName"
+        ]
+      },
       "OutputResponseDto": {
         "type": "object",
         "properties": {
@@ -8659,7 +8848,7 @@
           },
           "accessGroupId": {
             "type": "object",
-            "description": "Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.",
+            "description": "Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.",
             "format": "uuid",
             "nullable": true,
             "example": null
@@ -8711,6 +8900,18 @@
             "items": {
               "$ref": "#/components/schemas/OutputTopicResponseDto"
             }
+          },
+          "downloadablePdf": {
+            "description": "A PDF on the current Home feed release that the caller may download.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DownloadablePdfDto"
+              }
+            ]
+          },
+          "hasRestrictedPdf": {
+            "type": "boolean",
+            "description": "On the detail view, whether the current release has a private PDF unavailable to the caller."
           }
         },
         "required": [
@@ -8743,6 +8944,46 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "HomeFeedMetaDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total shared releases visible to the caller at the time of this request."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Cursor for the next batch. Absent when no older eligible works remain."
+          }
+        },
+        "required": [
+          "total"
+        ]
+      },
+      "HomeFeedResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Visible shared research outputs in this batch, newest shared first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The current total and continuation for the Home feed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HomeFeedMetaDto"
               }
             ]
           }
@@ -8862,8 +9103,32 @@
           },
           "accessGroupId": {
             "type": "string",
-            "description": "The research group that gains access. Required when visibility is RESEARCH_GROUP and rejected otherwise. The group must be one the caller is a member of.",
+            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and must be a group the caller is a member of.",
             "format": "uuid",
+            "example": "55555555-5555-4555-8555-555555555555"
+          }
+        },
+        "required": [
+          "visibility"
+        ]
+      },
+      "UpdateOutputVisibilityDto": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Who may see the work. FPTU_COMMUNITY opens it to the whole FPTU community even when the work carries a group affiliation; RESEARCH_GROUP restricts it to the members of the access group.",
+            "enum": [
+              "FPTU_COMMUNITY",
+              "RESEARCH_GROUP"
+            ],
+            "example": "FPTU_COMMUNITY"
+          },
+          "accessGroupId": {
+            "type": "object",
+            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and rejected when visibility is PRIVATE. Send null to clear the affiliation; omit it to keep the stored one. The group must be one the caller is a member of.",
+            "format": "uuid",
+            "nullable": true,
             "example": "55555555-5555-4555-8555-555555555555"
           }
         },
@@ -10611,6 +10876,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/PaginatedOutputsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "HomeFeedResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/HomeFeedResponseDto"
           },
           "message": {
             "type": "string",
