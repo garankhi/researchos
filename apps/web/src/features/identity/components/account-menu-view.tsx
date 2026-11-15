@@ -73,7 +73,7 @@ export function AccountMenuView({
           minW="11"
           p="0"
           aria-label={label}
-          onPointerEnter={(event) => {
+          onPointerMove={(event) => {
             cancelHoverClose();
             if (event.pointerType === 'mouse') {
               setOpenMode((mode) => mode ?? 'hover');

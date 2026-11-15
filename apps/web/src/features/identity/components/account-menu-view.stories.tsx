@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, waitFor, within } from 'storybook/test';
 import { AccountMenuView } from './account-menu-view';
 
 const meta = {
@@ -51,8 +51,6 @@ function menuItem(container: HTMLElement, name: string) {
 
 export const KeyboardNavigation: Story = {
   globals: { colorMode: 'light' },
-  // Keep the trigger away from the pointer position used by the hover story.
-  parameters: { layout: 'centered' },
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     const body = within(canvasElement.ownerDocument.body);
     const trigger = canvas.getByRole('button', {
@@ -76,6 +74,10 @@ export const KeyboardNavigation: Story = {
       expect(indicator.backgroundColor).toBe('rgb(115, 115, 115)');
     }
 
+    // A trigger rendered under a stationary mouse receives pointerover
+    // without a pointermove. It should stay closed for keyboard users.
+    await fireEvent.pointerOver(trigger, { pointerType: 'mouse' });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
