@@ -1,6 +1,14 @@
 'use client';
 
-import { Box, Button, Container, Flex, Stack, Tabs, Text } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  Container,
+  Flex,
+  Stack,
+  Tabs,
+  Text,
+} from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
@@ -54,7 +62,10 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
   if (isFailed) {
     return (
       <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <ErrorState title={t('detail.loadError')} onRetry={() => void refetch()} />
+        <ErrorState
+          title={t('detail.loadError')}
+          onRetry={() => void refetch()}
+        />
       </Container>
     );
   }
@@ -140,7 +151,9 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                   borderRadius="md"
                   p={{ base: '4', md: '5' }}
                 >
-                  <OutputAbstract abstract={output.revision?.abstract ?? null} />
+                  <OutputAbstract
+                    abstract={output.revision?.abstract ?? null}
+                  />
                 </Box>
                 <Box
                   bg="bg.panel"
@@ -152,6 +165,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                     <Text fontWeight="semibold">{t('detail.filesTitle')}</Text>
                     <OutputFiles
                       files={files}
+                      hasRestrictedPdf={output.hasRestrictedPdf}
                       isLoading={filesQuery.isLoading}
                       isFailed={filesQuery.isFailed}
                       onRetry={() => void filesQuery.refetch()}

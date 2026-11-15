@@ -4397,6 +4397,18 @@
             }
           },
           {
+            "name": "feed",
+            "required": false,
+            "in": "query",
+            "description": "The Home feed includes only shared releases and the PDF the caller can download, if available. It defaults to newest shared first.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "home"
+              ]
+            }
+          },
+          {
             "name": "userId",
             "required": false,
             "in": "query",
@@ -8714,6 +8726,24 @@
           "fieldName"
         ]
       },
+      "DownloadablePdfDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier used by the output file download endpoint.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original filename for the downloadable PDF."
+          }
+        },
+        "required": [
+          "id",
+          "fileName"
+        ]
+      },
       "OutputResponseDto": {
         "type": "object",
         "properties": {
@@ -8810,6 +8840,18 @@
             "items": {
               "$ref": "#/components/schemas/OutputTopicResponseDto"
             }
+          },
+          "downloadablePdf": {
+            "description": "A PDF on the current Home feed release that the caller may download.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DownloadablePdfDto"
+              }
+            ]
+          },
+          "hasRestrictedPdf": {
+            "type": "boolean",
+            "description": "On the detail view, whether the current release has a private PDF unavailable to the caller."
           }
         },
         "required": [

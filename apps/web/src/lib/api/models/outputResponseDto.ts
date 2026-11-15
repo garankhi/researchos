@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { DownloadablePdfDto } from './downloadablePdfDto';
 import type { OutputAuthorResponseDto } from './outputAuthorResponseDto';
 import type { OutputResponseDtoAccessGroupId } from './outputResponseDtoAccessGroupId';
 import type { OutputResponseDtoCurrentReleaseId } from './outputResponseDtoCurrentReleaseId';
@@ -60,4 +61,8 @@ export interface OutputResponseDto {
   authors: OutputAuthorResponseDto[];
   /** Hierarchical research taxonomy topics linked to this research output. */
   topics: OutputTopicResponseDto[];
+  /** A PDF on the current Home feed release that the caller may download. */
+  downloadablePdf?: DownloadablePdfDto;
+  /** On the detail view, whether the current release has a private PDF unavailable to the caller. */
+  hasRestrictedPdf?: boolean;
 }

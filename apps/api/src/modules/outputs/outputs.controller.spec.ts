@@ -94,6 +94,9 @@ describe('OutputsController & OutputsService', () => {
 
   const createTxMock = () => ({
     $queryRaw: vi.fn(),
+    research_outputs: { findMany: vi.fn() },
+    output_revisions: { findMany: vi.fn() },
+    output_topics: { findMany: vi.fn() },
   });
 
   const createPrismaMock = (tx = createTxMock()) => ({
@@ -102,15 +105,15 @@ describe('OutputsController & OutputsService', () => {
     $queryRaw: vi.fn(),
     research_outputs: {
       findUnique: vi.fn(),
-      findMany: vi.fn(),
+      findMany: tx.research_outputs.findMany,
     },
     output_revisions: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
-      findMany: vi.fn(),
+      findMany: tx.output_revisions.findMany,
     },
     output_topics: {
-      findMany: vi.fn(),
+      findMany: tx.output_topics.findMany,
     },
     output_authors: {
       findMany: vi.fn(),
@@ -153,6 +156,7 @@ describe('OutputsController & OutputsService', () => {
       const result = await controller.findAll(callerId, { page: 1, limit: 10 });
 
       expect(result.items).toHaveLength(1);
+      expect(result.items[0].downloadablePdf).toBeUndefined();
       expect(result.items[0]).toEqual(
         expect.objectContaining({
           id: outputId,
@@ -188,6 +192,47 @@ describe('OutputsController & OutputsService', () => {
         hasNextPage: false,
         hasPreviousPage: false,
       });
+    });
+
+    it('filters shared releases before paginating Home and fetches only authorized release PDFs', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 2n }])
+        .mockResolvedValueOnce([{ id: outputId }])
+        .mockResolvedValueOnce([
+          { output_id: outputId, id: fileId, file_name: 'paper.pdf' },
+        ]);
+      prismaMock.tx.research_outputs.findMany.mockResolvedValue([
+        mockSharedOutput,
+      ]);
+      prismaMock.tx.output_revisions.findMany.mockResolvedValue([
+        mockPinnedRevision,
+      ]);
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.findAll(callerId, {
+        feed: 'home',
+        page: 1,
+        limit: 1,
+      });
+
+      const [[count], [page], [pdf]] = prismaMock.tx.$queryRaw.mock.calls;
+      for (const query of [count, page]) {
+        expect(query.sql).toContain('can_view_output');
+        expect(query.sql).toContain("o.sharing_status = 'SHARED'");
+        expect(query.sql).toContain('release.released_at IS NOT NULL');
+      }
+      expect(page.sql).toContain(
+        'ORDER BY o.first_shared_at DESC NULLS LAST, o.created_at DESC, o.id DESC',
+      );
+      expect(pdf.join('')).toContain('rf.revision_id = o.current_release_id');
+      expect(pdf.join('')).toContain('can_view_output_file');
+      expect(result.items[0].downloadablePdf).toEqual({
+        id: fileId,
+        fileName: 'paper.pdf',
+      });
+      expect(result.meta).toMatchObject({ total: 2, hasNextPage: true });
     });
 
     it('returns empty list and meta when no outputs match', async () => {

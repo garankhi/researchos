@@ -41,10 +41,33 @@
     "current": "Ngôn ngữ hiện tại"
   },
   "home": {
-    "title": "ResearchOS",
+    "title": "Công trình được chia sẻ",
     "apiStatus": "Trạng thái API",
     "apiResponse": "API trả về: {status} ({service})",
-    "loadingStatus": "Đang tải trạng thái API…"
+    "loadingStatus": "Đang tải trạng thái API…",
+    "feed": {
+      "article": "Bài báo",
+      "preprint": "Bản tiền ấn phẩm",
+      "dataset": "Bộ dữ liệu",
+      "readCount": "{count, number} lượt đọc",
+      "citationCount": "{count, number} lượt trích dẫn",
+      "moreFigures": "Xem thêm {count} hình minh họa",
+      "figure": "Mở hình {number}",
+      "figureSource": "Hình từ bài báo gốc (CC BY 4.0)",
+      "example": "Thẻ mẫu",
+      "viewPublication": "Xem nguồn",
+      "download": "Tải PDF",
+      "share": "Chia sẻ",
+      "linkCopied": "Đã sao chép liên kết công trình.",
+      "copyError": "Không sao chép được liên kết công trình.",
+      "loadError": "Không tải được danh sách công trình",
+      "loadMoreError": "Không tải thêm được công trình",
+      "loadingMore": "Đang tải thêm công trình…",
+      "loadMore": "Tải thêm",
+      "empty": "Chưa có công trình được chia sẻ.",
+      "signInPrompt": "Đăng nhập để xem các công trình được chia sẻ.",
+      "signIn": "Đăng nhập"
+    }
   },
   "identity": {
     "title": "Đăng nhập",
@@ -219,6 +242,8 @@
       "filesLoadError": "Không tải được tệp. Vui lòng thử lại.",
       "retryAction": "Thử lại",
       "noFilesMessage": "Công trình này chưa có tệp đính kèm.",
+      "requestFile": "Yêu cầu file",
+      "requestFileUnavailable": "PDF này được chia sẻ riêng tư. Tính năng yêu cầu file chưa khả dụng.",
       "downloadStarted": "Đã bắt đầu tải xuống.",
       "downloadError": "Không thể tải tệp. Vui lòng thử lại.",
       "downloadFile": "Tải xuống",

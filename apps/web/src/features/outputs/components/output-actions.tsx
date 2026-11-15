@@ -32,16 +32,19 @@ function downloadBlob(blob: Blob, fileName: string) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Give the browser time to open the blob before releasing its URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 export function OutputFiles({
   files,
+  hasRestrictedPdf,
   isLoading,
   isFailed,
   onRetry,
 }: {
   files?: OutputFile[];
+  hasRestrictedPdf?: boolean;
   isLoading: boolean;
   isFailed: boolean;
   onRetry: () => void;
@@ -66,14 +69,19 @@ export function OutputFiles({
         <Text textStyle="sm" color="fg.error">
           {t('detail.filesLoadError')}
         </Text>
-        <Button variant="outline" size="sm" alignSelf="flex-start" onClick={onRetry}>
+        <Button
+          variant="outline"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={onRetry}
+        >
           {t('detail.retryAction')}
         </Button>
       </Flex>
     );
   }
 
-  if (!files || files.length === 0) {
+  if (!files?.length && !hasRestrictedPdf) {
     return (
       <Text textStyle="sm" color="fg.muted">
         {t('detail.noFilesMessage')}
@@ -87,10 +95,17 @@ export function OutputFiles({
     try {
       const blob = await outputDownloadControllerDownloadFile(file.id);
       downloadBlob(blob, file.fileName);
-      showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
+      showSnackbar({
+        severity: 'success',
+        message: t('detail.downloadStarted'),
+      });
     } catch (error) {
       setDownloadError(
-        resolveErrorCode(tError, apiErrorCode(error), t('detail.downloadError')),
+        resolveErrorCode(
+          tError,
+          apiErrorCode(error),
+          t('detail.downloadError'),
+        ),
       );
     } finally {
       setDownloadingId(null);
@@ -99,7 +114,7 @@ export function OutputFiles({
 
   return (
     <Flex direction="column" gap="2">
-      {files.map((file) => (
+      {files?.map((file) => (
         <Flex
           key={file.id}
           direction={{ base: 'column', sm: 'row' }}
@@ -131,6 +146,16 @@ export function OutputFiles({
           </Button>
         </Flex>
       ))}
+      {hasRestrictedPdf && (
+        <Flex direction="column" gap="2" align="start">
+          <Text textStyle="sm" color="fg.muted">
+            {t('detail.requestFileUnavailable')}
+          </Text>
+          <Button size="sm" variant="outline" disabled>
+            {t('detail.requestFile')}
+          </Button>
+        </Flex>
+      )}
       {downloadError ? (
         <Text textStyle="sm" color="fg.error" role="alert">
           {downloadError}
@@ -142,8 +167,10 @@ export function OutputFiles({
 
 export function OutputDownloadPrimaryButton({
   file,
+  label,
 }: {
-  file?: OutputFile;
+  file?: Pick<OutputFile, 'id' | 'fileName'>;
+  label?: string;
 }) {
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
@@ -153,16 +180,23 @@ export function OutputDownloadPrimaryButton({
 
   if (!file) return null;
 
-  async function handleDownload() {
+  async function handleDownload(selectedFile: Pick<OutputFile, 'id' | 'fileName'>) {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const blob = await outputDownloadControllerDownloadFile(file.id);
-      downloadBlob(blob, file.fileName);
-      showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
+      const blob = await outputDownloadControllerDownloadFile(selectedFile.id);
+      downloadBlob(blob, selectedFile.fileName);
+      showSnackbar({
+        severity: 'success',
+        message: t('detail.downloadStarted'),
+      });
     } catch (error) {
       setDownloadError(
-        resolveErrorCode(tError, apiErrorCode(error), t('detail.downloadError')),
+        resolveErrorCode(
+          tError,
+          apiErrorCode(error),
+          t('detail.downloadError'),
+        ),
       );
     } finally {
       setDownloading(false);
@@ -176,9 +210,9 @@ export function OutputDownloadPrimaryButton({
         size="sm"
         loading={downloading}
         loadingText={t('detail.downloading')}
-        onClick={() => void handleDownload()}
+        onClick={() => void handleDownload(file)}
       >
-        {t('detail.downloadPrimary')}
+        {label ?? t('detail.downloadPrimary')}
       </Button>
       {downloadError ? (
         <Text textStyle="xs" color="fg.error" role="alert">
@@ -233,10 +267,10 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
   );
   const isFollowing = Boolean(
     groupId &&
-      followsQuery.data?.items?.some(
-        (item) =>
-          item.entityType === GROUP_ENTITY_TYPE && item.entityId === groupId,
-      ),
+    followsQuery.data?.items?.some(
+      (item) =>
+        item.entityType === GROUP_ENTITY_TYPE && item.entityId === groupId,
+    ),
   );
 
   const createFollow = useFollowControllerCreate();
@@ -244,18 +278,18 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
 
   if (!groupId) return null;
 
-  async function handleToggleFollow() {
+  async function handleToggleFollow(targetGroupId: string) {
     setActionError(null);
     try {
       if (isFollowing) {
         await removeFollow.mutateAsync({
           entityType: GROUP_ENTITY_TYPE,
-          entityId: groupId,
+          entityId: targetGroupId,
         });
         showSnackbar({ severity: 'success', message: t('detail.unfollowed') });
       } else {
         await createFollow.mutateAsync({
-          data: { entityType: GROUP_ENTITY_TYPE, entityId: groupId },
+          data: { entityType: GROUP_ENTITY_TYPE, entityId: targetGroupId },
         });
         showSnackbar({ severity: 'success', message: t('detail.followed') });
       }
@@ -276,7 +310,7 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
         size="sm"
         loading={followPending}
         loadingText={t('detail.followLoading')}
-        onClick={() => void handleToggleFollow()}
+        onClick={() => void handleToggleFollow(groupId)}
       >
         {isFollowing ? <Check /> : <Link2 />}
         {isFollowing ? t('detail.followingAction') : t('detail.followAction')}

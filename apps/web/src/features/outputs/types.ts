@@ -56,6 +56,7 @@ export interface OutputDetail {
   visibility: OutputResponseDto['visibility'];
   accessGroupId: string | null;
   firstSharedAt: string | null;
+  hasRestrictedPdf: boolean;
   revision: OutputRevisionSummary | null;
   authors: OutputAuthor[];
   topics: OutputTopic[];
@@ -100,6 +101,7 @@ export function mapOutputDetail(dto: OutputResponseDto): OutputDetail {
     visibility: dto.visibility,
     accessGroupId: asString(dto.accessGroupId),
     firstSharedAt: asString(dto.firstSharedAt),
+    hasRestrictedPdf: dto.hasRestrictedPdf === true,
     revision: rev
       ? {
           id: rev.id,
