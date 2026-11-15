@@ -1,8 +1,7 @@
-import { Stack } from '@chakra-ui/react';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useTranslations } from 'next-intl';
 import { expect, fn } from 'storybook/test';
-import { EmptyState, ErrorState, ListItemSkeleton } from './feedback';
+import { EmptyState, ErrorState } from './feedback';
 
 const meta = {
   title: 'Shared/Feedback',
@@ -11,21 +10,6 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<{ onRetry?: () => void }>;
-
-export const Loading: Story = {
-  render: () => (
-    <Stack gap="2" maxW={640}>
-      <ListItemSkeleton />
-      <ListItemSkeleton />
-      <ListItemSkeleton />
-    </Stack>
-  ),
-  play: async ({ canvas }) => {
-    const [firstRow] = canvas.getAllByTestId('list-item-skeleton');
-    const avatar = firstRow.querySelector('[data-testid="loading-skeleton"]');
-    await expect(avatar).toHaveStyle({ width: '40px', height: '40px' });
-  },
-};
 
 function EmptyExample() {
   const t = useTranslations('storybook.feedback');

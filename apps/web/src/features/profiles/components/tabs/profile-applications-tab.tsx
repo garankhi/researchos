@@ -16,13 +16,10 @@ import {
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useMyApplications } from '../../hooks/use-my-applications';
 import type { ApplicationResponseDto } from '../../types';
+import { ProfileTabSkeleton } from '../profile-skeletons';
 
 function getStatusPalette(status: string): 'yellow' | 'green' | 'red' | 'gray' {
   switch (status) {
@@ -83,11 +80,7 @@ export function ProfileApplicationsTab() {
   };
 
   if (isLoading) {
-    return (
-      <Stack gap="4" py="2">
-        <LoadingSkeleton variant="rectangular" height={100} count={3} />
-      </Stack>
-    );
+    return <ProfileTabSkeleton tab="applications" />;
   }
 
   if (isFailed) {
@@ -110,13 +103,7 @@ export function ProfileApplicationsTab() {
         const isWithdrawing = withdrawingId === app.id;
 
         return (
-          <Box
-            key={app.id}
-            bg="bg.panel"
-            borderWidth="1px"
-            borderRadius="lg"
-            p="5"
-          >
+          <Box key={app.id} bg="bg.panel" borderWidth="1px" p="5">
             <Flex
               direction={{ base: 'column', sm: 'row' }}
               gap="4"
@@ -177,7 +164,7 @@ export function ProfileApplicationsTab() {
                 ) : null}
 
                 {app.responseNote ? (
-                  <Box mt="3" p="3" bg="bg.subtle" borderRadius="md">
+                  <Box mt="3" p="3" bg="bg.subtle">
                     <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
                       {t('applicationsTab.responseNoteLabel')}
                     </Text>

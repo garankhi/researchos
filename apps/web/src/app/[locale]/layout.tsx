@@ -15,6 +15,9 @@ import { AppHeader } from './_components/app-header';
 export const metadata: Metadata = {
   title: 'ResearchOS',
   description: 'Research networking and discovery platform',
+  icons: {
+    icon: { url: '/researchos-mark.svg', type: 'image/svg+xml', sizes: 'any' },
+  },
 };
 
 export default async function RootLayout({

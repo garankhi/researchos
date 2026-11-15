@@ -18,50 +18,242 @@ A spinner hides the layout; a skeleton reserves the space and prevents a
 layout shift when data arrives. Use skeletons whenever the thing being loaded
 *occupies an area* of the page.
 
-Shared primitives in `components/ui/feedback.tsx`: `LoadingSkeleton` (a
-block of content — `variant` is `text`, `rectangular` or `circular`),
-`ListItemSkeleton` (a row in a list) and `EmptyState` (loaded successfully,
-nothing to show — **not** an error).
-
-Match the skeleton's dimensions to the real content. A skeleton of a
-different size causes the layout to jump.
-
-```typescript
-import {
-  EmptyState,
-  ErrorState,
-  ListItemSkeleton,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
-
-// A single line of text.
-<LoadingSkeleton variant="text" width={220} />
-
-// A block that replaces a card.
-<LoadingSkeleton variant="rectangular" height={120} />
-
-// An avatar or icon.
-<LoadingSkeleton variant="circular" width={40} height={40} />
-
-// Several lines at once.
-<LoadingSkeleton count={4} />
-
-// A list row.
-<ListItemSkeleton />
-
-// Loaded, but nothing to show.
-<EmptyState
-  title="Chưa có hồ sơ"
-  message="Hồ sơ sẽ xuất hiện ở đây sau khi được duyệt."
-  action={<Button size="small" variant="outlined">Tạo hồ sơ</Button>}
-/>
-```
-
-`EmptyState` is not an error. A list that loaded with zero rows is a success
-state.
-
 The full-page spinner still has no place: a screen waiting for its first
 block of data shows a skeleton, not a spinner.
+
+## Skeletons that match the layout
+
+The app renders **Boneyard** skeletons (`boneyard-js`). A skeleton is not a
+generic grey rectangle — it is a set of bones positioned to match the real
+content, so the space is already reserved when the data arrives.
+
+### The primitive: `DelayedSkeleton`
+
+`src/components/ui/delayed-skeleton.tsx` is the shared primitive. It wraps
+Boneyard's `<Skeleton>` and adds the two behaviours the app needs:
+
+```tsx
+import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
+
+<DelayedSkeleton layout={headerLayout} />
+```
+
+| Prop | Default | Effect |
+| --- | --- | --- |
+| `layout` | required | A Boneyard `SkeletonResult` — the bones to draw |
+| `announce` | `true` | Renders a `VisuallyHidden role="status"` with `common.loading` |
+
+Two behaviours are built in:
+
+- **The space is reserved immediately.** The wrapper renders a box of the
+  layout's `width` and `height` on the first paint, and the bones are drawn
+  200 ms later (`SKELETON_DELAY_MS`). A fast response never flashes a
+  skeleton; a slow one still holds its space from the start.
+- **The bones are `aria-hidden`.** The visible skeleton carries no text; the
+  announcement is a separate live region.
+
+Use `DelayedSkeleton` for every block and route skeleton. There is no
+generic rectangle primitive — a skeleton is always an authored
+`SkeletonResult` that matches the content it replaces.
+
+### Authoring a `SkeletonResult`
+
+A `SkeletonResult` is a plain object. Author it in the module's **skeleton
+file**, next to the feature folder that owns the screen.
+
+```text
+apps/web/src/features/profiles/
+  components/
+    profile-skeletons.tsx   The layouts and the components that draw them
+```
+
+**One skeleton file per module.** The layouts and the components that draw
+them live together, so the whole screen's skeleton geometry and markup can
+be read — and corrected — in one place:
+
+```tsx
+// features/profiles/components/profile-skeletons.tsx
+import type { SkeletonResult } from 'boneyard-js';
+
+/** The avatar beside the header, on mobile. */
+const mobileAvatar: SkeletonResult = {
+  name: 'profile-avatar-mobile',
+  viewportWidth: 390,
+  width: 80,
+  height: 80,
+  bones: [[0, 0, 100, 80, 0]],
+};
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Unique identifier. Also the `data-boneyard` hook a Storybook test queries |
+| `viewportWidth` | The viewport the layout was authored for |
+| `width` / `height` | The box the skeleton reserves |
+| `bones` | Each bone is `[x, y, w, h, r]` — x and y are percentages of the box, w and h are percentages of the width and height, `r` is the corner radius |
+
+Bone coordinates are **percentages**, not pixels: `w: 100` means the full
+width of the box. The `r` value is a radius — use `0` for a square bone and
+`'50%'` for a circle.
+
+**The naming convention:** the file is `<module>-skeletons.tsx` and the
+layouts are named after the region they mirror — `mobileAvatar`,
+`sessionSummary`, `apiStatus`. A layout is module-private unless a route
+outside the module needs it; then it is exported and re-exported from the
+module's barrel.
+
+The **skeleton component** wraps the layout, so a consumer never touches
+`DelayedSkeleton` directly:
+
+```tsx
+// features/identity/components/identity-skeletons.tsx
+export function LoginFormSkeleton() {
+  return <DelayedSkeleton layout={loginForm} />;
+}
+```
+
+```tsx
+// app/[locale]/login/page.tsx
+import { LoginForm, LoginFormSkeleton } from '@/features/identity';
+
+<Suspense fallback={<LoginFormSkeleton />}>
+```
+
+### One layout per breakpoint
+
+A region that lays out differently on mobile and desktop needs **two**
+layouts, swapped with Chakra's `hideFrom` / `hideBelow`:
+
+```tsx
+<Box hideFrom="sm" w="20" flexShrink="0">
+  <DelayedSkeleton layout={mobileAvatar} announce={false} />
+</Box>
+<Box hideBelow="sm" w="25" flexShrink="0">
+  <DelayedSkeleton layout={desktopAvatar} announce={false} />
+</Box>
+```
+
+One layout sized for the wrong viewport reserves the wrong space, and the
+page jumps when the real content arrives.
+
+### Announcing the loading state
+
+`DelayedSkeleton` renders `role="status"` with the translated `common.loading`
+string by default. **One announcement per region** — every decorative bone
+inside that region passes `announce={false}`:
+
+```tsx
+// The header announces once; the avatar and the meta lines are decorative.
+<DelayedSkeleton layout={mobileHeaderDetails} announce />
+<DelayedSkeleton layout={mobileAvatar} announce={false} />
+```
+
+Several announcements firing at once make a screen reader read them all out
+before the content.
+
+The announcement string comes from the message catalog, so it is translated
+like any other string. See `researchos-localization`.
+
+### A skeleton belongs to the feature
+
+A skeleton that mirrors a domain layout is a **domain** concern, so it lives
+in the feature's `components/` folder next to the real component, and is
+exported from the feature barrel.
+
+```text
+features/profiles/components/
+  profile-skeletons.tsx   The layouts and the components that draw them
+```
+
+```tsx
+// features/profiles/components/profile-skeletons.tsx
+export function ProfileHeaderSkeleton({ announce = true }: { announce?: boolean }) { … }
+export function ProfileTabSkeleton({ tab, isOwner }: { tab: ProfileTab; isOwner?: boolean }) { … }
+```
+
+The layouts and the components that draw them live in **one file per
+module**. Splitting them into a separate `-skeleton-layouts.ts` doubles the
+files for no gain: the layouts are only meaningful next to the markup that
+draws them, and a reader looking at one screen's skeleton has to open both
+files to see it.
+
+`components/ui/` stays domain-free — `DelayedSkeleton` and the app shell's
+`RouteLoadingSkeleton` live there, the profile-shaped ones do not. The eslint
+rule `researchos/no-domain-entities-in-ui` enforces the boundary.
+
+### A route's skeleton belongs to the module that owns the screen
+
+A route that renders a domain screen imports its skeleton from that
+module's barrel, so the layout lives with the feature instead of being
+copied into the route:
+
+```tsx
+// app/[locale]/profile/my-profile/page.tsx
+import { ProfilePageSkeleton, ProfileShell } from '@/features/profiles';
+
+<Suspense fallback={<ProfilePageSkeleton />}>
+```
+
+A route that is not domain-specific — the app shell's `loading.tsx` — uses
+the shared `RouteLoadingSkeleton` from `components/ui/delayed-skeleton.tsx`.
+
+### As a Suspense fallback
+
+A route skeleton is the same primitive, wrapped in a `Suspense` fallback:
+
+```tsx
+export default function ProfilePage(props: ProfilePageProps) {
+  return (
+    <Suspense fallback={<ProfilePageSkeleton />}>
+      <ProfileContent {...props} />
+    </Suspense>
+  );
+}
+```
+
+The fallback is a **component**, not inline markup — the layout is defined
+once, in the feature, and the route just references it.
+
+## Initial fetch versus refetch
+
+A skeleton covers the **initial fetch** — the first load, when there is
+nothing to show yet. Once data has arrived, it stays on screen through a
+refetch; the request settles behind it.
+
+```tsx
+// Right — the skeleton only stands in for data that does not exist yet.
+{profile ? (
+  <ProfileHeader profile={profile} isOwner={isOwner} onEdit={onEdit} />
+) : (
+  <ProfileHeaderSkeleton announce={false} />
+)}
+```
+
+Blanking a screen the user is already reading looks like a crash. Branch on
+whether usable data exists, not on the request being in flight.
+
+The same rule applies to the outcome: the empty or error state appears as
+soon as the request settles. A skeleton must never mask it.
+
+```tsx
+if (isLoading) return <ProfileTabSkeleton tab={activeTab} isOwner={isOwner} />;
+if (isFailed) return <ErrorState … />;
+// data present, or empty → EmptyState
+```
+
+### Keep the chrome alive
+
+While the content loads, the surrounding chrome stays. The tab list, the
+navigation and the controls around a loading region remain usable — the
+skeleton replaces the *content*, not the page.
+
+```tsx
+// The tabs render above the skeleton; the user can switch tabs while one loads.
+<Tabs.Root value={activeTab} onValueChange={…}>
+  …
+  {renderContent()}
+</Tabs.Root>
+```
 
 ## Spinners for mutations
 
@@ -112,8 +304,8 @@ rather than hand-rolling an equivalent.
 
 | Component | Use for |
 | --- | --- |
-| `LoadingSkeleton` | A block of content that is loading |
-| `ListItemSkeleton` | A row in a list that is loading |
+| `DelayedSkeleton` | The primitive — draws one Boneyard layout. A module wraps it in its own skeleton component; see [Skeletons that match the layout](#skeletons-that-match-the-layout) |
+| `RouteLoadingSkeleton` | The app shell's route fallback, for a route that is not domain-specific |
 | `EmptyState` | Loaded successfully, nothing to show — **not** an error |
 | `ErrorState` | A failed request or a failed action; always offer a way forward |
 | `FieldError` | A validation message under one input |
@@ -122,6 +314,57 @@ rather than hand-rolling an equivalent.
 | `FormSelect` | A dropdown bound to react-hook-form — see `researchos-forms` |
 | `FormCheckbox` | A toggle bound to react-hook-form — see `researchos-forms` |
 | `FormSubmitButton` | The submit button, bound to the mutation's `isPending` — see `researchos-forms` |
+
+### Testing a skeleton in Storybook
+
+A skeleton's behaviour is not visible in a static snapshot: it reserves
+space, delays the bones and announces once. Give it a play function.
+
+```tsx
+play: async ({ canvas, canvasElement }) => {
+  // The announcement appears when the bones are drawn.
+  await canvas.findByRole('status');
+
+  await waitFor(() => {
+    expect(canvasElement.querySelectorAll('[data-boneyard-bone]')).toHaveLength(3);
+  });
+
+  // Exactly one announcement per region.
+  await expect(canvas.getAllByRole('status')).toHaveLength(1);
+});
+```
+
+`[data-boneyard="<name>"]` selects a specific skeleton by the `name` in its
+`SkeletonResult`. Assert the **geometry** between two bones — the gap
+between an avatar and the details beside it is what proves the layout
+matches:
+
+```tsx
+expect(details.getBoundingClientRect().left - avatar.getBoundingClientRect().right)
+  .toBeCloseTo(24, 0);
+```
+
+Test the fast path too: a response that settles inside the 200 ms delay must
+never announce a loading state. Watch the live region with a
+`MutationObserver` and assert that nothing was announced.
+
+Run `pnpm --filter web test:storybook` when a story or an interaction it
+covers changes.
+
+`EmptyState` is not an error. A list that loaded with zero rows is a success
+state.
+
+```typescript
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
+
+// Loaded, but nothing to show.
+<EmptyState
+  title="Chưa có hồ sơ"
+  message="Hồ sơ sẽ xuất hiện ở đây sau khi được duyệt."
+  action={<Button size="small" variant="outlined">Tạo hồ sơ</Button>}
+/>
+```
+
 
 ## Mutation feedback
 

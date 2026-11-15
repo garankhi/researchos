@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Button } from '@chakra-ui/react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -34,9 +34,9 @@ function LoadingExample({ fast = false }: { fast?: boolean }) {
       ) : (
         <Box>{t('emptyTitle')}</Box>
       )}
-      <button type="button" onClick={fast ? retry : () => setLoading(false)}>
+      <Button type="button" onClick={fast ? retry : () => setLoading(false)}>
         {fast ? common('retry') : t('finishLoading')}
-      </button>
+      </Button>
     </>
   );
 }
