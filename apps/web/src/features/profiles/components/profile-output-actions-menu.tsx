@@ -198,10 +198,7 @@ export function ProfileOutputActionsMenu({
                 >
                   {tCommon('cancel')}
                 </Button>
-                <Button
-                  onClick={() => void handleSave()}
-                  loading={isPending}
-                >
+                <Button onClick={() => void handleSave()} loading={isPending}>
                   {tCommon('save')}
                 </Button>
               </Dialog.Footer>

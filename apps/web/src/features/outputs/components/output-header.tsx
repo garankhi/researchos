@@ -1,7 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge, Box, Button, Flex, Heading, Link, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Link,
+  Separator,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
@@ -90,7 +100,13 @@ export function OutputHeader({
           >
             {hasGroupLabel ? (
               <Box minW="0">
-                <Link asChild fontWeight="semibold" textStyle="sm" truncate display="block">
+                <Link
+                  asChild
+                  fontWeight="semibold"
+                  textStyle="sm"
+                  truncate
+                  display="block"
+                >
                   <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
                 </Link>
               </Box>
@@ -121,8 +137,16 @@ export function OutputHeader({
 
       <Stack gap="2">
         {publishedDate ? (
-          <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
-            <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: '0', sm: '3' }}
+          >
+            <Text
+              textStyle="sm"
+              color="fg.muted"
+              w={{ sm: '24' }}
+              flexShrink={0}
+            >
               {t('detail.dateRowLabel')}
             </Text>
             <Text textStyle="sm" minW="0">
@@ -132,8 +156,16 @@ export function OutputHeader({
         ) : null}
 
         {groupId && hasGroupLabel ? (
-          <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
-            <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: '0', sm: '3' }}
+          >
+            <Text
+              textStyle="sm"
+              color="fg.muted"
+              w={{ sm: '24' }}
+              flexShrink={0}
+            >
               {t('detail.groupRowLabel')}
             </Text>
             <Box minW="0">
@@ -145,8 +177,16 @@ export function OutputHeader({
         ) : null}
 
         {doi ? (
-          <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
-            <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: '0', sm: '3' }}
+          >
+            <Text
+              textStyle="sm"
+              color="fg.muted"
+              w={{ sm: '24' }}
+              flexShrink={0}
+            >
               {t('detail.doiRowLabel')}
             </Text>
             <Link
@@ -166,8 +206,16 @@ export function OutputHeader({
         ) : null}
 
         {authors.length > 0 ? (
-          <Flex direction={{ base: 'column', sm: 'row' }} gap={{ base: '0', sm: '3' }}>
-            <Text textStyle="sm" color="fg.muted" w={{ sm: '24' }} flexShrink={0}>
+          <Flex
+            direction={{ base: 'column', sm: 'row' }}
+            gap={{ base: '0', sm: '3' }}
+          >
+            <Text
+              textStyle="sm"
+              color="fg.muted"
+              w={{ sm: '24' }}
+              flexShrink={0}
+            >
               {t('detail.authorsLabel')}
             </Text>
             <Box minW="0">

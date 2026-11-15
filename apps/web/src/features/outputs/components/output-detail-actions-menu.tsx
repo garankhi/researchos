@@ -31,11 +31,7 @@ type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
  * omits `accessGroupId`, so the backend keeps the stored group. A work with
  * no stored group cannot become group-only, so that option stays disabled.
  */
-export function OutputDetailActionsMenu({
-  output,
-}: {
-  output: OutputDetail;
-}) {
+export function OutputDetailActionsMenu({ output }: { output: OutputDetail }) {
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
   const tCommon = useTranslations('common');
@@ -131,9 +127,7 @@ export function OutputDetailActionsMenu({
                 alignItems="flex-start"
                 gap="1"
               >
-                <Dialog.Title>
-                  {t('detail.visibilityDialogTitle')}
-                </Dialog.Title>
+                <Dialog.Title>{t('detail.visibilityDialogTitle')}</Dialog.Title>
                 <Dialog.Description textStyle="sm" color="fg.muted">
                   {t('detail.visibilityDialogDesc')}
                 </Dialog.Description>
@@ -198,10 +192,7 @@ export function OutputDetailActionsMenu({
                 >
                   {tCommon('cancel')}
                 </Button>
-                <Button
-                  onClick={() => void handleSave()}
-                  loading={isPending}
-                >
+                <Button onClick={() => void handleSave()} loading={isPending}>
                   {tCommon('save')}
                 </Button>
               </Dialog.Footer>

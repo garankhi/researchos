@@ -549,9 +549,7 @@ describe('OutputsController mutations', () => {
         .mockResolvedValueOnce(mockSharedOutput)
         .mockResolvedValueOnce(mockLoadedOutput);
       prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
-      prismaMock.tx.research_outputs.update.mockResolvedValue(
-        mockLoadedOutput,
-      );
+      prismaMock.tx.research_outputs.update.mockResolvedValue(mockLoadedOutput);
       prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
         mockDraftRevision,
       );
@@ -580,9 +578,7 @@ describe('OutputsController mutations', () => {
         .mockResolvedValueOnce(mockSharedOutput)
         .mockResolvedValueOnce(mockLoadedOutput);
       prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
-      prismaMock.tx.research_outputs.update.mockResolvedValue(
-        mockLoadedOutput,
-      );
+      prismaMock.tx.research_outputs.update.mockResolvedValue(mockLoadedOutput);
       prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
         mockDraftRevision,
       );
