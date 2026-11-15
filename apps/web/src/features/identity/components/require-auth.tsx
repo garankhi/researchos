@@ -10,12 +10,26 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
+import type { SkeletonResult } from 'boneyard-js';
 import { LogIn } from 'lucide-react';
+import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 import NextLink from '@/components/ui/link';
-import { LoadingSkeleton } from '@/components/ui/feedback';
 import { usePathname } from '@/i18n/navigation';
 import { useSession } from '../hooks/use-session';
 import { buildLoginHref } from '../utils/return-to';
+
+const sessionCheckLayout: SkeletonResult = {
+  name: 'require-auth-session-check',
+  viewportWidth: 390,
+  width: 480,
+  height: 164,
+  bones: [
+    [46, 0, 8, 32, 0],
+    [25, 46, 50, 28, 0],
+    [8, 88, 84, 16, 0],
+    [33, 122, 34, 40, 0],
+  ],
+};
 
 /**
  * The front-end guard for a page that only a signed-in user may see.
@@ -52,7 +66,13 @@ import { buildLoginHref } from '../utils/return-to';
  * of a transient error would be wrong, and so would pretending they are
  * signed in. The guard shows the error and lets the reader retry.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({
+  children,
+  returnTo,
+}: {
+  children: ReactNode;
+  returnTo?: string;
+}) {
   const t = useTranslations('unauthorized');
   const tErrors = useTranslations('errors');
   const tCommon = useTranslations('common');
@@ -63,10 +83,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (isChecking) {
     return (
       <Container as="main" maxW="lg" py="8">
-        <Stack gap="4">
-          <LoadingSkeleton variant="rectangular" height={120} />
-          <LoadingSkeleton variant="text" count={3} />
-        </Stack>
+        <DelayedSkeleton layout={sessionCheckLayout} />
       </Container>
     );
   }
@@ -106,7 +123,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
           </Heading>
           <Text color="fg.muted">{t('description')}</Text>
           <Button asChild>
-            <NextLink href={buildLoginHref(pathname)}>{t('action')}</NextLink>
+            <NextLink href={buildLoginHref(returnTo ?? pathname)}>
+              {t('action')}
+            </NextLink>
           </Button>
         </Stack>
       </Container>

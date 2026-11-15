@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import {
   Button,
   Flex,
@@ -12,11 +12,9 @@ import {
 } from '@chakra-ui/react';
 import { Bell, ChevronDown, ListChecks, Mail } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { AddResearchDrawer } from '@/features/identity';
 import { usePathname } from '@/i18n/navigation';
 import { BrandLink } from './brand-link';
 import NextLink from './link';
-import SearchBar from './search-bar';
 
 const morePages = ['opportunities', 'groups'] as const;
 
@@ -26,15 +24,16 @@ const activityActions = [
   { label: 'requests', icon: ListChecks },
 ] as const;
 
-function PrimaryNavigation({
-  moreTrigger,
-  onAddResearch,
-}: {
-  moreTrigger: RefObject<HTMLButtonElement | null>;
-  onAddResearch: () => void;
-}) {
+type MoreMenuProps = {
+  moreAction: {
+    label: string;
+    onSelect: () => void;
+  };
+  moreTriggerRef: RefObject<HTMLButtonElement | null>;
+};
+
+function PrimaryNavigation({ moreAction, moreTriggerRef }: MoreMenuProps) {
   const t = useTranslations('nav');
-  const addResearch = useTranslations('addResearch');
   const pathname = usePathname();
 
   return (
@@ -95,7 +94,7 @@ function PrimaryNavigation({
       <Menu.Root positioning={{ placement: 'bottom-start' }}>
         <Menu.Trigger asChild>
           <Button
-            ref={moreTrigger}
+            ref={moreTriggerRef}
             type="button"
             variant="ghost"
             px="0"
@@ -117,11 +116,11 @@ function PrimaryNavigation({
                 </Menu.Item>
               ))}
               <Menu.Item
-                value="add-research"
+                value="header-action"
                 layerStyle="interactiveRow"
-                onSelect={onAddResearch}
+                onSelect={moreAction.onSelect}
               >
-                {addResearch('trigger')}
+                {moreAction.label}
               </Menu.Item>
             </Menu.Content>
           </Menu.Positioner>
@@ -131,7 +130,13 @@ function PrimaryNavigation({
   );
 }
 
-function HeaderActions({ children }: { children?: ReactNode }) {
+function HeaderActions({
+  mobileSearch,
+  children,
+}: {
+  mobileSearch: ReactNode;
+  children: ReactNode;
+}) {
   const t = useTranslations('nav');
 
   return (
@@ -143,7 +148,7 @@ function HeaderActions({ children }: { children?: ReactNode }) {
       align="center"
       justify="end"
     >
-      <SearchBar mode="popover" />
+      {mobileSearch}
       {activityActions.map(({ label, icon: Icon }) => {
         const actionLabel = t(label);
 
@@ -167,10 +172,17 @@ function HeaderActions({ children }: { children?: ReactNode }) {
   );
 }
 
-export default function Header({ accountSlot }: { accountSlot?: ReactNode }) {
-  const [addResearchOpen, setAddResearchOpen] = useState(false);
-  const moreTrigger = useRef<HTMLButtonElement>(null);
-
+export default function Header({
+  desktopSearch,
+  mobileSearch,
+  moreAction,
+  moreTriggerRef,
+  children,
+}: {
+  desktopSearch: ReactNode;
+  mobileSearch: ReactNode;
+  children: ReactNode;
+} & MoreMenuProps) {
   return (
     <Flex
       as="header"
@@ -223,24 +235,14 @@ export default function Header({ accountSlot }: { accountSlot?: ReactNode }) {
           <BrandLink />
         </Flex>
         <PrimaryNavigation
-          moreTrigger={moreTrigger}
-          onAddResearch={() => setAddResearchOpen(true)}
+          moreAction={moreAction}
+          moreTriggerRef={moreTriggerRef}
         />
       </Flex>
       <Flex gridArea="search" minW="0" hideBelow="lg">
-        <SearchBar mode="inline" />
+        {desktopSearch}
       </Flex>
-      <HeaderActions>
-        {accountSlot}
-        <AddResearchDrawer
-          inHeader
-          open={addResearchOpen}
-          onOpenChange={setAddResearchOpen}
-          finalFocusEl={() =>
-            moreTrigger.current?.offsetWidth ? moreTrigger.current : null
-          }
-        />
-      </HeaderActions>
+      <HeaderActions mobileSearch={mobileSearch}>{children}</HeaderActions>
     </Flex>
   );
 }

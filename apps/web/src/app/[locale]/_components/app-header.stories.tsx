@@ -2,16 +2,16 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock';
 import { expect, waitFor, within } from 'storybook/test';
 import { Button } from '@chakra-ui/react';
-import Header from './header';
+import { AppHeader } from './app-header';
 
 const meta = {
   title: 'Shared/Header',
-  component: Header,
+  component: AppHeader,
   parameters: {
     layout: 'fullscreen',
     nextjs: { navigation: { pathname: '/en' } },
   },
-} satisfies Meta<typeof Header>;
+} satisfies Meta<typeof AppHeader>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -33,9 +33,32 @@ export const Desktop: Story = {
     ).toBeVisible();
     await expect(getRouter().push).not.toHaveBeenCalled();
     await userEvent.clear(search);
-    await userEvent.type(search, 'quantum{Enter}');
+    await userEvent.type(search, 'quantum');
+    const options = within(
+      await canvas.findByRole('group', { name: 'Search for' }),
+    );
+    expect(
+      options.getAllByRole('button').map((option) => option.textContent),
+    ).toEqual(
+      ['Opportunities', 'People', 'Outputs', 'Groups'].map(
+        (category) => `quantum in ${category}`,
+      ),
+    );
+    await userEvent.keyboard('{Enter}');
     await expect(getRouter().push).toHaveBeenCalledWith(
-      '/en/search?q=quantum&tab=people',
+      '/en/search?q=quantum&tab=opportunity',
+    );
+    await userEvent.type(search, ' optics');
+    const people = await canvas.findByRole('button', {
+      name: 'quantum optics in People',
+    });
+    await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
+    await expect(people).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await expect(getRouter().push).toHaveBeenLastCalledWith(
+      '/en/search?q=quantum+optics&tab=people',
     );
     await expect(navigation.getAllByRole('link')).toHaveLength(1);
     for (const name of ['Opportunities', 'Groups']) {
@@ -106,12 +129,21 @@ export const Mobile: Story = {
     const searchPanel = within(
       await body.findByRole('dialog', { name: 'Tìm kiếm' }),
     );
-    await waitFor(() =>
-      expect(
-        searchPanel.getByRole('searchbox', { name: 'Tìm kiếm' }),
-      ).toBeVisible(),
+    const searchInput = searchPanel.getByRole('searchbox', {
+      name: 'Tìm kiếm',
+    });
+    await userEvent.type(searchInput, 'quang học');
+    await userEvent.click(
+      await searchPanel.findByRole('button', {
+        name: 'quang học trong mục Nhóm',
+      }),
     );
-    await userEvent.keyboard('{Escape}');
+    await expect(getRouter().push).toHaveBeenCalledWith(
+      '/vi/search?q=quang+h%E1%BB%8Dc&tab=group',
+    );
+    await waitFor(() =>
+      expect(body.queryByRole('dialog', { name: 'Tìm kiếm' })).toBeNull(),
+    );
 
     await userEvent.click(more);
     const menu = within(await body.findByRole('menu', { name: 'Thêm' }));

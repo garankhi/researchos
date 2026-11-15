@@ -5,12 +5,12 @@ import { AppThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import { DisplaySettings } from '@/components/ui/display-settings';
-import Header from '@/components/ui/header';
 import { AccountSlot } from '@/features/identity';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { fontVariableClasses } from '@/theme/fonts';
+import { AppHeader } from './_components/app-header';
 
 export const metadata: Metadata = {
   title: 'ResearchOS',
@@ -63,7 +63,7 @@ export default async function RootLayout({
                   {/* Both controls read the current path. Separate boundaries
                       let Next.js prerender the rest of the layout. */}
                   <Suspense fallback={null}>
-                    <Header accountSlot={<AccountSlot />} />
+                    <AppHeader accountSlot={<AccountSlot />} />
                   </Suspense>
                   {children}
                   <Suspense fallback={null}>

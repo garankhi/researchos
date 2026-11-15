@@ -5,24 +5,24 @@ import { Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { readSearchTab, SearchForm, searchHref } from '@/features/discovery';
 import { usePathname, useRouter } from '@/i18n/navigation';
+import { searchHref } from '../search-parameters';
+import { SearchForm } from './search-form';
 
-export default function SearchBar({ mode }: { mode: 'inline' | 'popover' }) {
+export function SearchBar({ mode }: { mode: 'inline' | 'popover' }) {
   const t = useTranslations('search');
   const label = t('label');
   const router = useRouter();
   const params = useSearchParams();
   const onSearchPage = usePathname() === '/search';
   const term = onSearchPage ? (params.get('q') ?? '') : '';
-  const tab = readSearchTab(onSearchPage ? params.get('tab') : null);
   const [open, setOpen] = useState(false);
 
   const form = (
     <SearchForm
       key={term}
       initialTerm={term}
-      onSearch={(nextTerm) => {
+      onSearch={(nextTerm, tab) => {
         setOpen(false);
         router.push(searchHref(nextTerm, tab));
       }}
@@ -49,7 +49,11 @@ export default function SearchBar({ mode }: { mode: 'inline' | 'popover' }) {
       </Popover.Trigger>
       <Portal>
         <Popover.Positioner hideFrom="lg">
-          <Popover.Content aria-label={label} width="min(90vw, 26rem)">
+          <Popover.Content
+            aria-label={label}
+            width="min(90vw, 26rem)"
+            boxShadow="overlayPanel"
+          >
             <Popover.Body>{form}</Popover.Body>
           </Popover.Content>
         </Popover.Positioner>

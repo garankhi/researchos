@@ -75,9 +75,19 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
               width="max-content"
               maxW="min(100%, 24rem)"
               pe="9"
+              css={{
+                '&[data-type=success]': {
+                  bg: 'green.subtle',
+                  color: 'green.fg',
+                },
+              }}
             >
               <Toast.Indicator />
-              <Toast.Description minW="0" overflowWrap="anywhere">
+              <Toast.Description
+                minW="0"
+                overflowWrap="anywhere"
+                opacity={toast.type === 'success' ? '1' : undefined}
+              >
                 {toast.description}
               </Toast.Description>
               {toast.action && (

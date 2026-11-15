@@ -5,8 +5,10 @@ import {
   PrismaService,
   SearchEntityType,
 } from '@researchos/database';
+import { maxLength, minLength } from 'class-validator';
 import {
   buildPaginationMeta,
+  DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
@@ -66,11 +68,7 @@ interface RawSearchCountRow {
  * Converts a PostgreSQL `bigint` count into a plain number for the wire.
  */
 function toCount(value: bigint | number | null | undefined): number {
-  if (value === null || value === undefined) {
-    return 0;
-  }
-
-  return typeof value === 'number' ? value : Number(value);
+  return Number(value ?? 0);
 }
 
 /**
@@ -79,6 +77,24 @@ function toCount(value: bigint | number | null | undefined): number {
  */
 export function escapeLikePattern(term: string): string {
   return term.replace(/[\\%_]/g, '\\$&');
+}
+
+function visibleSearchMatches(actorId: string, query: string): Prisma.Sql {
+  const term = typeof query === 'string' ? query.trim() : '';
+  if (
+    !minLength(term, MIN_SEARCH_QUERY_LENGTH) ||
+    !maxLength(term, MAX_SEARCH_QUERY_LENGTH) ||
+    term.includes('\0')
+  ) {
+    throw new BadRequestException('validation_failed');
+  }
+
+  const likePattern = `%${escapeLikePattern(term)}%`;
+  return Prisma.sql`
+    FROM visible_search_index(${actorId}::uuid) v,
+         websearch_to_tsquery('simple', ${term}) q
+    WHERE (v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\')
+  `;
 }
 
 /**
@@ -128,15 +144,7 @@ export class DiscoveryService {
     actorId: string,
     query: SearchCountsQueryDto,
   ): Promise<SearchCountsResponseDto> {
-    const term = typeof query.q === 'string' ? query.q.trim() : '';
-    if (
-      term.length < MIN_SEARCH_QUERY_LENGTH ||
-      term.length > MAX_SEARCH_QUERY_LENGTH
-    ) {
-      throw new BadRequestException('validation_failed');
-    }
-
-    const likePattern = `%${escapeLikePattern(term)}%`;
+    const matches = visibleSearchMatches(actorId, query.q);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
@@ -149,9 +157,7 @@ export class DiscoveryService {
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.RESEARCHER}::search_entity_type)::bigint AS people,
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.GROUP}::search_entity_type)::bigint AS group_count,
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.OPPORTUNITY}::search_entity_type)::bigint AS opportunity
-        FROM visible_search_index(${actorId}::uuid) v,
-             websearch_to_tsquery('simple', ${term}) q
-        WHERE v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\'
+        ${matches}
       `);
 
       const row = rows[0];
@@ -211,16 +217,16 @@ export class DiscoveryService {
     entityType: SearchEntityType,
     query: SearchQueryDto,
   ): Promise<PaginatedSearchResultsResponseDto> {
-    const term = typeof query.q === 'string' ? query.q.trim() : '';
-    if (
-      term.length < MIN_SEARCH_QUERY_LENGTH ||
-      term.length > MAX_SEARCH_QUERY_LENGTH
-    ) {
-      throw new BadRequestException('validation_failed');
-    }
+    const matches = Prisma.sql`
+      ${visibleSearchMatches(actorId, query.q)}
+      AND v.entity_type = ${entityType}::search_entity_type
+    `;
 
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit ?? 20));
+    const limit = Math.min(
+      MAX_PAGE_SIZE,
+      Math.max(1, query.limit ?? DEFAULT_PAGE_SIZE),
+    );
     const offset = (page - 1) * limit;
 
     const parsedSort = parseSortParam<SearchSortColumn>(
@@ -233,58 +239,56 @@ export class DiscoveryService {
     }
 
     const orderBySql = this.buildOrderByClause(parsedSort);
-    const likePattern = `%${escapeLikePattern(term)}%`;
+    // Use one snapshot for both the total and the page while the index changes.
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL statement_timeout = '${SEARCH_STATEMENT_TIMEOUT_MS}ms'`,
+        );
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `SET LOCAL statement_timeout = '${SEARCH_STATEMENT_TIMEOUT_MS}ms'`,
-      );
+        const countRows = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
+          SELECT COUNT(*)::bigint AS total
+          ${matches}
+        `);
 
-      const countRows = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS total
-        FROM visible_search_index(${actorId}::uuid) v,
-             websearch_to_tsquery('simple', ${term}) q
-        WHERE v.entity_type = ${entityType}::search_entity_type
-          AND (v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\')
-      `);
+        const total = toCount(countRows[0]?.total);
+        const pagination = { page, limit };
 
-      const total = Number(countRows[0]?.total ?? 0n);
-      if (total === 0) {
+        if (offset >= total) {
+          return {
+            items: [],
+            meta: buildPaginationMeta(pagination, 0, total),
+          };
+        }
+
+        const rows = await tx.$queryRaw<RawSearchIndexRow[]>(Prisma.sql`
+          SELECT
+            v.entity_type,
+            v.entity_id,
+            v.revision_id,
+            v.owner_id,
+            v.visibility,
+            v.access_group_id,
+            v.title,
+            v.body,
+            v.authors_text,
+            ts_rank(v.doc, q)::float8 AS rank,
+            v.updated_at
+          ${matches}
+          ORDER BY ${orderBySql}
+          LIMIT ${limit}
+          OFFSET ${offset}
+        `);
+
+        const items = rows.map((row) => this.mapRowToDto(row));
+
         return {
-          items: [],
-          meta: buildPaginationMeta({ page, limit }, 0, 0),
+          items,
+          meta: buildPaginationMeta(pagination, items.length, total),
         };
-      }
-
-      const rows = await tx.$queryRaw<RawSearchIndexRow[]>(Prisma.sql`
-        SELECT
-          v.entity_type,
-          v.entity_id,
-          v.revision_id,
-          v.owner_id,
-          v.visibility,
-          v.access_group_id,
-          v.title,
-          v.body,
-          v.authors_text,
-          ts_rank(v.doc, q)::float8 AS rank,
-          v.updated_at
-        FROM visible_search_index(${actorId}::uuid) v,
-             websearch_to_tsquery('simple', ${term}) q
-        WHERE v.entity_type = ${entityType}::search_entity_type
-          AND (v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\')
-        ORDER BY ${orderBySql}
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `);
-
-      const items = rows.map((row) => this.mapRowToDto(row));
-
-      return {
-        items,
-        meta: buildPaginationMeta({ page, limit }, items.length, total),
-      };
-    });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   private buildOrderByClause(

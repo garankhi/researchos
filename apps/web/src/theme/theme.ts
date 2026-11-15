@@ -29,6 +29,9 @@ const config = defineConfig({
   theme: {
     semanticTokens: {
       colors: {
+        home: {
+          background: { value: { base: '#f6f6f6', _dark: '{colors.bg}' } },
+        },
         interactiveRow: {
           highlight: { value: { base: '#e8e8e8', _dark: '#303034' } },
           indicator: { value: { base: '#737373', _dark: '#a1a1aa' } },
