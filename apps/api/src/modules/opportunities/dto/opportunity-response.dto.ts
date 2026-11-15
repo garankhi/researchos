@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   OpportunityKind,
   OpportunityStatus,
@@ -7,6 +7,11 @@ import {
 import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
 
 export class OpportunityResponseDto {
+  @ApiPropertyOptional({
+    description:
+      'Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes.',
+  })
+  canManage?: boolean;
   @ApiProperty({ description: 'Opportunity identifier.', format: 'uuid' })
   id: string;
   @ApiProperty({

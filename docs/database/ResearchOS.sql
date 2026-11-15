@@ -470,6 +470,7 @@ CREATE TABLE "group_members" (
   "user_id" uuid NOT NULL,
   "role" group_member_role NOT NULL DEFAULT 'MEMBER',
   "joined_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "archived_at" timestamptz,
   PRIMARY KEY ("group_id", "user_id")
 );
 
@@ -479,7 +480,8 @@ CREATE TABLE "group_directions" (
   "topic_id" uuid,
   "title" varchar(255) NOT NULL,
   "description" text,
-  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "archived_at" timestamptz
 );
 
 CREATE TABLE "research_outputs" (
@@ -1055,6 +1057,10 @@ COMMENT ON TABLE "research_groups" IS 'Every active researcher, including a gran
 
 COMMENT ON COLUMN "research_groups"."lead_id" IS 'Single authority for group leadership; LEAD is not duplicated in group_members.role.';
 
+COMMENT ON COLUMN "group_members"."archived_at" IS 'Removed memberships are retained; only unarchived rows grant access.';
+
+COMMENT ON COLUMN "group_directions"."archived_at" IS 'UI deletion archives the direction and preserves project references.';
+
 COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
 
 COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Duplicate DOI reuses existing work; backend checks visibility and offers authorship claim, never ownership. No DOI: warn on suspected duplicates, do not auto-merge.';
@@ -1406,7 +1412,8 @@ CREATE VIEW active_user_sessions AS
 CREATE FUNCTION is_group_member(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_groups g JOIN users u ON u.id=actor AND u.is_active
  WHERE g.id=target AND g.is_active AND g.archived_at IS NULL AND
- (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.user_id=actor)));
+ (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+   WHERE m.group_id=g.id AND m.user_id=actor AND m.archived_at IS NULL)));
 $$;
 CREATE FUNCTION can_manage_group(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_groups WHERE id=target AND lead_id=actor AND is_active AND archived_at IS NULL);
@@ -1481,11 +1488,20 @@ LANGUAGE sql STABLE AS $$
  AND can_view_candidate(actor,o.id);
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.creator_id=actor OR EXISTS (
-   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
-   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
-     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER')))));
+ SELECT is_researcher(actor) AND EXISTS (
+   SELECT 1 FROM research_opportunities o WHERE o.id=target AND CASE
+     WHEN o.project_id IS NOT NULL THEN EXISTS (
+       SELECT 1 FROM research_projects p WHERE p.id=o.project_id
+         AND p.lead_id=actor AND p.archived_at IS NULL
+         AND p.group_id IS NOT DISTINCT FROM o.group_id
+         AND (o.group_id IS NULL OR EXISTS (
+           SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL)))
+     WHEN o.group_id IS NOT NULL THEN EXISTS (
+       SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
+         AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+           WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER' AND m.archived_at IS NULL)))
+     ELSE o.creator_id=actor
+   END);
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -2343,5 +2359,9 @@ BEGIN
 END $$;
 CREATE TRIGGER guard_field_provenance_lock BEFORE INSERT OR UPDATE ON field_provenance
  FOR EACH ROW EXECUTE FUNCTION guard_field_provenance_lock();
+
+-- Archive filters used by group hub reads.
+CREATE INDEX group_members_active_user_idx ON group_members (user_id, group_id) WHERE archived_at IS NULL;
+CREATE INDEX group_directions_active_group_idx ON group_directions (group_id, created_at) WHERE archived_at IS NULL;
 
 COMMIT;

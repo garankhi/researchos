@@ -589,7 +589,7 @@ export const useGroupsControllerUpdate = <
   );
 };
 /**
- * The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.
+ * The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.
  * @summary List group members
  */
 export const groupMembersControllerFindAll = (
@@ -981,7 +981,7 @@ export const useGroupMembersControllerUpdate = <
   );
 };
 /**
- * @summary Remove a group member
+ * @summary Archive a group membership and revoke its group access
  */
 export const groupMembersControllerRemove = (
   groupId: string,
@@ -1051,7 +1051,7 @@ export type GroupMembersControllerRemoveMutationVariables = {
 };
 
 /**
- * @summary Remove a group member
+ * @summary Archive a group membership and revoke its group access
  */
 export const useGroupMembersControllerRemove = <
   TError = ApiErrorResponseDto,

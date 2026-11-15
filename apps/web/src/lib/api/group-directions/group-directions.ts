@@ -451,7 +451,7 @@ export const useGroupDirectionsControllerUpdate = <
   );
 };
 /**
- * @summary Delete an unused direction as the group lead
+ * @summary Archive a direction as the group lead, retaining the row and project references
  */
 export const groupDirectionsControllerRemove = (
   groupId: string,
@@ -525,7 +525,7 @@ export type GroupDirectionsControllerRemoveMutationVariables = {
 };
 
 /**
- * @summary Delete an unused direction as the group lead
+ * @summary Archive a direction as the group lead, retaining the row and project references
  */
 export const useGroupDirectionsControllerRemove = <
   TError = ApiErrorResponseDto,

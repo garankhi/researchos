@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpStatus,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpStatus } from '@nestjs/common';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
   OpportunityKind,
@@ -356,6 +352,21 @@ describe('OpportunitiesService', () => {
     });
   });
 
+  it('returns per-opportunity management permissions from the database policy', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id, can_manage: false }])
+      .mockResolvedValueOnce([{ total: 1n }]);
+    tx.research_opportunities.findMany.mockResolvedValue([row]);
+    const result = await service.findAll(
+      actor,
+      new ListOpportunitiesQueryDto(),
+    );
+    expect(result.items[0].canManage).toBe(false);
+    tx.research_opportunities.findUnique.mockResolvedValue(row);
+    tx.$queryRaw.mockResolvedValue([{ id, can_manage: true }]);
+    expect((await service.findOne(actor, id)).canManage).toBe(true);
+  });
+
   it('restores the SQL ordering of the paged ids', async () => {
     const second = { ...row, id: 'second-id', title: 'Second' };
     tx.$queryRaw
@@ -433,12 +444,12 @@ describe('OpportunitiesService', () => {
 
     await service.findAll(actor, query);
 
-    const sql = JSON.stringify(tx.$queryRaw.mock.calls[0][1]);
+    const sql = JSON.stringify(tx.$queryRaw.mock.calls[0][2]);
     // The creator filter narrows the result set; the visibility predicate
     // still decides which rows the caller may see at all.
     expect(sql).toContain('o.creator_id = ');
     expect(sql).toContain('can_manage_opportunity');
-    expect(tx.$queryRaw.mock.calls[0][1].values).toContain(
+    expect(tx.$queryRaw.mock.calls[0][2].values).toContain(
       '00000000-0000-4000-8000-000000000009',
     );
   });
@@ -451,7 +462,7 @@ describe('OpportunitiesService', () => {
 
     await service.findAll(actor, new ListOpportunitiesQueryDto());
 
-    expect(JSON.stringify(tx.$queryRaw.mock.calls[0][1])).not.toContain(
+    expect(JSON.stringify(tx.$queryRaw.mock.calls[0][2])).not.toContain(
       'o.creator_id',
     );
   });

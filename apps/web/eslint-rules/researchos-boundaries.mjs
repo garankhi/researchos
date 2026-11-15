@@ -266,6 +266,11 @@ const noCrossFeatureImports = {
       const targetFeature = segments[featuresIndex + 1];
       if (!targetFeature || targetFeature === ownFeature) return;
 
+      // Public barrels are the supported cross-feature interface. Keep deep
+      // imports blocked, including relative imports into another feature.
+      const entry = segments.slice(featuresIndex + 2).join('/');
+      if (!entry || /^index\.(?:ts|tsx|js|jsx)$/.test(entry)) return;
+
       context.report({
         node,
         messageId: 'crossFeature',

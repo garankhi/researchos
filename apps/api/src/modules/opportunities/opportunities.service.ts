@@ -131,7 +131,7 @@ export class OpportunitiesService {
       const [group] = await tx.$queryRaw<{ allowed: boolean }[]>`
         SELECT (g.lead_id = ${actorId}::uuid OR EXISTS (
           SELECT 1 FROM group_members m WHERE m.group_id = g.id
-          AND m.user_id = ${actorId}::uuid AND m.role = 'GROUP_LEADER'
+          AND m.user_id = ${actorId}::uuid AND m.role = 'GROUP_LEADER' AND m.archived_at IS NULL
         )) AS allowed FROM research_groups g
         WHERE g.id = ${dto.groupId}::uuid AND g.is_active AND g.archived_at IS NULL
       `;
@@ -401,8 +401,8 @@ export class OpportunitiesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        const ids = await tx.$queryRaw<{ id: string }[]>`
-        SELECT o.id FROM research_opportunities o WHERE ${conditions}
+        const ids = await tx.$queryRaw<{ id: string; can_manage: boolean }[]>`
+        SELECT o.id, ${this.management(actorId)} AS can_manage FROM research_opportunities o WHERE ${conditions}
         ORDER BY ${orderBySql} LIMIT ${limit} OFFSET ${(page - 1) * limit}
       `;
         const [count] = await tx.$queryRaw<
@@ -418,7 +418,12 @@ export class OpportunitiesService {
         const items = ids
           .map(({ id }) => byId.get(id))
           .filter((row): row is ResearchOpportunity => Boolean(row))
-          .map((row) => this.response(row));
+          .map((row) => {
+            const item = this.response(row);
+            item.canManage =
+              ids.find((entry) => entry.id === row.id)?.can_manage === true;
+            return item;
+          });
         return {
           items,
           meta: buildPaginationMeta({ page, limit }, items.length, total),
@@ -440,15 +445,19 @@ export class OpportunitiesService {
             domainErrorCodes.opportunities.notFound,
             HttpStatus.NOT_FOUND,
           );
-        const [visible] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT o.id FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
+        const [visible] = await tx.$queryRaw<
+          { id: string; can_manage: boolean }[]
+        >`
+        SELECT o.id, ${this.management(actorId)} AS can_manage FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
       `;
         if (!visible)
           throw new CodedHttpException(
             domainErrorCodes.opportunities.accessDenied,
             HttpStatus.FORBIDDEN,
           );
-        return this.response(row);
+        const item = this.response(row);
+        item.canManage = visible.can_manage === true;
+        return item;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

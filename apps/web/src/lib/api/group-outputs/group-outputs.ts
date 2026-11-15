@@ -53,7 +53,7 @@ const withQueryKey = <T extends object, K>(
 };
 
 /**
- * Returns the group links with their status, the revision each group shows, and the revision the pending request asks for.
+ * Active groups expose accepted links to signed-in readers. Only group managers see all link states and the pending review queue. Inactive or archived groups require membership or management access.
  * @summary List the research outputs linked to the group
  */
 export const groupOutputLinksControllerList = (

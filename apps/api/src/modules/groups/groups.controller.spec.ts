@@ -208,7 +208,11 @@ describe('GroupsController', () => {
                 OR: [
                   { is_active: true, archived_at: null },
                   { lead_id: memberId },
-                  { group_members: { some: { user_id: memberId } } },
+                  {
+                    group_members: {
+                      some: { user_id: memberId, archived_at: null },
+                    },
+                  },
                 ],
               },
             ],
@@ -236,10 +240,10 @@ describe('GroupsController', () => {
       // The member filter narrows the set; the visibility clause above still
       // decides which groups the caller may see at all.
       expect(where.AND).toContainEqual({
-        group_members: { some: { user_id: outsiderId } },
+        group_members: { some: { user_id: outsiderId, archived_at: null } },
       });
       expect(where.AND[0].OR).toContainEqual({
-        group_members: { some: { user_id: memberId } },
+        group_members: { some: { user_id: memberId, archived_at: null } },
       });
     });
 
@@ -267,6 +271,23 @@ describe('GroupsController', () => {
   });
 
   describe('findOne', () => {
+    it('does not treat an archived membership as access to an archived group', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_groups.findUnique.mockResolvedValue({
+        ...mockGroup,
+        is_active: false,
+        archived_at: new Date(),
+      });
+      prismaMock.group_members.findUnique.mockResolvedValue({
+        role: 'GROUP_LEADER',
+        archived_at: new Date(),
+      });
+      const controller = await setupController(prismaMock);
+      await expect(controller.findOne(groupId, memberId)).rejects.toMatchObject(
+        { status: HttpStatus.FORBIDDEN },
+      );
+    });
+
     it('returns a public active group to any authenticated caller', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);

@@ -34,6 +34,7 @@ const now = new Date('2026-11-12T00:00:00Z');
  */
 const policy = {
   group_exists: true,
+  is_active: true,
   is_researcher: true,
   can_manage_group: true,
   is_member: true,
@@ -194,11 +195,64 @@ describe('Group output links HTTP contract', () => {
     expect(response.body.meta).toMatchObject({ total: 1 });
   });
 
-  it('refuses the link list to an outsider and 404s a missing group', async () => {
-    mockPolicy({ is_member: false });
+  it('exposes only accepted links to outsiders of active groups', async () => {
+    mockPolicy({ is_member: false, can_manage_group: false });
+    tx.group_output_links.findMany.mockResolvedValue([acceptedLink]);
+    await request().get(base).set('Cookie', cookie).expect(200);
+    expect(tx.group_output_links.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { group_id: groupId, status: 'ACCEPTED' },
+      }),
+    );
+    expect(tx.group_output_links.count).toHaveBeenCalledWith({
+      where: { group_id: groupId, status: 'ACCEPTED' },
+    });
+  });
+
+  it('keeps the review queue private from ordinary members', async () => {
+    mockPolicy({ can_manage_group: false });
+    await request().get(base).set('Cookie', cookie).expect(200);
+    expect(tx.group_output_links.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { group_id: groupId, status: 'ACCEPTED' },
+      }),
+    );
+  });
+
+  it('refuses archived links to outsiders and 404s a missing group', async () => {
+    mockPolicy({ is_member: false, can_manage_group: false, is_active: false });
     await request().get(base).set('Cookie', cookie).expect(403);
     mockPolicy({ group_exists: false });
     await request().get(base).set('Cookie', cookie).expect(404);
+  });
+
+  it('allows archived members to read only accepted links', async () => {
+    mockPolicy({ is_active: false, can_manage_group: false });
+    await request().get(base).set('Cookie', cookie).expect(200);
+    expect(tx.group_output_links.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { group_id: groupId, status: 'ACCEPTED' },
+      }),
+    );
+  });
+
+  it('refuses pending-queue filtering for a readonly caller', async () => {
+    mockPolicy({ can_manage_group: false });
+    await request()
+      .get(`${base}?status=PENDING`)
+      .set('Cookie', cookie)
+      .expect(403);
+    expect(tx.group_output_links.findMany).not.toHaveBeenCalled();
+  });
+
+  it('filters a manager queue before pagination and counting', async () => {
+    await request()
+      .get(`${base}?status=PENDING`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(tx.group_output_links.count).toHaveBeenCalledWith({
+      where: { group_id: groupId, status: 'PENDING' },
+    });
   });
 
   it('requests a pending link for a member who does not own the work', async () => {

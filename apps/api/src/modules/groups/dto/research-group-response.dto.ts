@@ -1,9 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { GroupMemberRole } from '@researchos/database';
 
 /**
  * Representation of a research group.
  */
 export class ResearchGroupResponseDto {
+  @ApiPropertyOptional({
+    description:
+      'The current caller’s active membership role, if a member. Detail reads only.',
+    enum: GroupMemberRole,
+  })
+  callerMembershipRole?: GroupMemberRole;
   @ApiProperty({
     description: 'Unique identifier of the research group (UUID).',
     example: '7b0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e99',

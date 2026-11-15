@@ -87,6 +87,33 @@ function setup() {
 describe('Group membership policies', () => {
   const dto = { userId, role: GroupMemberRole.MEMBER };
 
+  it('restores an archived membership instead of creating or deleting a row', async () => {
+    const { service, tx } = setup();
+    tx.group_members.findUnique.mockResolvedValue(
+      memberRow({ archived_at: new Date() }),
+    );
+    await service.add(groupId, dto, leadId);
+    expect(tx.group_members.create).not.toHaveBeenCalled();
+    expect(tx.group_members.delete).not.toHaveBeenCalled();
+    expect(tx.group_members.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { archived_at: null, role: dto.role } }),
+    );
+  });
+
+  it('does not let an archived GROUP_LEADER membership grant management access', async () => {
+    const { service, tx } = setup();
+    tx.group_members.findUnique.mockResolvedValue(
+      memberRow({
+        role: GroupMemberRole.GROUP_LEADER,
+        archived_at: new Date(),
+      }),
+    );
+    await expect(
+      service.update(groupId, userId, dto, callerId),
+    ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
+    expect(tx.group_members.update).not.toHaveBeenCalled();
+  });
+
   it('allows the lead to add a member and returns the join timestamp', async () => {
     const { service, tx } = setup();
     await expect(service.add(groupId, dto, leadId)).resolves.toEqual({
@@ -204,7 +231,10 @@ describe('Group membership policies', () => {
       ),
     ).resolves.toMatchObject({ role: GroupMemberRole.GROUP_LEADER });
     expect(tx.group_members.update).toHaveBeenCalledWith({
-      where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+      where: {
+        group_id_user_id: { group_id: groupId, user_id: userId },
+        archived_at: null,
+      },
       data: { role: GroupMemberRole.GROUP_LEADER },
       include: { users: { include: { researcher_profiles: true } } },
     });
@@ -267,16 +297,21 @@ describe('Group membership policies', () => {
     const { service, tx, group } = setup();
     group.is_active = false;
     await service.remove(groupId, leadId, leadId);
-    expect(tx.group_members.delete).toHaveBeenCalled();
+    expect(tx.group_members.update).toHaveBeenCalled();
+    expect(tx.group_members.delete).not.toHaveBeenCalled();
   });
 
-  it('removes an ordinary membership', async () => {
+  it('archives an ordinary membership without deleting its row', async () => {
     const { service, tx } = setup();
     await expect(
       service.remove(groupId, userId, leadId),
     ).resolves.toBeUndefined();
-    expect(tx.group_members.delete).toHaveBeenCalledWith({
-      where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+    expect(tx.group_members.update).toHaveBeenCalledWith({
+      data: { archived_at: expect.any(Date) },
+      where: {
+        group_id_user_id: { group_id: groupId, user_id: userId },
+        archived_at: null,
+      },
     });
   });
 
@@ -393,7 +428,7 @@ describe('Group membership policies', () => {
       leadId,
     );
     expect(tx.group_members.findMany).toHaveBeenCalledWith({
-      where: { group_id: groupId },
+      where: { group_id: groupId, archived_at: null },
       skip: 5,
       take: 5,
       orderBy: [{ joined_at: 'desc' }, { user_id: 'asc' }],

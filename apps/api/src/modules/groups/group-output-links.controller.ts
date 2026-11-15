@@ -26,7 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
+import { ListGroupOutputLinksQueryDto } from './dto/list-group-output-links.query.dto.js';
 import {
   CreateGroupOutputLinkDto,
   DecideGroupOutputLinkDto,
@@ -75,7 +75,7 @@ export class GroupOutputLinksController {
   @ApiOperation({
     summary: 'List the research outputs linked to the group',
     description:
-      'Returns the group links with their status, the revision each group shows, and the revision the pending request asks for.',
+      'Active groups expose accepted links to signed-in readers. Only group managers see all link states and the pending review queue. Inactive or archived groups require membership or management access.',
   })
   @ApiOkResponse({
     description: 'Paginated group output links.',
@@ -83,7 +83,7 @@ export class GroupOutputLinksController {
   })
   list(
     @Param('groupId', ParseUUIDPipe) groupId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListGroupOutputLinksQueryDto,
     @CurrentUserId() callerId: string,
   ): Promise<GroupOutputLinkPageDto> {
     return this.links.list(groupId, query, callerId);

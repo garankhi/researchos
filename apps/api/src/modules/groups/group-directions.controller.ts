@@ -123,8 +123,14 @@ export class GroupDirectionsController {
     format: 'uuid',
     description: 'Direction belonging to this group.',
   })
-  @ApiOperation({ summary: 'Delete an unused direction as the group lead' })
-  @ApiNoContentResponse({ description: 'Direction deleted.' })
+  @ApiOperation({
+    summary:
+      'Archive a direction as the group lead, retaining the row and project references',
+  })
+  @ApiNoContentResponse({
+    description:
+      'Direction archived; permanently deleting records is not exposed by this route.',
+  })
   remove(
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Param('directionId', ParseUUIDPipe) directionId: string,
