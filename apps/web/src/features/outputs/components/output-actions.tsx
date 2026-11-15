@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Flex, Text } from '@chakra-ui/react';
+import { Button, Flex, Text, type ButtonProps } from '@chakra-ui/react';
 import { Check, Link2, Share2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -151,7 +151,12 @@ export function OutputFiles({
           <Text textStyle="sm" color="fg.muted">
             {t('detail.requestFileUnavailable')}
           </Text>
-          <Button size="sm" variant="outline" disabled>
+          <Button
+            size="xs"
+            variant="outline"
+            layerStyle="researchAccess"
+            disabled
+          >
             {t('detail.requestFile')}
           </Button>
         </Flex>
@@ -168,9 +173,11 @@ export function OutputFiles({
 export function OutputDownloadPrimaryButton({
   file,
   label,
+  buttonProps,
 }: {
   file?: Pick<OutputFile, 'id' | 'fileName'>;
   label?: string;
+  buttonProps?: Pick<ButtonProps, 'variant' | 'size' | 'layerStyle'>;
 }) {
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
@@ -180,7 +187,9 @@ export function OutputDownloadPrimaryButton({
 
   if (!file) return null;
 
-  async function handleDownload(selectedFile: Pick<OutputFile, 'id' | 'fileName'>) {
+  async function handleDownload(
+    selectedFile: Pick<OutputFile, 'id' | 'fileName'>,
+  ) {
     setDownloading(true);
     setDownloadError(null);
     try {
@@ -208,6 +217,7 @@ export function OutputDownloadPrimaryButton({
       <Button
         variant="solid"
         size="sm"
+        {...buttonProps}
         loading={downloading}
         loadingText={t('detail.downloading')}
         onClick={() => void handleDownload(file)}

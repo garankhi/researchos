@@ -216,11 +216,7 @@ describe('OutputsController & OutputsService', () => {
       prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
 
       const { controller } = await setupController(prismaMock);
-      const result = await controller.findAll(callerId, {
-        feed: 'home',
-        page: 1,
-        limit: 1,
-      });
+      const result = await controller.findHomeFeed(callerId, { limit: 1 });
 
       const [[count], [page], [pdf]] = prismaMock.tx.$queryRaw.mock.calls;
       for (const query of [count, page]) {
@@ -240,8 +236,10 @@ describe('OutputsController & OutputsService', () => {
         id: fileId,
         fileName: 'paper.pdf',
       });
-      expect(result.meta).toMatchObject({ total: 2, hasNextPage: true });
-      expect(result.nextCursor).toBe(`${sharedAt}~${outputId}`);
+      expect(result.meta).toEqual({
+        total: 2,
+        nextCursor: `${sharedAt}~${outputId}`,
+      });
     });
 
     it('continues Home after the cursor even when that work is archived', async () => {
@@ -261,9 +259,7 @@ describe('OutputsController & OutputsService', () => {
       prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
 
       const { controller } = await setupController(prismaMock);
-      const result = await controller.findAll(callerId, {
-        feed: 'home',
-        page: 2,
+      const result = await controller.findHomeFeed(callerId, {
         limit: 1,
         cursor: `${sharedAt}~${archivedOutputId}`,
       });
@@ -275,13 +271,8 @@ describe('OutputsController & OutputsService', () => {
       expect(page.values).toContain(sharedAt);
       expect(page.values).toContain(archivedOutputId);
       expect(result.items.map((item) => item.id)).toEqual([outputId]);
-      expect(result.nextCursor).toBeUndefined();
-      expect(result.meta).toMatchObject({
-        page: 2,
-        total: 1,
-        hasNextPage: false,
-        hasPreviousPage: true,
-      });
+      expect(result.meta).toEqual({ total: 1 });
+      expect(result.meta.nextCursor).toBeUndefined();
     });
 
     it('rejects a malformed Home cursor before querying the database', async () => {
@@ -289,9 +280,7 @@ describe('OutputsController & OutputsService', () => {
       const { controller } = await setupController(prismaMock);
 
       await expect(
-        controller.findAll(callerId, {
-          feed: 'home',
-          page: 2,
+        controller.findHomeFeed(callerId, {
           limit: 12,
           cursor: `2026-02-30T00:00:00.123456Z~${outputId}`,
         }),

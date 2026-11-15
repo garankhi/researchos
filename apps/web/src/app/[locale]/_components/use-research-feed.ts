@@ -2,13 +2,10 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { outputsControllerFindAll } from '@/lib/api';
+import { outputsControllerFindHomeFeed } from '@/lib/api';
 import { toResearchCard } from './research-feed-data';
 
 const pageSize = 12;
-
-type FeedPage = { page: number; cursor?: string };
-const firstPage: FeedPage = { page: 1 };
 
 export function useResearchFeed(userId: string) {
   const {
@@ -23,15 +20,14 @@ export function useResearchFeed(userId: string) {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['home-research-feed', userId],
-    initialPageParam: firstPage,
+    initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) =>
-      outputsControllerFindAll(
-        { feed: 'home', limit: pageSize, ...pageParam },
+      outputsControllerFindHomeFeed(
+        { limit: pageSize, cursor: pageParam },
         undefined,
         signal,
       ),
-    getNextPageParam: ({ meta, nextCursor }) =>
-      nextCursor ? { page: meta.page + 1, cursor: nextCursor } : undefined,
+    getNextPageParam: ({ meta }) => meta.nextCursor,
     staleTime: 60_000,
   });
 

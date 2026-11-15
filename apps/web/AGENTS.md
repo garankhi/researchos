@@ -11,6 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Chakra UI v3
 
 - Use the shared Chakra system in `src/theme/theme.ts`. Prefer semantic tokens and mobile-first responsive props.
+- Apply the [Home research card rules](../../.cursor/skills/researchos-ui/reference/chakra-and-responsive.md#home-research-card-actions) to Download, View publication, Request file, title links and text actions.
 - Compose localized navigation with Chakra `asChild` and `src/components/ui/link.tsx`. Use the localized router for redirects.
 - Keep account and language overlays keyboard accessible. Check portaled content in both themes, including the first load after changing the provider.
 - Use shared form controls, translated inline errors and `FormSubmitButton`. Use the snackbar for transient confirmations and failures outside a panel or field.

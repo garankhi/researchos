@@ -13,6 +13,7 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { HomeFeedQueryDto, HomeFeedResponseDto } from './dto/home-feed.dto.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputAuthorResponseDto } from './dto/output-author-response.dto.js';
 import { OutputFileResponseDto } from './dto/output-file-response.dto.js';
@@ -105,34 +106,18 @@ export class OutputsService {
   ): Promise<PaginatedOutputsResponseDto> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit ?? 20));
-    const isHomeFeed = query.feed === 'home';
-
     const parsedSort = parseSortParam<OutputSortColumn>(
       query.sort,
       OUTPUT_SORT_FIELDS,
-      isHomeFeed ? { first_shared_at: 'desc' } : { created_at: 'desc' },
+      { created_at: 'desc' },
     );
-    if (
-      !parsedSort ||
-      (isHomeFeed && parsedSort.first_shared_at !== 'desc') ||
-      (!isHomeFeed && query.cursor !== undefined)
-    ) {
+    if (!parsedSort) {
       throw new BadRequestException('validation_failed');
     }
 
     const conditions: Prisma.Sql[] = [
       Prisma.sql`can_view_output(${callerId}::uuid, o.id)`,
     ];
-
-    if (isHomeFeed) {
-      conditions.push(Prisma.sql`o.sharing_status = 'SHARED' AND EXISTS (
-        SELECT 1
-        FROM output_revisions release
-        WHERE release.id = o.current_release_id
-          AND release.output_id = o.id
-          AND release.released_at IS NOT NULL
-      )`);
-    }
 
     if (query.userId) {
       conditions.push(Prisma.sql`o.owner_id = ${query.userId}::uuid`);
@@ -160,17 +145,6 @@ export class OutputsService {
     }
 
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
-
-    if (isHomeFeed) {
-      const cursor =
-        query.cursor === undefined
-          ? undefined
-          : parseHomeFeedCursor(query.cursor);
-      if (page > 1 && !cursor) {
-        throw new BadRequestException('validation_failed');
-      }
-      return this.findHomeFeed(callerId, whereClause, { page, limit }, cursor);
-    }
 
     const offset = (page - 1) * limit;
     const sortColumn = Object.keys(parsedSort)[0] as OutputSortColumn;
@@ -214,13 +188,26 @@ export class OutputsService {
     );
   }
 
-  private async findHomeFeed(
+  async findHomeFeed(
     callerId: string,
-    whereClause: Prisma.Sql,
-    pagination: { page: number; limit: number },
-    cursor?: HomeFeedCursor,
-  ): Promise<PaginatedOutputsResponseDto> {
-    const { limit } = pagination;
+    query: HomeFeedQueryDto,
+  ): Promise<HomeFeedResponseDto> {
+    const { limit } = query;
+    const cursor =
+      query.cursor === undefined
+        ? undefined
+        : parseHomeFeedCursor(query.cursor);
+    const whereClause = Prisma.sql`
+      WHERE can_view_output(${callerId}::uuid, o.id)
+        AND o.sharing_status = 'SHARED'
+        AND EXISTS (
+          SELECT 1
+          FROM output_revisions release
+          WHERE release.id = o.current_release_id
+            AND release.output_id = o.id
+            AND release.released_at IS NOT NULL
+        )
+    `;
     const afterCursor = cursor
       ? Prisma.sql`AND (o.first_shared_at, o.id) < (${cursor.sharedAt}::timestamptz, ${cursor.id}::uuid)`
       : Prisma.empty;
@@ -250,10 +237,7 @@ export class OutputsService {
           pageRows.map(({ id }) => id),
           callerId,
         );
-        const meta = buildPaginationMeta(pagination, items.length, total);
-        meta.hasNextPage = nextCursor !== undefined;
-        meta.hasPreviousPage = cursor !== undefined;
-        return { items, meta, nextCursor };
+        return { items, meta: { total, nextCursor } };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

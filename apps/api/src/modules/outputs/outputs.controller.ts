@@ -24,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { HomeFeedQueryDto, HomeFeedResponseDto } from './dto/home-feed.dto.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputFileResponseDto } from './dto/output-file-response.dto.js';
 import {
@@ -67,6 +68,25 @@ export class OutputsController {
     @Query() query: ListOutputsQueryDto,
   ): Promise<PaginatedOutputsResponseDto> {
     return this.outputsService.findAll(callerId, query);
+  }
+
+  @ApiOperation({
+    summary: 'List shared research for Home',
+    description:
+      'Returns the shared releases visible to the caller, newest shared first, with a cursor for loading more.',
+  })
+  @ApiOkResponse({
+    description: 'A batch of shared releases with Home feed metadata.',
+    type: HomeFeedResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid cursor or limit.' })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @Get('home-feed')
+  async findHomeFeed(
+    @CurrentUserId() callerId: string,
+    @Query() query: HomeFeedQueryDto,
+  ): Promise<HomeFeedResponseDto> {
+    return this.outputsService.findHomeFeed(callerId, query);
   }
 
   @ApiOperation({

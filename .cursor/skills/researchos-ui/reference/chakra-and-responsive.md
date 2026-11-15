@@ -8,6 +8,25 @@ The Chakra system is defined in `apps/web/src/theme/theme.ts` with
 semantic token or recipe to the shared system when several components need
 the same treatment. Keep one-off layout values on the component.
 
+## Home research card actions
+
+Use the same card and action layout for the signed-out example and signed-in
+publications. Render Download when the card has a public PDF URL or the feed
+API supplies a PDF the reader can download.
+
+Use the same outline button with `size="xs"` and `layerStyle="researchAccess"`
+for Download, View publication (View source), and Request file. Match the Add
+new pill shape and padding. Enabled actions have a white background with blue
+text and border. On hover, use the same blue as the background and switch the
+text to white. Keep labels free of underlines, the keyboard focus ring visible,
+and disabled actions muted.
+
+Use `layerStyle="researchTextLink"` for the title link and for plain text
+buttons such as Save, Follow, Recommend and Share. On hover or keyboard focus,
+underline the text in its full foreground color, black in light mode. Use a
+transparent background for these actions. Place Save next to Download.
+Group Follow, Recommend and Share with a 3.5 px gap between adjacent buttons.
+
 ## Responsive props
 
 Use Chakra's mobile-first style props and its default breakpoints. For

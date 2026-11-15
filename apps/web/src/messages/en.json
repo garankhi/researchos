@@ -62,6 +62,8 @@
       "example": "Example",
       "viewPublication": "View source",
       "download": "Download PDF",
+      "follow": "Follow",
+      "recommend": "Recommend",
       "share": "Share",
       "linkCopied": "Publication link copied.",
       "copyError": "Could not copy the publication link.",

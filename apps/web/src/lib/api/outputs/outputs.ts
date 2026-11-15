@@ -23,10 +23,12 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  HomeFeedResponseDtoEnvelope,
   OutputResponseDtoEnvelope,
   OutputRevisionResponseDtoEnvelope,
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
+  OutputsControllerFindHomeFeedParams,
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
@@ -211,6 +213,174 @@ export function useOutputsControllerFindAll<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getOutputsControllerFindAllQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the shared releases visible to the caller, newest shared first, with a cursor for loading more.
+ * @summary List shared research for Home
+ */
+export const outputsControllerFindHomeFeed = (
+  params: OutputsControllerFindHomeFeedParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<HomeFeedResponseDtoEnvelope>(
+    { url: `/outputs/home-feed`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getOutputsControllerFindHomeFeedQueryKey = (
+  params?: OutputsControllerFindHomeFeedParams,
+) => {
+  return [`/outputs/home-feed`, ...(params ? [params] : [])] as const;
+};
+
+export const getOutputsControllerFindHomeFeedQueryOptions = <
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getOutputsControllerFindHomeFeedQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+  > = ({ signal }) =>
+    outputsControllerFindHomeFeed(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OutputsControllerFindHomeFeedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+>;
+export type OutputsControllerFindHomeFeedQueryError = ApiErrorResponseDto;
+
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List shared research for Home
+ */
+
+export function useOutputsControllerFindHomeFeed<
+  TData = Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OutputsControllerFindHomeFeedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindHomeFeed>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOutputsControllerFindHomeFeedQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

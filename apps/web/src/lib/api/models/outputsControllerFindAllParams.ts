@@ -5,7 +5,6 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { OutputsControllerFindAllFeed } from './outputsControllerFindAllFeed';
 
 export type OutputsControllerFindAllParams = {
   /**
@@ -23,15 +22,6 @@ export type OutputsControllerFindAllParams = {
    * Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.
    */
   sort?: string;
-  /**
-   * The Home feed includes only shared releases, newest shared first, and the PDF the caller can download, if available.
-   */
-  feed?: OutputsControllerFindAllFeed;
-  /**
-   * Home feed continuation. Omit it for the first page and pass the previous response’s nextCursor to load more.
-   * @maxLength 64
-   */
-  cursor?: string;
   /**
    * Filter outputs owned by a specific researcher user (UUID).
    */

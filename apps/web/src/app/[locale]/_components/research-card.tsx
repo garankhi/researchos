@@ -33,6 +33,20 @@ const outputTypes = {
   DISSERTATION: 'dissertation',
 } as const;
 
+const accessButtonProps = {
+  variant: 'outline',
+  size: 'xs',
+  layerStyle: 'researchAccess',
+} as const;
+
+const textActionProps = {
+  variant: 'plain',
+  size: 'sm',
+  layerStyle: 'researchTextLink',
+  minW: '0',
+  px: '0',
+} as const;
+
 function FigureThumbnail({ figure }: { figure: ResearchFigure }) {
   const [unavailable, setUnavailable] = useState(false);
 
@@ -124,6 +138,7 @@ function ResearchActions({
   'publicationUrl' | 'downloadUrl' | 'downloadablePdf'
 >) {
   const t = useTranslations('home.feed');
+  const common = useTranslations('common');
   const { showSnackbar } = useSnackbar();
   const [copyFailed, setCopyFailed] = useState(false);
   const copyErrorId = useId();
@@ -139,8 +154,6 @@ function ResearchActions({
     }
   }
 
-  if (!publicationUrl && !downloadUrl && !downloadablePdf) return null;
-
   return (
     <Flex
       borderTopWidth="1px"
@@ -149,49 +162,54 @@ function ResearchActions({
       justify="space-between"
       flexWrap="wrap"
     >
-      <Flex gap="2" align="start" wrap="wrap">
-        {downloadablePdf && (
+      <Flex gap="1" align="start" wrap="wrap">
+        {downloadablePdf ? (
           <OutputDownloadPrimaryButton
             file={downloadablePdf}
             label={t('download')}
+            buttonProps={accessButtonProps}
           />
-        )}
-        {downloadUrl && (
-          <Button asChild variant="outline" colorPalette="blue" size="sm">
-            <Link href={downloadUrl} target="_blank" rel="noopener noreferrer">
+        ) : downloadUrl ? (
+          <Button asChild {...accessButtonProps}>
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
               {t('download')}
-            </Link>
+            </a>
           </Button>
-        )}
+        ) : null}
+        <Button {...textActionProps} minW="9" px="3.5" disabled>
+          {common('save')}
+        </Button>
         {publicationUrl && (
-          <Button asChild variant="outline" size="sm">
-            <Link
-              href={publicationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+          <Button asChild {...accessButtonProps}>
+            <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
               {t('viewPublication')}
-            </Link>
+            </a>
           </Button>
         )}
       </Flex>
-      {publicationUrl && (
-        <Stack gap="1" align="end">
+      <Stack gap="1" align="end">
+        <Flex align="center" gap="3.5px" wrap="wrap">
+          <Button {...textActionProps} disabled>
+            {t('follow')}
+          </Button>
+          <Button {...textActionProps} disabled>
+            {t('recommend')}
+          </Button>
           <Button
-            variant="ghost"
-            size="sm"
+            {...textActionProps}
+            disabled={!publicationUrl}
             aria-describedby={copyFailed ? copyErrorId : undefined}
             onClick={() => void copyLink()}
           >
             {t('share')}
           </Button>
-          {copyFailed && (
-            <Text id={copyErrorId} role="alert" textStyle="sm" color="fg.error">
-              {t('copyError')}
-            </Text>
-          )}
-        </Stack>
-      )}
+        </Flex>
+        {copyFailed && (
+          <Text id={copyErrorId} role="alert" textStyle="sm" color="fg.error">
+            {t('copyError')}
+          </Text>
+        )}
+      </Stack>
     </Flex>
   );
 }
@@ -219,6 +237,13 @@ export function ResearchCard({ item }: { item: ResearchCardData }) {
       : t('citationCount', { count: item.citations }),
   ].filter(Boolean);
   const venue = [item.venue, item.publisher].filter(Boolean).join(' · ');
+  const titleLink = item.detailHref ? (
+    <NextLink href={item.detailHref}>{item.title}</NextLink>
+  ) : item.publicationUrl ? (
+    <a href={item.publicationUrl} target="_blank" rel="noopener noreferrer">
+      {item.title}
+    </a>
+  ) : null;
 
   return (
     <Box as="article" bg="bg.panel" boxShadow="xs" overflowWrap="anywhere">
@@ -230,9 +255,9 @@ export function ResearchCard({ item }: { item: ResearchCardData }) {
           />
         )}
         <Heading as="h2" size="lg" fontWeight="bold">
-          {item.detailHref ? (
-            <Link asChild>
-              <NextLink href={item.detailHref}>{item.title}</NextLink>
+          {titleLink ? (
+            <Link asChild layerStyle="researchTextLink">
+              {titleLink}
             </Link>
           ) : (
             item.title
