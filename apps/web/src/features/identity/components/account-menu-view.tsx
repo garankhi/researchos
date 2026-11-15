@@ -57,6 +57,9 @@ export function AccountMenuView({
   return (
     <Menu.Root
       open={openMode !== null}
+      // Keyboard opening finds the first enabled item during the transition.
+      lazyMount={false}
+      unmountOnExit={false}
       onOpenChange={({ open }) => {
         cancelHoverClose();
         setOpenMode(open ? 'trigger' : null);
