@@ -2,15 +2,22 @@ export * from './types';
 export * from './components/profile-header';
 export * from './components/profile-edit-dialog';
 export * from './components/profile-shell';
+export {
+  ProfilePageSkeleton,
+  topicOptions,
+} from './components/profile-skeletons';
 export * from './components/tabs/profile-applications-tab';
 export * from './components/tabs/profile-groups-tab';
 export * from './components/tabs/profile-outputs-tab';
+export * from './components/profile-output-actions-menu';
 export * from './components/tabs/profile-interests-tab';
 export * from './components/tabs/profile-openalex-tab';
 export * from './hooks/use-profile';
 export * from './hooks/use-update-profile';
 export * from './hooks/use-profile-groups';
 export * from './hooks/use-profile-outputs';
+export * from './hooks/use-profile-output-capability';
+export * from './hooks/use-output-visibility';
 export * from './hooks/use-profile-interests';
 export * from './hooks/use-my-applications';
 export * from './hooks/use-openalex-candidates';

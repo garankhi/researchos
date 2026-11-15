@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   OutputFileVisibility,
   OutputImportState,
@@ -8,6 +8,21 @@ import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
 import { OutputAuthorResponseDto } from './output-author-response.dto.js';
 import { OutputRevisionResponseDto } from './output-revision-response.dto.js';
 import { OutputTopicResponseDto } from './output-topic-response.dto.js';
+
+export class DownloadablePdfDto {
+  @ApiProperty({
+    description: 'Identifier used by the output file download endpoint.',
+    type: String,
+    format: 'uuid',
+  })
+  id: string;
+
+  @ApiProperty({
+    description: 'Original filename for the downloadable PDF.',
+    type: String,
+  })
+  fileName: string;
+}
 
 /**
  * Full details of a research output with its pinned / current release.
@@ -53,7 +68,7 @@ export class OutputResponseDto {
 
   @ApiProperty({
     description:
-      'Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.',
+      'Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.',
     format: 'uuid',
     nullable: true,
     example: null,
@@ -105,6 +120,20 @@ export class OutputResponseDto {
     type: [OutputTopicResponseDto],
   })
   topics: OutputTopicResponseDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'A PDF on the current Home feed release that the caller may download.',
+    type: DownloadablePdfDto,
+  })
+  downloadablePdf?: DownloadablePdfDto;
+
+  @ApiPropertyOptional({
+    description:
+      'On the detail view, whether the current release has a private PDF unavailable to the caller.',
+    type: Boolean,
+  })
+  hasRestrictedPdf?: boolean;
 }
 
 /**

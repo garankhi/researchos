@@ -1,7 +1,7 @@
 'use client';
 
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
-import { useApiHealth } from '@/features/health';
+import { ErrorState } from '@/components/ui/feedback';
+import { ApiStatusSkeleton, useApiHealth } from '@/features/health';
 import { useTranslations } from 'next-intl';
 
 /**
@@ -19,7 +19,7 @@ export function ApiStatus() {
   const tHome = useTranslations('home');
   const { data, isPending, isFailed, refetch } = useApiHealth();
 
-  if (isPending) return <LoadingSkeleton variant="text" width={220} />;
+  if (isPending) return <ApiStatusSkeleton />;
 
   if (isFailed) {
     return (

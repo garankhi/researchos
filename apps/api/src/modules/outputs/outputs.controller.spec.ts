@@ -94,6 +94,9 @@ describe('OutputsController & OutputsService', () => {
 
   const createTxMock = () => ({
     $queryRaw: vi.fn(),
+    research_outputs: { findMany: vi.fn() },
+    output_revisions: { findMany: vi.fn() },
+    output_topics: { findMany: vi.fn() },
   });
 
   const createPrismaMock = (tx = createTxMock()) => ({
@@ -102,15 +105,15 @@ describe('OutputsController & OutputsService', () => {
     $queryRaw: vi.fn(),
     research_outputs: {
       findUnique: vi.fn(),
-      findMany: vi.fn(),
+      findMany: tx.research_outputs.findMany,
     },
     output_revisions: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
-      findMany: vi.fn(),
+      findMany: tx.output_revisions.findMany,
     },
     output_topics: {
-      findMany: vi.fn(),
+      findMany: tx.output_topics.findMany,
     },
     output_authors: {
       findMany: vi.fn(),
@@ -153,6 +156,7 @@ describe('OutputsController & OutputsService', () => {
       const result = await controller.findAll(callerId, { page: 1, limit: 10 });
 
       expect(result.items).toHaveLength(1);
+      expect(result.items[0].downloadablePdf).toBeUndefined();
       expect(result.items[0]).toEqual(
         expect.objectContaining({
           id: outputId,
@@ -188,6 +192,100 @@ describe('OutputsController & OutputsService', () => {
         hasNextPage: false,
         hasPreviousPage: false,
       });
+    });
+
+    it('filters shared releases before paginating Home and fetches only authorized release PDFs', async () => {
+      const sharedAt = '2026-11-11T00:00:00.123456Z';
+      const olderOutputId = '33333333-3333-4333-8333-333333333332';
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 2n }])
+        .mockResolvedValueOnce([
+          { id: outputId, sharedAt },
+          { id: olderOutputId, sharedAt },
+        ])
+        .mockResolvedValueOnce([
+          { output_id: outputId, id: fileId, file_name: 'paper.pdf' },
+        ]);
+      prismaMock.tx.research_outputs.findMany.mockResolvedValue([
+        mockSharedOutput,
+      ]);
+      prismaMock.tx.output_revisions.findMany.mockResolvedValue([
+        mockPinnedRevision,
+      ]);
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.findHomeFeed(callerId, { limit: 1 });
+
+      const [[count], [page], [pdf]] = prismaMock.tx.$queryRaw.mock.calls;
+      for (const query of [count, page]) {
+        expect(query.sql).toContain('can_view_output');
+        expect(query.sql).toContain("o.sharing_status = 'SHARED'");
+        expect(query.sql).toContain('release.released_at IS NOT NULL');
+      }
+      expect(page.sql).toContain('ORDER BY o.first_shared_at DESC, o.id DESC');
+      expect(page.values).toContain(2);
+      expect(pdf.join('')).toContain('rf.revision_id = o.current_release_id');
+      expect(pdf.join('')).toContain('can_view_output_file');
+      expect(pdf.join('')).toContain("lower(f.mime_type) = 'application/pdf'");
+      expect(prismaMock.tx.research_outputs.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: [outputId] } } }),
+      );
+      expect(result.items[0].downloadablePdf).toEqual({
+        id: fileId,
+        fileName: 'paper.pdf',
+      });
+      expect(result.meta).toEqual({
+        total: 2,
+        nextCursor: `${sharedAt}~${outputId}`,
+      });
+    });
+
+    it('continues Home after the cursor even when that work is archived', async () => {
+      const sharedAt = '2026-11-11T00:00:00.123456Z';
+      const archivedOutputId = '33333333-3333-4333-8333-333333333334';
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([{ id: outputId, sharedAt }])
+        .mockResolvedValueOnce([]);
+      prismaMock.tx.research_outputs.findMany.mockResolvedValue([
+        mockSharedOutput,
+      ]);
+      prismaMock.tx.output_revisions.findMany.mockResolvedValue([
+        mockPinnedRevision,
+      ]);
+      prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.findHomeFeed(callerId, {
+        limit: 1,
+        cursor: `${sharedAt}~${archivedOutputId}`,
+      });
+
+      const [[count], [page]] = prismaMock.tx.$queryRaw.mock.calls;
+      expect(count.sql).not.toContain('timestamptz');
+      expect(page.sql).toContain('(o.first_shared_at, o.id) <');
+      expect(page.sql).not.toContain('OFFSET');
+      expect(page.values).toContain(sharedAt);
+      expect(page.values).toContain(archivedOutputId);
+      expect(result.items.map((item) => item.id)).toEqual([outputId]);
+      expect(result.meta).toEqual({ total: 1 });
+      expect(result.meta.nextCursor).toBeUndefined();
+    });
+
+    it('rejects a malformed Home cursor before querying the database', async () => {
+      const prismaMock = createPrismaMock();
+      const { controller } = await setupController(prismaMock);
+
+      await expect(
+        controller.findHomeFeed(callerId, {
+          limit: 12,
+          cursor: `2026-02-30T00:00:00.123456Z~${outputId}`,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
 
     it('returns empty list and meta when no outputs match', async () => {
@@ -294,7 +392,9 @@ describe('OutputsController & OutputsService', () => {
       prismaMock.research_outputs.findUnique.mockResolvedValue(
         mockSharedOutput,
       );
-      prismaMock.$queryRaw.mockResolvedValue([{ allowed: true }]);
+      prismaMock.$queryRaw
+        .mockResolvedValueOnce([{ allowed: true }])
+        .mockResolvedValueOnce([{ restricted: true }]);
       prismaMock.output_revisions.findUnique.mockResolvedValue(
         mockPinnedRevision,
       );
@@ -307,6 +407,10 @@ describe('OutputsController & OutputsService', () => {
       expect(result.currentRevision?.id).toBe(pinnedRevId);
       expect(result.currentRevision?.title).toBe('Pinned Research Publication');
       expect(result.topics).toHaveLength(1);
+      expect(result.hasRestrictedPdf).toBe(true);
+      expect(prismaMock.$queryRaw.mock.calls[1][0].join('')).toContain(
+        "lower(f.mime_type) = 'application/pdf'",
+      );
     });
 
     it('resolves owner working copy draft revision when owner views their own unpublished DRAFT output', async () => {

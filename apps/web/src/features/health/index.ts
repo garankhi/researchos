@@ -7,4 +7,5 @@
  */
 
 export { useApiHealth } from './hooks/use-api-health';
+export { ApiStatusSkeleton } from './components/health-skeletons';
 export type { ApiHealth } from './types';

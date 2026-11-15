@@ -1,4 +1,4 @@
-import { LoadingSkeleton } from '@/components/ui/feedback';
+import { RouteLoadingSkeleton } from '@/components/ui/delayed-skeleton';
 
 /**
  * Route-level loading UI.
@@ -9,5 +9,5 @@ import { LoadingSkeleton } from '@/components/ui/feedback';
  * Suspense boundary for the fallback to appear.
  */
 export default function Loading() {
-  return <LoadingSkeleton variant="rectangular" height={280} />;
+  return <RouteLoadingSkeleton />;
 }

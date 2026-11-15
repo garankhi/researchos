@@ -26,7 +26,7 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('common');
   const [toaster] = useState(() =>
     createToaster({
-      placement: 'bottom-end',
+      placement: 'top',
       pauseOnPageIdle: true,
     }),
   );
@@ -67,12 +67,28 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
           toaster={toaster}
           aria-label={t('notifications')}
           aria-keyshortcuts="Alt+T"
-          insetInline={{ base: '3', sm: '6' }}
         >
           {(toast) => (
-            <Toast.Root role={toast.type === 'error' ? 'alert' : 'status'}>
+            <Toast.Root
+              role={toast.type === 'error' ? 'alert' : 'status'}
+              width="max-content"
+              maxW="min(100%, 24rem)"
+              pe="9"
+              css={{
+                '&[data-type=success]': {
+                  bg: 'green.subtle',
+                  color: 'green.fg',
+                },
+              }}
+            >
               <Toast.Indicator />
-              <Toast.Description>{toast.description}</Toast.Description>
+              <Toast.Description
+                minW="0"
+                overflowWrap="anywhere"
+                opacity={toast.type === 'success' ? '1' : undefined}
+              >
+                {toast.description}
+              </Toast.Description>
               {toast.action && (
                 <Toast.ActionTrigger>{toast.action.label}</Toast.ActionTrigger>
               )}

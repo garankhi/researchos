@@ -1,5 +1,7 @@
 'use client';
 
+import { GroupLineSkeleton } from './group-skeletons';
+
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Box, Button, Heading, Stack, Text } from '@chakra-ui/react';
@@ -12,7 +14,7 @@ import {
   groupDirectionsControllerRemove,
 } from '@/lib/api';
 import { FormTextField } from '@/components/ui/form';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
+import { ErrorState } from '@/components/ui/feedback';
 import type { Direction } from '../types';
 import { HubAction, HubForm, HubList, HubSection } from './hub-controls';
 
@@ -124,7 +126,7 @@ function DirectionForm({
         {t('clearTopic')}
       </Button>
       {topics.isPending ? (
-        <LoadingSkeleton />
+        <GroupLineSkeleton />
       ) : topics.isError ? (
         <ErrorState
           title={t('loadError')}

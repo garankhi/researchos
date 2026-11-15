@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { Container } from '@chakra-ui/react';
-import { LoadingSkeleton } from '@/components/ui/feedback';
-import { GroupHub } from '@/features/groups';
+import { GroupHub, GroupHubSkeleton } from '@/features/groups';
 
 async function GroupContent({
   params,
@@ -19,7 +18,7 @@ export default function GroupPage(props: {
     <Suspense
       fallback={
         <Container maxW="6xl" py="8">
-          <LoadingSkeleton variant="rectangular" height={180} count={3} />
+          <GroupHubSkeleton />
         </Container>
       }
     >

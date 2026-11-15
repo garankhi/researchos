@@ -1,5 +1,7 @@
 'use client';
 
+import { GroupListSkeleton } from './group-skeletons';
+
 import { useState, type ReactNode } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,11 +14,7 @@ import {
   FormTextarea,
   FormTextField,
 } from '@/components/ui/form';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { useHubMutation } from '../hooks/use-group-hub';
@@ -246,8 +244,7 @@ export function HubList<T>({
 }) {
   const t = useTranslations('groups');
   const errors = useTranslations('errors');
-  if (query.isPending)
-    return <LoadingSkeleton variant="rectangular" height={130} count={2} />;
+  if (query.isPending) return <GroupListSkeleton />;
   if (query.isError)
     return (
       <ErrorState

@@ -8,9 +8,15 @@
 
 export { AccountMenu } from './components/account-menu';
 export { AccountSlot } from './components/account-slot';
+export { AddResearchDrawer } from './components/add-research-drawer';
 export { LoginForm } from './components/login-form';
 export { RequireAuth } from './components/require-auth';
 export { SessionSummary } from './components/session-summary';
+export {
+  LoginFormSkeleton,
+  SessionCheckSkeleton,
+  SessionSummarySkeleton,
+} from './components/identity-skeletons';
 export { useLogin } from './hooks/use-login';
 export { useLogout } from './hooks/use-logout';
 export { useMe } from './hooks/use-me';

@@ -127,6 +127,7 @@ apps/web/src/features/profiles/
     use-profiles.ts
   components/
     profile-card.tsx
+    profile-skeletons.tsx
   store/
     profiles-store.ts
 ```
@@ -134,6 +135,10 @@ apps/web/src/features/profiles/
 A feature folder is `index.ts` (barrel), `types.ts` (domain types), `hooks/`
 (API calls + state normalisation), `components/` and `store/` (client-side
 state).
+
+A module that has a skeleton keeps its layouts **and** the components that
+draw them in `components/<module>-skeletons.tsx`. See
+[loading-and-feedback.md](loading-and-feedback.md#authoring-a-skeletonresult).
 
 Do not create a feature folder before the domain exists — `health/` was the
 first one.
@@ -254,9 +259,14 @@ become explicit ones. Note `enabled: Boolean(id)` — without it, a request
 fires with an empty id.
 
 The component then branches on the hook's explicit flags, never on
-`query.data` being undefined — an `isPending` branch renders a
-`LoadingSkeleton`, an `isFailed` branch renders an `ErrorState` with a
-retry, and only then does it read `data`.
+`query.data` being undefined — an `isPending` branch renders a skeleton
+sized like the real content, an `isFailed` branch renders an `ErrorState`
+with a retry, and only then does it read `data`.
+
+A skeleton that mirrors a domain layout lives in the feature's
+`components/` folder, next to the component it stands in for, and is
+exported from the feature barrel — `components/ui/` stays domain-free.
+See [loading-and-feedback.md](loading-and-feedback.md#a-skeleton-belongs-to-the-feature).
 
 ## The store layer
 

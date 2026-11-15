@@ -1,5 +1,7 @@
 'use client';
 
+import { GroupLineSkeleton } from './group-skeletons';
+
 import { useForm, useWatch } from 'react-hook-form';
 import {
   Badge,
@@ -20,7 +22,7 @@ import {
   groupOutputLinksControllerDecide,
   groupOutputLinksControllerRemove,
 } from '@/lib/api';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/feedback';
+import { ErrorState } from '@/components/ui/feedback';
 import { FormSelect } from '@/components/ui/form';
 import { useHubCollection } from '../hooks/use-group-hub';
 import type { OutputLink } from '../types';
@@ -51,7 +53,7 @@ function OutputCard({
     <Box borderWidth="1px" borderRadius="md" p="4">
       <Stack gap="3">
         {output.isPending || (output.isSuccess && revisions.isPending) ? (
-          <LoadingSkeleton />
+          <GroupLineSkeleton />
         ) : output.isError || revisions.isError ? (
           <ErrorState
             title={t('outputUnavailable')}
@@ -150,7 +152,7 @@ function LinkOutput({ groupId }: { groupId: string }) {
       (output) =>
         output.sharingStatus === 'SHARED' && output.currentRevision?.releasedAt,
     ) ?? [];
-  if (outputs.isPending) return <LoadingSkeleton />;
+  if (outputs.isPending) return <GroupLineSkeleton />;
   if (outputs.isError)
     return (
       <ErrorState
@@ -181,7 +183,7 @@ function LinkOutput({ groupId }: { groupId: string }) {
           {t('loadMore')}
         </Button>
       ) : null}
-      {outputId && revisions.isPending ? <LoadingSkeleton /> : null}
+      {outputId && revisions.isPending ? <GroupLineSkeleton /> : null}
       {outputId && revisions.isError ? (
         <ErrorState
           title={t('loadError')}
