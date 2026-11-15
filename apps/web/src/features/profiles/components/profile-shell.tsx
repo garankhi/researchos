@@ -144,7 +144,7 @@ export function ProfileShell({
         </Tabs.Content>
 
         <Tabs.Content value="outputs">
-          <ProfileOutputsTab userId={effectiveUserId} isOwner={isOwner} />
+          <ProfileOutputsTab userId={effectiveUserId} />
         </Tabs.Content>
 
         <Tabs.Content value="interests">

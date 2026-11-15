@@ -17,6 +17,7 @@ import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
+import type { OutputCapability } from '@/utils/output-capability';
 import { useOutputVisibility } from '../hooks/use-output-visibility';
 import type { OutputResponseDto } from '../types';
 
@@ -30,11 +31,19 @@ type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
  * itself is left untouched: the request omits `accessGroupId`, so the
  * backend keeps the stored group. A work with no stored group cannot
  * become group-only, so that option stays disabled.
+ *
+ * The Visibility entry carries its own permission. A co-author sees their
+ * own work listed on the profile, but the backend only lets the owner (or
+ * the affiliated group's lead) change the visibility — so the entry is
+ * disabled with a reason rather than opening a dialog that would fail on
+ * save with a 403.
  */
 export function ProfileOutputActionsMenu({
   output,
+  capability,
 }: {
   output: OutputResponseDto;
+  capability: OutputCapability;
 }) {
   const t = useTranslations('profile');
   const tError = useTranslations('errors');
@@ -51,11 +60,11 @@ export function ProfileOutputActionsMenu({
   const [inlineError, setInlineError] = useState<string | null>(null);
 
   const hasGroup = Boolean(output.accessGroupId);
-  const canEdit = output.sharingStatus === 'SHARED';
-
-  if (!canEdit) return null;
+  const isShared = output.sharingStatus === 'SHARED';
+  const canChangeVisibility = isShared && capability.canChangeVisibility;
 
   const openDialog = () => {
+    if (!canChangeVisibility) return;
     setSelection(
       output.visibility === 'RESEARCH_GROUP'
         ? 'RESEARCH_GROUP'
@@ -105,9 +114,18 @@ export function ProfileOutputActionsMenu({
         <Portal>
           <Menu.Positioner>
             <Menu.Content>
-              <Menu.Item value="visibility" onSelect={openDialog}>
+              <Menu.Item
+                value="visibility"
+                onSelect={openDialog}
+                disabled={!canChangeVisibility}
+              >
                 <Eye />
                 {t('outputsTab.visibilityAction')}
+                {canChangeVisibility ? null : (
+                  <Text textStyle="xs" color="fg.muted">
+                    {t('outputsTab.visibilityLockedReason')}
+                  </Text>
+                )}
               </Menu.Item>
             </Menu.Content>
           </Menu.Positioner>

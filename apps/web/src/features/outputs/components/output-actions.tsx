@@ -153,12 +153,17 @@ export function OutputDownloadPrimaryButton({
 
   if (!file) return null;
 
+  // Captured into a local so the narrowing survives into the closure
+  // below: TypeScript does not keep a narrowing of a parameter across an
+  // `async` function boundary.
+  const target = file;
+
   async function handleDownload() {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const blob = await outputDownloadControllerDownloadFile(file.id);
-      downloadBlob(blob, file.fileName);
+      const blob = await outputDownloadControllerDownloadFile(target.id);
+      downloadBlob(blob, target.fileName);
       showSnackbar({ severity: 'success', message: t('detail.downloadStarted') });
     } catch (error) {
       setDownloadError(
@@ -244,18 +249,23 @@ export function OutputFollowButton({ output }: { output: OutputDetail }) {
 
   if (!groupId) return null;
 
+  // Captured into a local so the narrowing survives into the closure
+  // below: TypeScript does not keep a narrowing of a `const` initialized
+  // from a nullable property across an `async` function boundary.
+  const targetGroupId = groupId;
+
   async function handleToggleFollow() {
     setActionError(null);
     try {
       if (isFollowing) {
         await removeFollow.mutateAsync({
           entityType: GROUP_ENTITY_TYPE,
-          entityId: groupId,
+          entityId: targetGroupId,
         });
         showSnackbar({ severity: 'success', message: t('detail.unfollowed') });
       } else {
         await createFollow.mutateAsync({
-          data: { entityType: GROUP_ENTITY_TYPE, entityId: groupId },
+          data: { entityType: GROUP_ENTITY_TYPE, entityId: targetGroupId },
         });
         showSnackbar({ severity: 'success', message: t('detail.followed') });
       }
