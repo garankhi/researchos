@@ -48,7 +48,12 @@
     "feed": {
       "article": "Article",
       "preprint": "Preprint",
+      "review": "Review",
+      "editorial": "Editorial",
+      "bookChapter": "Book chapter",
+      "book": "Book",
       "dataset": "Dataset",
+      "dissertation": "Dissertation",
       "readCount": "{count, plural, one {# read} other {# reads}}",
       "citationCount": "{count, plural, one {# citation} other {# citations}}",
       "moreFigures": "View {count} more figures",

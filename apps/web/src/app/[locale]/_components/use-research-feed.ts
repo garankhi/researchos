@@ -7,6 +7,9 @@ import { toResearchCard } from './research-feed-data';
 
 const pageSize = 12;
 
+type FeedPage = { page: number; cursor?: string };
+const firstPage: FeedPage = { page: 1 };
+
 export function useResearchFeed(userId: string) {
   const {
     data,
@@ -20,24 +23,21 @@ export function useResearchFeed(userId: string) {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['home-research-feed', userId],
-    initialPageParam: 1,
+    initialPageParam: firstPage,
     queryFn: ({ pageParam, signal }) =>
       outputsControllerFindAll(
-        { feed: 'home', page: pageParam, limit: pageSize },
+        { feed: 'home', limit: pageSize, ...pageParam },
         undefined,
         signal,
       ),
-    getNextPageParam: ({ meta }) =>
-      meta.hasNextPage ? meta.page + 1 : undefined,
+    getNextPageParam: ({ meta, nextCursor }) =>
+      nextCursor ? { page: meta.page + 1, cursor: nextCursor } : undefined,
     staleTime: 60_000,
   });
 
   const cards = useMemo(() => {
-    const seen = new Set<string>();
     return (data?.pages ?? []).flatMap(({ items }) =>
       items.flatMap((output) => {
-        if (seen.has(output.id)) return [];
-        seen.add(output.id);
         const card = toResearchCard(output);
         return card ? [card] : [];
       }),

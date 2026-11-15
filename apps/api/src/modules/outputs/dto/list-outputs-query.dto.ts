@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
 
 /**
@@ -8,12 +8,22 @@ import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
 export class ListOutputsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     description:
-      'The Home feed includes only shared releases and the PDF the caller can download, if available. It defaults to newest shared first.',
+      'The Home feed includes only shared releases, newest shared first, and the PDF the caller can download, if available.',
     enum: ['home'],
   })
   @IsOptional()
   @IsIn(['home'])
   feed?: 'home';
+
+  @ApiPropertyOptional({
+    description:
+      'Home feed continuation. Omit it for the first page and pass the previous response’s nextCursor to load more.',
+    maxLength: 64,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  cursor?: string;
 
   @ApiPropertyOptional({
     description: 'Filter outputs owned by a specific researcher user (UUID).',

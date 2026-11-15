@@ -26,6 +26,11 @@ import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
 import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
+import {
+  formatHomeFeedCursor,
+  parseHomeFeedCursor,
+  type HomeFeedCursor,
+} from './home-feed-cursor.js';
 
 const OUTPUT_SORT_FIELDS = {
   firstSharedAt: 'first_shared_at',
@@ -100,7 +105,6 @@ export class OutputsService {
   ): Promise<PaginatedOutputsResponseDto> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
     const isHomeFeed = query.feed === 'home';
 
     const parsedSort = parseSortParam<OutputSortColumn>(
@@ -108,24 +112,13 @@ export class OutputsService {
       OUTPUT_SORT_FIELDS,
       isHomeFeed ? { first_shared_at: 'desc' } : { created_at: 'desc' },
     );
-    if (!parsedSort) {
+    if (
+      !parsedSort ||
+      (isHomeFeed && parsedSort.first_shared_at !== 'desc') ||
+      (!isHomeFeed && query.cursor !== undefined)
+    ) {
       throw new BadRequestException('validation_failed');
     }
-
-    const sortColumn = Object.keys(parsedSort)[0] as OutputSortColumn;
-    const sortDir = parsedSort[sortColumn] ?? 'desc';
-    const orderBySql =
-      sortColumn === 'first_shared_at'
-        ? sortDir === 'asc'
-          ? Prisma.sql`o.first_shared_at ASC NULLS LAST, o.created_at ASC, o.id ASC`
-          : Prisma.sql`o.first_shared_at DESC NULLS LAST, o.created_at DESC, o.id DESC`
-        : sortColumn === 'updated_at'
-          ? sortDir === 'asc'
-            ? Prisma.sql`o.updated_at ASC, o.id ASC`
-            : Prisma.sql`o.updated_at DESC, o.id DESC`
-          : sortDir === 'asc'
-            ? Prisma.sql`o.created_at ASC, o.id ASC`
-            : Prisma.sql`o.created_at DESC, o.id DESC`;
 
     const conditions: Prisma.Sql[] = [
       Prisma.sql`can_view_output(${callerId}::uuid, o.id)`,
@@ -168,15 +161,36 @@ export class OutputsService {
 
     const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
 
+    if (isHomeFeed) {
+      const cursor =
+        query.cursor === undefined
+          ? undefined
+          : parseHomeFeedCursor(query.cursor);
+      if (page > 1 && !cursor) {
+        throw new BadRequestException('validation_failed');
+      }
+      return this.findHomeFeed(callerId, whereClause, { page, limit }, cursor);
+    }
+
+    const offset = (page - 1) * limit;
+    const sortColumn = Object.keys(parsedSort)[0] as OutputSortColumn;
+    const sortDir = parsedSort[sortColumn] ?? 'desc';
+    const orderBySql =
+      sortColumn === 'first_shared_at'
+        ? sortDir === 'asc'
+          ? Prisma.sql`o.first_shared_at ASC NULLS LAST, o.created_at ASC, o.id ASC`
+          : Prisma.sql`o.first_shared_at DESC NULLS LAST, o.created_at DESC, o.id DESC`
+        : sortColumn === 'updated_at'
+          ? sortDir === 'asc'
+            ? Prisma.sql`o.updated_at ASC, o.id ASC`
+            : Prisma.sql`o.updated_at DESC, o.id DESC`
+          : sortDir === 'asc'
+            ? Prisma.sql`o.created_at ASC, o.id ASC`
+            : Prisma.sql`o.created_at DESC, o.id DESC`;
+
     return this.prisma.$transaction(
       async (tx) => {
-        const count = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
-          SELECT COUNT(*)::bigint AS total
-          FROM research_outputs o
-          ${whereClause}
-        `);
-
-        const total = Number(count[0]?.total ?? 0n);
+        const total = await this.countOutputs(tx, whereClause);
         const ids =
           total === 0
             ? []
@@ -190,11 +204,7 @@ export class OutputsService {
         `);
 
         const outputIds = ids.map((row) => row.id);
-        const items = await this.loadOutputPage(
-          tx,
-          outputIds,
-          isHomeFeed ? callerId : undefined,
-        );
+        const items = await this.loadOutputPage(tx, outputIds);
         return {
           items,
           meta: buildPaginationMeta({ page, limit }, items.length, total),
@@ -202,6 +212,63 @@ export class OutputsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  private async findHomeFeed(
+    callerId: string,
+    whereClause: Prisma.Sql,
+    pagination: { page: number; limit: number },
+    cursor?: HomeFeedCursor,
+  ): Promise<PaginatedOutputsResponseDto> {
+    const { limit } = pagination;
+    const afterCursor = cursor
+      ? Prisma.sql`AND (o.first_shared_at, o.id) < (${cursor.sharedAt}::timestamptz, ${cursor.id}::uuid)`
+      : Prisma.empty;
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const total = await this.countOutputs(tx, whereClause);
+        // Preserve PostgreSQL's microseconds for the cursor. A JavaScript Date
+        // would truncate the timestamp used for the next page's comparison.
+        const rows = await tx.$queryRaw<HomeFeedCursor[]>(Prisma.sql`
+          SELECT o.id, to_char(o.first_shared_at AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "sharedAt"
+          FROM research_outputs o
+          ${whereClause}
+          ${afterCursor}
+          ORDER BY o.first_shared_at DESC, o.id DESC
+          LIMIT ${limit + 1}
+        `);
+        const pageRows = rows.slice(0, limit);
+        const lastRow = pageRows.at(-1);
+        const nextCursor =
+          lastRow && rows.length > limit
+            ? formatHomeFeedCursor(lastRow)
+            : undefined;
+        const items = await this.loadOutputPage(
+          tx,
+          pageRows.map(({ id }) => id),
+          callerId,
+        );
+        const meta = buildPaginationMeta(pagination, items.length, total);
+        meta.hasNextPage = nextCursor !== undefined;
+        meta.hasPreviousPage = cursor !== undefined;
+        return { items, meta, nextCursor };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  private async countOutputs(
+    tx: Prisma.TransactionClient,
+    whereClause: Prisma.Sql,
+  ): Promise<number> {
+    const [count] = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM research_outputs o
+      ${whereClause}
+    `);
+    return Number(count?.total ?? 0n);
   }
 
   private async loadOutputPage(
@@ -325,7 +392,7 @@ export class OutputsService {
         ON rf.output_id = o.id AND rf.revision_id = o.current_release_id
       JOIN output_files f ON f.id = rf.file_id AND f.output_id = o.id
       WHERE o.id IN (${ids})
-        AND f.mime_type = 'application/pdf'
+        AND lower(f.mime_type) = 'application/pdf'
         AND can_view_output_file(${callerId}::uuid, f.id)
       ORDER BY f.output_id, f.uploaded_at DESC, f.id ASC
     `;
@@ -432,7 +499,7 @@ export class OutputsService {
           AND o.current_release_id = ${exists.current_release_id}::uuid
           AND o.sharing_status = 'SHARED'
           AND can_view_output(${callerId}::uuid, o.id)
-          AND f.mime_type = 'application/pdf'
+          AND lower(f.mime_type) = 'application/pdf'
           AND f.visibility = 'PRIVATE'
           AND f.is_available
           AND NOT can_view_output_file(${callerId}::uuid, f.id)

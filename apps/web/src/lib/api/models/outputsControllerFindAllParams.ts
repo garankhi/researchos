@@ -24,9 +24,14 @@ export type OutputsControllerFindAllParams = {
    */
   sort?: string;
   /**
-   * The Home feed includes only shared releases and the PDF the caller can download, if available. It defaults to newest shared first.
+   * The Home feed includes only shared releases, newest shared first, and the PDF the caller can download, if available.
    */
   feed?: OutputsControllerFindAllFeed;
+  /**
+   * Home feed continuation. Omit it for the first page and pass the previous response’s nextCursor to load more.
+   * @maxLength 64
+   */
+  cursor?: string;
   /**
    * Filter outputs owned by a specific researcher user (UUID).
    */

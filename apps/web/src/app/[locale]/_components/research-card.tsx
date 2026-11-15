@@ -15,7 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { BookOpen, ImageIcon, UserRound } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { OutputDownloadPrimaryButton } from '@/features/outputs';
@@ -25,7 +25,12 @@ const visibleFigureCount = 5;
 const outputTypes = {
   PAPER: 'article',
   PREPRINT: 'preprint',
+  REVIEW: 'review',
+  EDITORIAL: 'editorial',
+  BOOK_CHAPTER: 'bookChapter',
+  BOOK: 'book',
   DATASET: 'dataset',
+  DISSERTATION: 'dissertation',
 } as const;
 
 function FigureThumbnail({ figure }: { figure: ResearchFigure }) {
@@ -120,14 +125,17 @@ function ResearchActions({
 >) {
   const t = useTranslations('home.feed');
   const { showSnackbar } = useSnackbar();
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copyErrorId = useId();
 
   async function copyLink() {
     if (!publicationUrl) return;
+    setCopyFailed(false);
     try {
       await navigator.clipboard.writeText(publicationUrl);
       showSnackbar({ severity: 'success', message: t('linkCopied') });
     } catch {
-      showSnackbar({ severity: 'error', message: t('copyError') });
+      setCopyFailed(true);
     }
   }
 
@@ -168,9 +176,21 @@ function ResearchActions({
         )}
       </Flex>
       {publicationUrl && (
-        <Button variant="ghost" size="sm" onClick={() => void copyLink()}>
-          {t('share')}
-        </Button>
+        <Stack gap="1" align="end">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-describedby={copyFailed ? copyErrorId : undefined}
+            onClick={() => void copyLink()}
+          >
+            {t('share')}
+          </Button>
+          {copyFailed && (
+            <Text id={copyErrorId} role="alert" textStyle="sm" color="fg.error">
+              {t('copyError')}
+            </Text>
+          )}
+        </Stack>
       )}
     </Flex>
   );

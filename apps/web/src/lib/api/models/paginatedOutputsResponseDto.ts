@@ -13,4 +13,6 @@ export interface PaginatedOutputsResponseDto {
   items: OutputResponseDto[];
   /** The pagination metadata of this page. */
   meta: PaginationMetaDto;
+  /** Cursor for the next Home feed page. Absent when the feed ends or when listing outputs outside Home. */
+  nextCursor?: string;
 }

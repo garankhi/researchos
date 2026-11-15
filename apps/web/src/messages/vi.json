@@ -48,7 +48,12 @@
     "feed": {
       "article": "Bài báo",
       "preprint": "Bản tiền ấn phẩm",
+      "review": "Bài tổng quan",
+      "editorial": "Bài xã luận",
+      "bookChapter": "Chương sách",
+      "book": "Sách",
       "dataset": "Bộ dữ liệu",
+      "dissertation": "Luận án",
       "readCount": "{count, number} lượt đọc",
       "citationCount": "{count, number} lượt trích dẫn",
       "moreFigures": "Xem thêm {count} hình minh họa",

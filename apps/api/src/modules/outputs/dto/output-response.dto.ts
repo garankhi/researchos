@@ -145,4 +145,11 @@ export class PaginatedOutputsResponseDto extends PaginatedResultDto<OutputRespon
     type: [OutputResponseDto],
   })
   declare items: OutputResponseDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Cursor for the next Home feed page. Absent when the feed ends or when listing outputs outside Home.',
+    type: String,
+  })
+  nextCursor?: string;
 }

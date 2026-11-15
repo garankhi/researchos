@@ -4400,12 +4400,22 @@
             "name": "feed",
             "required": false,
             "in": "query",
-            "description": "The Home feed includes only shared releases and the PDF the caller can download, if available. It defaults to newest shared first.",
+            "description": "The Home feed includes only shared releases, newest shared first, and the PDF the caller can download, if available.",
             "schema": {
               "type": "string",
               "enum": [
                 "home"
               ]
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Home feed continuation. Omit it for the first page and pass the previous response’s nextCursor to load more.",
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
             }
           },
           {
@@ -8886,6 +8896,10 @@
                 "$ref": "#/components/schemas/PaginationMetaDto"
               }
             ]
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Cursor for the next Home feed page. Absent when the feed ends or when listing outputs outside Home."
           }
         },
         "required": [
