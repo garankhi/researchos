@@ -14,18 +14,29 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
+import type { SkeletonResult } from 'boneyard-js';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/feedback';
+import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
+import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useTaxonomyControllerFindAllTopics } from '@/lib/api';
 import type { TopicResponseDto } from '@/lib/api/models';
 import { useProfileInterests } from '../../hooks/use-profile-interests';
 import type { ProfileInterestResponseDto } from '../../types';
+import { ProfileTabSkeleton } from '../profile-skeletons';
+
+const topicOptionsLayout: SkeletonResult = {
+  name: 'profile-topic-options',
+  viewportWidth: 390,
+  width: 448,
+  height: 136,
+  bones: [
+    [0, 0, 100, 40, 0],
+    [0, 48, 100, 40, 0],
+    [0, 96, 100, 40, 0],
+  ],
+};
 
 export function ProfileInterestsTab({
   userId,
@@ -121,11 +132,7 @@ export function ProfileInterestsTab({
   };
 
   if (isLoading) {
-    return (
-      <Stack gap="4" py="2">
-        <LoadingSkeleton variant="rectangular" height={80} count={3} />
-      </Stack>
-    );
+    return <ProfileTabSkeleton tab="interests" isOwner={isOwner} />;
   }
 
   if (isFailed) {
@@ -162,13 +169,7 @@ export function ProfileInterestsTab({
             const fullPath = `${field?.name ?? ''} › ${subfield?.name ?? ''} › ${topic?.name ?? ''}`;
 
             return (
-              <Box
-                key={interest.id}
-                bg="bg.panel"
-                borderWidth="1px"
-                borderRadius="lg"
-                p="4"
-              >
+              <Box key={interest.id} bg="bg.panel" borderWidth="1px" p="4">
                 <Flex
                   direction={{ base: 'column', sm: 'row' }}
                   gap="3"
@@ -286,11 +287,7 @@ export function ProfileInterestsTab({
                   />
 
                   {topicsQuery.isLoading ? (
-                    <LoadingSkeleton
-                      variant="rectangular"
-                      height={80}
-                      count={3}
-                    />
+                    <DelayedSkeleton layout={topicOptionsLayout} />
                   ) : searchedTopics.length === 0 ? (
                     <Text textStyle="sm" color="fg.muted">
                       {t('interestsTab.emptyMessage')}

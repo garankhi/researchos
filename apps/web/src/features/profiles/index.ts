@@ -2,6 +2,7 @@ export * from './types';
 export * from './components/profile-header';
 export * from './components/profile-edit-dialog';
 export * from './components/profile-shell';
+export { ProfilePageSkeleton } from './components/profile-skeletons';
 export * from './components/tabs/profile-applications-tab';
 export * from './components/tabs/profile-groups-tab';
 export * from './components/tabs/profile-outputs-tab';

@@ -334,6 +334,7 @@
   },
   "storybook": {
     "feedback": {
+      "finishLoading": "Hoàn tất tải",
       "emptyTitle": "Không có kết quả nghiên cứu",
       "emptyMessage": "Hãy thử một từ khóa khác.",
       "errorTitle": "Không tải được kết quả nghiên cứu",
