@@ -161,6 +161,7 @@ model group_directions {
   research_projects research_projects[]
 
   @@unique([id, group_id], map: "group_directions_id_group_id_idx")
+  @@index([group_id, created_at], map: "group_directions_active_group_idx", where: raw("(archived_at IS NULL)"))
 }
 
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
@@ -175,6 +176,7 @@ model group_members {
 
   @@id([group_id, user_id])
   @@index([user_id, group_id])
+  @@index([user_id, group_id], map: "group_members_active_user_idx", where: raw("(archived_at IS NULL)"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

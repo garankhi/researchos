@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpStatus,
+} from '@nestjs/common';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
   OpportunityKind,
