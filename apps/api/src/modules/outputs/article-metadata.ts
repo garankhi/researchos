@@ -1,6 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
-import { domainErrorCodes } from '@researchos/error-codes';
-import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { BadRequestException } from '@nestjs/common';
 import { normalizeDoi } from '../../common/normalize-doi.js';
 import type { CreateArticleDto } from './dto/create-article.dto.js';
 
@@ -24,20 +22,16 @@ function normalizePublicationDate(value: string): string {
       return normalized;
     }
   }
-  throw new CodedHttpException(
-    domainErrorCodes.outputs.outputPublicationDateInvalid,
-    HttpStatus.BAD_REQUEST,
-  );
+  throw new BadRequestException({
+    message: { publicationDate: ['publication_date_invalid'] },
+  });
 }
 
 /** Build the stored values in a stable order for the idempotency fingerprint. */
 export function normalizeArticleMetadata(dto: CreateArticleDto) {
   const doi = normalizeDoi(dto.doi);
   if (dto.doi && (!doi || doi.length > 255 || !DOI.test(doi))) {
-    throw new CodedHttpException(
-      domainErrorCodes.outputs.outputDoiInvalid,
-      HttpStatus.BAD_REQUEST,
-    );
+    throw new BadRequestException({ message: { doi: ['doi_invalid'] } });
   }
 
   return {

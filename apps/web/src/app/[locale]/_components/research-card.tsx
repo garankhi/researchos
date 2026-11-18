@@ -24,7 +24,6 @@ import type { ResearchCardData, ResearchFigure } from './research-feed-data';
 const visibleFigureCount = 5;
 const outputTypes = {
   ARTICLE: 'article',
-  PAPER: 'article',
   PREPRINT: 'preprint',
   REVIEW: 'review',
   EDITORIAL: 'editorial',

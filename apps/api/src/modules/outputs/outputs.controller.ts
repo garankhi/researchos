@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiBearerAuth,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
@@ -48,7 +48,7 @@ import { OutputsService } from './outputs.service.js';
  * Controller for research outputs, their revisions and associated files.
  */
 @ApiTags('outputs')
-@ApiBearerAuth()
+@ApiCookieAuth()
 @Controller('outputs')
 export class OutputsController {
   constructor(private readonly outputsService: OutputsService) {}

@@ -61,7 +61,7 @@ Body (every field optional — a partial update sends only what changed):
   "venue": "IEEE Transactions on Medical Imaging",
   "publicationYear": 2026,
   "externalUrl": "https://doi.org/10.1109/TMI.2026.1234567",
-  "outputType": "PAPER"
+  "outputType": "ARTICLE"
 }
 ```
 

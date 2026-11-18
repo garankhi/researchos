@@ -14,6 +14,7 @@ export default defineConfig({
       schemas: './src/lib/api/models',
       client: 'react-query',
       httpClient: 'axios',
+      headers: true,
       mode: 'tags-split',
       clean: true,
       formatter: 'prettier',

@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import {
-  canonicalOutputType,
   DataProvenanceType,
   OutputFileVisibility,
   OutputSharingStatus,
@@ -9,6 +8,9 @@ import {
   Prisma,
   PrismaService,
   PublicationStatusEnum,
+  type OutputAuthor,
+  type OutputRevision,
+  type ResearchOutput,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
@@ -19,6 +21,7 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { readArticleByline } from './article-byline.js';
 import { normalizeArticleMetadata } from './article-metadata.js';
 import type {
   CreateArticleDto,
@@ -177,6 +180,10 @@ export class OutputsService {
             },
             select: { id: true },
           });
+          const byline = article.authors.map((author) => ({
+            id: randomUUID(),
+            ...author,
+          }));
           const revision = await tx.output_revisions.create({
             data: {
               output_id: output.id,
@@ -192,13 +199,14 @@ export class OutputsService {
               issue: article.issue,
               pages: article.pages,
               peer_reviewed: article.peerReviewed,
-              authors_snapshot: article.authors,
+              authors_snapshot: byline,
               created_by: callerId,
             },
             select: { id: true },
           });
           await tx.output_authors.createMany({
-            data: article.authors.map(({ name, userId, order }) => ({
+            data: byline.map(({ id, name, userId, order }) => ({
+              id,
               output_id: output.id,
               author_name_string: name,
               user_id: userId,
@@ -819,7 +827,15 @@ export class OutputsService {
       data['external_url'] = dto.externalUrl;
     }
     if (dto.outputType !== undefined) {
-      data['output_type'] = canonicalOutputType(dto.outputType.trim());
+      const type = dto.outputType.trim();
+      const normalizedType = type.toUpperCase();
+      if (normalizedType === 'PAPER') {
+        throw new BadRequestException({
+          message: { outputType: ['article_type_invalid'] },
+        });
+      }
+      data['output_type'] =
+        normalizedType === OutputType.ARTICLE ? OutputType.ARTICLE : type;
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1221,28 +1237,35 @@ export class OutputsService {
   }
 
   private mapToOutputResponse(
-    o: any,
-    revision: any,
-    authors: any[],
+    output: ResearchOutput,
+    revision: OutputRevision | null,
+    authors: OutputAuthor[],
     topics: OutputTopicResponseDto[],
   ): OutputResponseDto {
+    // Older releases may have no byline snapshot. Keep their authors readable.
+    const byline =
+      revision?.released_at && revision.output_type === OutputType.ARTICLE
+        ? readArticleByline(revision)
+        : [];
     return {
-      id: o.id,
-      doi: o.doi ?? null,
-      ownerId: o.owner_id ?? null,
-      sharingStatus: o.sharing_status,
-      visibility: o.visibility,
-      accessGroupId: o.access_group_id ?? null,
-      importState: o.import_state,
-      currentReleaseId: o.current_release_id ?? null,
-      firstSharedAt: o.first_shared_at ? o.first_shared_at.toISOString() : null,
+      id: output.id,
+      doi: output.doi ?? null,
+      ownerId: output.owner_id ?? null,
+      sharingStatus: output.sharing_status,
+      visibility: output.visibility,
+      accessGroupId: output.access_group_id ?? null,
+      importState: output.import_state,
+      currentReleaseId: output.current_release_id ?? null,
+      firstSharedAt: output.first_shared_at?.toISOString() ?? null,
       currentRevision: revision ? this.mapToRevisionResponse(revision) : null,
-      authors: authors.map((a) => this.mapToAuthorResponse(a)),
+      authors: byline.length
+        ? byline
+        : authors.map((a) => this.mapToAuthorResponse(a)),
       topics,
     };
   }
 
-  private mapToRevisionResponse(r: any): OutputRevisionResponseDto {
+  private mapToRevisionResponse(r: OutputRevision): OutputRevisionResponseDto {
     return {
       id: r.id,
       outputId: r.output_id,
@@ -1255,7 +1278,7 @@ export class OutputsService {
       publicationDate:
         r.publication_date ?? r.publication_year?.toString() ?? null,
       publicationStatus: r.publication_status,
-      outputType: canonicalOutputType(r.output_type),
+      outputType: r.output_type,
       volume: r.volume ?? null,
       issue: r.issue ?? null,
       pages: r.pages ?? null,
@@ -1266,7 +1289,7 @@ export class OutputsService {
     };
   }
 
-  private mapToAuthorResponse(a: any): OutputAuthorResponseDto {
+  private mapToAuthorResponse(a: OutputAuthor): OutputAuthorResponseDto {
     return {
       id: a.id,
       outputId: a.output_id,

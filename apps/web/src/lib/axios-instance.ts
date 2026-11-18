@@ -78,8 +78,7 @@ export const axiosInstance = <T>(
 ): Promise<Unwrap<T>> => {
   const source = Axios.CancelToken.source();
   const promise = AXIOS_INSTANCE({
-    ...config,
-    ...options,
+    ...Axios.mergeConfig(config, options ?? {}),
     cancelToken: source.token,
   }).then(({ data: body }) => {
     const payload = isEnvelope(body) ? body.data : body;

@@ -21,7 +21,7 @@ function makeRevision(
     abstract: 'An abstract',
     venue: 'A venue',
     publication_year: 2020,
-    output_type: 'PAPER',
+    output_type: 'ARTICLE',
     external_url: 'https://example.org/work',
     authors_snapshot: [
       {

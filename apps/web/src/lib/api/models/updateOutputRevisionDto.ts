@@ -36,7 +36,7 @@ export interface UpdateOutputRevisionDto {
    */
   externalUrl?: string | null;
   /**
-   * Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT). PAPER is a legacy alias for ARTICLE.
+   * Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT).
    * @maxLength 50
    */
   outputType?: string;

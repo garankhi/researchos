@@ -9,7 +9,7 @@ import type { CreateArticleAuthorDto } from './createArticleAuthorDto';
 import type { CreateArticleDtoOutputType } from './createArticleDtoOutputType';
 
 export interface CreateArticleDto {
-  /** ARTICLE is the canonical type. PAPER is a legacy alias. */
+  /** Output type for the Article creation flow. */
   outputType?: CreateArticleDtoOutputType;
   /**
    * Article title.

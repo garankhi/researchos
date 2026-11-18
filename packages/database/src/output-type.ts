@@ -11,10 +11,3 @@ export const OutputType = {
 } as const;
 
 export type OutputType = (typeof OutputType)[keyof typeof OutputType];
-
-/** The legacy revision API also supports custom type strings. */
-export function canonicalOutputType(value: string): string {
-  const normalized = value.trim().toUpperCase();
-  if (normalized === 'PAPER') return OutputType.ARTICLE;
-  return Object.hasOwn(OutputType, normalized) ? normalized : value;
-}

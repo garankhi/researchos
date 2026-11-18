@@ -28,6 +28,7 @@ import type {
   HomeFeedResponseDtoEnvelope,
   OutputResponseDtoEnvelope,
   OutputRevisionResponseDtoEnvelope,
+  OutputsControllerCreateArticleHeaders,
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
   OutputsControllerFindHomeFeedParams,
@@ -66,6 +67,7 @@ const withQueryKey = <T extends object, K>(
  */
 export const outputsControllerCreateArticle = (
   createArticleDto: CreateArticleDto,
+  headers: OutputsControllerCreateArticleHeaders,
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
@@ -73,7 +75,7 @@ export const outputsControllerCreateArticle = (
     {
       url: `/outputs`,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       data: createArticleDto,
       signal,
     },
@@ -114,9 +116,9 @@ export const getOutputsControllerCreateArticleMutationOptions = <
     Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
     OutputsControllerCreateArticleMutationVariables
   > = (props) => {
-    const { data } = props ?? {};
+    const { data, headers } = props ?? {};
 
-    return outputsControllerCreateArticle(data, requestOptions);
+    return outputsControllerCreateArticle(data, headers, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -129,6 +131,7 @@ export type OutputsControllerCreateArticleMutationBody = CreateArticleDto;
 export type OutputsControllerCreateArticleMutationError = ApiErrorResponseDto;
 export type OutputsControllerCreateArticleMutationVariables = {
   data: CreateArticleDto;
+  headers: OutputsControllerCreateArticleHeaders;
 };
 
 /**

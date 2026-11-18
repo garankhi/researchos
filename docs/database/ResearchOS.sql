@@ -504,10 +504,7 @@ CREATE TABLE "research_outputs" (
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
   CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
   CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL),
-  CONSTRAINT "ck_output_create_request" CHECK (
-    (create_idempotency_key IS NULL AND create_request_hash IS NULL)
-    OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL)
-  )
+  CONSTRAINT "ck_output_create_request" CHECK ((create_idempotency_key IS NULL AND create_request_hash IS NULL) OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL))
 );
 
 CREATE TABLE "resource_handovers" (
@@ -552,13 +549,7 @@ CREATE TABLE "output_revisions" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_output_revision_no" CHECK (revision_no > 0),
   CONSTRAINT "ck_publication_year" CHECK (publication_year IS NULL OR publication_year BETWEEN 1000 AND 9999),
-  CONSTRAINT "ck_output_publication_date" CHECK (
-    publication_date IS NULL OR (
-      publication_year IS NOT NULL
-      AND left(publication_date, 4) = publication_year::text
-      AND publication_date ~ '^[1-9][0-9]{3}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$'
-    )
-  ),
+  CONSTRAINT "ck_output_publication_date" CHECK (publication_date IS NULL OR (publication_year IS NOT NULL AND left(publication_date, 4) = publication_year::text AND publication_date ~ '^[1-9][0-9]{3}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$')),
   CONSTRAINT "ck_revision_authors" CHECK (jsonb_typeof(authors_snapshot) = 'array'),
   CONSTRAINT "ck_revision_release" CHECK ((released_at IS NULL AND released_by IS NULL) OR (released_at IS NOT NULL AND released_by IS NOT NULL AND released_at >= created_at))
 );
@@ -973,9 +964,9 @@ CREATE UNIQUE INDEX ON "group_directions" ("id", "group_id");
 
 CREATE INDEX ON "research_outputs" ("owner_id");
 
-CREATE INDEX ON "resource_handovers" ("performed_by", "performed_at");
-
 CREATE UNIQUE INDEX "uq_output_creator_create_key" ON "research_outputs" ("created_by", "create_idempotency_key");
+
+CREATE INDEX ON "resource_handovers" ("performed_by", "performed_at");
 
 CREATE UNIQUE INDEX ON "output_revisions" ("output_id", "revision_no");
 
@@ -1088,6 +1079,8 @@ COMMENT ON TABLE "resource_handovers" IS 'Append-only owner/Leader handover ledg
 COMMENT ON COLUMN "resource_handovers"."authorization_reference" IS 'Reference to verified consent/official authorization, not a client assertion. Backend verifies evidence before insert.';
 
 COMMENT ON TABLE "output_revisions" IS 'NULL released_at = editable draft. Release is an owner action, not a review. SQL freezes released metadata and revision-topic/file links. Publish revision and current_release_id atomically. New draft does not change current personal/group release.';
+
+COMMENT ON COLUMN "output_revisions"."publication_date" IS 'Canonical YYYY, YYYY-MM or YYYY-MM-DD at the recorded precision.';
 
 COMMENT ON COLUMN "output_external_ids"."source" IS 'E.g. OPENALEX, SCOPUS. Presence here records metadata origin, not a quality certification.';
 

@@ -7,12 +7,11 @@
  */
 
 /**
- * ARTICLE is the canonical type. PAPER is a legacy alias.
+ * Output type for the Article creation flow.
  */
 export type CreateArticleDtoOutputType =
   (typeof CreateArticleDtoOutputType)[keyof typeof CreateArticleDtoOutputType];
 
 export const CreateArticleDtoOutputType = {
   ARTICLE: 'ARTICLE',
-  PAPER: 'PAPER',
 } as const;

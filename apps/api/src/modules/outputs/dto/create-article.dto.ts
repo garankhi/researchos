@@ -5,7 +5,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
-  IsIn,
+  Equals,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -50,18 +50,16 @@ class CreateArticleAuthorDto {
   userId?: string | null;
 }
 
-const articleTypes = [OutputType.ARTICLE, 'PAPER'] as const;
-
 export class CreateArticleDto {
   @ApiPropertyOptional({
-    enum: articleTypes,
+    enum: [OutputType.ARTICLE],
     default: OutputType.ARTICLE,
-    description: 'ARTICLE is the canonical type. PAPER is a legacy alias.',
+    description: 'Output type for the Article creation flow.',
   })
   @Transform(trimText)
   @ValidateIf((_object, value) => value !== undefined)
-  @IsIn(articleTypes, { message: 'article_type_invalid' })
-  outputType?: (typeof articleTypes)[number];
+  @Equals(OutputType.ARTICLE, { message: 'article_type_invalid' })
+  outputType?: typeof OutputType.ARTICLE;
 
   @ApiProperty({ type: String, maxLength: 500, description: 'Article title.' })
   @Transform(trimText)

@@ -1,6 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
-  canonicalOutputType,
   OutputImportState,
   OutputType,
   Prisma,
@@ -554,9 +553,7 @@ export class OpenAlexCandidatesService {
       abstract: revision?.abstract ?? null,
       venue: revision?.venue ?? null,
       publicationYear: revision?.publication_year ?? null,
-      outputType: canonicalOutputType(
-        revision?.output_type ?? OutputType.ARTICLE,
-      ),
+      outputType: revision?.output_type ?? OutputType.ARTICLE,
       url: revision?.external_url ?? null,
       authors: toAuthorNames(revision?.authors_snapshot),
       claimStatus: claim?.status ?? null,

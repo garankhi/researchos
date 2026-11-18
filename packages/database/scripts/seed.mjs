@@ -2010,6 +2010,8 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
     const authorsSnapshot = output.authors.map((author) => ({
       name: author.name,
       order: author.order,
+      userId: idsByEmail.get(author.email) ?? null,
+      isCorresponding: author.corresponding === true,
     }));
 
     // The revision is found by its number rather than upserted, so that the

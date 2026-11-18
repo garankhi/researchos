@@ -95,10 +95,11 @@ describe('Article creation', () => {
     await db.query(
       `INSERT INTO output_revisions
          (id, output_id, revision_no, title, output_type, publication_year,
-          created_by, released_by, released_at)
-       VALUES ($1, $4, 1, 'Legacy paper', 'PAPER', 2020, $6, $6, clock_timestamp()),
-              ($2, $4, 2, 'Legacy draft', ' paper ', NULL, $6, NULL, NULL),
-              ($3, $5, 1, 'Imported dataset', 'DATASET', NULL, $6, NULL, NULL)`,
+          created_by, released_by, released_at, authors_snapshot)
+       VALUES ($1, $4, 1, 'Legacy paper', 'PAPER', 2020, $6, $6, clock_timestamp(),
+               '[{"name":"Legacy author","order":1}]'),
+              ($2, $4, 2, 'Legacy draft', ' paper ', NULL, $6, NULL, NULL, '[]'),
+              ($3, $5, 1, 'Imported dataset', 'DATASET', NULL, $6, NULL, NULL, '[]')`,
       [
         legacyRevision,
         aliasRevision,
@@ -262,6 +263,13 @@ describe('Article creation', () => {
       publicationDate: '2020',
       publicationYear: 2020,
     });
+    expect(response.body.data.authors).toMatchObject([
+      {
+        id: expect.any(String),
+        authorNameString: 'Legacy author',
+        userId: null,
+      },
+    ]);
   });
 
   it('releases a metadata-only Article for immediate community access without implicitly linking the owner as author', async () => {
@@ -311,6 +319,19 @@ describe('Article creation', () => {
     }
   });
 
+  it('preserves other types on draft edits and rejects the retired PAPER alias', async () => {
+    const update = (outputType: string) =>
+      http
+        .request(app.getHttpServer())
+        .patch(`/outputs/${legacyOutput}/revision`)
+        .set('Cookie', cookies.get('owner')!)
+        .send({ outputType });
+
+    const edited = await update('Dataset').expect(200);
+    expect(edited.body.data.outputType).toBe('Dataset');
+    await update('PAPER').expect(400);
+  });
+
   it('rejects invalid metadata and unselectable author and Topic IDs', async () => {
     for (const patch of [
       { title: '   ' },
@@ -334,6 +355,7 @@ describe('Article creation', () => {
       { topicIds: [inactiveTopic] },
       { peerReviewed: 'false' },
       { outputType: 'DATASET' },
+      { outputType: 'PAPER' },
       { visibility: 'PRIVATE' },
       { uploadId: randomUUID(), fileVisibility: 'PRIVATE' },
     ]) {
@@ -342,10 +364,25 @@ describe('Article creation', () => {
     }
   });
 
+  it.each([
+    {
+      field: 'publicationDate',
+      value: '29-02-2023',
+      code: 'publication_date_invalid',
+    },
+    { field: 'doi', value: 'not a DOI', code: 'doi_invalid' },
+  ])(
+    'reports invalid $field on the submitted field',
+    async ({ field, value, code }) => {
+      const response = await submit({ ...input, [field]: value }).expect(400);
+      expect(response.body.errors).toContainEqual({ field, messages: [code] });
+    },
+  );
+
   it('stores ordered authors, selected Topics, month precision and optional bibliography', async () => {
     const response = await submit({
       ...input,
-      outputType: 'PAPER',
+      outputType: 'ARTICLE',
       authors: [
         { displayName: 'Outside author' },
         { displayName: 'ResearchOS co-author', userId: actors.reader },
@@ -383,6 +420,36 @@ describe('Article creation', () => {
       pages: 'e133',
       peerReviewed: false,
     });
+  });
+
+  it('keeps the released byline when current author names and account links change', async () => {
+    const response = await submit({
+      ...input,
+      authors: [
+        { displayName: 'An' },
+        { displayName: 'Binh', userId: actors.reader },
+      ],
+    }).expect(201);
+    const { outputId } = response.body.data;
+    const original = (await detail(outputId).expect(200)).body.data.authors;
+
+    await db.query(
+      `UPDATE output_authors
+       SET author_name_string = 'Updated name', user_id = $2
+       WHERE output_id = $1 AND author_order = 1`,
+      [outputId, actors.researcher],
+    );
+
+    const article = (await detail(outputId).expect(200)).body.data;
+    expect(article.authors).toEqual(original);
+    const feed = await http
+      .request(app.getHttpServer())
+      .get('/outputs/home-feed')
+      .set('Cookie', cookies.get('reader')!)
+      .expect(200);
+    expect(feed.body.data.items).toContainEqual(
+      expect.objectContaining({ id: outputId, authors: original }),
+    );
   });
 
   it('replays a concurrent normalized payload before checking DOI and conflicts on changed metadata', async () => {

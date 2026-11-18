@@ -85,7 +85,7 @@ export class UpdateOutputRevisionDto {
 
   @ApiPropertyOptional({
     description:
-      'Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT). PAPER is a legacy alias for ARTICLE.',
+      'Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT).',
     type: String,
     maxLength: 50,
     example: 'ARTICLE',
