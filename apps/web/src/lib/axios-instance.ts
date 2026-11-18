@@ -77,8 +77,14 @@ export const axiosInstance = <T>(
   options?: AxiosRequestConfig,
 ): Promise<Unwrap<T>> => {
   const source = Axios.CancelToken.source();
+  const { headers } = Axios.mergeConfig(
+    { headers: config.headers },
+    { headers: options?.headers },
+  );
   const promise = AXIOS_INSTANCE({
-    ...Axios.mergeConfig(config, options ?? {}),
+    ...config,
+    ...options,
+    headers,
     cancelToken: source.token,
   }).then(({ data: body }) => {
     const payload = isEnvelope(body) ? body.data : body;

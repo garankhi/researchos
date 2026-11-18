@@ -66,7 +66,7 @@ function defaultValidateStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
 
-it('sends the generated Article key alongside custom request headers', async () => {
+it('preserves the generated Article request alongside custom options', async () => {
   const body = {
     title: 'Article',
     publicationDate: '2026',
@@ -81,6 +81,9 @@ it('sends the generated Article key alongside custom request headers', async () 
       {
         headers: { 'x-request-id': 'test-request' },
         adapter: async (config) => {
+          expect(config.url).toBe('/outputs');
+          expect(config.method).toBe('post');
+          expect(JSON.parse(config.data as string)).toEqual(body);
           expect(config.headers.get('idempotency-key')).toBe(key);
           expect(config.headers.get('x-request-id')).toBe('test-request');
           return adapterFor(
