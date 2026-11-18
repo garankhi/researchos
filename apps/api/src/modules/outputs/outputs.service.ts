@@ -21,7 +21,7 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
-import { readArticleByline } from './article-byline.js';
+import { completeArticleByline, readArticleByline } from './article-byline.js';
 import { normalizeArticleMetadata } from './article-metadata.js';
 import type {
   CreateArticleDto,
@@ -226,14 +226,13 @@ export class OutputsService {
 
           // RES-173 consumes the verified upload and attaches it at this point,
           // while the revision still accepts attachment writes.
-          await this.releaseRevision(
-            tx,
-            output.id,
-            revision.id,
+          await this.releaseRevision(tx, {
+            outputId: output.id,
+            revisionId: revision.id,
             callerId,
-            OutputFileVisibility.FPTU_COMMUNITY,
-            null,
-          );
+            visibility: OutputFileVisibility.FPTU_COMMUNITY,
+            accessGroupId: null,
+          });
           return { outputId: output.id, revisionId: revision.id };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
@@ -905,15 +904,16 @@ export class OutputsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const output = await tx.research_outputs.findUnique({
-        where: { id: outputId },
-        select: {
-          id: true,
-          owner_id: true,
-          sharing_status: true,
-          current_release_id: true,
-        },
-      });
+      // Serialize publication with OpenAlex acceptance so the byline includes
+      // author links confirmed before we release the draft.
+      const [output] = await tx.$queryRaw<
+        Pick<ResearchOutput, 'owner_id' | 'sharing_status'>[]
+      >`
+        SELECT owner_id, sharing_status
+        FROM research_outputs
+        WHERE id = ${outputId}::uuid
+        FOR NO KEY UPDATE
+      `;
 
       if (!output) {
         throw new CodedHttpException(
@@ -959,31 +959,58 @@ export class OutputsService {
         );
       }
 
-      await this.releaseRevision(
-        tx,
+      const authorsSnapshot =
+        draft.output_type === OutputType.ARTICLE
+          ? completeArticleByline(
+              draft.authors_snapshot,
+              await tx.output_authors.findMany({
+                where: { output_id: outputId },
+                orderBy: { author_order: 'asc' },
+              }),
+            )
+          : undefined;
+
+      await this.releaseRevision(tx, {
         outputId,
-        draft.id,
+        revisionId: draft.id,
         callerId,
-        dto.visibility,
-        dto.accessGroupId ?? null,
-      );
+        visibility: dto.visibility,
+        accessGroupId: dto.accessGroupId ?? null,
+        authorsSnapshot,
+      });
       return this.loadResponse(tx, outputId);
     });
   }
 
   private async releaseRevision(
     tx: Prisma.TransactionClient,
-    outputId: string,
-    revisionId: string,
-    callerId: string,
-    visibility: OutputFileVisibility,
-    accessGroupId: string | null,
+    {
+      outputId,
+      revisionId,
+      callerId,
+      visibility,
+      accessGroupId,
+      authorsSnapshot,
+    }: {
+      outputId: string;
+      revisionId: string;
+      callerId: string;
+      visibility: OutputFileVisibility;
+      accessGroupId: string | null;
+      authorsSnapshot?: Prisma.InputJsonArray;
+    },
   ): Promise<void> {
     const now = await this.now(tx);
     // The database requires a released revision before it can pin and share it.
     await tx.output_revisions.update({
       where: { id: revisionId },
-      data: { released_at: now, released_by: callerId },
+      data: {
+        released_at: now,
+        released_by: callerId,
+        ...(authorsSnapshot === undefined
+          ? {}
+          : { authors_snapshot: authorsSnapshot }),
+      },
     });
     await tx.research_outputs.update({
       where: { id: outputId },

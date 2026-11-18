@@ -1,4 +1,5 @@
 import type { OutputResponseDto } from '@/lib/api/models';
+import { doiUrl } from '@/lib/doi-url';
 
 export type ResearchFigure = { src: string; number: number };
 
@@ -42,10 +43,6 @@ export function toResearchCard(
   // The generated types represent nullable scalars as objects in this API.
   // Read their actual JSON types at the boundary.
   const rawDoi: unknown = output.doi;
-  const doi =
-    typeof rawDoi === 'string'
-      ? rawDoi.split('/').map(encodeURIComponent).join('/')
-      : undefined;
   return {
     id: output.id,
     detailHref: `/outputs/${output.id}`,
@@ -60,7 +57,7 @@ export function toResearchCard(
       typeof revision.publisher === 'string' ? revision.publisher : undefined,
     publicationUrl:
       publicationLink(revision.externalUrl) ??
-      (doi ? `https://doi.org/${doi}` : undefined),
+      (typeof rawDoi === 'string' && rawDoi ? doiUrl(rawDoi) : undefined),
     downloadablePdf: output.downloadablePdf,
     authors: output.authors.map((author) => ({
       id: author.id,

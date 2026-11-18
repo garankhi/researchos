@@ -135,7 +135,7 @@ One transaction, four writes, in the order the triggers require:
 
 | # | Write | Protecting constraint |
 | --- | --- | --- |
-| 1 | release the draft revision: `released_at`, `released_by` | trigger `guard_revision` — only a managing researcher may release, and the title must not be blank |
+| 1 | complete any missing Article byline links and release the draft revision with `released_at` and `released_by` | trigger `guard_revision` — only a managing researcher may release, and the title must not be blank |
 | 2 | `research_outputs.current_release_id` → the revision just released | trigger `guard_output_release` — the pin must point at a **released** revision of this output |
 | 3 | `sharing_status = 'SHARED'`, `first_shared_at = now()` | check `ck_shared_output` — a shared work needs an owner, a pin and a first-shared timestamp |
 | 4 | `visibility` and `access_group_id` | check `ck_output_access_scope` |

@@ -53,6 +53,27 @@ describe('normalizeDoi', () => {
     expect(normalizeDoi('10.1234/abc')).toBe('10.1234/abc');
   });
 
+  it.each([
+    ['DOI:10.1000/Res#Test', '10.1000/res#test'],
+    [
+      'http://dx.doi.org/10.1000/Res%23Test?noredirect#copy',
+      '10.1000/res#test',
+    ],
+    ['https://doi.org/10.1000/Res%3FTest', '10.1000/res?test'],
+    ['https://doi.org/10.1000/literal%2523', '10.1000/literal%23'],
+    ['10.1000/literal%23', '10.1000/literal%23'],
+    ['https://doi.org/10.1000/./%C3%89', '10.1000/./É'],
+  ])('normalizes %s to %s', (value, expected) => {
+    expect(normalizeDoi(value)).toBe(expected);
+  });
+
+  it.each(['%xy', '%e9', '%00'])(
+    'rejects an invalid URL path escape %s',
+    (escape) => {
+      expect(normalizeDoi(`https://doi.org/10.1000/res${escape}`)).toBeNull();
+    },
+  );
+
   it('returns null for missing or blank DOIs', () => {
     expect(normalizeDoi(null)).toBeNull();
     expect(normalizeDoi('  ')).toBeNull();
@@ -145,7 +166,7 @@ describe('OpenAlexClient', () => {
           results: [
             {
               id: 'https://openalex.org/W2741809807',
-              doi: 'https://doi.org/10.1234/ABC',
+              doi: 'https://doi.org/10.1234/ABC%23edition',
               title: '  Some title  ',
               abstract_inverted_index: { Some: [0], title: [1] },
               primary_location: { source: { display_name: 'Nature' } },
@@ -174,7 +195,7 @@ describe('OpenAlexClient', () => {
     expect(page.total).toBe(1);
     expect(page.works[0]).toMatchObject({
       shortId: 'W2741809807',
-      doi: '10.1234/abc',
+      doi: '10.1234/abc#edition',
       title: 'Some title',
       abstract: 'Some title',
       venue: 'Nature',

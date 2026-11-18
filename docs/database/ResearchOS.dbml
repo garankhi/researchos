@@ -522,7 +522,7 @@ Table group_directions {
 
 Table research_outputs {
   id uuid [pk, default: `gen_random_uuid()`]
-  doi varchar(255) [unique, note: 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.']
+  doi varchar(255) [unique, note: 'SQL normalizes DOI names and decodes doi.org resolver paths. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.']
   owner_id uuid [note: 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.']
   created_by uuid
   sharing_status output_sharing_status [not null, default: 'DRAFT']

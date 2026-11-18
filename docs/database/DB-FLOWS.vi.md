@@ -290,7 +290,7 @@ SQL ghi sự kiện chia sẻ vào outbox cùng transaction. Sau commit, worker 
 
 ### Khi người khác đã thêm cùng bài báo
 
-Nếu Bình thêm P1 bằng DOI đã có, hệ thống dùng lại công trình P1, không tạo thêm bản sao. SQL chuẩn hóa DOI và chặn trùng cả khi người này nhập mã DOI, người kia dán URL doi.org, kể cả có space/tab/xuống dòng ở đầu hoặc cuối do copy/paste. Ký tự bên trong DOI được giữ nguyên ngoài việc chuyển chữ thường; backend vẫn phải kiểm tra định dạng. Nếu Bình được xem bài, ứng dụng có thể dẫn tới bài và flow claim tác giả; claim không cho Bình quyền sửa bài của cô An. Nếu P1 là PRIVATE mà Bình không được xem, không trả thông tin bài/owner để làm lộ dữ liệu; hướng Bình tới quy trình hỗ trợ phù hợp.
+Nếu Bình tạo Article bằng DOI của P1, API trả `409 output_doi_conflict`. Backend và SQL đều bỏ khoảng trắng đầu cuối và chuyển các chữ cái ASCII về chữ thường. Khi Bình dán URL doi.org, hệ thống giải mã phần path một lần, nên mã `10.1000/res#test` khớp với URL có `res%23test`. Quyền xem P1 theo visibility của công trình, còn việc xác nhận Bình là tác giả đi qua luồng claim riêng.
 
 Với bài chưa có DOI, MVP chỉ cảnh báo nghi trùng, không tự gộp hai bài vì tên gần giống.
 

@@ -36,7 +36,9 @@ describe('Article creation', () => {
   const aliasRevision = randomUUID();
   const datasetRevision = randomUUID();
   const importedOutput = randomUUID();
-  const importedDoi = '10.1234/openalex-candidate';
+  const importedDoi = '10.1234/openalex#candidate';
+  const literalPercentDoi = '10.1234/literal%23doi';
+  const importedOrcid = '0000-0002-1825-0097';
   const input = {
     title: 'A new Article',
     publicationDate: '2026',
@@ -50,6 +52,7 @@ describe('Article creation', () => {
   let databaseCreated = false;
   let app: INestApplication;
   let originalRevision: Record<string, unknown>;
+  let originalSearchTimestamp: string;
 
   async function readLegacyRevision() {
     const result = await db.query(
@@ -58,6 +61,14 @@ describe('Article creation', () => {
       [legacyRevision],
     );
     return result.rows[0];
+  }
+
+  async function readLegacySearchTimestamp(): Promise<string> {
+    const { rows } = await db.query(
+      "SELECT updated_at::text FROM search_index WHERE entity_type = 'OUTPUT' AND entity_id = $1",
+      [legacyOutput],
+    );
+    return rows[0].updated_at;
   }
 
   async function seedLegacy() {
@@ -88,16 +99,30 @@ describe('Article creation', () => {
     }
 
     await db.query(
+      'INSERT INTO researcher_profiles (user_id, orcid_id) VALUES ($1, $2)',
+      [actors.researcher, importedOrcid],
+    );
+    await db.query(
       `INSERT INTO research_outputs (id, owner_id, created_by, doi, import_state)
-       VALUES ($1, $3, $3, NULL, 'NONE'), ($2, NULL, $3, $4, 'CANDIDATE')`,
-      [legacyOutput, importedOutput, actors.owner, importedDoi],
+       VALUES ($1, $3, $3, $4, 'NONE'), ($2, NULL, $5, $6, 'CANDIDATE')`,
+      [
+        legacyOutput,
+        importedOutput,
+        actors.owner,
+        literalPercentDoi,
+        actors.researcher,
+        'https://doi.org/10.1234/openalex%23candidate',
+      ],
     );
     await db.query(
       `INSERT INTO output_revisions
          (id, output_id, revision_no, title, output_type, publication_year,
           created_by, released_by, released_at, authors_snapshot)
        VALUES ($1, $4, 1, 'Legacy paper', 'PAPER', 2020, $6, $6, clock_timestamp(),
-               '[{"name":"Legacy author","order":1}]'),
+               '[{"name":"Legacy author","order":1},
+                 {"name":"Outside author","order":2},
+                 {"name":"Older display name","order":3},
+                 {"name":"Explicitly unlinked","order":4,"userId":null,"isCorresponding":false}]'),
               ($2, $4, 2, 'Legacy draft', ' paper ', NULL, $6, NULL, NULL, '[]'),
               ($3, $5, 1, 'Imported dataset', 'DATASET', NULL, $6, NULL, NULL, '[]')`,
       [
@@ -110,11 +135,21 @@ describe('Article creation', () => {
       ],
     );
     await db.query(
+      `INSERT INTO output_authors
+         (output_id, author_name_string, author_order, user_id, is_corresponding_author)
+       VALUES ($1, 'Legacy author', 1, $2, true),
+              ($1, 'Outside author', 2, NULL, false),
+              ($1, 'Newer display name', 3, $3, false),
+              ($1, 'Explicitly unlinked', 4, $4, true)`,
+      [legacyOutput, actors.owner, actors.researcher, actors.reader],
+    );
+    await db.query(
       `UPDATE research_outputs SET current_release_id = $1, sharing_status = 'SHARED',
          first_shared_at = clock_timestamp(), visibility = 'FPTU_COMMUNITY' WHERE id = $2`,
       [legacyRevision, legacyOutput],
     );
     originalRevision = await readLegacyRevision();
+    originalSearchTimestamp = await readLegacySearchTimestamp();
   }
 
   beforeAll(async () => {
@@ -172,6 +207,8 @@ describe('Article creation', () => {
       await import('../dist/modules/identity/identity.module.js');
     const { OutputsModule } =
       await import('../dist/modules/outputs/outputs.module.js');
+    const { OpenAlexModule } =
+      await import('../dist/modules/openalex/openalex.module.js');
     const { HttpExceptionFilter } =
       await import('../dist/common/filters/http-exception.filter.js');
     const { ApiResponseInterceptor } =
@@ -185,6 +222,7 @@ describe('Article creation', () => {
         PrismaModule,
         IdentityModule,
         OutputsModule,
+        OpenAlexModule,
       ],
     }).compile();
     app = fixture.createNestApplication({ logger: false });
@@ -267,9 +305,29 @@ describe('Article creation', () => {
       {
         id: expect.any(String),
         authorNameString: 'Legacy author',
+        userId: actors.owner,
+        isCorrespondingAuthor: true,
+      },
+      {
+        authorNameString: 'Outside author',
         userId: null,
+        isCorrespondingAuthor: false,
+      },
+      {
+        authorNameString: 'Older display name',
+        userId: null,
+        isCorrespondingAuthor: false,
+      },
+      {
+        authorNameString: 'Explicitly unlinked',
+        userId: null,
+        isCorrespondingAuthor: false,
       },
     ]);
+  });
+
+  it('preserves the Discovery timestamp when migrating a shared PAPER revision', async () => {
+    expect(await readLegacySearchTimestamp()).toBe(originalSearchTimestamp);
   });
 
   it('releases a metadata-only Article for immediate community access without implicitly linking the owner as author', async () => {
@@ -371,6 +429,11 @@ describe('Article creation', () => {
       code: 'publication_date_invalid',
     },
     { field: 'doi', value: 'not a DOI', code: 'doi_invalid' },
+    {
+      field: 'doi',
+      value: 'https://doi.org/10.1234/invalid%00',
+      code: 'doi_invalid',
+    },
   ])(
     'reports invalid $field on the submitted field',
     async ({ field, value, code }) => {
@@ -456,7 +519,7 @@ describe('Article creation', () => {
     const key = randomUUID();
     const body = {
       ...input,
-      doi: 'DOI:10.1234/Replay',
+      doi: 'DOI:10.1234/Replay#Edition',
       publicationDate: '29-02-2024',
       topicIds: [activeTopic, secondTopic],
     };
@@ -464,7 +527,7 @@ describe('Article creation', () => {
       ...input,
       outputType: 'ARTICLE',
       title: `  ${input.title}  `,
-      doi: 'https://doi.org/10.1234/replay',
+      doi: 'https://doi.org/10.1234/replay%23edition?noredirect',
       publicationDate: '2024-02-29',
       topicIds: [secondTopic, activeTopic],
     };
@@ -475,13 +538,26 @@ describe('Article creation', () => {
     expect(retry.body.data).toEqual(first.body.data);
     const article = (await detail(first.body.data.outputId).expect(200)).body
       .data;
-    expect(article.doi).toBe('10.1234/replay');
+    expect(article.doi).toBe('10.1234/replay#edition');
     expect(article.currentRevision.publicationDate).toBe('2024-02-29');
     const conflict = await submit(
       { ...body, title: 'Changed title' },
       key,
     ).expect(409);
     expect(conflict.body.message).toBe('output_idempotency_key_conflict');
+    const duplicate = await submit(canonical).expect(409);
+    expect(duplicate.body.message).toBe('output_doi_conflict');
+  });
+
+  it('preserves a literal percent escape in the name of a pre-existing manual DOI', async () => {
+    expect((await detail(legacyOutput).expect(200)).body.data.doi).toBe(
+      literalPercentDoi,
+    );
+    const duplicate = await submit({
+      ...input,
+      doi: 'https://doi.org/10.1234/literal%2523doi',
+    }).expect(409);
+    expect(duplicate.body.message).toBe('output_doi_conflict');
   });
 
   it('scopes keys to the actor and rejects DOI conflicts even with imported works or concurrent requests', async () => {
@@ -495,10 +571,14 @@ describe('Article creation', () => {
     const existing = await submit({ ...input, doi: importedDoi }).expect(409);
     expect(existing.body.message).toBe('output_doi_conflict');
     const row = await db.query(
-      'SELECT owner_id, import_state FROM research_outputs WHERE id = $1',
+      'SELECT doi, owner_id, import_state FROM research_outputs WHERE id = $1',
       [importedOutput],
     );
-    expect(row.rows[0]).toEqual({ owner_id: null, import_state: 'CANDIDATE' });
+    expect(row.rows[0]).toEqual({
+      doi: importedDoi,
+      owner_id: null,
+      import_state: 'CANDIDATE',
+    });
 
     const body = { ...input, doi: '10.1234/concurrent' };
     const racing = await Promise.all([
@@ -511,6 +591,65 @@ describe('Article creation', () => {
     expect(
       racing.find((response) => response.status === 409)?.body.message,
     ).toBe('output_doi_conflict');
+  });
+
+  it('freezes the verified author link when an OpenAlex Article is accepted and published', async () => {
+    const outputId = randomUUID();
+    await db.query(
+      "INSERT INTO research_outputs (id, created_by, import_state) VALUES ($1, $2, 'CANDIDATE')",
+      [outputId, actors.researcher],
+    );
+    await db.query(
+      `INSERT INTO output_revisions
+         (output_id, revision_no, title, output_type, created_by, authors_snapshot)
+       VALUES ($1, 1, 'Imported Article', 'ARTICLE', $2, $3::jsonb)`,
+      [
+        outputId,
+        actors.researcher,
+        JSON.stringify([
+          {
+            name: 'Imported author',
+            order: 1,
+            orcid: importedOrcid,
+            isCorresponding: true,
+          },
+        ]),
+      ],
+    );
+    await db.query(
+      `INSERT INTO output_authors (output_id, author_name_string, author_order, is_corresponding_author)
+       VALUES ($1, 'Imported author', 1, true)`,
+      [outputId],
+    );
+    const server = app.getHttpServer();
+    const cookie = cookies.get('researcher')!;
+    await http
+      .request(server)
+      .post(`/external/openalex/works/${outputId}/accept`)
+      .set('Cookie', cookie)
+      .expect(200);
+    await http
+      .request(server)
+      .post(`/outputs/${outputId}/publish`)
+      .set('Cookie', cookie)
+      .send({ visibility: 'FPTU_COMMUNITY' })
+      .expect(200);
+
+    const article = (await detail(outputId).expect(200)).body.data;
+    expect(article.authors).toMatchObject([
+      {
+        authorNameString: 'Imported author',
+        userId: actors.researcher,
+        isCorrespondingAuthor: true,
+      },
+    ]);
+    await db.query(
+      'UPDATE output_authors SET user_id = NULL WHERE output_id = $1',
+      [outputId],
+    );
+    expect((await detail(outputId).expect(200)).body.data.authors).toEqual(
+      article.authors,
+    );
   });
 
   it('rolls back the Article and retry record when pinning the released revision fails', async () => {

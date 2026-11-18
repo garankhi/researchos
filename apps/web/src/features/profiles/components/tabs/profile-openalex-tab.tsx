@@ -15,6 +15,7 @@ import { Check, ExternalLink, GraduationCap, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
+import { doiUrl } from '@/lib/doi-url';
 import { useOpenAlexCandidates } from '../../hooks/use-openalex-candidates';
 import type { CandidateWorkDto } from '../../types';
 import { ProfileTabSkeleton } from '../profile-skeletons';
@@ -147,7 +148,7 @@ export function ProfileOpenAlexTab() {
 
                     {work.doi ? (
                       <Link
-                        href={`https://doi.org/${work.doi}`}
+                        href={doiUrl(work.doi)}
                         target="_blank"
                         rel="noopener noreferrer"
                         display="inline-flex"
