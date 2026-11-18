@@ -93,8 +93,14 @@
       "label": "Presentation",
       "description": "Add a presentation"
     },
-    "poster": { "label": "Poster", "description": "Add a conference poster" },
-    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
+    "poster": {
+      "label": "Poster",
+      "description": "Add a conference poster"
+    },
+    "data": {
+      "label": "Data",
+      "description": "Table, image, sequence, etc."
+    },
     "other": {
       "label": "Other",
       "description": "Methods, proposal, code, etc."
@@ -554,10 +560,24 @@
     "removeAttachment": "Remove attachment",
     "downloadFile": "Download",
     "previewImage": "Image attachment: {name}",
-    "messageDeleted": "This message was deleted.",
+    "messageDeleted": "This message was unsent.",
+    "youUnsentMessage": "You unsent a message.",
+    "senderUnsentMessage": "{name} unsent a message.",
     "editedBadge": "edited",
     "editAction": "Edit",
-    "deleteAction": "Delete",
+    "deleteAction": "Remove",
+    "removeMenu": {
+      "title": "Who do you want to remove this message for?",
+      "titleOther": "Remove message from your view?",
+      "unsendEveryone": "Unsend for everyone",
+      "unsendEveryoneHint": "Removes this message for all participants in the conversation.",
+      "moderateEveryone": "Remove for everyone (Group Admin)",
+      "removeForYou": "Remove for you",
+      "removeForYouHint": "Hidden on your screen only. Other members will still see this message.",
+      "cancel": "Cancel",
+      "hiddenToast": "Message hidden from your view.",
+      "undo": "Undo"
+    },
     "retrySend": "Retry",
     "addReaction": "Add reaction",
     "mentionAllLabel": "Everyone in conversation",
@@ -587,6 +607,42 @@
       "sendFailed": "Message could not be sent",
       "reactionFailed": "Could not update reaction",
       "uploadFailed": "Could not upload attachment"
+    },
+    "details": {
+      "togglePanel": "Conversation details & settings",
+      "closePanel": "Close details",
+      "viewProfile": "Profile",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "mutedToast": "Notifications muted for this chat.",
+      "unmutedToast": "Notifications enabled for this chat.",
+      "settingsSection": "Chat settings",
+      "groupNameLabel": "Group chat name",
+      "saveGroupName": "Save",
+      "groupRenamedToast": "Group name updated.",
+      "archiveChat": "Archive chat",
+      "unarchiveChat": "Unarchive chat",
+      "archivedToast": "Conversation archived.",
+      "unarchivedToast": "Conversation restored.",
+      "leaveGroup": "Leave group",
+      "leftGroupToast": "You left the group conversation.",
+      "membersSection": "Chat members ({count})",
+      "ownerBadge": "Admin",
+      "youBadge": "You",
+      "addPeople": "Add people",
+      "cancelAdd": "Cancel",
+      "searchToAddPlaceholder": "Search researchers to add...",
+      "noUsersFound": "No matching researchers found.",
+      "addButton": "Add",
+      "memberAddedToast": "Added {name} to the group.",
+      "removeMember": "Remove from group",
+      "memberRemovedToast": "Removed {name} from the group.",
+      "messageMember": "Message {name}",
+      "mediaSection": "Media & files ({count})",
+      "noMedia": "No photos or files shared in this chat yet.",
+      "photosLabel": "Photos",
+      "filesLabel": "Files",
+      "settingsError": "Could not update conversation settings."
     }
   },
   "notFound": {

@@ -9,15 +9,26 @@ import {
   Flex,
   HStack,
   IconButton,
+  Link,
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { ArrowLeft, MessageSquare, Users } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Info, MessageSquare, Users } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
-import { useRouter } from '@/i18n/navigation';
+import NextLink from '@/components/ui/link';
+import { getPathname } from '@/i18n/navigation';
+import type { Locale } from '@/i18n/routing';
 import { apiErrorCode } from '@/lib/api-error';
 import type { ChatConversationResponseDto } from '@/lib/api/models';
 import { resolveErrorCode } from '@/utils/error-messages';
@@ -31,6 +42,7 @@ import {
   ChatWorkspaceSkeleton,
   MessageHistorySkeleton,
 } from './chat-skeletons';
+import { ConversationDetailsPanel } from './conversation-details-panel';
 import {
   ConversationList,
   resolveConversationTitle,
@@ -52,26 +64,69 @@ type RoomEventBridge = {
   onReconnected?: ReturnType<typeof useChatRoom>['refreshAfterReconnect'];
 };
 
+function hiddenMessagesStorageKey(userId: string): string {
+  return `researchos:chat:hidden-messages:${userId}`;
+}
+
+function loadHiddenMessageIds(userId: string): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(hiddenMessagesStorageKey(userId));
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed.filter((item): item is string => typeof item === 'string'),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHiddenMessageIds(userId: string, ids: ReadonlySet<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      hiddenMessagesStorageKey(userId),
+      JSON.stringify(Array.from(ids)),
+    );
+  } catch {
+    // Ignore storage quota errors safely
+  }
+}
+
 function ActiveConversationPane({
   conversationId,
   fallbackConversation,
   currentUser,
   socket,
   bridgeRef,
+  hiddenMessageIds,
+  onHideMessageForMe,
   onBackToList,
+  onSelectConversation,
 }: {
   conversationId: string;
   fallbackConversation: ChatConversationResponseDto | null;
   currentUser: ChatUserSummary;
   socket: ReturnType<typeof useChatSocket>;
   bridgeRef: React.RefObject<RoomEventBridge>;
+  hiddenMessageIds: ReadonlySet<string>;
+  onHideMessageForMe: (messageId: string) => void;
   onBackToList: () => void;
+  onSelectConversation: (nextId: string) => void;
 }) {
   const t = useTranslations('chat');
+  const tDetails = useTranslations('chat.details');
   const tTyping = useTranslations('chat.typing');
   const tErrors = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const initialAnchoredRef = useRef(false);
+  const prevLastMsgIdRef = useRef<string | undefined>(undefined);
+
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [expandMembersKey, setExpandMembersKey] = useState(0);
 
   const room = useChatRoom({
     conversationId,
@@ -105,12 +160,31 @@ function ActiveConversationPane({
     room.refreshAfterReconnect,
   ]);
 
-  const lastMsgId = room.messages[room.messages.length - 1]?.id;
-  useEffect(() => {
-    if (lastMsgId) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const visibleMessages = useMemo(
+    () => room.messages.filter((m) => !hiddenMessageIds.has(m.id)),
+    [room.messages, hiddenMessageIds],
+  );
+
+  const lastMsgId = visibleMessages[visibleMessages.length - 1]?.id;
+
+  // Anchor scroll position synchronously BEFORE browser paint so entering a
+  // conversation starts immediately at the latest message with zero visible animation.
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || visibleMessages.length === 0) return;
+
+    if (!initialAnchoredRef.current) {
+      el.scrollTop = el.scrollHeight;
+      initialAnchoredRef.current = true;
+      prevLastMsgIdRef.current = lastMsgId;
+      return;
     }
-  }, [lastMsgId]);
+
+    if (lastMsgId && lastMsgId !== prevLastMsgIdRef.current) {
+      prevLastMsgIdRef.current = lastMsgId;
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [lastMsgId, visibleMessages.length]);
 
   if (room.isConversationFailed) {
     return (
@@ -135,7 +209,13 @@ function ActiveConversationPane({
     (p) => p.userId === currentUser.id,
   );
   const isOwner = myParticipant?.role === 'OWNER';
+  const isGroup = activeConversation?.type === 'GROUP';
   const canMentionAll = activeConversation?.type === 'DIRECT' || isOwner;
+
+  const directPartner = !isGroup
+    ? (activeParticipants.find((p) => p.userId !== currentUser.id) ??
+      activeParticipants[0])
+    : null;
 
   const activeTitle = activeConversation
     ? resolveConversationTitle(
@@ -160,174 +240,268 @@ function ActiveConversationPane({
           ? tTyping('many', { count: typingNames.length })
           : null;
 
+  const openMembersView = () => {
+    setExpandMembersKey((k) => k + 1);
+    setDetailsOpen(true);
+  };
+
   return (
-    <>
+    <Flex flex="1" minW="0" h="full" overflow="hidden">
+      {/* Center Message Thread Column */}
       <Flex
-        px="4"
-        py="3"
-        align="center"
-        justify="space-between"
-        borderBottomWidth="1px"
-        borderColor="border.emphasized"
-        bg="bg.panel"
-        gap="3"
+        direction="column"
+        flex="1"
+        minW="0"
+        h="full"
+        display={{
+          base: detailsOpen ? 'none' : 'flex',
+          xl: 'flex',
+        }}
       >
-        <HStack gap="2.5" minW="0">
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            hideFrom="lg"
-            aria-label={t('backToList')}
-            onClick={onBackToList}
-          >
-            <ArrowLeft size={18} />
-          </IconButton>
+        <Flex
+          px="4"
+          py="3"
+          align="center"
+          justify="space-between"
+          borderBottomWidth="1px"
+          borderColor="border.emphasized"
+          bg="bg.panel"
+          gap="3"
+        >
+          <HStack gap="2.5" minW="0">
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              hideFrom="lg"
+              aria-label={t('backToList')}
+              onClick={onBackToList}
+            >
+              <ArrowLeft size={18} />
+            </IconButton>
 
-          {activeTitle && (
-            <Avatar.Root size="sm" flexShrink={0}>
-              <Avatar.Fallback name={activeTitle}>
-                {initialsForChatName(activeTitle)}
-              </Avatar.Fallback>
-            </Avatar.Root>
-          )}
+            {activeTitle && (
+              <Avatar.Root size="sm" flexShrink={0}>
+                <Avatar.Fallback name={activeTitle}>
+                  {isGroup ? (
+                    <Users size={15} />
+                  ) : (
+                    initialsForChatName(activeTitle)
+                  )}
+                </Avatar.Fallback>
+              </Avatar.Root>
+            )}
 
-          <Box minW="0">
-            <Text fontWeight="semibold" textStyle="sm" truncate>
-              {activeTitle || '—'}
-            </Text>
-            {activeConversation?.type === 'GROUP' && (
-              <HStack gap="1" textStyle="xs" color="fg.muted">
-                <Users size={12} />
-                <Text>
-                  {t('participantsCount', {
-                    count: activeParticipants.length,
-                  })}
+            <Box minW="0">
+              {directPartner ? (
+                <Link
+                  asChild
+                  fontWeight="semibold"
+                  textStyle="sm"
+                  layerStyle="researchTextLink"
+                  display="block"
+                  truncate
+                >
+                  <NextLink href={`/profile/${directPartner.userId}`}>
+                    {activeTitle || '—'}
+                  </NextLink>
+                </Link>
+              ) : (
+                <Text fontWeight="semibold" textStyle="sm" truncate>
+                  {activeTitle || '—'}
                 </Text>
-              </HStack>
-            )}
-          </Box>
-        </HStack>
+              )}
 
-        {activeConversation?.archivedAt && (
-          <Badge variant="subtle" colorPalette="orange">
-            Archived
-          </Badge>
-        )}
-      </Flex>
-
-      <Box flex="1" overflowY="auto" px="4" py="3" bg="bg">
-        {room.isMessagesLoading ? (
-          <MessageHistorySkeleton />
-        ) : room.isMessagesFailed ? (
-          <ErrorState
-            title={t('errors.messagesLoadFailed')}
-            message={resolveErrorCode(
-              tErrors,
-              apiErrorCode(room.messagesError) ?? 'server_error',
-              tErrors('unknown'),
-            )}
-            onRetry={() => void room.refetchMessages()}
-          />
-        ) : room.messages.length === 0 ? (
-          <EmptyState
-            title={t('messagesEmptyTitle')}
-            message={t('messagesEmptyMessage')}
-          />
-        ) : (
-          <Stack gap="3.5">
-            {room.hasOlderMessages && (
-              <Flex justify="center" py="1">
+              {isGroup ? (
                 <Button
                   type="button"
-                  size="xs"
-                  variant="outline"
-                  loading={room.isLoadingOlder}
-                  onClick={() => void room.loadOlderMessages()}
+                  variant="plain"
+                  size="2xs"
+                  px="0"
+                  minW="0"
+                  h="auto"
+                  color="fg.muted"
+                  layerStyle="researchTextLink"
+                  onClick={openMembersView}
                 >
-                  {room.isLoadingOlder ? t('loadingOlder') : t('loadOlder')}
+                  <Users size={12} />
+                  <Text as="span" textStyle="xs">
+                    {t('participantsCount', {
+                      count: activeParticipants.length,
+                    })}
+                  </Text>
                 </Button>
-              </Flex>
+              ) : directPartner?.user.departmentUnit ? (
+                <Text textStyle="xs" color="fg.muted" truncate>
+                  {directPartner.user.departmentUnit}
+                </Text>
+              ) : null}
+            </Box>
+          </HStack>
+
+          <HStack gap="2" flexShrink={0}>
+            {activeConversation?.archivedAt && (
+              <Badge variant="subtle" colorPalette="orange">
+                Archived
+              </Badge>
             )}
 
-            {room.messages.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                currentUserId={currentUser.id}
-                canModerate={isOwner}
-                participants={activeParticipants}
-                onToggleReaction={(messageId, emoji) => {
-                  void room
-                    .toggleReactionOptimistic(messageId, emoji)
-                    .then((errCode) => {
-                      if (errCode) {
-                        showSnackbar({
-                          severity: 'error',
-                          message: resolveErrorCode(
-                            tErrors,
-                            errCode,
-                            t('errors.reactionFailed'),
-                          ),
-                        });
-                      }
-                    });
-                }}
-                onEditMessage={room.editExistingMessage}
-                onDeleteMessage={(messageId) => {
-                  void room.deleteExistingMessage(messageId).then((errCode) => {
-                    if (errCode) {
-                      showSnackbar({
-                        severity: 'error',
-                        message: resolveErrorCode(
-                          tErrors,
-                          errCode,
-                          tErrors('unknown'),
-                        ),
-                      });
-                    }
-                  });
-                }}
-                onRetrySend={(failed) => {
-                  void room.retryFailedMessage(failed);
-                }}
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </Stack>
-        )}
-      </Box>
+            <IconButton
+              type="button"
+              variant={detailsOpen ? 'subtle' : 'ghost'}
+              colorPalette={detailsOpen ? 'blue' : 'gray'}
+              size="sm"
+              aria-label={tDetails('togglePanel')}
+              title={tDetails('togglePanel')}
+              aria-pressed={detailsOpen}
+              onClick={() => setDetailsOpen((prev) => !prev)}
+            >
+              <Info size={18} />
+            </IconButton>
+          </HStack>
+        </Flex>
 
-      {typingText && (
         <Box
+          ref={scrollContainerRef}
+          flex="1"
+          overflowY="auto"
           px="4"
-          py="1"
-          bg="bg.subtle"
-          borderTopWidth="1px"
-          borderColor="border.subtle"
+          py="3"
+          bg="bg"
         >
-          <Text textStyle="xs" color="fg.muted" fontStyle="italic">
-            {typingText}
-          </Text>
-        </Box>
-      )}
+          {room.isMessagesLoading ? (
+            <MessageHistorySkeleton />
+          ) : room.isMessagesFailed ? (
+            <ErrorState
+              title={t('errors.messagesLoadFailed')}
+              message={resolveErrorCode(
+                tErrors,
+                apiErrorCode(room.messagesError) ?? 'server_error',
+                tErrors('unknown'),
+              )}
+              onRetry={() => void room.refetchMessages()}
+            />
+          ) : visibleMessages.length === 0 ? (
+            <EmptyState
+              title={t('messagesEmptyTitle')}
+              message={t('messagesEmptyMessage')}
+            />
+          ) : (
+            <Stack gap="3.5">
+              {room.hasOlderMessages && (
+                <Flex justify="center" py="1">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    loading={room.isLoadingOlder}
+                    onClick={() => void room.loadOlderMessages()}
+                  >
+                    {room.isLoadingOlder ? t('loadingOlder') : t('loadOlder')}
+                  </Button>
+                </Flex>
+              )}
 
-      <MessageComposer
-        participants={activeParticipants}
-        currentUserId={currentUser.id}
-        canMentionAll={canMentionAll}
-        disabled={Boolean(activeConversation?.archivedAt)}
-        pendingAttachments={room.pendingAttachments}
-        hasUploadingAttachments={room.hasUploadingAttachments}
-        errorCode={room.composerErrorCode}
-        onClearError={room.clearComposerError}
-        onStageFiles={(files) => void room.stageFiles(files)}
-        onRemoveAttachment={room.removePendingAttachment}
-        onSendMessage={room.submitMessage}
-        onStartTyping={() => socket.startTyping(conversationId)}
-        onStopTyping={() => socket.stopTyping(conversationId)}
-      />
-    </>
+              {visibleMessages.map((msg) => (
+                <MessageItem
+                  key={msg.id}
+                  message={msg}
+                  currentUserId={currentUser.id}
+                  canModerate={isGroup && isOwner}
+                  participants={activeParticipants}
+                  onToggleReaction={(messageId, emoji) => {
+                    void room
+                      .toggleReactionOptimistic(messageId, emoji)
+                      .then((errCode) => {
+                        if (errCode) {
+                          showSnackbar({
+                            severity: 'error',
+                            message: resolveErrorCode(
+                              tErrors,
+                              errCode,
+                              t('errors.reactionFailed'),
+                            ),
+                          });
+                        }
+                      });
+                  }}
+                  onEditMessage={room.editExistingMessage}
+                  onDeleteMessage={(messageId) => {
+                    void room
+                      .deleteExistingMessage(messageId)
+                      .then((errCode) => {
+                        if (errCode) {
+                          showSnackbar({
+                            severity: 'error',
+                            message: resolveErrorCode(
+                              tErrors,
+                              errCode,
+                              tErrors('unknown'),
+                            ),
+                          });
+                        }
+                      });
+                  }}
+                  onHideMessageForMe={onHideMessageForMe}
+                  onRetrySend={(failed) => {
+                    void room.retryFailedMessage(failed);
+                  }}
+                />
+              ))}
+            </Stack>
+          )}
+        </Box>
+
+        {typingText && (
+          <Box
+            px="4"
+            py="1"
+            bg="bg.subtle"
+            borderTopWidth="1px"
+            borderColor="border.subtle"
+          >
+            <Text textStyle="xs" color="fg.muted" fontStyle="italic">
+              {typingText}
+            </Text>
+          </Box>
+        )}
+
+        <MessageComposer
+          participants={activeParticipants}
+          currentUserId={currentUser.id}
+          canMentionAll={canMentionAll}
+          disabled={Boolean(activeConversation?.archivedAt)}
+          pendingAttachments={room.pendingAttachments}
+          hasUploadingAttachments={room.hasUploadingAttachments}
+          errorCode={room.composerErrorCode}
+          onClearError={room.clearComposerError}
+          onStageFiles={(files) => void room.stageFiles(files)}
+          onRemoveAttachment={room.removePendingAttachment}
+          onSendMessage={room.submitMessage}
+          onStartTyping={() => socket.startTyping(conversationId)}
+          onStopTyping={() => socket.stopTyping(conversationId)}
+        />
+      </Flex>
+
+      {/* Right Messenger-style Conversation Details & Group Settings Sidebar */}
+      {detailsOpen && activeConversation ? (
+        <Box w={{ base: 'full', xl: '320px' }} flexShrink={0} h="full">
+          <ConversationDetailsPanel
+            key={`${activeConversation.id}:${expandMembersKey}`}
+            conversation={activeConversation}
+            displayTitle={activeTitle || t('untitledGroup')}
+            participants={activeParticipants}
+            messages={room.messages}
+            currentUserId={currentUser.id}
+            isOwner={isOwner}
+            defaultExpandMembers={expandMembersKey > 0}
+            onClose={() => setDetailsOpen(false)}
+            onSelectConversation={onSelectConversation}
+            onLeftGroup={onBackToList}
+          />
+        </Box>
+      ) : null}
+    </Flex>
   );
 }
 
@@ -337,17 +511,46 @@ export function ChatShell({
   initialConversationId?: string | null;
 }) {
   const t = useTranslations('chat');
-  const router = useRouter();
+  const tRemove = useTranslations('chat.removeMenu');
+  const locale = useLocale() as Locale;
+  const params = useParams<{ conversationId?: string }>();
   const { showSnackbar } = useSnackbar();
 
+  const routeConversationId =
+    typeof params?.conversationId === 'string'
+      ? params.conversationId
+      : (initialConversationId ?? null);
+
   const { currentUser, isLoading: isMeLoading } = useChatCurrentUser();
-  const [selectedOverride, setSelectedOverride] = useState<
-    string | null | undefined
-  >(undefined);
+  const [manualSelection, setManualSelection] = useState<{
+    baseRouteId: string | null;
+    selectedId: string | null;
+  } | null>(null);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
 
+  const [hiddenByUser, setHiddenByUser] = useState<{
+    userId: string;
+    ids: Set<string>;
+  } | null>(null);
+
   const selectedConversationId =
-    selectedOverride !== undefined ? selectedOverride : initialConversationId;
+    manualSelection && manualSelection.baseRouteId === routeConversationId
+      ? manualSelection.selectedId
+      : routeConversationId;
+
+  // Support browser Back/Forward without page reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPopState = () => {
+      const match = /\/chat\/([^/?#]+)/.exec(window.location.pathname);
+      setManualSelection({
+        baseRouteId: routeConversationId,
+        selectedId: match?.[1] ?? null,
+      });
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [routeConversationId]);
 
   const {
     conversations,
@@ -371,12 +574,70 @@ export function ChatShell({
     [currentUser],
   );
 
+  const hiddenMessageIds = useMemo(() => {
+    if (!normalizedMe) return new Set<string>();
+    if (hiddenByUser?.userId === normalizedMe.id) return hiddenByUser.ids;
+    return loadHiddenMessageIds(normalizedMe.id);
+  }, [hiddenByUser, normalizedMe]);
+
+  const handleHideMessageForMe = useCallback(
+    (messageId: string) => {
+      if (!normalizedMe) return;
+      const uid = normalizedMe.id;
+      setHiddenByUser((prev) => {
+        const base =
+          prev?.userId === uid ? prev.ids : loadHiddenMessageIds(uid);
+        const next = new Set(base);
+        next.add(messageId);
+        saveHiddenMessageIds(uid, next);
+        return { userId: uid, ids: next };
+      });
+
+      showSnackbar({
+        severity: 'info',
+        message: tRemove('hiddenToast'),
+        actionLabel: tRemove('undo'),
+        onAction: () => {
+          setHiddenByUser((prev) => {
+            const base =
+              prev?.userId === uid ? prev.ids : loadHiddenMessageIds(uid);
+            const next = new Set(base);
+            next.delete(messageId);
+            saveHiddenMessageIds(uid, next);
+            return { userId: uid, ids: next };
+          });
+        },
+      });
+    },
+    [normalizedMe, showSnackbar, tRemove],
+  );
+
   const bridgeRef = useRef<RoomEventBridge>({});
 
-  const handleSelectConversation = (id: string) => {
-    setSelectedOverride(id);
-    router.replace(`/chat/${id}`);
-  };
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      setManualSelection({
+        baseRouteId: routeConversationId,
+        selectedId: id,
+      });
+      if (typeof window !== 'undefined') {
+        const nextPath = getPathname({ locale, href: `/chat/${id}` });
+        window.history.replaceState(window.history.state, '', nextPath);
+      }
+    },
+    [locale, routeConversationId],
+  );
+
+  const handleBackToList = useCallback(() => {
+    setManualSelection({
+      baseRouteId: routeConversationId,
+      selectedId: null,
+    });
+    if (typeof window !== 'undefined') {
+      const nextPath = getPathname({ locale, href: '/chat' });
+      window.history.replaceState(window.history.state, '', nextPath);
+    }
+  }, [locale, routeConversationId]);
 
   const socket = useChatSocket({
     enabled: Boolean(normalizedMe),
@@ -489,10 +750,10 @@ export function ChatShell({
               currentUser={normalizedMe}
               socket={socket}
               bridgeRef={bridgeRef}
-              onBackToList={() => {
-                setSelectedOverride(null);
-                router.replace('/chat');
-              }}
+              hiddenMessageIds={hiddenMessageIds}
+              onHideMessageForMe={handleHideMessageForMe}
+              onSelectConversation={handleSelectConversation}
+              onBackToList={handleBackToList}
             />
           )}
         </Flex>

@@ -23,7 +23,7 @@ import {
   type ChatToggleReactionPayload,
   type ChatTypingUpdatedEventPayload,
 } from '@researchos/chat';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type { ChatConnectionStatus } from '../types';
 
@@ -170,9 +170,18 @@ export function useChatSocket({
           });
         }, 10_000);
 
-        invoke(socket, (ack) => {
+        invoke(socket, (rawAck) => {
           clearTimeout(timeout);
-          resolve(ack);
+          const unwrapped =
+            rawAck &&
+            typeof rawAck === 'object' &&
+            'success' in rawAck &&
+            'data' in rawAck &&
+            typeof (rawAck as { data: unknown }).data === 'object' &&
+            (rawAck as { data: unknown }).data !== null
+              ? (rawAck as unknown as { data: ChatSocketAck<T> }).data
+              : rawAck;
+          resolve(unwrapped);
         });
       });
     },
@@ -260,17 +269,32 @@ export function useChatSocket({
     [emitAck],
   );
 
-  return {
-    connectionStatus: status,
-    joinConversation,
-    leaveConversation,
-    sendMessage,
-    editMessage,
-    deleteMessage,
-    startTyping,
-    stopTyping,
-    markRead,
-    markDelivered,
-    toggleReaction,
-  };
+  return useMemo(
+    () => ({
+      connectionStatus: status,
+      joinConversation,
+      leaveConversation,
+      sendMessage,
+      editMessage,
+      deleteMessage,
+      startTyping,
+      stopTyping,
+      markRead,
+      markDelivered,
+      toggleReaction,
+    }),
+    [
+      deleteMessage,
+      editMessage,
+      joinConversation,
+      leaveConversation,
+      markDelivered,
+      markRead,
+      sendMessage,
+      startTyping,
+      status,
+      stopTyping,
+      toggleReaction,
+    ],
+  );
 }

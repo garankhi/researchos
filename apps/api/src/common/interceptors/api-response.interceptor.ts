@@ -26,9 +26,17 @@ export class ApiResponseInterceptor<T> implements NestInterceptor<
   { success: true; data: T; message: string }
 > {
   intercept(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<{ success: true; data: T; message: string }> {
+    if (typeof context.getType === 'function' && context.getType() !== 'http') {
+      return next.handle() as unknown as Observable<{
+        success: true;
+        data: T;
+        message: string;
+      }>;
+    }
+
     return next.handle().pipe(
       map((payload): { success: true; data: T; message: string } => {
         if (isEnvelope(payload)) {

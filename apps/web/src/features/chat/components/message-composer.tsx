@@ -36,7 +36,7 @@ function detectActiveMention(
   caretPos: number,
 ): ActiveMentionQuery | null {
   const beforeCaret = text.slice(0, caretPos);
-  const match = /(?:^|[\s(])@([^\s@\[\]]{0,40})$/.exec(beforeCaret);
+  const match = /(?:^|[\s(])@([^\s@[\]]{0,40})$/.exec(beforeCaret);
   if (!match) return null;
   const query = match[1] ?? '';
   const triggerIndex = caretPos - query.length - 1;
@@ -171,6 +171,10 @@ export function MessageComposer({
     !hasUploadingAttachments &&
     (body.trim().length > 0 || readyAttachmentCount > 0);
 
+  const attachDisabled =
+    Boolean(disabled) ||
+    pendingAttachments.length >= MAX_CHAT_ATTACHMENTS_PER_MESSAGE;
+
   return (
     <Box
       borderTopWidth="1px"
@@ -206,7 +210,7 @@ export function MessageComposer({
               layerStyle="interactiveRow"
             >
               <button type="button" onClick={() => insertMentionToken('@all')}>
-                <Badge variant="solid" colorPalette="orange">
+                <Badge variant="solid" colorPalette="blue">
                   @all
                 </Badge>
                 <Text textStyle="xs" color="fg.muted">
@@ -314,14 +318,13 @@ export function MessageComposer({
           </FieldError>
         )}
 
-        <Flex gap="2" align="end">
+        <Flex gap="2" align="end" w="full" minW="0">
           <FileUpload.Root
+            w="auto"
+            flexShrink={0}
             maxFiles={MAX_CHAT_ATTACHMENTS_PER_MESSAGE}
             accept={[...ALLOWED_CHAT_ATTACHMENT_MIME_TYPES]}
-            disabled={
-              disabled ||
-              pendingAttachments.length >= MAX_CHAT_ATTACHMENTS_PER_MESSAGE
-            }
+            disabled={attachDisabled}
             onFileAccept={(details) => {
               if (details.files.length > 0) {
                 onStageFiles(details.files);
@@ -334,6 +337,8 @@ export function MessageComposer({
                 type="button"
                 variant="outline"
                 size="sm"
+                flexShrink={0}
+                disabled={attachDisabled}
                 aria-label={t('attachFiles')}
                 title={t('attachFiles')}
               >
@@ -351,18 +356,17 @@ export function MessageComposer({
                 e.target.selectionStart ?? e.target.value.length,
               )
             }
-            onClick={(e) =>
-              setCaretPos(
-                e.currentTarget.selectionStart ?? e.currentTarget.value.length,
-              )
-            }
-            onKeyUp={(e) =>
+            onSelect={(e) =>
               setCaretPos(
                 e.currentTarget.selectionStart ?? e.currentTarget.value.length,
               )
             }
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
                 e.preventDefault();
                 void handleSubmit();
               }
@@ -373,11 +377,13 @@ export function MessageComposer({
             resize="none"
             disabled={disabled}
             flex="1"
+            minW="0"
           />
 
           <Button
             type="button"
             size="sm"
+            flexShrink={0}
             onClick={() => void handleSubmit()}
             disabled={!canSend}
             loading={isSending}

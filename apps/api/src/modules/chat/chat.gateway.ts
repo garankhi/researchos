@@ -55,6 +55,7 @@ import {
 
 interface SocketSessionData {
   principal?: AuthPrincipal;
+  authPromise?: Promise<AuthPrincipal | null>;
 }
 
 export type ChatAuthenticatedSocket = Socket<
@@ -135,6 +136,14 @@ export class ChatGateway
   }
 
   async handleConnection(client: ChatAuthenticatedSocket): Promise<void> {
+    const authTask = this.authenticateHandshake(client);
+    client.data.authPromise = authTask;
+    await authTask;
+  }
+
+  private async authenticateHandshake(
+    client: ChatAuthenticatedSocket,
+  ): Promise<AuthPrincipal | null> {
     try {
       const token = this.extractSessionToken(client);
       if (!token) {
@@ -142,7 +151,7 @@ export class ChatGateway
           code: codeForStatus(HttpStatus.UNAUTHORIZED),
           status: HttpStatus.UNAUTHORIZED,
         });
-        return;
+        return null;
       }
 
       const principal = await this.sessionResolver.resolve(token);
@@ -151,7 +160,7 @@ export class ChatGateway
           code: codeForStatus(HttpStatus.UNAUTHORIZED),
           status: HttpStatus.UNAUTHORIZED,
         });
-        return;
+        return null;
       }
 
       if (principal.mustChangePassword) {
@@ -159,7 +168,7 @@ export class ChatGateway
           code: domainErrorCodes.identity.mustChangePassword,
           status: HttpStatus.FORBIDDEN,
         });
-        return;
+        return null;
       }
 
       await this.sessionResolver
@@ -192,9 +201,11 @@ export class ChatGateway
         userId: principal.userId,
         connectedAt: new Date().toISOString(),
       });
+      return principal;
     } catch (error) {
       const mapped = this.toSocketError(error);
       this.rejectConnection(client, mapped);
+      return null;
     }
   }
 
@@ -548,7 +559,9 @@ export class ChatGateway
     client: ChatAuthenticatedSocket,
     handler: (userId: string) => Promise<T>,
   ): Promise<ChatSocketAck<T>> {
-    const principal = client.data.principal;
+    const principal =
+      client.data.principal ??
+      (client.data.authPromise ? await client.data.authPromise : null);
     if (!principal) {
       return {
         ok: false,

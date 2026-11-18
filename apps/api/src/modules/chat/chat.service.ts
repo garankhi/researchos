@@ -243,11 +243,16 @@ export class ChatService {
   async assertParticipant(
     userId: string,
     conversationId: string,
-  ): Promise<{ role: ChatParticipantRole; participantIds: string[] }> {
+  ): Promise<{
+    role: ChatParticipantRole;
+    type: ChatConversationType;
+    participantIds: string[];
+  }> {
     const conv = await this.prisma.chat_conversations.findUnique({
       where: { id: conversationId },
       select: {
         id: true,
+        type: true,
         chat_conversation_participants: {
           select: { user_id: true, role: true },
         },
@@ -273,6 +278,7 @@ export class ChatService {
 
     return {
       role: me.role,
+      type: conv.type,
       participantIds: conv.chat_conversation_participants.map((p) => p.user_id),
     };
   }
@@ -1066,7 +1072,7 @@ export class ChatService {
     deleted: ChatMessageDeletedEventPayload;
     participantIds: string[];
   }> {
-    const { role, participantIds } = await this.assertParticipant(
+    const { role, type, participantIds } = await this.assertParticipant(
       userId,
       dto.conversationId,
     );
@@ -1085,7 +1091,9 @@ export class ChatService {
       );
     }
 
-    if (existing.sender_id !== userId && role !== ChatParticipantRole.OWNER) {
+    const isGroupOwner =
+      type === ChatConversationType.GROUP && role === ChatParticipantRole.OWNER;
+    if (existing.sender_id !== userId && !isGroupOwner) {
       throw new CodedHttpException(
         domainErrorCodes.chat.messageDeleteDenied,
         HttpStatus.FORBIDDEN,

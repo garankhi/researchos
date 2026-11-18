@@ -58,6 +58,13 @@ export function useChatRoom({
   socket: SocketActions;
 }) {
   const queryClient = useQueryClient();
+  const {
+    connectionStatus,
+    joinConversation,
+    leaveConversation,
+    markDelivered,
+    markRead,
+  } = socket;
 
   const [olderPages, setOlderPages] = useState<ChatMessagePayload[][]>([]);
   const [olderCursor, setOlderCursor] = useState<string | null | undefined>(
@@ -104,12 +111,12 @@ export function useChatRoom({
 
   // Join & leave Socket.IO conversation room when connected
   useEffect(() => {
-    if (!conversationId || socket.connectionStatus !== 'connected') {
+    if (!conversationId || connectionStatus !== 'connected') {
       return;
     }
 
     let cancelled = false;
-    void socket.joinConversation(conversationId).then((ack) => {
+    void joinConversation(conversationId).then((ack) => {
       if (!cancelled && ack.ok) {
         setTypingUserIds(
           ack.data.typingUserIds.filter((id) => id !== currentUser?.id),
@@ -119,15 +126,14 @@ export function useChatRoom({
 
     return () => {
       cancelled = true;
-      void socket.leaveConversation(conversationId);
+      void leaveConversation(conversationId);
     };
   }, [
+    connectionStatus,
     conversationId,
     currentUser?.id,
-    socket,
-    socket.connectionStatus,
-    socket.joinConversation,
-    socket.leaveConversation,
+    joinConversation,
+    leaveConversation,
   ]);
 
   const initialItems = useMemo(
@@ -151,7 +157,7 @@ export function useChatRoom({
     if (
       !conversationId ||
       !currentUser ||
-      socket.connectionStatus !== 'connected' ||
+      connectionStatus !== 'connected' ||
       messages.length === 0
     ) {
       return;
@@ -171,7 +177,7 @@ export function useChatRoom({
       .map((m) => m.id);
 
     if (undeliveredIds.length > 0) {
-      void socket.markDelivered({
+      void markDelivered({
         conversationId,
         messageIds: undeliveredIds,
       });
@@ -183,7 +189,7 @@ export function useChatRoom({
     );
     if (!alreadyRead && lastMarkedReadIdRef.current !== lastPersisted.id) {
       lastMarkedReadIdRef.current = lastPersisted.id;
-      void socket.markRead({
+      void markRead({
         conversationId,
         messageId: lastPersisted.id,
       });
@@ -194,12 +200,13 @@ export function useChatRoom({
       });
     }
   }, [
+    connectionStatus,
     conversationId,
     currentUser,
+    markDelivered,
+    markRead,
     messages,
     queryClient,
-    socket,
-    socket.connectionStatus,
   ]);
 
   // Socket event handlers scoped to this active conversation
@@ -242,7 +249,10 @@ export function useChatRoom({
     (updater: (msg: ChatMessagePayload) => ChatMessagePayload) => {
       setLiveById((prev) => {
         const next = new Map(prev);
+        const visited = new Set<string>();
+
         for (const base of initialItems) {
+          visited.add(base.id);
           const current = next.get(base.id) ?? base;
           const updated = updater(current);
           if (updated !== current) {
@@ -251,6 +261,8 @@ export function useChatRoom({
         }
         for (const page of olderPages) {
           for (const base of page) {
+            if (visited.has(base.id)) continue;
+            visited.add(base.id);
             const current = next.get(base.id) ?? base;
             const updated = updater(current);
             if (updated !== current) {
@@ -258,7 +270,9 @@ export function useChatRoom({
             }
           }
         }
-        for (const [id, current] of next.entries()) {
+        for (const [id, current] of prev.entries()) {
+          if (visited.has(id)) continue;
+          visited.add(id);
           const updated = updater(current);
           if (updated !== current) {
             next.set(id, updated);

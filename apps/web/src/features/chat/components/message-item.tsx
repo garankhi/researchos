@@ -10,7 +10,7 @@ import {
   IconButton,
   Image,
   Link,
-  Menu,
+  Popover,
   Portal,
   Stack,
   Text,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import NextLink from '@/components/ui/link';
 import { resolveErrorCode } from '@/utils/error-messages';
 import type { ChatParticipantPayload, ChatUiMessage } from '../types';
 import { resolveAuthorizedAttachmentUrl } from '../utils/attachment-upload';
@@ -50,6 +51,7 @@ export function MessageItem({
   onToggleReaction,
   onEditMessage,
   onDeleteMessage,
+  onHideMessageForMe,
   onRetrySend,
 }: {
   message: ChatUiMessage;
@@ -59,15 +61,19 @@ export function MessageItem({
   onToggleReaction: (messageId: string, emoji: string) => void;
   onEditMessage: (messageId: string, body: string) => Promise<string | null>;
   onDeleteMessage: (messageId: string) => void;
+  onHideMessageForMe: (messageId: string) => void;
   onRetrySend: (message: ChatUiMessage) => void;
 }) {
   const t = useTranslations('chat');
+  const tRemove = useTranslations('chat.removeMenu');
   const tErrors = useTranslations('errors');
   const format = useFormatter();
 
   const isOwn = message.senderId === currentUserId;
   const isDeleted = Boolean(message.deletedAt);
   const [isEditing, setIsEditing] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const [removeMenuOpen, setRemoveMenuOpen] = useState(false);
   const [editDraft, setEditDraft] = useState(message.body);
   const [editErrorCode, setEditErrorCode] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -108,11 +114,19 @@ export function MessageItem({
       data-testid={`chat-message-${message.id}`}
     >
       {!isOwn && (
-        <Avatar.Root size="sm" flexShrink={0}>
-          <Avatar.Fallback name={senderName}>
-            {initialsForChatName(senderName)}
-          </Avatar.Fallback>
-        </Avatar.Root>
+        <Link
+          asChild
+          flexShrink={0}
+          _hover={{ opacity: 0.85, textDecoration: 'none' }}
+        >
+          <NextLink href={`/profile/${message.senderId}`}>
+            <Avatar.Root size="sm">
+              <Avatar.Fallback name={senderName}>
+                {initialsForChatName(senderName)}
+              </Avatar.Fallback>
+            </Avatar.Root>
+          </NextLink>
+        </Link>
       )}
 
       <Stack
@@ -122,9 +136,16 @@ export function MessageItem({
       >
         <HStack gap="2" textStyle="xs" color="fg.muted">
           {!isOwn && (
-            <Text fontWeight="semibold" color="fg">
-              {senderName}
-            </Text>
+            <Link
+              asChild
+              fontWeight="semibold"
+              color="fg"
+              layerStyle="researchTextLink"
+            >
+              <NextLink href={`/profile/${message.senderId}`}>
+                {senderName}
+              </NextLink>
+            </Link>
           )}
           <Text>
             {format.dateTime(new Date(message.createdAt), {
@@ -153,9 +174,23 @@ export function MessageItem({
           w="full"
         >
           {isDeleted ? (
-            <Text textStyle="sm" fontStyle="italic" color="fg.muted">
-              {t('messageDeleted')}
-            </Text>
+            <HStack justify="space-between" gap="2">
+              <Text textStyle="sm" fontStyle="italic" color="fg.muted">
+                {isOwn
+                  ? t('youUnsentMessage')
+                  : t('senderUnsentMessage', { name: senderName })}
+              </Text>
+              <IconButton
+                type="button"
+                size="2xs"
+                variant="ghost"
+                aria-label={tRemove('removeForYou')}
+                title={tRemove('removeForYou')}
+                onClick={() => onHideMessageForMe(message.id)}
+              >
+                <Trash2 size={12} />
+              </IconButton>
+            </HStack>
           ) : isEditing ? (
             <Stack gap="2" minW={{ base: '220px', sm: '320px' }}>
               <Textarea
@@ -346,8 +381,12 @@ export function MessageItem({
               );
             })}
 
-            <Menu.Root positioning={{ placement: 'top' }}>
-              <Menu.Trigger asChild>
+            <Popover.Root
+              open={reactionPickerOpen}
+              onOpenChange={(details) => setReactionPickerOpen(details.open)}
+              positioning={{ placement: 'top' }}
+            >
+              <Popover.Trigger asChild>
                 <IconButton
                   type="button"
                   size="2xs"
@@ -357,28 +396,32 @@ export function MessageItem({
                 >
                   <SmilePlus size={14} />
                 </IconButton>
-              </Menu.Trigger>
+              </Popover.Trigger>
               <Portal>
-                <Menu.Positioner>
-                  <Menu.Content boxShadow="overlayPanel" p="1">
+                <Popover.Positioner>
+                  <Popover.Content boxShadow="overlayPanel" w="auto" p="1">
                     <HStack gap="0.5">
                       {ALLOWED_CHAT_REACTIONS.map((emoji) => (
-                        <Menu.Item
+                        <Button
                           key={emoji}
-                          value={emoji}
-                          px="2"
-                          py="1"
-                          cursor="pointer"
-                          onSelect={() => onToggleReaction(message.id, emoji)}
+                          type="button"
+                          size="2xs"
+                          variant="ghost"
+                          px="1.5"
+                          minW="7"
+                          onClick={() => {
+                            setReactionPickerOpen(false);
+                            onToggleReaction(message.id, emoji);
+                          }}
                         >
                           {emoji}
-                        </Menu.Item>
+                        </Button>
                       ))}
                     </HStack>
-                  </Menu.Content>
-                </Menu.Positioner>
+                  </Popover.Content>
+                </Popover.Positioner>
               </Portal>
-            </Menu.Root>
+            </Popover.Root>
 
             {isOwn && !isEditing && (
               <IconButton
@@ -396,18 +439,101 @@ export function MessageItem({
               </IconButton>
             )}
 
-            {(isOwn || canModerate) && !isEditing && (
-              <IconButton
-                type="button"
-                size="2xs"
-                variant="ghost"
-                colorPalette="red"
-                aria-label={t('deleteAction')}
-                title={t('deleteAction')}
-                onClick={() => onDeleteMessage(message.id)}
+            {!isEditing && (
+              <Popover.Root
+                open={removeMenuOpen}
+                onOpenChange={(details) => setRemoveMenuOpen(details.open)}
+                positioning={{ placement: 'top' }}
               >
-                <Trash2 size={13} />
-              </IconButton>
+                <Popover.Trigger asChild>
+                  <IconButton
+                    type="button"
+                    size="2xs"
+                    variant="ghost"
+                    colorPalette={isOwn ? 'red' : 'gray'}
+                    aria-label={t('deleteAction')}
+                    title={t('deleteAction')}
+                  >
+                    <Trash2 size={13} />
+                  </IconButton>
+                </Popover.Trigger>
+                <Portal>
+                  <Popover.Positioner>
+                    <Popover.Content boxShadow="overlayPanel" w="276px" p="3">
+                      <Stack gap="2.5">
+                        <Text textStyle="xs" fontWeight="semibold">
+                          {isOwn ? tRemove('title') : tRemove('titleOther')}
+                        </Text>
+
+                        {isOwn && (
+                          <Stack gap="1">
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="solid"
+                              colorPalette="red"
+                              w="full"
+                              onClick={() => {
+                                setRemoveMenuOpen(false);
+                                onDeleteMessage(message.id);
+                              }}
+                            >
+                              {tRemove('unsendEveryone')}
+                            </Button>
+                            <Text textStyle="2xs" color="fg.muted">
+                              {tRemove('unsendEveryoneHint')}
+                            </Text>
+                          </Stack>
+                        )}
+
+                        <Stack gap="1">
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant={isOwn ? 'outline' : 'solid'}
+                            w="full"
+                            onClick={() => {
+                              setRemoveMenuOpen(false);
+                              onHideMessageForMe(message.id);
+                            }}
+                          >
+                            {tRemove('removeForYou')}
+                          </Button>
+                          <Text textStyle="2xs" color="fg.muted">
+                            {tRemove('removeForYouHint')}
+                          </Text>
+                        </Stack>
+
+                        {!isOwn && canModerate && (
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            colorPalette="red"
+                            w="full"
+                            onClick={() => {
+                              setRemoveMenuOpen(false);
+                              onDeleteMessage(message.id);
+                            }}
+                          >
+                            {tRemove('moderateEveryone')}
+                          </Button>
+                        )}
+
+                        <Button
+                          type="button"
+                          size="2xs"
+                          variant="ghost"
+                          w="full"
+                          onClick={() => setRemoveMenuOpen(false)}
+                        >
+                          {tRemove('cancel')}
+                        </Button>
+                      </Stack>
+                    </Popover.Content>
+                  </Popover.Positioner>
+                </Portal>
+              </Popover.Root>
             )}
           </Flex>
         )}
