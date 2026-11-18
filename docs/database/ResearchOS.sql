@@ -496,12 +496,18 @@ CREATE TABLE "research_outputs" (
   "last_synced_at" timestamptz,
   "first_shared_at" timestamptz,
   "archived_at" timestamptz,
+  "create_idempotency_key" varchar(200),
+  "create_request_hash" char(64),
   "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_shared_output" CHECK (sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)),
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
   CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
-  CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL)
+  CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL),
+  CONSTRAINT "ck_output_create_request" CHECK (
+    (create_idempotency_key IS NULL AND create_request_hash IS NULL)
+    OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL)
+  )
 );
 
 CREATE TABLE "resource_handovers" (
@@ -530,8 +536,13 @@ CREATE TABLE "output_revisions" (
   "venue" varchar(255),
   "publisher" varchar(255),
   "publication_year" int,
+  "publication_date" varchar(10),
   "publication_status" publication_status NOT NULL DEFAULT 'UNPUBLISHED',
-  "output_type" varchar(50) NOT NULL DEFAULT 'PAPER',
+  "output_type" varchar(50) NOT NULL DEFAULT 'ARTICLE',
+  "volume" varchar(50),
+  "issue" varchar(50),
+  "pages" varchar(100),
+  "peer_reviewed" boolean,
   "external_url" text,
   "authors_snapshot" jsonb NOT NULL DEFAULT ('[]'::jsonb),
   "created_by" uuid NOT NULL,
@@ -541,6 +552,13 @@ CREATE TABLE "output_revisions" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_output_revision_no" CHECK (revision_no > 0),
   CONSTRAINT "ck_publication_year" CHECK (publication_year IS NULL OR publication_year BETWEEN 1000 AND 9999),
+  CONSTRAINT "ck_output_publication_date" CHECK (
+    publication_date IS NULL OR (
+      publication_year IS NOT NULL
+      AND left(publication_date, 4) = publication_year::text
+      AND publication_date ~ '^[1-9][0-9]{3}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$'
+    )
+  ),
   CONSTRAINT "ck_revision_authors" CHECK (jsonb_typeof(authors_snapshot) = 'array'),
   CONSTRAINT "ck_revision_release" CHECK ((released_at IS NULL AND released_by IS NULL) OR (released_at IS NOT NULL AND released_by IS NOT NULL AND released_at >= created_at))
 );
@@ -957,6 +975,8 @@ CREATE INDEX ON "research_outputs" ("owner_id");
 
 CREATE INDEX ON "resource_handovers" ("performed_by", "performed_at");
 
+CREATE UNIQUE INDEX "uq_output_creator_create_key" ON "research_outputs" ("created_by", "create_idempotency_key");
+
 CREATE UNIQUE INDEX ON "output_revisions" ("output_id", "revision_no");
 
 CREATE UNIQUE INDEX ON "output_revisions" ("output_id", "id");
@@ -1057,7 +1077,7 @@ COMMENT ON COLUMN "research_groups"."lead_id" IS 'Single authority for group lea
 
 COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
 
-COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Duplicate DOI reuses existing work; backend checks visibility and offers authorship claim, never ownership. No DOI: warn on suspected duplicates, do not auto-merge.';
+COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.';
 
 COMMENT ON COLUMN "research_outputs"."owner_id" IS 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.';
 

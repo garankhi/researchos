@@ -124,6 +124,13 @@ export const domainErrorCodes = {
     outputRevisionNotFound: 'output_revision_not_found',
     outputVisibilityInvalid: 'output_visibility_invalid',
     outputAccessGroupInvalid: 'output_access_group_invalid',
+    outputIdempotencyKeyInvalid: 'output_idempotency_key_invalid',
+    outputIdempotencyKeyConflict: 'output_idempotency_key_conflict',
+    outputDoiInvalid: 'output_doi_invalid',
+    outputDoiConflict: 'output_doi_conflict',
+    outputPublicationDateInvalid: 'output_publication_date_invalid',
+    outputAuthorInvalid: 'output_author_invalid',
+    outputTopicInvalid: 'output_topic_invalid',
   },
   storage: {
     fileNotFound: 'output_file_not_found',

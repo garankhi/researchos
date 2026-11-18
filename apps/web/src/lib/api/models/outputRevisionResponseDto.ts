@@ -42,10 +42,35 @@ export interface OutputRevisionResponseDto {
    * @nullable
    */
   publicationYear: OutputRevisionResponseDtoPublicationYear;
+  /**
+   * Publication date at the recorded precision: YYYY, YYYY-MM or YYYY-MM-DD.
+   * @nullable
+   */
+  publicationDate: string | null;
   /** Publication status of the work (`UNPUBLISHED` or `PUBLISHED`). */
   publicationStatus: OutputRevisionResponseDtoPublicationStatus;
-  /** Type classification of the output (e.g. PAPER, DATASET). */
+  /** Type classification of the output (e.g. ARTICLE, DATASET). */
   outputType: string;
+  /**
+   * Journal volume.
+   * @nullable
+   */
+  volume: string | null;
+  /**
+   * Journal issue.
+   * @nullable
+   */
+  issue: string | null;
+  /**
+   * Page range or article number.
+   * @nullable
+   */
+  pages: string | null;
+  /**
+   * Whether the Article was peer-reviewed. Null means unspecified.
+   * @nullable
+   */
+  peerReviewed: boolean | null;
   /**
    * External URL pointing to the publication source.
    * @nullable

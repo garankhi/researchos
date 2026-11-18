@@ -522,7 +522,7 @@ Table group_directions {
 
 Table research_outputs {
   id uuid [pk, default: `gen_random_uuid()`]
-  doi varchar(255) [unique, note: 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Duplicate DOI reuses existing work; backend checks visibility and offers authorship claim, never ownership. No DOI: warn on suspected duplicates, do not auto-merge.']
+  doi varchar(255) [unique, note: 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.']
   owner_id uuid [note: 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.']
   created_by uuid
   sharing_status output_sharing_status [not null, default: 'DRAFT']
@@ -534,6 +534,8 @@ Table research_outputs {
   last_synced_at timestamptz
   first_shared_at timestamptz
   archived_at timestamptz
+  create_idempotency_key varchar(200)
+  create_request_hash char(64)
   created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   checks {
@@ -541,8 +543,12 @@ Table research_outputs {
     `(sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)` [name: 'ck_output_archive']
     `(visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)` [name: 'ck_output_access_scope']
     `import_state <> 'ACCEPTED' OR owner_id IS NOT NULL` [name: 'ck_output_import_owner']
+    `(create_idempotency_key IS NULL AND create_request_hash IS NULL) OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL)` [name: 'ck_output_create_request']
   }
-  indexes { owner_id }
+  indexes {
+    owner_id
+    (created_by, create_idempotency_key) [unique, name: 'uq_output_creator_create_key']
+  }
   Note: 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.'
 }
 
@@ -578,8 +584,13 @@ Table output_revisions {
   venue varchar(255)
   publisher varchar(255)
   publication_year int
+  publication_date varchar(10) [note: 'Canonical YYYY, YYYY-MM or YYYY-MM-DD at the recorded precision.']
   publication_status publication_status [not null, default: 'UNPUBLISHED']
-  output_type varchar(50) [not null, default: 'PAPER']
+  output_type varchar(50) [not null, default: 'ARTICLE']
+  volume varchar(50)
+  issue varchar(50)
+  pages varchar(100)
+  peer_reviewed boolean
   external_url text
   authors_snapshot jsonb [not null, default: `'[]'::jsonb`]
   created_by uuid [not null]
@@ -590,6 +601,7 @@ Table output_revisions {
   checks {
     `revision_no > 0` [name: 'ck_output_revision_no']
     `publication_year IS NULL OR publication_year BETWEEN 1000 AND 9999` [name: 'ck_publication_year']
+    `publication_date IS NULL OR (publication_year IS NOT NULL AND left(publication_date, 4) = publication_year::text AND publication_date ~ '^[1-9][0-9]{3}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$')` [name: 'ck_output_publication_date']
     `jsonb_typeof(authors_snapshot) = 'array'` [name: 'ck_revision_authors']
     `(released_at IS NULL AND released_by IS NULL) OR (released_at IS NOT NULL AND released_by IS NOT NULL AND released_at >= created_at)` [name: 'ck_revision_release']
   }

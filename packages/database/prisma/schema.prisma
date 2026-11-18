@@ -423,8 +423,13 @@ model output_revisions {
   venue                                                                                   String?                    @db.VarChar(255)
   publisher                                                                               String?                    @db.VarChar(255)
   publication_year                                                                        Int?
+  publication_date                                                                        String?                    @db.VarChar(10)
   publication_status                                                                      publication_status         @default(UNPUBLISHED)
-  output_type                                                                             String                     @default("PAPER") @db.VarChar(50)
+  output_type                                                                             String                     @default("ARTICLE") @db.VarChar(50)
+  volume                                                                                  String?                    @db.VarChar(50)
+  issue                                                                                   String?                    @db.VarChar(50)
+  pages                                                                                   String?                    @db.VarChar(100)
+  peer_reviewed                                                                           Boolean?
   external_url                                                                            String?
   authors_snapshot                                                                        Json                       @default("[]")
   created_by                                                                              String                     @db.Uuid
@@ -652,6 +657,8 @@ model research_outputs {
   last_synced_at                                                            DateTime?                  @db.Timestamptz(6)
   first_shared_at                                                           DateTime?                  @db.Timestamptz(6)
   archived_at                                                               DateTime?                  @db.Timestamptz(6)
+  create_idempotency_key                                                    String?                    @db.VarChar(200)
+  create_request_hash                                                       String?                    @db.Char(64)
   created_at                                                                DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at                                                                DateTime                   @default(now()) @db.Timestamptz(6)
   achievement_posts                                                         achievement_posts[]
@@ -670,6 +677,7 @@ model research_outputs {
   research_updates                                                          research_updates[]
   resource_handovers                                                        resource_handovers[]
 
+  @@unique([created_by, create_idempotency_key], map: "uq_output_creator_create_key")
   @@index([visibility, sharing_status], map: "idx_output_visibility_lookup", where: raw("(sharing_status = 'SHARED'::output_sharing_status)"))
   @@index([owner_id])
 }

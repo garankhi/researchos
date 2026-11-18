@@ -1,11 +1,17 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import {
+  canonicalOutputType,
+  DataProvenanceType,
   OutputFileVisibility,
   OutputSharingStatus,
+  OutputType,
   Prisma,
   PrismaService,
+  PublicationStatusEnum,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
+import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
@@ -13,6 +19,11 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { normalizeArticleMetadata } from './article-metadata.js';
+import type {
+  CreateArticleDto,
+  CreateArticleResponseDto,
+} from './dto/create-article.dto.js';
 import { HomeFeedQueryDto, HomeFeedResponseDto } from './dto/home-feed.dto.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputAuthorResponseDto } from './dto/output-author-response.dto.js';
@@ -91,6 +102,178 @@ export class OutputsService {
     private readonly prisma: PrismaService,
     private readonly provenance: ProvenanceService,
   ) {}
+
+  async createArticle(
+    callerId: string,
+    dto: CreateArticleDto,
+    key?: string,
+  ): Promise<CreateArticleResponseDto> {
+    const requestKey = key?.trim();
+    if (!requestKey || requestKey.length > 200) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputIdempotencyKeyInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const article = normalizeArticleMetadata(dto);
+    const hash = createHash('sha256')
+      .update(JSON.stringify(article))
+      .digest('hex');
+
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const [access] = await tx.$queryRaw<{ allowed: boolean }[]>`
+          SELECT is_researcher(${callerId}::uuid) AS allowed
+        `;
+          if (!access?.allowed) {
+            throw new CodedHttpException(
+              domainErrorCodes.identity.researcherRequired,
+              HttpStatus.FORBIDDEN,
+            );
+          }
+
+          // Serialize retries across API processes. Under READ COMMITTED the
+          // lookup after taking the lock can see the previous request's commit.
+          const lockKey = `outputs:create:${callerId}:${requestKey}`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
+          const previous = await tx.research_outputs.findUnique({
+            where: {
+              created_by_create_idempotency_key: {
+                created_by: callerId,
+                create_idempotency_key: requestKey,
+              },
+            },
+            select: { id: true, create_request_hash: true },
+          });
+          if (previous) {
+            if (previous.create_request_hash !== hash) {
+              throw new CodedHttpException(
+                domainErrorCodes.outputs.outputIdempotencyKeyConflict,
+                HttpStatus.CONFLICT,
+              );
+            }
+            const first = await tx.output_revisions.findUniqueOrThrow({
+              where: {
+                output_id_revision_no: {
+                  output_id: previous.id,
+                  revision_no: 1,
+                },
+              },
+              select: { id: true },
+            });
+            return { outputId: previous.id, revisionId: first.id };
+          }
+
+          await this.validateArticleReferences(tx, article);
+          const output = await tx.research_outputs.create({
+            data: {
+              doi: article.doi,
+              owner_id: callerId,
+              created_by: callerId,
+              provenance_tag: DataProvenanceType.HUMAN,
+              create_idempotency_key: requestKey,
+              create_request_hash: hash,
+            },
+            select: { id: true },
+          });
+          const revision = await tx.output_revisions.create({
+            data: {
+              output_id: output.id,
+              revision_no: 1,
+              title: article.title,
+              abstract: article.abstract,
+              venue: article.journal,
+              publication_date: article.publicationDate,
+              publication_year: Number(article.publicationDate.slice(0, 4)),
+              publication_status: PublicationStatusEnum.PUBLISHED,
+              output_type: OutputType.ARTICLE,
+              volume: article.volume,
+              issue: article.issue,
+              pages: article.pages,
+              peer_reviewed: article.peerReviewed,
+              authors_snapshot: article.authors,
+              created_by: callerId,
+            },
+            select: { id: true },
+          });
+          await tx.output_authors.createMany({
+            data: article.authors.map(({ name, userId, order }) => ({
+              output_id: output.id,
+              author_name_string: name,
+              user_id: userId,
+              author_order: order,
+            })),
+          });
+          if (article.topicIds.length > 0) {
+            await tx.output_topics.createMany({
+              data: article.topicIds.map((topicId) => ({
+                output_id: output.id,
+                revision_id: revision.id,
+                topic_id: topicId,
+                added_by: callerId,
+              })),
+            });
+          }
+
+          // RES-173 consumes the verified upload and attaches it at this point,
+          // while the revision still accepts attachment writes.
+          await this.releaseRevision(
+            tx,
+            output.id,
+            revision.id,
+            callerId,
+            OutputFileVisibility.FPTU_COMMUNITY,
+            null,
+          );
+          return { outputId: output.id, revisionId: revision.id };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+      );
+    } catch (error) {
+      if (
+        readDatabaseFailure(error)?.constraintName ===
+        'research_outputs_doi_key'
+      ) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputDoiConflict,
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async validateArticleReferences(
+    tx: Prisma.TransactionClient,
+    { authors, topicIds }: ReturnType<typeof normalizeArticleMetadata>,
+  ): Promise<void> {
+    const accountIds = authors.flatMap(({ userId }) =>
+      userId ? [userId] : [],
+    );
+    if (accountIds.length > 0) {
+      const count = await tx.users.count({
+        where: { id: { in: accountIds }, is_active: true },
+      });
+      if (count !== accountIds.length) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputAuthorInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+    if (topicIds.length > 0) {
+      const count = await tx.research_topics.count({
+        where: { id: { in: topicIds }, is_active: true },
+      });
+      if (count !== topicIds.length) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputTopicInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
 
   /**
    * Lists visible research outputs for the caller.
@@ -625,12 +808,18 @@ export class OutputsService {
     }
     if (dto.publicationYear !== undefined) {
       data['publication_year'] = dto.publicationYear;
+      if (
+        draft.publication_date &&
+        dto.publicationYear !== draft.publication_year
+      ) {
+        data['publication_date'] = null;
+      }
     }
     if (dto.externalUrl !== undefined) {
       data['external_url'] = dto.externalUrl;
     }
     if (dto.outputType !== undefined) {
-      data['output_type'] = dto.outputType.trim();
+      data['output_type'] = canonicalOutputType(dto.outputType.trim());
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -754,32 +943,41 @@ export class OutputsService {
         );
       }
 
-      const now = await this.now(tx);
-
-      // Step 1: release the draft revision. `guard_revision` refuses a
-      // release by anybody but the owner, and refuses an empty title.
-      const released = await tx.output_revisions.update({
-        where: { id: draft.id },
-        data: { released_at: now, released_by: callerId },
-      });
-
-      // Steps 2-4: pin the released revision, share the work, and set
-      // the visibility the caller chose. `guard_output_release` checks
-      // that the pinned revision is a released one, and `ck_shared_output`
-      // checks that a shared work has an owner, a pin and a first-shared
-      // timestamp — all three land in this same update.
-      await tx.research_outputs.update({
-        where: { id: outputId },
-        data: {
-          current_release_id: released.id,
-          sharing_status: OutputSharingStatus.SHARED,
-          first_shared_at: now,
-          visibility: dto.visibility,
-          access_group_id: dto.accessGroupId ?? null,
-        },
-      });
-
+      await this.releaseRevision(
+        tx,
+        outputId,
+        draft.id,
+        callerId,
+        dto.visibility,
+        dto.accessGroupId ?? null,
+      );
       return this.loadResponse(tx, outputId);
+    });
+  }
+
+  private async releaseRevision(
+    tx: Prisma.TransactionClient,
+    outputId: string,
+    revisionId: string,
+    callerId: string,
+    visibility: OutputFileVisibility,
+    accessGroupId: string | null,
+  ): Promise<void> {
+    const now = await this.now(tx);
+    // The database requires a released revision before it can pin and share it.
+    await tx.output_revisions.update({
+      where: { id: revisionId },
+      data: { released_at: now, released_by: callerId },
+    });
+    await tx.research_outputs.update({
+      where: { id: outputId },
+      data: {
+        current_release_id: revisionId,
+        sharing_status: OutputSharingStatus.SHARED,
+        first_shared_at: now,
+        visibility,
+        access_group_id: accessGroupId,
+      },
     });
   }
 
@@ -1054,8 +1252,14 @@ export class OutputsService {
       venue: r.venue ?? null,
       publisher: r.publisher ?? null,
       publicationYear: r.publication_year ?? null,
+      publicationDate:
+        r.publication_date ?? r.publication_year?.toString() ?? null,
       publicationStatus: r.publication_status,
-      outputType: r.output_type,
+      outputType: canonicalOutputType(r.output_type),
+      volume: r.volume ?? null,
+      issue: r.issue ?? null,
+      pages: r.pages ?? null,
+      peerReviewed: r.peer_reviewed ?? null,
       externalUrl: r.external_url ?? null,
       releasedAt: r.released_at ? r.released_at.toISOString() : null,
       createdAt: r.created_at.toISOString(),

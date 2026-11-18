@@ -122,7 +122,7 @@ describe('OpenAlexCandidatesService', () => {
       abstract: 'An abstract',
       venue: 'A venue',
       publicationYear: 2020,
-      outputType: 'PAPER',
+      outputType: 'ARTICLE',
       url: 'https://example.org/work',
       // Snapshot order is normalised into author order.
       authors: ['Nguyen Van An', 'Tran Thi B'],

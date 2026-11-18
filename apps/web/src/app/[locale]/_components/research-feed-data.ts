@@ -79,7 +79,7 @@ const articleFiles =
 export const exampleResearch: ResearchCardData = {
   id: 'example-math13081270',
   title: 'Auto-Probabilistic Mining Method for Siamese Neural Network Training',
-  type: 'PAPER',
+  type: 'ARTICLE',
   publicationDate: '2025-04-12',
   publicationUrl: articleUrl,
   downloadUrl: `${articleFiles}/mathematics-13-01270.pdf`,

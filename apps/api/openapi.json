@@ -4357,6 +4357,93 @@
       }
     },
     "/outputs": {
+      "post": {
+        "description": "Creates a metadata-only Article and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.",
+        "operationId": "OutputsController_createArticle",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "An actor-scoped key for retrying the same submission.",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateArticleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The Article and first release identifiers for a new submission or replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateArticleResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Article metadata or idempotency key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active researcher account is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "output_idempotency_key_conflict for a changed submission using the same key, or output_doi_conflict for an existing DOI.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create and release an Article",
+        "tags": [
+          "outputs"
+        ]
+      },
       "get": {
         "description": "Returns a paginated list of research outputs visible to the caller (shared community works, member group works, or the caller own working copy draft works).",
         "operationId": "OutputsController_findAll",
@@ -8594,6 +8681,132 @@
           "decision"
         ]
       },
+      "CreateArticleAuthorDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Name as it appears in the confirmed byline.",
+            "maxLength": 255,
+            "example": "Nguyen Minh"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ResearchOS account explicitly selected for this author."
+          }
+        },
+        "required": [
+          "displayName"
+        ]
+      },
+      "CreateArticleDto": {
+        "type": "object",
+        "properties": {
+          "outputType": {
+            "type": "string",
+            "enum": [
+              "ARTICLE",
+              "PAPER"
+            ],
+            "default": "ARTICLE",
+            "description": "ARTICLE is the canonical type. PAPER is a legacy alias."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Article title."
+          },
+          "authors": {
+            "minItems": 1,
+            "description": "The confirmed byline in publication order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateArticleAuthorDto"
+            }
+          },
+          "publicationDate": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "18-11-2026",
+            "description": "Publication date as YYYY, YYYY-MM, YYYY-MM-DD or DD-MM-YYYY. Partial dates retain their precision."
+          },
+          "doi": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://doi.org/10.1234/article",
+            "description": "A DOI, optionally prefixed by doi: or a doi.org resolver URL."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Article abstract.",
+            "maxLength": 20000,
+            "nullable": true
+          },
+          "journal": {
+            "type": "string",
+            "description": "Journal name, returned as venue on the revision.",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "volume": {
+            "type": "string",
+            "description": "Journal volume.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "issue": {
+            "type": "string",
+            "description": "Journal issue.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "pages": {
+            "type": "string",
+            "description": "Page range or article number.",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "peerReviewed": {
+            "type": "boolean",
+            "description": "Whether the Article was peer-reviewed. Null means unspecified.",
+            "nullable": true
+          },
+          "topicIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Active ResearchOS Topic IDs confirmed by the submitter."
+          }
+        },
+        "required": [
+          "title",
+          "authors",
+          "publicationDate"
+        ]
+      },
+      "CreateArticleResponseDto": {
+        "type": "object",
+        "properties": {
+          "outputId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Created Article ID."
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "First released revision ID."
+          }
+        },
+        "required": [
+          "outputId",
+          "revisionId"
+        ]
+      },
       "OutputRevisionResponseDto": {
         "type": "object",
         "properties": {
@@ -8643,6 +8856,12 @@
             "nullable": true,
             "example": 2026
           },
+          "publicationDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11",
+            "description": "Publication date at the recorded precision: YYYY, YYYY-MM or YYYY-MM-DD."
+          },
           "publicationStatus": {
             "type": "string",
             "description": "Publication status of the work (`UNPUBLISHED` or `PUBLISHED`).",
@@ -8654,8 +8873,31 @@
           },
           "outputType": {
             "type": "string",
-            "description": "Type classification of the output (e.g. PAPER, DATASET).",
-            "example": "PAPER"
+            "description": "Type classification of the output (e.g. ARTICLE, DATASET).",
+            "example": "ARTICLE"
+          },
+          "volume": {
+            "type": "string",
+            "nullable": true,
+            "example": "12",
+            "description": "Journal volume."
+          },
+          "issue": {
+            "type": "string",
+            "nullable": true,
+            "example": "S1",
+            "description": "Journal issue."
+          },
+          "pages": {
+            "type": "string",
+            "nullable": true,
+            "example": "101–113",
+            "description": "Page range or article number."
+          },
+          "peerReviewed": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether the Article was peer-reviewed. Null means unspecified."
           },
           "externalUrl": {
             "type": "object",
@@ -8686,8 +8928,13 @@
           "venue",
           "publisher",
           "publicationYear",
+          "publicationDate",
           "publicationStatus",
           "outputType",
+          "volume",
+          "issue",
+          "pages",
+          "peerReviewed",
           "externalUrl",
           "releasedAt",
           "createdAt"
@@ -9083,9 +9330,9 @@
           },
           "outputType": {
             "type": "string",
-            "description": "Type classification of the work (e.g. PAPER, DATASET, PREPRINT).",
+            "description": "Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT). PAPER is a legacy alias for ARTICLE.",
             "maxLength": 50,
-            "example": "PAPER"
+            "example": "ARTICLE"
           }
         }
       },
@@ -10876,6 +11123,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/PaginatedOutputsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "CreateArticleResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateArticleResponseDto"
           },
           "message": {
             "type": "string",

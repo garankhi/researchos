@@ -2,9 +2,9 @@ import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { normalizeDoi } from '../../common/normalize-doi.js';
 import {
   mapOutputType,
-  normalizeDoi,
   OpenAlexClient,
   reconstructAbstract,
 } from './openalex.client.js';
@@ -61,14 +61,14 @@ describe('normalizeDoi', () => {
 
 describe('mapOutputType', () => {
   it('maps known OpenAlex types', () => {
-    expect(mapOutputType('article')).toBe('PAPER');
+    expect(mapOutputType('article')).toBe('ARTICLE');
     expect(mapOutputType('dataset')).toBe('DATASET');
     expect(mapOutputType('book')).toBe('BOOK');
   });
 
-  it('defaults unknown and missing types to PAPER', () => {
-    expect(mapOutputType('something-new')).toBe('PAPER');
-    expect(mapOutputType(null)).toBe('PAPER');
+  it('defaults unknown and missing types to ARTICLE', () => {
+    expect(mapOutputType('something-new')).toBe('ARTICLE');
+    expect(mapOutputType(null)).toBe('ARTICLE');
   });
 });
 
@@ -179,7 +179,7 @@ describe('OpenAlexClient', () => {
       abstract: 'Some title',
       venue: 'Nature',
       publicationYear: 2020,
-      outputType: 'PAPER',
+      outputType: 'ARTICLE',
     });
     expect(page.works[0].authors).toEqual([
       {

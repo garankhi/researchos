@@ -85,10 +85,10 @@ export class UpdateOutputRevisionDto {
 
   @ApiPropertyOptional({
     description:
-      'Type classification of the work (e.g. PAPER, DATASET, PREPRINT).',
+      'Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT). PAPER is a legacy alias for ARTICLE.',
     type: String,
     maxLength: 50,
-    example: 'PAPER',
+    example: 'ARTICLE',
   })
   @IsOptional()
   @IsString({ message: 'output_type_invalid' })
