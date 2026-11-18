@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Badge, Box, Button, Container, Tabs } from '@chakra-ui/react';
+import { Badge, Box, Button, Container, Grid, Tabs } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -12,15 +12,20 @@ import {
 import NextLink from '@/components/ui/link';
 import { useOpenAlexCandidates } from '../hooks/use-openalex-candidates';
 import { useProfile } from '../hooks/use-profile';
+import { useProfileGroups } from '../hooks/use-profile-groups';
+import { useProfileInterests } from '../hooks/use-profile-interests';
+import { useProfileOutputs } from '../hooks/use-profile-outputs';
 import type { ProfileTab, PublicProfileTab } from '../types';
-import { ProfileHeader } from './profile-header';
 import { ProfileEditDialog } from './profile-edit-dialog';
+import { ProfileHeader } from './profile-header';
+import { ProfileSidebar } from './profile-sidebar';
 import { ProfileHeaderSkeleton, ProfileTabSkeleton } from './profile-skeletons';
 import { ProfileApplicationsTab } from './tabs/profile-applications-tab';
 import { ProfileGroupsTab } from './tabs/profile-groups-tab';
-import { ProfileOutputsTab } from './tabs/profile-outputs-tab';
 import { ProfileInterestsTab } from './tabs/profile-interests-tab';
 import { ProfileOpenAlexTab } from './tabs/profile-openalex-tab';
+import { ProfileOutputsTab } from './tabs/profile-outputs-tab';
+import { ProfileOverviewTab } from './tabs/profile-overview-tab';
 
 export function ProfileShell({
   userId,
@@ -33,7 +38,7 @@ export function ProfileShell({
   const common = useTranslations('common');
   const [editOpen, setEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab | PublicProfileTab>(
-    isOwner ? 'applications' : 'groups',
+    'overview',
   );
 
   const {
@@ -46,70 +51,81 @@ export function ProfileShell({
     refetch,
   } = useProfile({ userId, isOwner });
 
+  const effectiveUserId = profile?.userId ?? userId;
+  const hasProfileReady = Boolean(profile && effectiveUserId);
+
+  const outputsQuery = useProfileOutputs({
+    userId: effectiveUserId,
+    enabled: hasProfileReady,
+  });
+  const groupsQuery = useProfileGroups({
+    userId: effectiveUserId,
+  });
+  const interestsQuery = useProfileInterests({
+    userId: effectiveUserId,
+  });
   const { pendingCount } = useOpenAlexCandidates({ enabled: isOwner });
 
-  /*
-   * The tab list remains visible while the profile loads. The content
-   * area distinguishes these states:
-   *
-   * - **loading** — the request is in flight, so there is nothing to say
-   *   yet; the content area shows a skeleton;
-   * - **failed** — the request never produced an answer, so the content
-   *   area shows an error with a retry. It says nothing about the
-   *   researcher;
-   * - **forbidden** — the answer came back and refused access;
-   * - **empty** — the answer came back and said there is no profile yet;
-   * - **not found** — the answer came back and said there is no such
-   *   researcher.
-   *
-   * A failure is deliberately not rendered as "not found": the two mean
-   * opposite things to the reader, and collapsing them would make a
-   * transient API error look like a fact about the person.
-   */
-  const effectiveUserId = profile?.userId ?? userId;
+  const activeInterests = interestsQuery.interests.filter(
+    (item) => item.status === 'ACTIVE',
+  );
+  const ledGroupIds = new Set(groupsQuery.groupsLed.map((g) => g.id));
 
-  const renderContent = () => {
+  if (isForbidden) {
+    return (
+      <RouteFeedback
+        icon={<LockKeyhole aria-hidden />}
+        title={t('profileAccessDenied')}
+        description={t('unauthenticatedNotice')}
+        action={
+          <Button asChild>
+            <NextLink href="/">{common('backToHome')}</NextLink>
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (isNotFound) {
+    return (
+      <RouteFeedback
+        icon={<SearchX aria-hidden />}
+        title={t('profileNotFound')}
+        description={t('profileEmptyDesc')}
+        action={
+          <Button asChild>
+            <NextLink href="/">{common('backToHome')}</NextLink>
+          </Button>
+        }
+      />
+    );
+  }
+
+  const renderMainContent = () => {
     if (isLoading) {
-      return <ProfileTabSkeleton tab={activeTab} isOwner={isOwner} />;
+      return (
+        <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+          <ProfileTabSkeleton tab={activeTab} isOwner={isOwner} />
+        </Box>
+      );
     }
 
     if (isFailed) {
-      return <ErrorState title={t('loadError')} onRetry={refetch} />;
-    }
-
-    if (isForbidden) {
       return (
-        <RouteFeedback
-          icon={<LockKeyhole aria-hidden />}
-          title={t('profileAccessDenied')}
-          description={t('unauthenticatedNotice')}
-          action={
-            <Button asChild>
-              <NextLink href="/">{common('backToHome')}</NextLink>
-            </Button>
-          }
-        />
+        <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+          <ErrorState title={t('loadError')} onRetry={refetch} />
+        </Box>
       );
     }
 
     if (isEmpty) {
       return (
-        <EmptyState title={t('profileEmpty')} message={t('profileEmptyDesc')} />
-      );
-    }
-
-    if (isNotFound) {
-      return (
-        <RouteFeedback
-          icon={<SearchX aria-hidden />}
-          title={t('profileNotFound')}
-          description={t('profileEmptyDesc')}
-          action={
-            <Button asChild>
-              <NextLink href="/">{common('backToHome')}</NextLink>
-            </Button>
-          }
-        />
+        <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+          <EmptyState
+            title={t('profileEmpty')}
+            message={t('profileEmptyDesc')}
+          />
+        </Box>
       );
     }
 
@@ -117,32 +133,40 @@ export function ProfileShell({
       return null;
     }
 
-    /*
-     * The tabs. A tab whose content cannot be fetched renders its own
-     * error or empty state, so switching tabs always lands on something.
-     */
     return (
       <>
-        {isOwner ? (
-          <Tabs.Content value="applications">
-            <ProfileApplicationsTab />
-          </Tabs.Content>
-        ) : null}
+        <Tabs.Content value="overview" pt="0">
+          <ProfileOverviewTab
+            profile={profile}
+            isOwner={isOwner}
+            outputs={outputsQuery.allOutputs}
+            outputsLoading={outputsQuery.isLoading}
+            activeInterests={activeInterests}
+            onEditProfile={isOwner ? () => setEditOpen(true) : undefined}
+            onSelectTab={(nextTab) => setActiveTab(nextTab)}
+          />
+        </Tabs.Content>
 
-        <Tabs.Content value="groups">
+        <Tabs.Content value="outputs" pt="0">
+          <ProfileOutputsTab userId={effectiveUserId} isOwner={isOwner} />
+        </Tabs.Content>
+
+        <Tabs.Content value="groups" pt="0">
           <ProfileGroupsTab userId={effectiveUserId} isOwner={isOwner} />
         </Tabs.Content>
 
-        <Tabs.Content value="outputs">
-          <ProfileOutputsTab userId={effectiveUserId} />
-        </Tabs.Content>
-
-        <Tabs.Content value="interests">
+        <Tabs.Content value="interests" pt="0">
           <ProfileInterestsTab userId={effectiveUserId} isOwner={isOwner} />
         </Tabs.Content>
 
         {isOwner ? (
-          <Tabs.Content value="openalex">
+          <Tabs.Content value="applications" pt="0">
+            <ProfileApplicationsTab />
+          </Tabs.Content>
+        ) : null}
+
+        {isOwner ? (
+          <Tabs.Content value="openalex" pt="0">
             <ProfileOpenAlexTab />
           </Tabs.Content>
         ) : null}
@@ -151,20 +175,86 @@ export function ProfileShell({
   };
 
   return (
-    <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-      {(profile || isLoading) && (
-        <Box mb="6">
-          {profile ? (
-            <ProfileHeader
-              profile={profile}
-              isOwner={isOwner}
-              onEdit={isOwner ? () => setEditOpen(true) : undefined}
-            />
-          ) : (
-            <ProfileHeaderSkeleton announce={false} />
+    <Tabs.Root
+      as="main"
+      flex="1"
+      bg="home.background"
+      variant="line"
+      colorPalette="blue"
+      value={activeTab}
+      onValueChange={(details) =>
+        setActiveTab(details.value as ProfileTab | PublicProfileTab)
+      }
+    >
+      {/* Full-bleed white ResearchGate-style profile hero banner */}
+      <Box bg="bg.panel" borderBottomWidth="1px" borderColor="border">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          pt={{ base: '5', md: '8' }}
+        >
+          {(profile || isLoading) && (
+            <Box pb={{ base: '4', md: '6' }}>
+              {profile ? (
+                <ProfileHeader
+                  profile={profile}
+                  isOwner={isOwner}
+                  onEdit={isOwner ? () => setEditOpen(true) : undefined}
+                />
+              ) : (
+                <ProfileHeaderSkeleton announce={false} />
+              )}
+            </Box>
           )}
-        </Box>
-      )}
+
+          <Tabs.List
+            gap={{ base: '4', md: '7' }}
+            borderBottomWidth="0"
+            flexWrap="wrap"
+          >
+            <Tabs.Trigger value="overview" height="12" px="0">
+              {t('tabs.overview')}
+            </Tabs.Trigger>
+
+            <Tabs.Trigger value="outputs" height="12" px="0">
+              {t('tabs.outputs')}
+              {profile && outputsQuery.allOutputs.length > 0 ? (
+                <Badge variant="subtle" colorPalette="gray">
+                  {outputsQuery.allOutputs.length}
+                </Badge>
+              ) : null}
+            </Tabs.Trigger>
+
+            <Tabs.Trigger value="groups" height="12" px="0">
+              {t('tabs.groups')}
+              {profile && groupsQuery.allGroups.length > 0 ? (
+                <Badge variant="subtle" colorPalette="gray">
+                  {groupsQuery.allGroups.length}
+                </Badge>
+              ) : null}
+            </Tabs.Trigger>
+
+            <Tabs.Trigger value="interests" height="12" px="0">
+              {t('tabs.interests')}
+            </Tabs.Trigger>
+
+            {isOwner ? (
+              <Tabs.Trigger value="applications" height="12" px="0">
+                {t('tabs.applications')}
+              </Tabs.Trigger>
+            ) : null}
+
+            {isOwner ? (
+              <Tabs.Trigger value="openalex" height="12" px="0">
+                {t('tabs.openalex')}
+                {pendingCount > 0 ? (
+                  <Badge colorPalette="blue">{pendingCount}</Badge>
+                ) : null}
+              </Tabs.Trigger>
+            ) : null}
+          </Tabs.List>
+        </Container>
+      </Box>
 
       {isOwner && profile ? (
         <ProfileEditDialog
@@ -174,40 +264,36 @@ export function ProfileShell({
         />
       ) : null}
 
-      <Box bg="bg.panel" borderWidth="1px" overflow="hidden">
-        <Tabs.Root
-          value={activeTab}
-          onValueChange={(details) =>
-            setActiveTab(details.value as ProfileTab | PublicProfileTab)
-          }
-          variant="line"
+      {/* Two-column ResearchGate academic workspace on #f6f6f6 canvas */}
+      <Container
+        maxW="64rem"
+        px={{ base: '4', md: '6' }}
+        py={{ base: '4', lg: '6' }}
+      >
+        <Grid
+          templateColumns={{
+            base: 'minmax(0, 1fr)',
+            lg: 'minmax(0, 1.95fr) minmax(0, 1fr)',
+          }}
+          alignItems="start"
+          gap="4"
         >
-          <Tabs.List px={{ base: '2', sm: '4' }} overflowX="auto">
-            {isOwner ? (
-              <Tabs.Trigger value="applications">
-                {t('tabs.applications')}
-              </Tabs.Trigger>
-            ) : null}
+          <Box minW="0">{renderMainContent()}</Box>
 
-            <Tabs.Trigger value="groups">{t('tabs.groups')}</Tabs.Trigger>
-
-            <Tabs.Trigger value="outputs">{t('tabs.outputs')}</Tabs.Trigger>
-
-            <Tabs.Trigger value="interests">{t('tabs.interests')}</Tabs.Trigger>
-
-            {isOwner ? (
-              <Tabs.Trigger value="openalex">
-                <Badge colorPalette="blue" variant="surface">
-                  {t('tabs.openalex')}
-                  {pendingCount > 0 ? ` (${pendingCount})` : ''}
-                </Badge>
-              </Tabs.Trigger>
-            ) : null}
-          </Tabs.List>
-
-          <Box p={{ base: '4', sm: '6' }}>{renderContent()}</Box>
-        </Tabs.Root>
-      </Box>
-    </Container>
+          {profile ? (
+            <ProfileSidebar
+              profile={profile}
+              isOwner={isOwner}
+              outputs={outputsQuery.allOutputs}
+              groups={groupsQuery.allGroups}
+              ledGroupIds={ledGroupIds}
+              activeInterests={activeInterests}
+              pendingOpenAlexCount={pendingCount}
+              onSelectTab={(nextTab) => setActiveTab(nextTab)}
+            />
+          ) : null}
+        </Grid>
+      </Container>
+    </Tabs.Root>
   );
 }

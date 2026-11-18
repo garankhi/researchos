@@ -21,10 +21,10 @@ import { useMyApplications } from '../../hooks/use-my-applications';
 import type { ApplicationResponseDto } from '../../types';
 import { ProfileTabSkeleton } from '../profile-skeletons';
 
-function getStatusPalette(status: string): 'yellow' | 'green' | 'red' | 'gray' {
+function getStatusPalette(status: string): 'blue' | 'green' | 'red' | 'gray' {
   switch (status) {
     case 'PENDING':
-      return 'yellow';
+      return 'blue';
     case 'ACCEPTED':
     case 'INVITED_TO_DISCUSS':
       return 'green';
@@ -58,9 +58,11 @@ export function ProfileApplicationsTab() {
   const [confirmWithdrawApp, setConfirmWithdrawApp] =
     useState<ApplicationResponseDto | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   const handleWithdrawConfirm = async () => {
     if (!confirmWithdrawApp) return;
+    setWithdrawError(null);
     try {
       setWithdrawingId(confirmWithdrawApp.id);
       await withdraw(confirmWithdrawApp.id);
@@ -70,125 +72,165 @@ export function ProfileApplicationsTab() {
       });
       setConfirmWithdrawApp(null);
     } catch {
-      showSnackbar({
-        message: t('applicationsTab.withdrawError'),
-        severity: 'error',
-      });
+      setWithdrawError(t('applicationsTab.withdrawError'));
     } finally {
       setWithdrawingId(null);
     }
   };
 
   if (isLoading) {
-    return <ProfileTabSkeleton tab="applications" />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ProfileTabSkeleton tab="applications" />
+      </Box>
+    );
   }
 
   if (isFailed) {
-    return <ErrorState title={t('loadError')} onRetry={() => refetch()} />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ErrorState title={t('loadError')} onRetry={() => refetch()} />
+      </Box>
+    );
   }
 
   if (applications.length === 0) {
     return (
-      <EmptyState
-        title={t('applicationsTab.emptyTitle')}
-        message={t('applicationsTab.emptyMessage')}
-      />
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <EmptyState
+          title={t('applicationsTab.emptyTitle')}
+          message={t('applicationsTab.emptyMessage')}
+        />
+      </Box>
     );
   }
 
   return (
-    <Stack gap="4" py="1">
-      {applications.map((app) => {
-        const remaining = formatRemainingTime(app.remainingSeconds);
-        const isWithdrawing = withdrawingId === app.id;
+    <Box bg="bg.panel" boxShadow="xs">
+      <Box
+        px={{ base: '4', md: '6' }}
+        py="4"
+        borderBottomWidth="1px"
+        borderColor="border"
+      >
+        <Heading as="h2" size="md" fontWeight="bold">
+          {t('applicationsTab.title')} ({applications.length})
+        </Heading>
+      </Box>
 
-        return (
-          <Box key={app.id} bg="bg.panel" borderWidth="1px" p="5">
-            <Flex
-              direction={{ base: 'column', sm: 'row' }}
-              gap="4"
-              justify="space-between"
-              align={{ base: 'flex-start', sm: 'center' }}
+      <Box>
+        {applications.map((app, idx) => {
+          const remaining = formatRemainingTime(app.remainingSeconds);
+          const isWithdrawing = withdrawingId === app.id;
+
+          return (
+            <Box
+              key={app.id}
+              py="4"
+              px={{ base: '4', md: '6' }}
+              borderBottomWidth={idx < applications.length - 1 ? '1px' : '0'}
+              borderColor="border"
             >
-              <Box flex="1" minW="0">
-                <Heading as="h3" size="sm" fontWeight="semibold">
-                  {app.opportunityTitle ? (
-                    <Link asChild color="fg">
-                      <NextLink href={`/opportunities/${app.opportunityId}`}>
-                        {app.opportunityTitle}
-                      </NextLink>
-                    </Link>
-                  ) : (
-                    `Opportunity #${app.opportunityId.slice(0, 8)}`
-                  )}
-                </Heading>
+              <Flex
+                direction={{ base: 'column', sm: 'row' }}
+                gap="4"
+                justify="space-between"
+                align={{ base: 'flex-start', sm: 'flex-start' }}
+              >
+                <Stack gap="2" flex="1" minW="0">
+                  <Heading as="h3" size="sm" fontWeight="bold">
+                    {app.opportunityTitle ? (
+                      <Link asChild layerStyle="researchTextLink">
+                        <NextLink href={`/opportunities/${app.opportunityId}`}>
+                          {app.opportunityTitle}
+                        </NextLink>
+                      </Link>
+                    ) : (
+                      `Opportunity #${app.opportunityId.slice(0, 8)}`
+                    )}
+                  </Heading>
 
-                <Flex mt="2" gap="3" align="center" flexWrap="wrap">
-                  <Badge
+                  <Flex gap="2.5" align="center" flexWrap="wrap">
+                    <Badge
+                      variant="subtle"
+                      colorPalette={getStatusPalette(app.status)}
+                    >
+                      {tApplicationStatus(app.status)}
+                    </Badge>
+
+                    <Text textStyle="xs" color="fg.muted">
+                      {t('applicationsTab.appliedOn', {
+                        date: format.dateTime(new Date(app.appliedAt), {
+                          dateStyle: 'medium',
+                        }),
+                      })}
+                    </Text>
+
+                    {app.status === 'PENDING' && remaining ? (
+                      <Text textStyle="xs" color="fg.warning">
+                        {t('applicationsTab.remaining', { time: remaining })}
+                      </Text>
+                    ) : null}
+
+                    {app.status === 'PENDING' && app.isOverdue ? (
+                      <Text textStyle="xs" color="fg.error">
+                        {t('applicationsTab.countdownOverdue')}
+                      </Text>
+                    ) : null}
+                  </Flex>
+
+                  {app.applicantNote ? (
+                    <Text
+                      textStyle="sm"
+                      color="fg.muted"
+                      whiteSpace="pre-line"
+                      lineHeight="1.55"
+                    >
+                      {app.applicantNote}
+                    </Text>
+                  ) : null}
+
+                  {app.responseNote ? (
+                    <Box
+                      p="3"
+                      bg="bg.muted"
+                      borderLeftWidth="2px"
+                      borderColor="blue.solid"
+                    >
+                      <Text
+                        textStyle="xs"
+                        color="fg.muted"
+                        fontWeight="semibold"
+                      >
+                        {t('applicationsTab.responseNoteLabel')}
+                      </Text>
+                      <Text textStyle="sm" mt="0.5">
+                        {app.responseNote}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </Stack>
+
+                {app.status === 'PENDING' ? (
+                  <Button
                     variant="outline"
-                    colorPalette={getStatusPalette(app.status)}
+                    colorPalette="red"
+                    size="xs"
+                    onClick={() => {
+                      setWithdrawError(null);
+                      setConfirmWithdrawApp(app);
+                    }}
+                    loading={isWithdrawing}
+                    flexShrink={0}
                   >
-                    {tApplicationStatus(app.status)}
-                  </Badge>
-
-                  <Text textStyle="xs" color="fg.muted">
-                    {t('applicationsTab.appliedOn', {
-                      date: format.dateTime(new Date(app.appliedAt), {
-                        dateStyle: 'medium',
-                      }),
-                    })}
-                  </Text>
-
-                  {app.status === 'PENDING' && remaining ? (
-                    <Text textStyle="xs" color="fg.warning">
-                      {t('applicationsTab.remaining', { time: remaining })}
-                    </Text>
-                  ) : null}
-
-                  {app.status === 'PENDING' && app.isOverdue ? (
-                    <Text textStyle="xs" color="fg.error">
-                      {t('applicationsTab.countdownOverdue')}
-                    </Text>
-                  ) : null}
-                </Flex>
-
-                {app.applicantNote ? (
-                  <Text
-                    textStyle="sm"
-                    color="fg.muted"
-                    mt="3"
-                    whiteSpace="pre-line"
-                  >
-                    {app.applicantNote}
-                  </Text>
+                    {t('applicationsTab.withdraw')}
+                  </Button>
                 ) : null}
-
-                {app.responseNote ? (
-                  <Box mt="3" p="3" bg="bg.subtle">
-                    <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
-                      {t('applicationsTab.responseNoteLabel')}
-                    </Text>
-                    <Text textStyle="sm">{app.responseNote}</Text>
-                  </Box>
-                ) : null}
-              </Box>
-
-              {app.status === 'PENDING' ? (
-                <Button
-                  variant="outline"
-                  colorPalette="red"
-                  size="sm"
-                  onClick={() => setConfirmWithdrawApp(app)}
-                  loading={isWithdrawing}
-                  alignSelf={{ base: 'flex-start', sm: 'center' }}
-                >
-                  {t('applicationsTab.withdraw')}
-                </Button>
-              ) : null}
-            </Flex>
-          </Box>
-        );
-      })}
+              </Flex>
+            </Box>
+          );
+        })}
+      </Box>
 
       <Dialog.Root
         open={Boolean(confirmWithdrawApp)}
@@ -201,16 +243,24 @@ export function ProfileApplicationsTab() {
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content>
+            <Dialog.Content boxShadow="overlayPanel">
               <Dialog.Header>
                 <Dialog.Title>
                   {t('applicationsTab.confirmWithdrawTitle')}
                 </Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
-                <Text textStyle="sm" color="fg.muted">
-                  {t('applicationsTab.confirmWithdrawDesc')}
-                </Text>
+                <Stack gap="3">
+                  {withdrawError ? (
+                    <ErrorState
+                      title={t('applicationsTab.withdrawError')}
+                      message={withdrawError}
+                    />
+                  ) : null}
+                  <Text textStyle="sm" color="fg.muted">
+                    {t('applicationsTab.confirmWithdrawDesc')}
+                  </Text>
+                </Stack>
               </Dialog.Body>
               <Dialog.Footer>
                 <Button
@@ -221,7 +271,7 @@ export function ProfileApplicationsTab() {
                 </Button>
                 <Button
                   colorPalette="red"
-                  onClick={handleWithdrawConfirm}
+                  onClick={() => void handleWithdrawConfirm()}
                   loading={withdrawingId !== null}
                 >
                   {t('applicationsTab.withdraw')}
@@ -232,6 +282,6 @@ export function ProfileApplicationsTab() {
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-    </Stack>
+    </Box>
   );
 }
