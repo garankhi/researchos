@@ -5,11 +5,16 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor.js';
+import { ChatRedisIoAdapter } from './modules/chat/chat-redis-io.adapter.js';
 import { createOpenApiDocument } from './openapi.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+
+  const chatIoAdapter = new ChatRedisIoAdapter(app);
+  await chatIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(chatIoAdapter);
 
   app.enableCors({
     origin: process.env.WEB_ORIGIN?.split(',') ?? true,

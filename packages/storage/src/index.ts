@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -40,6 +41,7 @@ export interface StorageAdapter {
     body: Uint8Array,
     contentType: string,
   ): Promise<ObjectMetadata>;
+  deleteObject(key: string): Promise<void>;
 }
 
 export class StorageObjectNotFoundError extends Error {
@@ -222,6 +224,22 @@ class S3Storage implements StorageAdapter {
       contentType,
       sha256: checksum.toString('hex'),
     };
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch (error) {
+      if (isObjectNotFound(error)) {
+        return;
+      }
+      throw error;
+    }
   }
 }
 

@@ -975,39 +975,39 @@ model user_sessions {
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model users {
   background_jobs                                                       background_jobs[]
-  id                                                                    String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fptu_guid                                                             String?                    @unique @db.VarChar(100)
+  id                                                                    String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fptu_guid                                                             String?                          @unique @db.VarChar(100)
   user_type                                                             user_type
-  email                                                                 String                     @db.VarChar(255)
-  full_name                                                             String                     @db.VarChar(255)
-  academic_title                                                        String?                    @db.VarChar(100)
-  academic_degree                                                       String?                    @db.VarChar(100)
-  department_unit                                                       String                     @db.VarChar(255)
-  is_active                                                             Boolean                    @default(true)
-  last_login_at                                                         DateTime?                  @db.Timestamptz(6)
-  created_at                                                            DateTime                   @default(now()) @db.Timestamptz(6)
-  updated_at                                                            DateTime                   @default(now()) @db.Timestamptz(6)
+  email                                                                 String                           @db.VarChar(255)
+  full_name                                                             String                           @db.VarChar(255)
+  academic_title                                                        String?                          @db.VarChar(100)
+  academic_degree                                                       String?                          @db.VarChar(100)
+  department_unit                                                       String                           @db.VarChar(255)
+  is_active                                                             Boolean                          @default(true)
+  last_login_at                                                         DateTime?                        @db.Timestamptz(6)
+  created_at                                                            DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime                         @default(now()) @db.Timestamptz(6)
   achievement_posts                                                     achievement_posts[]
   digest_deliveries                                                     digest_deliveries[]
   digest_preferences                                                    digest_preferences?
   group_members                                                         group_members[]
-  group_output_links_group_output_links_accepted_byTousers              group_output_links[]       @relation("group_output_links_accepted_byTousers")
-  group_output_links_group_output_links_decided_byTousers               group_output_links[]       @relation("group_output_links_decided_byTousers")
-  group_output_links_group_output_links_removed_byTousers               group_output_links[]       @relation("group_output_links_removed_byTousers")
-  group_output_links_group_output_links_requested_byTousers             group_output_links[]       @relation("group_output_links_requested_byTousers")
+  group_output_links_group_output_links_accepted_byTousers              group_output_links[]             @relation("group_output_links_accepted_byTousers")
+  group_output_links_group_output_links_decided_byTousers               group_output_links[]             @relation("group_output_links_decided_byTousers")
+  group_output_links_group_output_links_removed_byTousers               group_output_links[]             @relation("group_output_links_removed_byTousers")
+  group_output_links_group_output_links_requested_byTousers             group_output_links[]             @relation("group_output_links_requested_byTousers")
   interest_circle_members                                               interest_circle_members[]
   interest_circles                                                      interest_circles[]
   knowledge_graph_edges                                                 knowledge_graph_edges[]
   local_credentials                                                     local_credentials?
-  mentoring_records_mentoring_records_mentor_idTousers                  mentoring_records[]        @relation("mentoring_records_mentor_idTousers")
-  mentoring_records_mentoring_records_student_user_idTousers            mentoring_records[]        @relation("mentoring_records_student_user_idTousers")
+  mentoring_records_mentoring_records_mentor_idTousers                  mentoring_records[]              @relation("mentoring_records_mentor_idTousers")
+  mentoring_records_mentoring_records_student_user_idTousers            mentoring_records[]              @relation("mentoring_records_student_user_idTousers")
   oidc_identities                                                       oidc_identities[]
-  opportunity_applications_opportunity_applications_applicant_idTousers opportunity_applications[] @relation("opportunity_applications_applicant_idTousers")
-  opportunity_applications_opportunity_applications_responded_byTousers opportunity_applications[] @relation("opportunity_applications_responded_byTousers")
+  opportunity_applications_opportunity_applications_applicant_idTousers opportunity_applications[]       @relation("opportunity_applications_applicant_idTousers")
+  opportunity_applications_opportunity_applications_responded_byTousers opportunity_applications[]       @relation("opportunity_applications_responded_byTousers")
   output_authors                                                        output_authors[]
   output_files                                                          output_files[]
-  output_revisions_output_revisions_created_byTousers                   output_revisions[]         @relation("output_revisions_created_byTousers")
-  output_revisions_output_revisions_released_byTousers                  output_revisions[]         @relation("output_revisions_released_byTousers")
+  output_revisions_output_revisions_created_byTousers                   output_revisions[]               @relation("output_revisions_created_byTousers")
+  output_revisions_output_revisions_released_byTousers                  output_revisions[]               @relation("output_revisions_released_byTousers")
   output_topics                                                         output_topics[]
   pending_research_updates                                              pending_research_updates[]
   project_members                                                       project_members[]
@@ -1015,23 +1015,32 @@ model users {
   research_groups                                                       research_groups[]
   research_interests                                                    research_interests[]
   research_opportunities                                                research_opportunities[]
-  research_outputs_research_outputs_created_byTousers                   research_outputs[]         @relation("research_outputs_created_byTousers")
-  research_outputs_research_outputs_owner_idTousers                     research_outputs[]         @relation("research_outputs_owner_idTousers")
+  research_outputs_research_outputs_created_byTousers                   research_outputs[]               @relation("research_outputs_created_byTousers")
+  research_outputs_research_outputs_owner_idTousers                     research_outputs[]               @relation("research_outputs_owner_idTousers")
   research_projects                                                     research_projects[]
   research_records                                                      research_records[]
   research_seminars                                                     research_seminars[]
   research_topics                                                       research_topics[]
   research_updates                                                      research_updates[]
   researcher_profiles                                                   researcher_profiles?
-  resource_handovers_resource_handovers_new_user_idTousers              resource_handovers[]       @relation("resource_handovers_new_user_idTousers")
-  resource_handovers_resource_handovers_performed_byTousers             resource_handovers[]       @relation("resource_handovers_performed_byTousers")
-  resource_handovers_resource_handovers_previous_user_idTousers         resource_handovers[]       @relation("resource_handovers_previous_user_idTousers")
+  resource_handovers_resource_handovers_new_user_idTousers              resource_handovers[]             @relation("resource_handovers_new_user_idTousers")
+  resource_handovers_resource_handovers_performed_byTousers             resource_handovers[]             @relation("resource_handovers_performed_byTousers")
+  resource_handovers_resource_handovers_previous_user_idTousers         resource_handovers[]             @relation("resource_handovers_previous_user_idTousers")
   search_index                                                          search_index[]
   user_follows                                                          user_follows[]
-  user_role_assignments_user_role_assignments_granted_byTousers         user_role_assignments[]    @relation("user_role_assignments_granted_byTousers")
-  user_role_assignments_user_role_assignments_revoked_byTousers         user_role_assignments[]    @relation("user_role_assignments_revoked_byTousers")
-  user_role_assignments_user_role_assignments_user_idTousers            user_role_assignments[]    @relation("user_role_assignments_user_idTousers")
+  user_role_assignments_user_role_assignments_granted_byTousers         user_role_assignments[]          @relation("user_role_assignments_granted_byTousers")
+  user_role_assignments_user_role_assignments_revoked_byTousers         user_role_assignments[]          @relation("user_role_assignments_revoked_byTousers")
+  user_role_assignments_user_role_assignments_user_idTousers            user_role_assignments[]          @relation("user_role_assignments_user_idTousers")
   user_sessions                                                         user_sessions[]
+  chat_conversations                                                    chat_conversations[]
+  chat_conversation_participants                                        chat_conversation_participants[]
+  chat_messages_chat_messages_sender_idTousers                          chat_messages[]                  @relation("chat_messages_sender_idTousers")
+  chat_messages_chat_messages_deleted_byTousers                         chat_messages[]                  @relation("chat_messages_deleted_byTousers")
+  chat_message_mentions                                                 chat_message_mentions[]
+  chat_message_reactions                                                chat_message_reactions[]
+  chat_message_attachments                                              chat_message_attachments[]
+  chat_message_reads                                                    chat_message_reads[]
+  chat_message_receipts                                                 chat_message_receipts[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1332,4 +1341,156 @@ enum visibility_level {
   PRIVATE
   RESEARCH_GROUP
   FPTU_COMMUNITY
+}
+
+enum chat_conversation_type {
+  DIRECT
+  GROUP
+}
+
+enum chat_participant_role {
+  MEMBER
+  OWNER
+}
+
+enum chat_receipt_status {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model chat_conversations {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                          String?                          @db.VarChar(120)
+  type                           chat_conversation_type           @default(DIRECT)
+  created_by                     String                           @db.Uuid
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  archived_at                    DateTime?                        @db.Timestamptz(6)
+  users                          users                            @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  chat_conversation_participants chat_conversation_participants[]
+  chat_messages                  chat_messages[]
+  chat_message_mentions          chat_message_mentions[]
+  chat_message_attachments       chat_message_attachments[]
+
+  @@index([created_by], map: "idx_chat_conversations_created_by")
+  @@index([archived_at], map: "idx_chat_conversations_archived_at")
+  @@index([updated_at], map: "idx_chat_conversations_active", where: raw("(archived_at IS NULL)"))
+}
+
+model chat_conversation_participants {
+  conversation_id      String                @db.Uuid
+  user_id              String                @db.Uuid
+  role                 chat_participant_role @default(MEMBER)
+  joined_at            DateTime              @default(now()) @db.Timestamptz(6)
+  last_read_message_id String?               @db.Uuid
+  last_read_at         DateTime?             @db.Timestamptz(6)
+  notification_muted   Boolean               @default(false)
+  chat_conversations   chat_conversations    @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                users                 @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  last_read_message    chat_messages?        @relation("chat_participant_last_read_message", fields: [last_read_message_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@id([conversation_id, user_id])
+  @@index([user_id], map: "idx_chat_participants_user_id")
+  @@index([user_id, conversation_id], map: "idx_chat_participants_user_conversation")
+  @@index([last_read_message_id], map: "idx_chat_participants_last_read_msg")
+}
+
+model chat_messages {
+  id                                    String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id                       String                           @db.Uuid
+  sender_id                             String                           @db.Uuid
+  body                                  String                           @default("")
+  client_nonce                          String?                          @db.VarChar(128)
+  created_at                            DateTime                         @default(now()) @db.Timestamptz(6)
+  edited_at                             DateTime?                        @db.Timestamptz(6)
+  deleted_at                            DateTime?                        @db.Timestamptz(6)
+  deleted_by                            String?                          @db.Uuid
+  chat_conversations                    chat_conversations               @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sender                                users                            @relation("chat_messages_sender_idTousers", fields: [sender_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  deleted_by_user                       users?                           @relation("chat_messages_deleted_byTousers", fields: [deleted_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  chat_message_mentions                 chat_message_mentions[]
+  chat_message_reactions                chat_message_reactions[]
+  chat_message_attachments              chat_message_attachments[]
+  chat_message_reads                    chat_message_reads[]
+  chat_message_receipts                 chat_message_receipts[]
+  chat_participants_last_read_reference chat_conversation_participants[] @relation("chat_participant_last_read_message")
+
+  @@unique([conversation_id, sender_id, client_nonce], map: "uq_chat_messages_client_nonce", where: raw("(client_nonce IS NOT NULL)"))
+  @@index([conversation_id, created_at, id], map: "idx_chat_messages_history")
+  @@index([sender_id, created_at], map: "idx_chat_messages_sender")
+}
+
+model chat_message_mentions {
+  message_id         String             @db.Uuid
+  mentioned_user_id  String             @db.Uuid
+  conversation_id    String             @db.Uuid
+  mentioned_at       DateTime           @default(now()) @db.Timestamptz(6)
+  chat_messages      chat_messages      @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users              @relation(fields: [mentioned_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  chat_conversations chat_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([message_id, mentioned_user_id])
+  @@index([mentioned_user_id], map: "idx_chat_mentions_user_id")
+  @@index([conversation_id], map: "idx_chat_mentions_conversation_id")
+  @@index([mentioned_user_id, mentioned_at], map: "idx_chat_mentions_user_time")
+}
+
+model chat_message_reactions {
+  message_id    String        @db.Uuid
+  user_id       String        @db.Uuid
+  reaction      String        @db.VarChar(32)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  chat_messages chat_messages @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([message_id, user_id, reaction])
+  @@index([message_id], map: "idx_chat_reactions_message_id")
+}
+
+model chat_message_attachments {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id         String?            @db.Uuid
+  conversation_id    String             @db.Uuid
+  uploaded_by        String             @db.Uuid
+  storage_key        String             @unique
+  file_name          String
+  mime_type          String             @db.VarChar(100)
+  size_bytes         BigInt
+  sha256             String             @db.VarChar(64)
+  width              Int?
+  height             Int?
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  chat_messages      chat_messages?     @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  chat_conversations chat_conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users              @relation(fields: [uploaded_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([message_id], map: "idx_chat_attachments_message_id")
+  @@index([conversation_id], map: "idx_chat_attachments_conversation_id")
+  @@index([uploaded_by], map: "idx_chat_attachments_uploaded_by")
+}
+
+model chat_message_reads {
+  message_id    String        @db.Uuid
+  user_id       String        @db.Uuid
+  read_at       DateTime      @default(now()) @db.Timestamptz(6)
+  chat_messages chat_messages @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([message_id, user_id])
+  @@index([user_id], map: "idx_chat_reads_user_id")
+  @@index([message_id, user_id], map: "idx_chat_reads_message_user")
+}
+
+model chat_message_receipts {
+  message_id    String              @db.Uuid
+  user_id       String              @db.Uuid
+  status        chat_receipt_status @default(PENDING)
+  updated_at    DateTime            @default(now()) @db.Timestamptz(6)
+  chat_messages chat_messages       @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([message_id, user_id])
+  @@index([user_id, status], map: "idx_chat_receipts_user_status")
 }

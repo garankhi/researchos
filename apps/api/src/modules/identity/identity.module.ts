@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { SESSION_RESOLVER } from '../../common/auth/session-resolver.js';
+import { HttpThrottlerGuard } from '../../common/guards/http-throttler.guard.js';
 import { RoleGuard } from '../../common/guards/role.guard.js';
 import { SessionGuard } from '../../common/guards/session.guard.js';
 import { AccessService } from './access.service.js';
@@ -59,7 +59,7 @@ import { UsersService } from './users.service.js';
     // Global guards, in the order they run.
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: RoleGuard },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: HttpThrottlerGuard },
   ],
   exports: [SESSION_RESOLVER, AccessService, SessionService, UsersService],
 })

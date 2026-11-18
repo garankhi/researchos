@@ -35,6 +35,9 @@ export {
   VerificationStatus,
   Visibility,
   visibility_level as OutputFileVisibility,
+  chat_conversation_type as ChatConversationType,
+  chat_participant_role as ChatParticipantRole,
+  chat_receipt_status as ChatReceiptStatus,
 } from './generated/prisma/client.js';
 export type { data_provenance_type as DataProvenance } from './generated/prisma/client.js';
 
@@ -45,4 +48,12 @@ export type {
   output_revisions as OutputRevision,
   output_authors as OutputAuthor,
   output_files as OutputFile,
+  chat_conversations as ChatConversation,
+  chat_conversation_participants as ChatConversationParticipant,
+  chat_messages as ChatMessage,
+  chat_message_mentions as ChatMessageMention,
+  chat_message_reactions as ChatMessageReaction,
+  chat_message_attachments as ChatMessageAttachment,
+  chat_message_reads as ChatMessageRead,
+  chat_message_receipts as ChatMessageReceipt,
 } from './generated/prisma/client.js';

@@ -1,0 +1,35 @@
+{
+  "name": "@researchos/chat",
+  "version": "0.0.1",
+  "description": "Shared Socket.IO event enums, payload contracts, and mention utilities for ResearchOS chat",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "oxlint --type-aware src/",
+    "format": "prettier --write \"src/**/*.ts\" --no-error-on-unmatched-pattern",
+    "format:check": "prettier --check \"src/**/*.ts\" --no-error-on-unmatched-pattern",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "prettier": "^3.4.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.2"
+  }
+}
