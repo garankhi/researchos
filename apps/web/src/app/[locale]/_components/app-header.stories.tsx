@@ -67,11 +67,10 @@ export const Desktop: Story = {
         'true',
       );
     }
-    for (const name of [
-      'Update notifications',
-      'Messages',
-      'Request notifications',
-    ]) {
+    await expect(
+      canvas.getByRole('link', { name: 'Messages' }),
+    ).toHaveAttribute('href', '/en/chat');
+    for (const name of ['Update notifications', 'Request notifications']) {
       await expect(canvas.getByRole('button', { name })).toHaveAttribute(
         'aria-disabled',
         'true',

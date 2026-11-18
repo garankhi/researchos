@@ -30,7 +30,7 @@ export function formatUserMentionToken(
   displayName: string,
   userId: string,
 ): string {
-  const safeName = displayName.replace(/[\[\]]/g, "").trim() || "User";
+  const safeName = displayName.replace(/[[\]]/g, "").trim() || "User";
   return `@[${safeName}](${userId.toLowerCase()})`;
 }
 

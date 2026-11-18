@@ -194,7 +194,7 @@ describe('ChatAttachmentsService', () => {
       expiresAt: Date.now() + 60_000,
     });
 
-    expect(() =>
+    await expect(
       service.confirmUpload(ALICE_ID, CONV_ID, outputToken),
     ).rejects.toMatchObject({
       code: domainErrorCodes.storage.uploadIntentInvalid,
