@@ -127,8 +127,7 @@ export function OutputFiles({
           justify="space-between"
           borderWidth="1px"
           borderColor="border"
-          borderRadius="md"
-          p="3"
+          p="3.5"
           bg="bg.subtle"
         >
           <Flex direction="column" gap="0.5" minW="0">

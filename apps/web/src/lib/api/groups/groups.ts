@@ -488,7 +488,7 @@ export function useGroupsControllerFindOne<
 }
 
 /**
- * Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.
+ * Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Requires researcher access and either designated leadership or an active GROUP_LEADER membership in this group.
  * @summary Update or archive a research group
  */
 export const groupsControllerUpdate = (
@@ -589,7 +589,7 @@ export const useGroupsControllerUpdate = <
   );
 };
 /**
- * The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.
+ * The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.
  * @summary List group members
  */
 export const groupMembersControllerFindAll = (
@@ -981,7 +981,7 @@ export const useGroupMembersControllerUpdate = <
   );
 };
 /**
- * @summary Remove a group member
+ * @summary Archive a group membership and revoke its group access
  */
 export const groupMembersControllerRemove = (
   groupId: string,
@@ -1051,7 +1051,7 @@ export type GroupMembersControllerRemoveMutationVariables = {
 };
 
 /**
- * @summary Remove a group member
+ * @summary Archive a group membership and revoke its group access
  */
 export const useGroupMembersControllerRemove = <
   TError = ApiErrorResponseDto,

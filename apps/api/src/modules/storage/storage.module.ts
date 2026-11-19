@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ArticleCreationUploadCleanupService } from './article-creation-upload-cleanup.service.js';
 import { ArticleCreationUploadController } from './article-creation-upload.controller.js';
+import { ObjectStorageService } from './object-storage.service.js';
 import { OutputDownloadController } from './output-download.controller.js';
 import { OutputDownloadService } from './output-download.service.js';
 import { OutputUploadController } from './output-upload.controller.js';
@@ -19,5 +20,7 @@ import { StorageServicesModule } from './storage-services.module.js';
     OutputDownloadService,
     ArticleCreationUploadCleanupService,
   ],
+  // ChatModule imports StorageModule and injects ObjectStorageService.
+  exports: [ObjectStorageService],
 })
 export class StorageModule {}

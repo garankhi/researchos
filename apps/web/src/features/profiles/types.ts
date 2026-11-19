@@ -10,9 +10,9 @@ import type {
 } from '@/lib/api/models';
 
 export type ProfileTab =
-  'applications' | 'groups' | 'outputs' | 'interests' | 'openalex';
+  'overview' | 'outputs' | 'groups' | 'interests' | 'applications' | 'openalex';
 
-export type PublicProfileTab = 'groups' | 'outputs' | 'interests';
+export type PublicProfileTab = 'overview' | 'outputs' | 'groups' | 'interests';
 
 export type {
   ApplicationResponseDto,

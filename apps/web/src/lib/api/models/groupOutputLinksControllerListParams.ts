@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { GroupOutputLinksControllerListStatus } from './groupOutputLinksControllerListStatus';
 
 export type GroupOutputLinksControllerListParams = {
   /**
@@ -22,4 +23,8 @@ export type GroupOutputLinksControllerListParams = {
    * Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.
    */
   sort?: string;
+  /**
+   * Filter the showcase or review queue before pagination. PENDING requires group management permission.
+   */
+  status?: GroupOutputLinksControllerListStatus;
 };

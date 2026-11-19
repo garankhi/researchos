@@ -61,10 +61,15 @@ CREATE VIEW active_user_sessions AS
 CREATE FUNCTION is_group_member(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_groups g JOIN users u ON u.id=actor AND u.is_active
  WHERE g.id=target AND g.is_active AND g.archived_at IS NULL AND
- (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.user_id=actor)));
+ (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+   WHERE m.group_id=g.id AND m.user_id=actor AND m.archived_at IS NULL)));
 $$;
 CREATE FUNCTION can_manage_group(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_groups WHERE id=target AND lead_id=actor AND is_active AND archived_at IS NULL);
+ SELECT is_researcher(actor) AND EXISTS (
+   SELECT 1 FROM research_groups g WHERE g.id=target AND g.is_active AND g.archived_at IS NULL
+     AND (g.lead_id=actor OR EXISTS (
+       SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.user_id=actor
+         AND m.role='GROUP_LEADER' AND m.archived_at IS NULL)));
 $$;
 CREATE FUNCTION can_manage_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs WHERE id=target AND owner_id=actor);
@@ -144,11 +149,17 @@ LANGUAGE sql STABLE AS $$
  AND can_view_candidate(actor,o.id);
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.creator_id=actor OR EXISTS (
-   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
-   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
-     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER')))));
+ SELECT is_researcher(actor) AND EXISTS (
+   SELECT 1 FROM research_opportunities o WHERE o.id=target AND CASE
+     WHEN o.group_id IS NOT NULL THEN can_manage_group(actor,o.group_id) AND (
+       o.project_id IS NULL OR EXISTS (
+         SELECT 1 FROM research_projects p WHERE p.id=o.project_id
+           AND p.group_id=o.group_id AND p.archived_at IS NULL))
+     WHEN o.project_id IS NOT NULL THEN EXISTS (
+       SELECT 1 FROM research_projects p WHERE p.id=o.project_id
+         AND p.group_id IS NULL AND p.lead_id=actor AND p.archived_at IS NULL)
+     ELSE o.creator_id=actor
+   END);
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1053,3 +1064,7 @@ BEGIN
 END $$;
 CREATE TRIGGER guard_field_provenance_lock BEFORE INSERT OR UPDATE ON field_provenance
  FOR EACH ROW EXECUTE FUNCTION guard_field_provenance_lock();
+
+-- Archive filters used by group hub reads.
+CREATE INDEX group_members_active_user_idx ON group_members (user_id, group_id) WHERE archived_at IS NULL;
+CREATE INDEX group_directions_active_group_idx ON group_directions (group_id, created_at) WHERE archived_at IS NULL;

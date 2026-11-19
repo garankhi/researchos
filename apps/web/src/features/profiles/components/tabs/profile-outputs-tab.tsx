@@ -1,177 +1,133 @@
 'use client';
 
-import {
-  Badge,
-  Box,
-  Flex,
-  Heading,
-  HStack,
-  Link,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
-import { FileText, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Box, Button, Flex, Heading } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
-import { doiUrl } from '@/lib/doi-url';
 import { useProfileOutputs } from '../../hooks/use-profile-outputs';
-import { useProfileOutputCapability } from '../../hooks/use-profile-output-capability';
-import { ProfileOutputActionsMenu } from '../profile-output-actions-menu';
-import { ProfileOutputsSkeleton } from '../profile-skeletons';
 import type { OutputResponseDto } from '../../types';
+import { ProfileOutputItem } from '../profile-output-item';
+import { ProfileOutputsSkeleton } from '../profile-skeletons';
 
-/**
- * One work on the profile page.
- *
- * The card is its own component so the capability hook can run per work:
- * a hook cannot be called inside the list's `.map`, and the capability
- * differs from card to card — the viewer may own one work and merely be a
- * co-author on the next.
- */
-function ProfileOutputCard({ output }: { output: OutputResponseDto }) {
+type OutputFilter = 'all' | 'published' | 'drafts';
+
+export function ProfileOutputsTab({
+  userId,
+  isOwner = false,
+}: {
+  userId?: string;
+  isOwner?: boolean;
+}) {
   const t = useTranslations('profile');
-  const capability = useProfileOutputCapability({ output });
-
-  const rev = output.currentRevision;
-  const title = rev?.title || `Output #${output.id.slice(0, 8)}`;
-  const authorsList = output.authors
-    ?.sort((a, b) => a.authorOrder - b.authorOrder)
-    .map((a) => a.authorNameString)
-    .join(', ');
-  const venueStr = typeof rev?.venue === 'string' ? rev.venue : null;
-  const doiStr = typeof output.doi === 'string' ? output.doi : null;
-  const yearStr =
-    typeof rev?.publicationYear === 'number' ||
-    typeof rev?.publicationYear === 'string'
-      ? String(rev.publicationYear)
-      : null;
-
-  /*
-   * The menu is for the people connected to the work. A visitor reading
-   * someone else's profile has no operation to perform, so they get no
-   * menu at all — not a menu with everything greyed out. A co-author does
-   * get one: they are part of the work even though the visibility entry
-   * inside it is locked for them.
-   */
-  const showMenu = capability.role !== 'reader';
-
-  return (
-    <Box bg="bg.panel" borderWidth="1px" borderRadius="lg" p="5">
-      <Stack gap="3">
-        <Flex
-          direction={{ base: 'column', sm: 'row' }}
-          gap="2"
-          justify="space-between"
-          align="flex-start"
-        >
-          <Box flex="1" minW="0">
-            <Heading as="h3" size="sm" fontWeight="semibold" lineHeight="1.4">
-              <Link asChild color="fg">
-                <NextLink href={`/outputs/${output.id}`}>{title}</NextLink>
-              </Link>
-            </Heading>
-
-            {authorsList ? (
-              <Text textStyle="sm" color="fg.muted" mt="1">
-                {authorsList}
-              </Text>
-            ) : null}
-          </Box>
-
-          {output.visibility ? (
-            <HStack gap="1" flexShrink={0} align="center">
-              <Badge variant="outline" colorPalette="gray">
-                {output.visibility === 'FPTU_COMMUNITY'
-                  ? t('outputsTab.visibilityPublic')
-                  : output.visibility === 'RESEARCH_GROUP'
-                    ? t('outputsTab.visibilityGroupOnly')
-                    : output.visibility}
-              </Badge>
-              {showMenu ? (
-                <ProfileOutputActionsMenu
-                  output={output}
-                  capability={capability}
-                />
-              ) : null}
-            </HStack>
-          ) : showMenu ? (
-            <ProfileOutputActionsMenu output={output} capability={capability} />
-          ) : null}
-        </Flex>
-
-        <Flex gap="3" align="center" flexWrap="wrap">
-          {venueStr ? (
-            <Text textStyle="sm" color="fg.muted" fontStyle="italic">
-              {venueStr}
-            </Text>
-          ) : null}
-
-          {yearStr ? (
-            <Text textStyle="sm" color="fg.muted">
-              ({yearStr})
-            </Text>
-          ) : null}
-
-          {doiStr ? (
-            <Link
-              href={doiUrl(doiStr)}
-              target="_blank"
-              rel="noopener noreferrer"
-              display="inline-flex"
-              alignItems="center"
-              gap="1"
-              textStyle="xs"
-            >
-              <FileText />
-              {`DOI: ${doiStr}`}
-              <ExternalLink />
-            </Link>
-          ) : null}
-        </Flex>
-
-        {output.topics && output.topics.length > 0 ? (
-          <Flex gap="2" flexWrap="wrap">
-            {output.topics.map((topic) => (
-              <Badge key={topic.topicId} variant="outline" colorPalette="gray">
-                {topic.topicName}
-              </Badge>
-            ))}
-          </Flex>
-        ) : null}
-      </Stack>
-    </Box>
-  );
-}
-
-export function ProfileOutputsTab({ userId }: { userId?: string }) {
-  const t = useTranslations('profile');
+  const [filter, setFilter] = useState<OutputFilter>('all');
   const { allOutputs, isLoading, isFailed, refetch } = useProfileOutputs({
     userId,
   });
 
   if (isLoading) {
-    return <ProfileOutputsSkeleton />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ProfileOutputsSkeleton />
+      </Box>
+    );
   }
 
   if (isFailed) {
-    return <ErrorState title={t('loadError')} onRetry={refetch} />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ErrorState title={t('loadError')} onRetry={refetch} />
+      </Box>
+    );
   }
 
   if (allOutputs.length === 0) {
     return (
-      <EmptyState
-        title={t('outputsTab.emptyTitle')}
-        message={t('outputsTab.emptyMessage')}
-      />
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <EmptyState
+          title={t('outputsTab.emptyTitle')}
+          message={t('outputsTab.emptyMessage')}
+        />
+      </Box>
     );
   }
 
+  const publishedOutputs = allOutputs.filter(
+    (item) => item.sharingStatus === 'SHARED',
+  );
+  const draftOutputs = allOutputs.filter(
+    (item) => item.sharingStatus !== 'SHARED',
+  );
+
+  const visibleOutputs: OutputResponseDto[] =
+    filter === 'published'
+      ? publishedOutputs
+      : filter === 'drafts'
+        ? draftOutputs
+        : allOutputs;
+
   return (
-    <Stack gap="4" py="1">
-      {allOutputs.map((output: OutputResponseDto) => (
-        <ProfileOutputCard key={output.id} output={output} />
-      ))}
-    </Stack>
+    <Box bg="bg.panel" boxShadow="xs">
+      <Flex
+        px={{ base: '4', md: '6' }}
+        py="4"
+        borderBottomWidth="1px"
+        borderColor="border"
+        align="center"
+        justify="space-between"
+        gap="3"
+        flexWrap="wrap"
+      >
+        <Heading as="h2" size="md" fontWeight="bold">
+          {t('outputsTab.title')} ({allOutputs.length})
+        </Heading>
+
+        {isOwner && draftOutputs.length > 0 ? (
+          <Flex gap="1.5" wrap="wrap">
+            <Button
+              size="xs"
+              variant={filter === 'all' ? 'solid' : 'outline'}
+              onClick={() => setFilter('all')}
+            >
+              {t('outputsTab.filterAll', { count: allOutputs.length })}
+            </Button>
+            <Button
+              size="xs"
+              variant={filter === 'published' ? 'solid' : 'outline'}
+              onClick={() => setFilter('published')}
+            >
+              {t('outputsTab.filterPublished', {
+                count: publishedOutputs.length,
+              })}
+            </Button>
+            <Button
+              size="xs"
+              variant={filter === 'drafts' ? 'solid' : 'outline'}
+              onClick={() => setFilter('drafts')}
+            >
+              {t('outputsTab.filterDrafts', { count: draftOutputs.length })}
+            </Button>
+          </Flex>
+        ) : null}
+      </Flex>
+
+      {visibleOutputs.length === 0 ? (
+        <Box p={{ base: '4', md: '6' }}>
+          <EmptyState
+            title={t('outputsTab.emptyTitle')}
+            message={t('outputsTab.emptyMessage')}
+          />
+        </Box>
+      ) : (
+        <Box>
+          {visibleOutputs.map((output, index) => (
+            <ProfileOutputItem
+              key={output.id}
+              output={output}
+              showBottomBorder={index < visibleOutputs.length - 1}
+            />
+          ))}
+        </Box>
+      )}
+    </Box>
   );
 }

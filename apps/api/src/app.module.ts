@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { resolveEnvFilePaths } from '@researchos/config';
 import { PrismaModule } from '@researchos/database';
+import { ChatModule } from './modules/chat/chat.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { DiscoveryModule } from './modules/discovery/discovery.module.js';
 import { FollowModule } from './modules/follow/follow.module.js';
@@ -61,6 +62,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
       },
     ]),
 
+    ChatModule,
     DemoModule,
     DiscoveryModule,
     FollowModule,

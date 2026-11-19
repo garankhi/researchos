@@ -478,6 +478,7 @@ CREATE TABLE "group_members" (
   "user_id" uuid NOT NULL,
   "role" group_member_role NOT NULL DEFAULT 'MEMBER',
   "joined_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "archived_at" timestamptz,
   PRIMARY KEY ("group_id", "user_id")
 );
 
@@ -487,7 +488,8 @@ CREATE TABLE "group_directions" (
   "topic_id" uuid,
   "title" varchar(255) NOT NULL,
   "description" text,
-  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "archived_at" timestamptz
 );
 
 CREATE TABLE "research_outputs" (
@@ -1094,6 +1096,10 @@ COMMENT ON TABLE "research_groups" IS 'Every active researcher, including a gran
 
 COMMENT ON COLUMN "research_groups"."lead_id" IS 'Single authority for group leadership; LEAD is not duplicated in group_members.role.';
 
+COMMENT ON COLUMN "group_members"."archived_at" IS 'Removed memberships are retained; only unarchived rows grant access.';
+
+COMMENT ON COLUMN "group_directions"."archived_at" IS 'UI deletion archives the direction and preserves project references.';
+
 COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
 
 COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes DOI names and decodes doi.org resolver paths. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.';
@@ -1455,10 +1461,15 @@ CREATE VIEW active_user_sessions AS
 CREATE FUNCTION is_group_member(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_groups g JOIN users u ON u.id=actor AND u.is_active
  WHERE g.id=target AND g.is_active AND g.archived_at IS NULL AND
- (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.user_id=actor)));
+ (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
+   WHERE m.group_id=g.id AND m.user_id=actor AND m.archived_at IS NULL)));
 $$;
 CREATE FUNCTION can_manage_group(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_groups WHERE id=target AND lead_id=actor AND is_active AND archived_at IS NULL);
+ SELECT is_researcher(actor) AND EXISTS (
+   SELECT 1 FROM research_groups g WHERE g.id=target AND g.is_active AND g.archived_at IS NULL
+     AND (g.lead_id=actor OR EXISTS (
+       SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.user_id=actor
+         AND m.role='GROUP_LEADER' AND m.archived_at IS NULL)));
 $$;
 CREATE FUNCTION can_manage_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs WHERE id=target AND owner_id=actor);
@@ -1538,11 +1549,17 @@ LANGUAGE sql STABLE AS $$
  AND can_view_candidate(actor,o.id);
 $$;
 CREATE FUNCTION can_manage_opportunity(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_opportunities o WHERE o.id=target
- AND (o.creator_id=actor OR EXISTS (
-   SELECT 1 FROM research_groups g WHERE g.id=o.group_id AND g.is_active AND g.archived_at IS NULL
-   AND (g.lead_id=actor OR EXISTS (SELECT 1 FROM group_members m
-     WHERE m.group_id=g.id AND m.user_id=actor AND m.role='GROUP_LEADER')))));
+ SELECT is_researcher(actor) AND EXISTS (
+   SELECT 1 FROM research_opportunities o WHERE o.id=target AND CASE
+     WHEN o.group_id IS NOT NULL THEN can_manage_group(actor,o.group_id) AND (
+       o.project_id IS NULL OR EXISTS (
+         SELECT 1 FROM research_projects p WHERE p.id=o.project_id
+           AND p.group_id=o.group_id AND p.archived_at IS NULL))
+     WHEN o.project_id IS NOT NULL THEN EXISTS (
+       SELECT 1 FROM research_projects p WHERE p.id=o.project_id
+         AND p.group_id IS NULL AND p.lead_id=actor AND p.archived_at IS NULL)
+     ELSE o.creator_id=actor
+   END);
 $$;
 
 CREATE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -2447,5 +2464,275 @@ BEGIN
 END $$;
 CREATE TRIGGER guard_field_provenance_lock BEFORE INSERT OR UPDATE ON field_provenance
  FOR EACH ROW EXECUTE FUNCTION guard_field_provenance_lock();
+
+-- Archive filters used by group hub reads.
+CREATE INDEX group_members_active_user_idx ON group_members (user_id, group_id) WHERE archived_at IS NULL;
+CREATE INDEX group_directions_active_group_idx ON group_directions (group_id, created_at) WHERE archived_at IS NULL;
+-- Standalone real-time chat domain (RES-166).
+CREATE TYPE "chat_conversation_type" AS ENUM (
+  'DIRECT',
+  'GROUP'
+);
+
+CREATE TYPE "chat_participant_role" AS ENUM (
+  'MEMBER',
+  'OWNER'
+);
+
+CREATE TYPE "chat_receipt_status" AS ENUM (
+  'PENDING',
+  'SENT',
+  'DELIVERED',
+  'FAILED'
+);
+
+CREATE TABLE "chat_conversations" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "title" varchar(120),
+  "type" chat_conversation_type NOT NULL DEFAULT 'DIRECT',
+  "created_by" uuid NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "archived_at" timestamptz,
+  CONSTRAINT "ck_chat_conversation_title" CHECK (title IS NULL OR btrim(title) <> '')
+);
+
+CREATE TABLE "chat_conversation_participants" (
+  "conversation_id" uuid NOT NULL,
+  "user_id" uuid NOT NULL,
+  "role" chat_participant_role NOT NULL DEFAULT 'MEMBER',
+  "joined_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "last_read_message_id" uuid,
+  "last_read_at" timestamptz,
+  "notification_muted" boolean NOT NULL DEFAULT false,
+  PRIMARY KEY ("conversation_id", "user_id")
+);
+
+CREATE TABLE "chat_messages" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "conversation_id" uuid NOT NULL,
+  "sender_id" uuid NOT NULL,
+  "body" text NOT NULL DEFAULT '',
+  "client_nonce" varchar(128),
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "edited_at" timestamptz,
+  "deleted_at" timestamptz,
+  "deleted_by" uuid,
+  CONSTRAINT "ck_chat_message_body_len" CHECK (char_length(body) <= 4000),
+  CONSTRAINT "ck_chat_message_deleted_pair" CHECK ((deleted_at IS NULL) = (deleted_by IS NULL))
+);
+
+CREATE TABLE "chat_message_mentions" (
+  "message_id" uuid NOT NULL,
+  "mentioned_user_id" uuid NOT NULL,
+  "conversation_id" uuid NOT NULL,
+  "mentioned_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY ("message_id", "mentioned_user_id")
+);
+
+CREATE TABLE "chat_message_reactions" (
+  "message_id" uuid NOT NULL,
+  "user_id" uuid NOT NULL,
+  "reaction" varchar(32) NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY ("message_id", "user_id", "reaction"),
+  CONSTRAINT "ck_chat_reaction_nonempty" CHECK (btrim(reaction) <> '')
+);
+
+CREATE TABLE "chat_message_attachments" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "message_id" uuid,
+  "conversation_id" uuid NOT NULL,
+  "uploaded_by" uuid NOT NULL,
+  "storage_key" text UNIQUE NOT NULL,
+  "file_name" text NOT NULL,
+  "mime_type" varchar(100) NOT NULL,
+  "size_bytes" bigint NOT NULL,
+  "sha256" varchar(64) NOT NULL,
+  "width" integer,
+  "height" integer,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_chat_attachment_size" CHECK (size_bytes > 0 AND size_bytes <= 26214400),
+  CONSTRAINT "ck_chat_attachment_sha256" CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT "ck_chat_attachment_dimensions" CHECK ((width IS NULL AND height IS NULL) OR (width > 0 AND height > 0))
+);
+
+CREATE TABLE "chat_message_reads" (
+  "message_id" uuid NOT NULL,
+  "user_id" uuid NOT NULL,
+  "read_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY ("message_id", "user_id")
+);
+
+CREATE TABLE "chat_message_receipts" (
+  "message_id" uuid NOT NULL,
+  "user_id" uuid NOT NULL,
+  "status" chat_receipt_status NOT NULL DEFAULT 'PENDING',
+  "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY ("message_id", "user_id")
+);
+
+ALTER TABLE "chat_conversations"
+  ADD CONSTRAINT "chat_conversations_created_by_fkey"
+  FOREIGN KEY ("created_by") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_conversation_participants"
+  ADD CONSTRAINT "chat_conversation_participants_conversation_id_fkey"
+  FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_conversation_participants"
+  ADD CONSTRAINT "chat_conversation_participants_user_id_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_conversation_participants"
+  ADD CONSTRAINT "chat_conversation_participants_last_read_message_id_fkey"
+  FOREIGN KEY ("last_read_message_id") REFERENCES "chat_messages" ("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_messages"
+  ADD CONSTRAINT "chat_messages_conversation_id_fkey"
+  FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_messages"
+  ADD CONSTRAINT "chat_messages_sender_id_fkey"
+  FOREIGN KEY ("sender_id") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_messages"
+  ADD CONSTRAINT "chat_messages_deleted_by_fkey"
+  FOREIGN KEY ("deleted_by") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_mentions"
+  ADD CONSTRAINT "chat_message_mentions_message_id_fkey"
+  FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_mentions"
+  ADD CONSTRAINT "chat_message_mentions_mentioned_user_id_fkey"
+  FOREIGN KEY ("mentioned_user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_mentions"
+  ADD CONSTRAINT "chat_message_mentions_conversation_id_fkey"
+  FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_reactions"
+  ADD CONSTRAINT "chat_message_reactions_message_id_fkey"
+  FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_reactions"
+  ADD CONSTRAINT "chat_message_reactions_user_id_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_attachments"
+  ADD CONSTRAINT "chat_message_attachments_message_id_fkey"
+  FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_attachments"
+  ADD CONSTRAINT "chat_message_attachments_conversation_id_fkey"
+  FOREIGN KEY ("conversation_id") REFERENCES "chat_conversations" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_attachments"
+  ADD CONSTRAINT "chat_message_attachments_uploaded_by_fkey"
+  FOREIGN KEY ("uploaded_by") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_reads"
+  ADD CONSTRAINT "chat_message_reads_message_id_fkey"
+  FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_reads"
+  ADD CONSTRAINT "chat_message_reads_user_id_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_receipts"
+  ADD CONSTRAINT "chat_message_receipts_message_id_fkey"
+  FOREIGN KEY ("message_id") REFERENCES "chat_messages" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+ALTER TABLE "chat_message_receipts"
+  ADD CONSTRAINT "chat_message_receipts_user_id_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+CREATE INDEX "idx_chat_conversations_created_by" ON "chat_conversations" ("created_by");
+CREATE INDEX "idx_chat_conversations_archived_at" ON "chat_conversations" ("archived_at");
+CREATE INDEX "idx_chat_conversations_active" ON "chat_conversations" ("updated_at") WHERE (archived_at IS NULL);
+
+CREATE INDEX "idx_chat_participants_user_id" ON "chat_conversation_participants" ("user_id");
+CREATE INDEX "idx_chat_participants_user_conversation" ON "chat_conversation_participants" ("user_id", "conversation_id");
+CREATE INDEX "idx_chat_participants_last_read_msg" ON "chat_conversation_participants" ("last_read_message_id");
+
+CREATE UNIQUE INDEX "uq_chat_messages_client_nonce"
+  ON "chat_messages" ("conversation_id", "sender_id", "client_nonce")
+  WHERE (client_nonce IS NOT NULL);
+CREATE INDEX "idx_chat_messages_history" ON "chat_messages" ("conversation_id", "created_at", "id");
+CREATE INDEX "idx_chat_messages_sender" ON "chat_messages" ("sender_id", "created_at");
+
+CREATE INDEX "idx_chat_mentions_user_id" ON "chat_message_mentions" ("mentioned_user_id");
+CREATE INDEX "idx_chat_mentions_conversation_id" ON "chat_message_mentions" ("conversation_id");
+CREATE INDEX "idx_chat_mentions_user_time" ON "chat_message_mentions" ("mentioned_user_id", "mentioned_at");
+
+CREATE INDEX "idx_chat_reactions_message_id" ON "chat_message_reactions" ("message_id");
+
+CREATE INDEX "idx_chat_attachments_message_id" ON "chat_message_attachments" ("message_id");
+CREATE INDEX "idx_chat_attachments_conversation_id" ON "chat_message_attachments" ("conversation_id");
+CREATE INDEX "idx_chat_attachments_uploaded_by" ON "chat_message_attachments" ("uploaded_by");
+
+CREATE INDEX "idx_chat_reads_user_id" ON "chat_message_reads" ("user_id");
+CREATE INDEX "idx_chat_reads_message_user" ON "chat_message_reads" ("message_id", "user_id");
+
+CREATE INDEX "idx_chat_receipts_user_status" ON "chat_message_receipts" ("user_id", "status");
+
+CREATE OR REPLACE FUNCTION guard_chat_message_participant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM chat_conversation_participants
+    WHERE conversation_id = NEW.conversation_id AND user_id = NEW.sender_id
+  ) THEN
+    RAISE EXCEPTION 'Chat message sender must be a conversation participant' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_chat_message_participant
+  BEFORE INSERT ON chat_messages
+  FOR EACH ROW EXECUTE FUNCTION guard_chat_message_participant();
+
+CREATE OR REPLACE FUNCTION guard_chat_attachment_consistency() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  msg_conv uuid;
+BEGIN
+  IF NEW.message_id IS NOT NULL THEN
+    SELECT conversation_id INTO msg_conv FROM chat_messages WHERE id = NEW.message_id;
+    IF msg_conv IS NULL OR msg_conv <> NEW.conversation_id THEN
+      RAISE EXCEPTION 'Chat attachment message must belong to the same conversation' USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_chat_attachment_consistency
+  BEFORE INSERT OR UPDATE ON chat_message_attachments
+  FOR EACH ROW EXECUTE FUNCTION guard_chat_attachment_consistency();
+
+CREATE TRIGGER touch_updated_at
+  BEFORE UPDATE ON chat_conversations
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE OR REPLACE FUNCTION guard_chat_message_content() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  cur_body text;
+  cur_deleted_at timestamptz;
+BEGIN
+  SELECT body, deleted_at INTO cur_body, cur_deleted_at FROM chat_messages WHERE id = NEW.id;
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  IF cur_deleted_at IS NULL AND btrim(cur_body) = '' AND NOT EXISTS (
+    SELECT 1 FROM chat_message_attachments WHERE message_id = NEW.id
+  ) THEN
+    RAISE EXCEPTION 'Chat message body cannot be empty without confirmed attachments' USING ERRCODE = '23514';
+  END IF;
+  RETURN NULL;
+END $$;
+
+CREATE CONSTRAINT TRIGGER trg_chat_message_content
+  AFTER INSERT OR UPDATE ON chat_messages
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION guard_chat_message_content();
 
 COMMIT;

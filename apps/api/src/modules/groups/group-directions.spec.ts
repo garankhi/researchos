@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { GroupMemberRole, PrismaService } from '@researchos/database';
 import cookieParser from 'cookie-parser';
 import {
   afterAll,
@@ -154,7 +154,7 @@ describe('Group directions HTTP contract', () => {
     });
   });
 
-  it('allows group leaders to publish, but forbids their edit/delete operations', async () => {
+  it('allows delegated group leaders to publish, edit and archive directions', async () => {
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,
       lead_id: otherId,
@@ -171,11 +171,11 @@ describe('Group directions HTTP contract', () => {
       .patch(`${base}/${directionId}`)
       .set('Cookie', cookie)
       .send({ title: 'Changed' })
-      .expect(403);
+      .expect(200);
     await request()
       .delete(`${base}/${directionId}`)
       .set('Cookie', cookie)
-      .expect(403);
+      .expect(204);
   });
 
   it('forbids publishing by plain members, outsiders and unrelated admins', async () => {
@@ -183,15 +183,29 @@ describe('Group directions HTTP contract', () => {
       ...group,
       lead_id: otherId,
     });
-    for (const member of [null, { role: GroupMemberRole.MEMBER }]) {
+    for (const member of [
+      null,
+      { role: GroupMemberRole.MEMBER },
+      { role: GroupMemberRole.GROUP_LEADER, archived_at: new Date() },
+    ]) {
       tx.group_members.findUnique.mockResolvedValue(member);
       await request()
         .post(base)
         .set('Cookie', cookie)
         .send({ title: 'Attempt' })
         .expect(403);
+      await request()
+        .patch(`${base}/${directionId}`)
+        .set('Cookie', cookie)
+        .send({ title: 'Attempt' })
+        .expect(403);
+      await request()
+        .delete(`${base}/${directionId}`)
+        .set('Cookie', cookie)
+        .expect(403);
     }
     expect(tx.group_directions.create).not.toHaveBeenCalled();
+    expect(tx.group_directions.update).not.toHaveBeenCalled();
   });
 
   it('returns full field/subfield/topic paths and pagination to authenticated readers', async () => {
@@ -221,7 +235,7 @@ describe('Group directions HTTP contract', () => {
     });
     expect(tx.group_directions.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { group_id: groupId },
+        where: { group_id: groupId, archived_at: null },
         skip: 1,
         take: 1,
         orderBy: [{ title: 'asc' }, { id: 'asc' }],
@@ -291,7 +305,10 @@ describe('Group directions HTTP contract', () => {
       .expect(200);
     expect(tx.group_directions.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id_group_id: { id: directionId, group_id: groupId } },
+        where: {
+          id_group_id: { id: directionId, group_id: groupId },
+          archived_at: null,
+        },
         data: { topic_id: null, description: null, title: undefined },
       }),
     );
@@ -299,22 +316,34 @@ describe('Group directions HTTP contract', () => {
       .delete(`${base}/${directionId}`)
       .set('Cookie', cookie)
       .expect(204);
-    expect(tx.group_directions.delete).toHaveBeenCalledWith({
-      where: { id_group_id: { id: directionId, group_id: groupId } },
+    expect(tx.group_directions.update).toHaveBeenCalledWith({
+      data: { archived_at: expect.any(Date) },
+      where: {
+        id_group_id: { id: directionId, group_id: groupId },
+        archived_at: null,
+      },
     });
   });
 
-  it('returns 409 when deleting a direction referenced by a project', async () => {
-    tx.group_directions.delete.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Referenced', {
-        code: 'P2003',
-        clientVersion: 'test',
-      }),
-    );
+  it('archives directions without removing project references', async () => {
     await request()
       .delete(`${base}/${directionId}`)
       .set('Cookie', cookie)
-      .expect(409);
+      .expect(204);
+    expect(tx.group_directions.delete).not.toHaveBeenCalled();
+  });
+
+  it('refuses edits to archived directions', async () => {
+    tx.group_directions.findUnique.mockResolvedValue({
+      ...row,
+      archived_at: new Date(),
+    });
+    await request()
+      .patch(`${base}/${directionId}`)
+      .set('Cookie', cookie)
+      .send({ title: 'Hidden' })
+      .expect(404);
+    expect(tx.group_directions.update).not.toHaveBeenCalled();
   });
 
   it('rejects invalid UUIDs, pagination, sort, titles and protected fields', async () => {

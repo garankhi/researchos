@@ -10,6 +10,8 @@ import type { OpportunityResponseDtoStatus } from './opportunityResponseDtoStatu
 import type { OpportunityResponseDtoTargetAudience } from './opportunityResponseDtoTargetAudience';
 
 export interface OpportunityResponseDto {
+  /** Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes. */
+  canManage?: boolean;
   /** Opportunity identifier. */
   id: string;
   /**

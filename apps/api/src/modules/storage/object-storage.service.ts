@@ -10,6 +10,7 @@ import {
   type StorageAdapter,
   type UploadRequest,
 } from '@researchos/storage';
+import { CodedHttpException } from '../../common/errors/error-codes.js';
 
 const pdfHeader = Buffer.from('%PDF-');
 const pdfVerificationTimeoutMs = 45_000;
@@ -27,6 +28,9 @@ export class ObjectStorageService {
     try {
       return await operation(this.adapter);
     } catch (error) {
+      // A coded domain error is an answer, not an outage. Keep its status
+      // instead of masking it as a service-unavailable.
+      if (error instanceof CodedHttpException) throw error;
       this.logger.warn(
         `S3 operation failed: ${error instanceof Error ? error.name : 'unknown error'}`,
       );

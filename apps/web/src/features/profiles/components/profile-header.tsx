@@ -1,24 +1,23 @@
 'use client';
 
+import Image from 'next/image';
 import {
   Badge,
   Box,
   Button,
   Flex,
   Heading,
+  Icon,
   Link,
   Stack,
   Text,
 } from '@chakra-ui/react';
-import {
-  CheckCircle2,
-  ExternalLink,
-  GraduationCap,
-  Link2,
-  Pencil,
-} from 'lucide-react';
+import { Check, ExternalLink, Mail, Pencil, UserPlus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { initialsOf } from '../utils/initials';
+import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { FieldError } from '@/components/ui/feedback';
+import { useRouter } from '@/i18n/navigation';
+import { useProfileSocial } from '../hooks/use-profile-social';
 import type {
   ProfileResponseDto,
   ProfileResponseDtoAvailabilityStatus,
@@ -26,16 +25,14 @@ import type {
 
 function getAvailabilityPalette(
   status: ProfileResponseDtoAvailabilityStatus,
-): 'green' | 'blue' | 'purple' | 'orange' | 'gray' {
+): 'green' | 'blue' | 'gray' {
   switch (status) {
     case 'OPEN_FOR_COLLABORATION':
       return 'green';
     case 'SEEKING_GROUP':
-      return 'blue';
     case 'MENTORING_ONLY':
-      return 'purple';
+      return 'blue';
     case 'LIMITED_AVAILABILITY':
-      return 'orange';
     case 'NOT_AVAILABLE':
     default:
       return 'gray';
@@ -53,81 +50,103 @@ export function ProfileHeader({
 }) {
   const t = useTranslations('profile');
   const tAvailability = useTranslations('profile.availability');
+  const { showSnackbar } = useSnackbar();
+  const router = useRouter();
 
-  const titlesAndDegrees = [profile.academicTitle, profile.academicDegree]
+  const social = useProfileSocial({
+    targetUserId: profile.userId,
+    isOwner,
+  });
+
+  const academicSubtitle = [
+    profile.departmentUnit,
+    profile.academicTitle,
+    profile.academicDegree,
+  ]
     .filter(Boolean)
-    .join(', ');
+    .join(' · ');
+
+  const handleToggleFollow = async () => {
+    try {
+      const nowFollowing = await social.toggleFollow();
+      showSnackbar({
+        severity: 'success',
+        message: t(nowFollowing ? 'followedToast' : 'unfollowedToast', {
+          name: profile.fullName,
+        }),
+      });
+    } catch {
+      // Inline FieldError renders below the action group.
+    }
+  };
+
+  const handleMessage = async () => {
+    try {
+      const conversationId = await social.startDirectChat();
+      router.push(`/chat/${conversationId}`);
+    } catch {
+      // Inline FieldError renders below the action group.
+    }
+  };
 
   return (
-    <Box bg="bg.panel" borderWidth="1px" p={{ base: '4', md: '6' }}>
+    <Flex
+      direction={{ base: 'column', sm: 'row' }}
+      gap="6"
+      align={{ base: 'center', sm: 'flex-start' }}
+      justify="space-between"
+    >
       <Flex
         direction={{ base: 'column', sm: 'row' }}
         gap="6"
-        align={{ base: 'center', sm: 'flex-start' }}
+        align={{ base: 'center', sm: 'center' }}
+        flex="1"
+        minW="0"
       >
-        <Flex
-          align="center"
-          justify="center"
+        <Box
+          flexShrink={0}
           w={{ base: '20', sm: '25' }}
           h={{ base: '20', sm: '25' }}
-          flexShrink={0}
-          bg="colorPalette.solid"
-          color="colorPalette.contrast"
-          fontSize={{ base: 'xl', sm: '2xl' }}
-          fontWeight="semibold"
         >
-          {initialsOf(profile.fullName)}
-        </Flex>
+          <Image
+            src="/default-avatar.webp"
+            alt={profile.fullName}
+            width={100}
+            height={100}
+            unoptimized
+          />
+        </Box>
 
         <Stack
-          gap="3"
+          gap="2"
           flex="1"
           minW="0"
           textAlign={{ base: 'center', sm: 'left' }}
         >
-          <Flex
-            direction={{ base: 'column', sm: 'row' }}
-            gap="3"
-            align={{ base: 'center', sm: 'center' }}
-            justify="space-between"
-            flexWrap="wrap"
+          <Heading
+            as="h1"
+            size={{ base: 'xl', md: '2xl' }}
+            fontWeight="bold"
+            lineHeight="1.2"
           >
-            <Box>
-              <Heading as="h1" size="lg" fontWeight="bold">
-                {profile.fullName}
-              </Heading>
-              {titlesAndDegrees ? (
-                <Text textStyle="md" color="fg.muted">
-                  {titlesAndDegrees}
-                </Text>
-              ) : null}
-            </Box>
+            {profile.fullName}
+          </Heading>
 
-            {isOwner && onEdit ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onEdit}
-                alignSelf={{ base: 'stretch', sm: 'flex-start' }}
-              >
-                <Pencil />
-                {t('editProfile')}
-              </Button>
-            ) : null}
-          </Flex>
-
-          <Text textStyle="sm" color="fg.muted">
-            {profile.departmentUnit} • {profile.email}
-          </Text>
+          {academicSubtitle ? (
+            <Text textStyle="md" color="fg.muted">
+              {academicSubtitle}
+            </Text>
+          ) : null}
 
           <Flex
-            gap="2"
+            gap="3"
             flexWrap="wrap"
             justify={{ base: 'center', sm: 'flex-start' }}
             align="center"
+            pt="0.5"
           >
             <Badge
-              variant="outline"
+              variant="subtle"
               colorPalette={getAvailabilityPalette(profile.availabilityStatus)}
             >
               {tAvailability(profile.availabilityStatus)}
@@ -142,9 +161,11 @@ export function ProfileHeader({
                 alignItems="center"
                 gap="1"
                 textStyle="xs"
+                color="fg.muted"
+                layerStyle="researchTextLink"
               >
-                <CheckCircle2 />
-                {`ORCID: ${profile.orcidId}`}
+                {`ORCID · ${profile.orcidId}`}
+                <Icon as={ExternalLink} boxSize="3" aria-hidden />
               </Link>
             ) : null}
 
@@ -157,10 +178,11 @@ export function ProfileHeader({
                 alignItems="center"
                 gap="1"
                 textStyle="xs"
+                color="fg.muted"
+                layerStyle="researchTextLink"
               >
-                <GraduationCap />
                 Google Scholar
-                <ExternalLink />
+                <Icon as={ExternalLink} boxSize="3" aria-hidden />
               </Link>
             ) : null}
 
@@ -173,20 +195,69 @@ export function ProfileHeader({
                 alignItems="center"
                 gap="1"
                 textStyle="xs"
+                color="fg.muted"
+                layerStyle="researchTextLink"
               >
-                <Link2 />
-                {`Scopus: ${profile.scopusAuthorId}`}
+                {`Scopus · ${profile.scopusAuthorId}`}
+                <Icon as={ExternalLink} boxSize="3" aria-hidden />
               </Link>
             ) : null}
           </Flex>
-
-          {profile.bio ? (
-            <Text textStyle="sm" pt="1" whiteSpace="pre-line">
-              {profile.bio}
-            </Text>
-          ) : null}
         </Stack>
       </Flex>
-    </Box>
+
+      {isOwner && onEdit ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+          flexShrink={0}
+          alignSelf={{ base: 'stretch', sm: 'flex-start' }}
+        >
+          <Pencil />
+          {t('editProfile')}
+        </Button>
+      ) : social.canInteract ? (
+        <Stack
+          gap="1.5"
+          align={{ base: 'stretch', sm: 'flex-end' }}
+          flexShrink={0}
+          alignSelf={{ base: 'stretch', sm: 'flex-start' }}
+        >
+          <Flex gap="2" justify={{ base: 'center', sm: 'flex-end' }}>
+            {social.canFollow ? (
+              <Button
+                variant={social.isFollowing ? 'outline' : 'solid'}
+                size="sm"
+                disabled={!social.followReady}
+                loading={social.isTogglingFollow}
+                aria-pressed={social.isFollowing}
+                onClick={() => void handleToggleFollow()}
+              >
+                {social.isFollowing ? <Check /> : <UserPlus />}
+                {t(social.isFollowing ? 'following' : 'follow')}
+              </Button>
+            ) : null}
+
+            <Button
+              variant="outline"
+              size="sm"
+              loading={social.isStartingChat}
+              onClick={() => void handleMessage()}
+            >
+              <Mail />
+              {t('message')}
+            </Button>
+          </Flex>
+
+          {social.followFailed ? (
+            <FieldError>{t('followError')}</FieldError>
+          ) : null}
+          {social.chatFailed ? (
+            <FieldError>{t('messageError')}</FieldError>
+          ) : null}
+        </Stack>
+      ) : null}
+    </Flex>
   );
 }
