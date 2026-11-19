@@ -829,6 +829,7 @@ export class OutputsService {
         outputId: release.output_id,
         revisionId,
         callerId,
+        // No `sharing`: the Article is already shared and stays shared.
       });
       return { revisionId, fileId: file.id };
     });
@@ -873,6 +874,7 @@ export class OutputsService {
         outputId: release.output_id,
         revisionId,
         callerId,
+        // No `sharing`: the Article is already shared and stays shared.
       });
       return { revisionId };
     });
@@ -1314,6 +1316,25 @@ export class OutputsService {
       outputId: string;
       revisionId: string;
       callerId: string;
+      /**
+       * How the release affects the output's sharing columns.
+       *
+       * `sharing` is optional, and omitting it means "release the revision
+       * without touching the sharing columns". The PDF edit endpoints
+       * (`attachArticlePdf`, `removeArticlePdf`) rely on that: the output is
+       * already SHARED, so re-stamping `first_shared_at` would reset the
+       * shared-since date and trip the `guard_output_release` trigger, which
+       * rejects a change to `first_shared_at` on an already-shared output.
+       *
+       * Pass `sharing` to also publish the output. `createArticle` passes it
+       * because it creates the first release; the draft edit path passes it
+       * because it publishes a draft.
+       *
+       * Omitting `sharing` by mistake releases a revision without sharing it,
+       * and the database will not complain: `guard_output_release` only
+       * checks that `current_release_id` points at a released revision. Pass
+       * `sharing` deliberately.
+       */
       sharing?: {
         visibility: OutputFileVisibility;
         accessGroupId: string | null;
