@@ -113,9 +113,10 @@ export function ProfileOutputActionsMenu({
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
-            <Menu.Content>
+            <Menu.Content boxShadow="overlayPanel">
               <Menu.Item
                 value="visibility"
+                layerStyle="interactiveRow"
                 onSelect={openDialog}
                 disabled={!canChangeVisibility}
               >
@@ -143,7 +144,7 @@ export function ProfileOutputActionsMenu({
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content>
+            <Dialog.Content boxShadow="overlayPanel">
               <Dialog.Header
                 flexDirection="column"
                 alignItems="flex-start"

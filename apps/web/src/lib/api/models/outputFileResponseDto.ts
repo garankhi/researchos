@@ -5,26 +5,29 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { OutputFileVisibility } from './outputFileVisibility';
+import type { OutputFileResponseDtoAccessGroupId } from './outputFileResponseDtoAccessGroupId';
+import type { OutputFileResponseDtoVisibility } from './outputFileResponseDtoVisibility';
 
 export interface OutputFileResponseDto {
-  /** Identifier of the confirmed file. */
+  /** Unique identifier of the output file. */
   id: string;
-  /** Identifier of the parent output. */
+  /** Research output identifier. */
   outputId: string;
-  /** Original file name. */
+  /** Original name of the uploaded file. */
   fileName: string;
-  /** Content-Type stored on the uploaded object. */
+  /** MIME content type of the file. */
   mimeType: string;
-  /** Verified size in bytes. */
+  /** Size of the file in bytes. */
   sizeBytes: number;
-  /** Verified SHA-256 as a hex digest. */
+  /** SHA-256 digest of the file contents. */
   sha256: string;
-  /** File visibility. */
-  visibility: OutputFileVisibility;
+  /** Visibility scope of the file (`PRIVATE`, `RESEARCH_GROUP`, `FPTU_COMMUNITY`). */
+  visibility: OutputFileResponseDtoVisibility;
   /**
-   * Group allowed by the file visibility, if applicable.
+   * Research group identifier scoping access when visibility is RESEARCH_GROUP; null otherwise.
    * @nullable
    */
-  accessGroupId: string | null;
+  accessGroupId: OutputFileResponseDtoAccessGroupId;
+  /** Timestamp when the file was uploaded. */
+  uploadedAt: string;
 }

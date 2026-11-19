@@ -81,6 +81,36 @@ cho phép web `http://localhost:3000` gửi yêu cầu cross-origin tới S3. N�
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
+### Xem file trong S3 local
+
+SeaweedFS có sẵn web UI và compose đã publish ra loopback:
+
+| URL | Dùng để |
+| --- | --- |
+| `http://localhost:8888/buckets/` | Duyệt file trong bucket, upload bằng drag-and-drop |
+| `http://localhost:8888/` | Filer: duyệt cây thư mục |
+| `http://localhost:9333/` | Master: cluster status, volume, số liệu |
+
+Hai UI này không có authentication, nên chỉ bind vào `127.0.0.1`. Đổi port thì sửa
+mục `ports` của service `seaweedfs` trong `compose.yaml`.
+
+Để đọc/ghi object bằng script, dùng AWS SDK với endpoint path-style:
+
+```typescript
+const client = new S3Client({
+  region: process.env.S3_REGION,
+  endpoint: process.env.S3_ENDPOINT,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  },
+});
+```
+
+Không có `aws` CLI hay `mc` sẵn trên máy local; `packages/storage` đã phụ thuộc
+`@aws-sdk/client-s3` nên script chạy trong workspace không cần cài thêm.
+
 Trong UI, dùng link trực tiếp `GET /output-files/:fileId/download` tới API để
 trình duyệt tải attachment bằng session cookie. Mỗi tiến trình API xử lý tối đa
 8 lượt tải đồng thời với tổng dung lượng tạm tối đa 5 GiB. Mỗi lượt có 15 phút

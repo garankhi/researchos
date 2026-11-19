@@ -8,5 +8,6 @@ import { OutputUploadService } from './output-upload.service.js';
 @Module({
   controllers: [OutputUploadController, OutputDownloadController],
   providers: [ObjectStorageService, OutputUploadService, OutputDownloadService],
+  exports: [ObjectStorageService],
 })
 export class StorageModule {}

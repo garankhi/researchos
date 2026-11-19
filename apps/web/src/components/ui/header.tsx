@@ -19,9 +19,9 @@ import NextLink from './link';
 const morePages = ['opportunities', 'groups'] as const;
 
 const activityActions = [
-  { label: 'updates', icon: Bell },
-  { label: 'messages', icon: Mail },
-  { label: 'requests', icon: ListChecks },
+  { label: 'updates', icon: Bell, href: undefined },
+  { label: 'messages', icon: Mail, href: '/chat' },
+  { label: 'requests', icon: ListChecks, href: undefined },
 ] as const;
 
 type MoreMenuProps = {
@@ -149,8 +149,26 @@ function HeaderActions({
       justify="end"
     >
       {mobileSearch}
-      {activityActions.map(({ label, icon: Icon }) => {
+      {activityActions.map(({ label, icon: Icon, href }) => {
         const actionLabel = t(label);
+
+        if (href) {
+          return (
+            <IconButton
+              key={label}
+              asChild
+              variant="ghost"
+              size="sm"
+              data-header-icon="compact"
+              aria-label={actionLabel}
+              title={actionLabel}
+            >
+              <NextLink href={href}>
+                <Icon aria-hidden />
+              </NextLink>
+            </IconButton>
+          );
+        }
 
         return (
           <IconButton

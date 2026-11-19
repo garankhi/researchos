@@ -1,5 +1,6 @@
 export * from './applications/applications';
 export * from './auth/auth';
+export * from './chat/chat';
 export * from './discovery/discovery';
 export * from './follows/follows';
 export * from './group-directions/group-directions';

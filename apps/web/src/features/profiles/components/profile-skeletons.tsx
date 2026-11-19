@@ -1,4 +1,4 @@
-import { Box, Container, Flex, SimpleGrid, Stack } from '@chakra-ui/react';
+import { Box, Container, Flex, Grid, Stack } from '@chakra-ui/react';
 import type { SkeletonResult } from 'boneyard-js';
 import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 import type { ProfileTab } from '../types';
@@ -8,7 +8,7 @@ const mobileAvatar: SkeletonResult = {
   viewportWidth: 390,
   width: 80,
   height: 80,
-  bones: [[0, 0, 100, 80, 0]],
+  bones: [[0, 0, 100, 80, '50%']],
 };
 
 const desktopAvatar: SkeletonResult = {
@@ -16,7 +16,7 @@ const desktopAvatar: SkeletonResult = {
   viewportWidth: 768,
   width: 100,
   height: 100,
-  bones: [[0, 0, 100, 100, 0]],
+  bones: [[0, 0, 100, 100, '50%']],
 };
 
 const mobileHeaderDetails: SkeletonResult = {
@@ -34,12 +34,43 @@ const mobileHeaderDetails: SkeletonResult = {
 const desktopHeaderDetails: SkeletonResult = {
   name: 'profile-header-details-desktop',
   viewportWidth: 768,
-  width: 960,
-  height: 100,
+  width: 720,
+  height: 92,
   bones: [
-    [0, 2, 38, 24, 0],
-    [0, 40, 55, 16, 0],
-    [0, 68, 23, 18, 0],
+    [0, 4, 42, 26, 0],
+    [0, 42, 64, 16, 0],
+    [0, 70, 28, 18, 0],
+  ],
+};
+
+const overviewAboutLayout: SkeletonResult = {
+  name: 'profile-overview-about',
+  viewportWidth: 768,
+  width: 640,
+  height: 148,
+  bones: [
+    [0, 0, 24, 18, 0],
+    [0, 24, 96, 14, 0],
+    [0, 44, 90, 14, 0],
+    [0, 64, 62, 14, 0],
+    [0, 96, 20, 22, 0],
+    [22, 96, 24, 22, 0],
+    [48, 96, 18, 22, 0],
+  ],
+};
+
+const sidebarSummaryLayout: SkeletonResult = {
+  name: 'profile-sidebar-summary',
+  viewportWidth: 768,
+  width: 300,
+  height: 164,
+  bones: [
+    [0, 0, 56, 16, 0],
+    [0, 28, 28, 32, 0],
+    [36, 28, 28, 32, 0],
+    [72, 28, 28, 32, 0],
+    [0, 74, 88, 14, 0],
+    [0, 94, 72, 14, 0],
   ],
 };
 
@@ -55,20 +86,19 @@ const groupCard: SkeletonResult = {
   name: 'profile-group-card',
   viewportWidth: 390,
   width: 576,
-  height: 92,
+  height: 76,
   bones: [
     [0, 2, 52, 16, 0],
-    [75, 0, 25, 20, 0],
-    [0, 25, 24, 12, 0],
-    [0, 52, 95, 14, 0],
-    [0, 74, 65, 14, 0],
+    [78, 0, 22, 18, 0],
+    [0, 32, 24, 12, 0],
+    [0, 60, 88, 14, 0],
   ],
 };
 
 const applicationCard: SkeletonResult = {
   name: 'profile-application-card',
   viewportWidth: 768,
-  width: 1152,
+  width: 640,
   height: 54,
   bones: [
     [0, 0, 62, 18, 0],
@@ -80,107 +110,100 @@ const applicationCard: SkeletonResult = {
 const outputCard: SkeletonResult = {
   name: 'profile-output-card',
   viewportWidth: 768,
-  width: 1152,
-  height: 92,
+  width: 640,
+  height: 96,
   bones: [
-    [0, 0, 65, 18, 0],
-    [0, 25, 53, 14, 0],
-    [0, 50, 38, 14, 0],
-    [0, 74, 23, 16, 0],
-    [26, 74, 16, 16, 0],
+    [0, 0, 18, 16, 0],
+    [20, 2, 22, 14, 0],
+    [0, 26, 78, 18, 0],
+    [0, 54, 52, 14, 0],
+    [0, 78, 24, 16, 0],
   ],
 };
 
 const outputVisibility: SkeletonResult = {
   name: 'profile-output-visibility',
   viewportWidth: 390,
-  width: 108,
+  width: 96,
   height: 20,
   bones: [[0, 0, 100, 20, 0]],
 };
 
 /**
  * The layout of the outputs list while it loads.
- *
- * The list is a stack of work cards, so the fallback reserves three of
- * them and the space is already taken when the works arrive.
  */
 const outputsList: SkeletonResult = {
   name: 'profile-outputs-list',
   viewportWidth: 768,
-  width: 1152,
+  width: 640,
   height: 292,
   bones: [
-    [0, 0, 100, 92, 0],
-    [0, 100, 100, 92, 0],
-    [0, 200, 100, 92, 0],
+    [0, 0, 100, 88, 0],
+    [0, 102, 100, 88, 0],
+    [0, 204, 100, 88, 0],
   ],
 };
 
 const interestCard: SkeletonResult = {
   name: 'profile-interest-card',
   viewportWidth: 768,
-  width: 1152,
-  height: 65,
+  width: 640,
+  height: 48,
   bones: [
     [0, 0, 48, 16, 0],
-    [0, 23, 76, 12, 0],
-    [0, 45, 23, 18, 0],
-    [27, 45, 26, 18, 0],
+    [0, 54, 72, 12, 0],
   ],
 };
 
 const openAlexCard: SkeletonResult = {
   name: 'profile-openalex-card',
   viewportWidth: 768,
-  width: 1152,
-  height: 126,
+  width: 640,
+  height: 118,
   bones: [
-    [0, 0, 66, 18, 0],
-    [0, 25, 49, 14, 0],
-    [0, 50, 38, 14, 0],
-    [43, 49, 29, 16, 0],
-    [0, 81, 91, 14, 0],
-    [0, 104, 70, 14, 0],
+    [0, 0, 20, 16, 0],
+    [0, 24, 76, 18, 0],
+    [0, 52, 49, 14, 0],
+    [0, 78, 91, 14, 0],
   ],
 };
 
 const applicationAction: SkeletonResult = {
   name: 'profile-application-action',
   viewportWidth: 390,
-  width: 104,
-  height: 32,
-  bones: [[0, 0, 100, 32, 0]],
+  width: 96,
+  height: 28,
+  bones: [[0, 0, 100, 28, 0]],
 };
 
 const interestActions: SkeletonResult = {
   name: 'profile-interest-actions',
   viewportWidth: 390,
-  width: 68,
-  height: 32,
+  width: 64,
+  height: 28,
   bones: [
-    [0, 0, 47, 32, 0],
-    [53, 0, 47, 32, 0],
+    [0, 0, 46, 28, 0],
+    [54, 0, 46, 28, 0],
   ],
 };
 
 const openAlexActions: SkeletonResult = {
   name: 'profile-openalex-actions',
   viewportWidth: 390,
-  width: 168,
-  height: 32,
+  width: 156,
+  height: 28,
   bones: [
-    [0, 0, 46, 32, 0],
-    [54, 0, 46, 32, 0],
+    [0, 0, 46, 28, 0],
+    [54, 0, 46, 28, 0],
   ],
 };
 
 const interestHeadingAction: SkeletonResult = {
   name: 'profile-interest-heading-action',
   viewportWidth: 390,
-  width: 124,
-  height: 32,
-  bones: [[0, 0, 100, 32, 0]],
+  width: 116,
+  height: 28,
+  bones: [[0, 0, 100, 28, 0]],
 };
 
 const sectionHeading: SkeletonResult = {
@@ -210,39 +233,71 @@ export function ProfileHeaderSkeleton({
   announce?: boolean;
 }) {
   return (
-    <Box bg="bg.panel" borderWidth="1px" p={{ base: '4', md: '6' }}>
-      <Flex
-        direction={{ base: 'column', sm: 'row' }}
-        gap="6"
-        align={{ base: 'center', sm: 'flex-start' }}
-      >
-        <Box hideFrom="sm" w="20" flexShrink="0">
-          <DelayedSkeleton layout={mobileAvatar} announce={false} />
+    <Flex
+      direction={{ base: 'column', sm: 'row' }}
+      gap="6"
+      align={{ base: 'center', sm: 'center' }}
+    >
+      <Box hideFrom="sm" w="20" flexShrink="0">
+        <DelayedSkeleton layout={mobileAvatar} announce={false} />
+      </Box>
+      <Box hideBelow="sm" w="25" flexShrink="0">
+        <DelayedSkeleton layout={desktopAvatar} announce={false} />
+      </Box>
+      <Box w="full" minW="0" flex="1">
+        <Box hideFrom="sm" maxW="280px" mx="auto">
+          <DelayedSkeleton layout={mobileHeaderDetails} announce={announce} />
         </Box>
-        <Box hideBelow="sm" w="25" flexShrink="0">
-          <DelayedSkeleton layout={desktopAvatar} announce={false} />
+        <Box hideBelow="sm">
+          <DelayedSkeleton layout={desktopHeaderDetails} announce={announce} />
         </Box>
-        <Box w="full" minW="0" flex="1">
-          <Box hideFrom="sm" maxW="280px" mx="auto">
-            <DelayedSkeleton layout={mobileHeaderDetails} announce={announce} />
-          </Box>
-          <Box hideBelow="sm">
-            <DelayedSkeleton
-              layout={desktopHeaderDetails}
-              announce={announce}
-            />
-          </Box>
-        </Box>
-      </Flex>
-    </Box>
+      </Box>
+    </Flex>
   );
 }
 
 export function ProfilePageSkeleton() {
   return (
-    <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-      <ProfileHeaderSkeleton />
-    </Container>
+    <Box flex="1" bg="home.background">
+      <Box bg="bg.panel" borderBottomWidth="1px" borderColor="border">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          pt={{ base: '5', md: '8' }}
+          pb={{ base: '5', md: '7' }}
+        >
+          <ProfileHeaderSkeleton />
+        </Container>
+      </Box>
+
+      <Container
+        maxW="64rem"
+        px={{ base: '4', md: '6' }}
+        py={{ base: '4', lg: '6' }}
+      >
+        <Grid
+          templateColumns={{
+            base: 'minmax(0, 1fr)',
+            lg: 'minmax(0, 1.95fr) minmax(0, 1fr)',
+          }}
+          alignItems="start"
+          gap="4"
+        >
+          <Stack gap="4" minW="0">
+            <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+              <DelayedSkeleton layout={overviewAboutLayout} announce={false} />
+            </Box>
+            <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+              <DelayedSkeleton layout={outputsList} announce={false} />
+            </Box>
+          </Stack>
+
+          <Box hideBelow="lg" bg="bg.panel" boxShadow="xs" p="5">
+            <DelayedSkeleton layout={sidebarSummaryLayout} announce={false} />
+          </Box>
+        </Grid>
+      </Container>
+    </Box>
   );
 }
 
@@ -253,17 +308,29 @@ export function ProfileTabSkeleton({
   tab: ProfileTab;
   isOwner?: boolean;
 }) {
+  if (tab === 'overview') {
+    return (
+      <Stack gap="5" py="1">
+        <DelayedSkeleton layout={overviewAboutLayout} />
+        <DelayedSkeleton layout={outputsList} announce={false} />
+      </Stack>
+    );
+  }
+
   if (tab === 'groups') {
     return (
-      <Stack gap="3" py="1">
+      <Stack gap="4" py="1">
         <DelayedSkeleton layout={groupHeading} />
-        <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
-          {[1, 2, 3, 4].map((card) => (
-            <Box key={card} bg="bg.panel" borderWidth="1px" p="5">
-              <DelayedSkeleton layout={groupCard} announce={false} />
-            </Box>
-          ))}
-        </SimpleGrid>
+        {[1, 2, 3].map((card) => (
+          <Box
+            key={card}
+            py="3"
+            borderBottomWidth={card < 3 ? '1px' : '0'}
+            borderColor="border"
+          >
+            <DelayedSkeleton layout={groupCard} announce={false} />
+          </Box>
+        ))}
       </Stack>
     );
   }
@@ -284,14 +351,14 @@ export function ProfileTabSkeleton({
   const showHeading = tab === 'openalex' || (tab === 'interests' && isOwner);
 
   return (
-    <Stack gap={tab === 'interests' ? '3' : '4'} py="1">
+    <Stack gap="3" py="1">
       {showHeading && (
         <Flex justify="space-between" align="center" gap="3" mb="1">
           <Box flex="1" minW="0">
             <DelayedSkeleton layout={sectionHeading} />
           </Box>
           {tab === 'interests' && (
-            <Box w="124px" maxW="45%" flexShrink="0">
+            <Box w="116px" maxW="45%" flexShrink="0">
               <DelayedSkeleton
                 layout={interestHeadingAction}
                 announce={false}
@@ -303,9 +370,9 @@ export function ProfileTabSkeleton({
       {[1, 2, 3].map((card) => (
         <Box
           key={card}
-          bg="bg.panel"
-          borderWidth="1px"
-          p={tab === 'interests' ? '4' : '5'}
+          py="3.5"
+          borderBottomWidth={card < 3 ? '1px' : '0'}
+          borderColor="border"
         >
           <Flex
             direction={{ base: 'column', [rowBreakpoint]: 'row' }}

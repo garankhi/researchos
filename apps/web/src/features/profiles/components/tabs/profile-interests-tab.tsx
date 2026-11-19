@@ -53,6 +53,9 @@ export function ProfileInterestsTab({
   const [selectedTopic, setSelectedTopic] = useState<TopicResponseDto | null>(
     null,
   );
+  const [inlineActionError, setInlineActionError] = useState<string | null>(
+    null,
+  );
 
   const topicsQuery = useTaxonomyControllerFindAllTopics(
     {
@@ -71,6 +74,7 @@ export function ProfileInterestsTab({
 
   const handleAddInterest = async () => {
     if (!selectedTopic) return;
+    setInlineActionError(null);
     try {
       await createInterest(selectedTopic.id);
       showSnackbar({
@@ -81,10 +85,7 @@ export function ProfileInterestsTab({
       setSelectedTopic(null);
       setTopicSearchInput('');
     } catch {
-      showSnackbar({
-        message: t('interestsTab.interestAddError'),
-        severity: 'error',
-      });
+      setInlineActionError(t('interestsTab.interestAddError'));
     }
   };
 
@@ -92,6 +93,7 @@ export function ProfileInterestsTab({
     interest: ProfileInterestResponseDto,
     status: 'ACTIVE' | 'REJECTED',
   ) => {
+    setInlineActionError(null);
     try {
       await updateStatus(interest.id, status);
       showSnackbar({
@@ -102,11 +104,12 @@ export function ProfileInterestsTab({
         severity: 'success',
       });
     } catch {
-      showSnackbar({ message: t('updateError'), severity: 'error' });
+      setInlineActionError(t('updateError'));
     }
   };
 
   const handleRemoveInterest = async (interest: ProfileInterestResponseDto) => {
+    setInlineActionError(null);
     try {
       await removeInterest(interest.id);
       showSnackbar({
@@ -114,16 +117,24 @@ export function ProfileInterestsTab({
         severity: 'success',
       });
     } catch {
-      showSnackbar({ message: t('updateError'), severity: 'error' });
+      setInlineActionError(t('updateError'));
     }
   };
 
   if (isLoading) {
-    return <ProfileTabSkeleton tab="interests" isOwner={isOwner} />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ProfileTabSkeleton tab="interests" isOwner={isOwner} />
+      </Box>
+    );
   }
 
   if (isFailed) {
-    return <ErrorState title={t('loadError')} onRetry={refetch} />;
+    return (
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+        <ErrorState title={t('loadError')} onRetry={refetch} />
+      </Box>
+    );
   }
 
   const displayInterests = isOwner
@@ -131,32 +142,66 @@ export function ProfileInterestsTab({
     : interests.filter((item) => item.status === 'ACTIVE');
 
   return (
-    <Stack gap="5" py="1">
-      {isOwner ? (
-        <Flex justify="space-between" align="center" gap="3" flexWrap="wrap">
-          <Heading as="h3" size="sm" fontWeight="semibold">
-            {t('interestsTab.title')} ({displayInterests.length})
-          </Heading>
-          <Button size="sm" onClick={() => setOpenAddDialog(true)}>
+    <Box bg="bg.panel" boxShadow="xs">
+      <Flex
+        px={{ base: '4', md: '6' }}
+        py="4"
+        borderBottomWidth="1px"
+        borderColor="border"
+        justify="space-between"
+        align="center"
+        gap="3"
+        flexWrap="wrap"
+      >
+        <Heading as="h2" size="md" fontWeight="bold">
+          {t('interestsTab.title')} ({displayInterests.length})
+        </Heading>
+
+        {isOwner ? (
+          <Button
+            size="xs"
+            onClick={() => {
+              setInlineActionError(null);
+              setOpenAddDialog(true);
+            }}
+          >
             <Plus />
             {t('interestsTab.addInterest')}
           </Button>
-        </Flex>
+        ) : null}
+      </Flex>
+
+      {inlineActionError && !openAddDialog ? (
+        <Box px={{ base: '4', md: '6' }} pt="4">
+          <ErrorState title={t('updateError')} message={inlineActionError} />
+        </Box>
       ) : null}
 
       {displayInterests.length === 0 ? (
-        <EmptyState
-          title={t('interestsTab.emptyTitle')}
-          message={t('interestsTab.emptyMessage')}
-        />
+        <Box p={{ base: '4', md: '6' }}>
+          <EmptyState
+            title={t('interestsTab.emptyTitle')}
+            message={t('interestsTab.emptyMessage')}
+          />
+        </Box>
       ) : (
-        <Stack gap="3">
-          {displayInterests.map((interest) => {
+        <Box>
+          {displayInterests.map((interest, idx) => {
             const { field, subfield, topic } = interest.topicPath;
-            const fullPath = `${field?.name ?? ''} › ${subfield?.name ?? ''} › ${topic?.name ?? ''}`;
+            const hierarchy = [field?.name, subfield?.name]
+              .filter(Boolean)
+              .join(' › ');
 
             return (
-              <Box key={interest.id} bg="bg.panel" borderWidth="1px" p="4">
+              <Box
+                key={interest.id}
+                py="4"
+                px={{ base: '4', md: '6' }}
+                borderBottomWidth={
+                  idx < displayInterests.length - 1 ? '1px' : '0'
+                }
+                borderColor="border"
+              >
                 <Flex
                   direction={{ base: 'column', sm: 'row' }}
                   gap="3"
@@ -164,57 +209,55 @@ export function ProfileInterestsTab({
                   align={{ base: 'flex-start', sm: 'center' }}
                 >
                   <Box flex="1" minW="0">
-                    <Text textStyle="sm" fontWeight="semibold">
-                      {topic?.name}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      {fullPath}
-                    </Text>
-
-                    <Flex mt="2" gap="2" align="center" flexWrap="wrap">
-                      <Badge
-                        variant="outline"
-                        colorPalette={
-                          interest.status === 'ACTIVE'
-                            ? 'green'
-                            : interest.status === 'SUGGESTED'
-                              ? 'blue'
-                              : 'gray'
-                        }
-                      >
-                        {tInterestStatus(interest.status)}
-                      </Badge>
-
-                      {interest.sourceType ? (
-                        <Badge variant="outline" colorPalette="gray">
-                          {interest.sourceType}
+                    <Flex align="center" gap="2" wrap="wrap">
+                      <Text textStyle="sm" fontWeight="semibold">
+                        {topic?.name}
+                      </Text>
+                      {isOwner ? (
+                        <Badge
+                          variant="subtle"
+                          colorPalette={
+                            interest.status === 'ACTIVE'
+                              ? 'green'
+                              : interest.status === 'SUGGESTED'
+                                ? 'blue'
+                                : 'gray'
+                          }
+                        >
+                          {tInterestStatus(interest.status)}
                         </Badge>
                       ) : null}
                     </Flex>
+
+                    {hierarchy ? (
+                      <Text textStyle="xs" color="fg.muted" mt="0.5">
+                        {hierarchy}
+                      </Text>
+                    ) : null}
                   </Box>
 
                   {isOwner ? (
-                    <Flex gap="1" align="center">
+                    <Flex gap="1" align="center" flexShrink={0}>
                       {interest.status === 'SUGGESTED' ? (
                         <>
                           <IconButton
-                            size="sm"
-                            variant="ghost"
+                            size="xs"
+                            variant="outline"
                             colorPalette="green"
                             aria-label={t('interestsTab.acceptInterest')}
                             onClick={() =>
-                              handleUpdateStatus(interest, 'ACTIVE')
+                              void handleUpdateStatus(interest, 'ACTIVE')
                             }
                           >
                             <Check />
                           </IconButton>
                           <IconButton
-                            size="sm"
-                            variant="ghost"
+                            size="xs"
+                            variant="outline"
                             colorPalette="red"
                             aria-label={t('interestsTab.rejectInterest')}
                             onClick={() =>
-                              handleUpdateStatus(interest, 'REJECTED')
+                              void handleUpdateStatus(interest, 'REJECTED')
                             }
                           >
                             <X />
@@ -222,11 +265,11 @@ export function ProfileInterestsTab({
                         </>
                       ) : (
                         <IconButton
-                          size="sm"
+                          size="xs"
                           variant="ghost"
-                          colorPalette="red"
+                          colorPalette="gray"
                           aria-label={t('interestsTab.removeInterest')}
-                          onClick={() => handleRemoveInterest(interest)}
+                          onClick={() => void handleRemoveInterest(interest)}
                         >
                           <Trash2 />
                         </IconButton>
@@ -237,7 +280,7 @@ export function ProfileInterestsTab({
               </Box>
             );
           })}
-        </Stack>
+        </Box>
       )}
 
       <Dialog.Root
@@ -252,8 +295,12 @@ export function ProfileInterestsTab({
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content>
-              <Dialog.Header>
+            <Dialog.Content boxShadow="overlayPanel">
+              <Dialog.Header
+                flexDirection="column"
+                alignItems="flex-start"
+                gap="1"
+              >
                 <Dialog.Title>
                   {t('interestsTab.addInterestDialogTitle')}
                 </Dialog.Title>
@@ -264,6 +311,13 @@ export function ProfileInterestsTab({
 
               <Dialog.Body>
                 <Stack gap="3">
+                  {inlineActionError && openAddDialog ? (
+                    <ErrorState
+                      title={t('interestsTab.interestAddError')}
+                      message={inlineActionError}
+                    />
+                  ) : null}
+
                   <Input
                     value={topicSearchInput}
                     onChange={(event) =>
@@ -280,13 +334,22 @@ export function ProfileInterestsTab({
                       {t('interestsTab.emptyMessage')}
                     </Text>
                   ) : (
-                    <Stack gap="2" maxH="60" overflowY="auto">
+                    <Stack
+                      gap="0"
+                      maxH="60"
+                      overflowY="auto"
+                      borderWidth="1px"
+                      borderColor="border"
+                    >
                       {searchedTopics.map((topic) => {
                         const isSelected = selectedTopic?.id === topic.id;
                         return (
                           <Button
                             key={topic.id}
-                            variant={isSelected ? 'solid' : 'outline'}
+                            variant={isSelected ? 'solid' : 'ghost'}
+                            layerStyle={
+                              isSelected ? undefined : 'interactiveRow'
+                            }
                             justifyContent="flex-start"
                             onClick={() => setSelectedTopic(topic)}
                           >
@@ -308,7 +371,7 @@ export function ProfileInterestsTab({
                   {tCommon('cancel')}
                 </Button>
                 <Button
-                  onClick={handleAddInterest}
+                  onClick={() => void handleAddInterest()}
                   disabled={!selectedTopic}
                   loading={isCreating}
                 >
@@ -320,6 +383,6 @@ export function ProfileInterestsTab({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-    </Stack>
+    </Box>
   );
 }
