@@ -426,6 +426,7 @@
         "venue_invalid": "Nơi xuất bản phải là chuỗi ký tự.",
         "venue_too_long": "Nơi xuất bản không được vượt quá 255 ký tự.",
         "publication_year_invalid": "Năm xuất bản phải là năm trong khoảng 1000 đến 9999.",
+        "publication_year_date_mismatch": "Năm xuất bản phải khớp với ngày công bố.",
         "publication_date_required": "Vui lòng nhập ngày công bố.",
         "publication_date_invalid": "Nhập ngày công bố hợp lệ theo định dạng YYYY, YYYY-MM, YYYY-MM-DD hoặc DD-MM-YYYY.",
         "doi_invalid": "Vui lòng nhập DOI hợp lệ.",

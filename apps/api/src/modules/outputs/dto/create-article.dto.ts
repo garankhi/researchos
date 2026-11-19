@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OutputType } from '@researchos/database';
-import { Transform, Type, type TransformFnParams } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -16,15 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-function submittedValue({ obj, key }: TransformFnParams): unknown {
-  return (obj as Record<string, unknown>)[key];
-}
-
-/** Read the original value so implicit conversion cannot coerce numbers or objects to text. */
-function trimText(params: TransformFnParams): unknown {
-  const value = submittedValue(params);
-  return typeof value === 'string' ? value.trim() : value;
-}
+import { submittedValue, trimText } from './submitted-value.js';
 
 class CreateArticleAuthorDto {
   @ApiProperty({

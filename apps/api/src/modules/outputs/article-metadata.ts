@@ -7,7 +7,7 @@ const PUBLICATION_DATE =
   /^([1-9]\d{3})(?:-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?)?$/;
 const DOI = /^10\.\d{4,}(?:\.\d+)*\/\S+$/u;
 
-function normalizePublicationDate(value: string): string {
+export function normalizePublicationDate(value: string): string {
   const dayFirst = DAY_FIRST_DATE.exec(value);
   const normalized = dayFirst
     ? [dayFirst[3], dayFirst[2], dayFirst[1]].join('-')

@@ -59,7 +59,7 @@ Body (every field optional — a partial update sends only what changed):
   "title": "Deep Learning for Medical Image Classification",
   "abstract": "In this paper, we propose a novel deep convolutional network...",
   "venue": "IEEE Transactions on Medical Imaging",
-  "publicationYear": 2026,
+  "publicationDate": "28-02-2025",
   "externalUrl": "https://doi.org/10.1109/TMI.2026.1234567",
   "outputType": "ARTICLE"
 }
@@ -68,6 +68,12 @@ Body (every field optional — a partial update sends only what changed):
 A nullable field sent as `null` clears the stored value. An absent field
 keeps its stored value. The response is the updated revision, in the same
 shape as `GET /outputs/:outputId/revisions`.
+
+Send `publicationDate` as `YYYY`, `YYYY-MM`, `YYYY-MM-DD` or `DD-MM-YYYY`.
+The API keeps the submitted precision and derives `publicationYear`. A year-only
+edit can still use `publicationYear` on a draft without a stored date. To change
+the year of a stored date, submit the new `publicationDate`. If both fields are
+sent, their years must match.
 
 `authorsSnapshot` is deliberately **not** editable here. The snapshot is
 shared with `output_authors` and with the accept path's authorship
@@ -88,7 +94,8 @@ wins over machine — and `ProvenanceService` is the only writer that sets
 `is_locked`, so a machine sync can never unlock a field.
 
 Only the fields with a provenance mapping are locked: `title`, `abstract`,
-`venue` and `publication_year`. `externalUrl` and `outputType` have no
+`venue` and `publication_year`, including the year derived from `publicationDate`.
+`externalUrl` and `outputType` have no
 provenance row today (the OpenAlex ingest writes six fields, and
 `external_url` is not among them), so correcting them changes the value
 without a lock.

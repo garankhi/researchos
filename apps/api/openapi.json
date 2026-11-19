@@ -9316,11 +9316,17 @@
           },
           "publicationYear": {
             "type": "number",
-            "description": "Calendar year of publication. Send null to clear the stored year.",
+            "description": "Year-only metadata for drafts without a stored publication date. If sent with publicationDate, it must match the year in that date.",
             "nullable": true,
             "minimum": 1000,
             "maximum": 9999,
             "example": 2026
+          },
+          "publicationDate": {
+            "type": "string",
+            "description": "Publication date as YYYY, YYYY-MM, YYYY-MM-DD or DD-MM-YYYY. The supplied precision is preserved and the year is derived from the date.",
+            "maxLength": 10,
+            "example": "28-02-2025"
           },
           "externalUrl": {
             "type": "string",

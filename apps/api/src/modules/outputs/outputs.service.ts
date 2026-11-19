@@ -22,7 +22,10 @@ import {
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
 import { completeArticleByline, readArticleByline } from './article-byline.js';
-import { normalizeArticleMetadata } from './article-metadata.js';
+import {
+  normalizeArticleMetadata,
+  normalizePublicationDate,
+} from './article-metadata.js';
 import type {
   CreateArticleDto,
   CreateArticleResponseDto,
@@ -86,18 +89,17 @@ interface FeedPdfRow {
 const OUTPUT_ENTITY = 'OUTPUT';
 
 /**
- * The metadata fields a human may correct on a draft revision, mapped to
- * the `field_provenance.field_name` they are recorded under.
+ * The draft fields tracked by the metadata provenance writer.
  *
  * `authors` is absent on purpose: the authorship list is not editable
  * here, so there is no field to lock.
  */
-const EDITABLE_PROVENANCE_FIELDS = {
-  title: 'title',
-  abstract: 'abstract',
-  venue: 'venue',
-  publicationYear: 'publication_year',
-} as const;
+const EDITABLE_PROVENANCE_FIELDS = [
+  'title',
+  'abstract',
+  'venue',
+  'publication_year',
+] as const;
 
 @Injectable()
 export class OutputsService {
@@ -813,14 +815,26 @@ export class OutputsService {
     if (dto.venue !== undefined) {
       data['venue'] = dto.venue === null ? null : dto.venue.trim();
     }
-    if (dto.publicationYear !== undefined) {
-      data['publication_year'] = dto.publicationYear;
+    if (dto.publicationDate !== undefined) {
+      const date = normalizePublicationDate(dto.publicationDate);
+      const year = Number(date.slice(0, 4));
+      if (dto.publicationYear !== undefined && dto.publicationYear !== year) {
+        throw new BadRequestException({
+          message: { publicationYear: ['publication_year_date_mismatch'] },
+        });
+      }
+      data['publication_date'] = date;
+      data['publication_year'] = year;
+    } else if (dto.publicationYear !== undefined) {
       if (
         draft.publication_date &&
         dto.publicationYear !== draft.publication_year
       ) {
-        data['publication_date'] = null;
+        throw new BadRequestException({
+          message: { publicationDate: ['publication_date_required'] },
+        });
       }
+      data['publication_year'] = dto.publicationYear;
     }
     if (dto.externalUrl !== undefined) {
       data['external_url'] = dto.externalUrl;
@@ -846,10 +860,8 @@ export class OutputsService {
       // Lock every corrected field against the next sync. The provenance
       // writer is the only path that sets `is_locked`, so this is the only
       // place the lock can come from.
-      for (const [key, fieldName] of Object.entries(
-        EDITABLE_PROVENANCE_FIELDS,
-      )) {
-        if (dto[key as keyof UpdateOutputRevisionDto] === undefined) {
+      for (const fieldName of EDITABLE_PROVENANCE_FIELDS) {
+        if (data[fieldName] === undefined) {
           continue;
         }
         await this.provenance.confirmField(tx, {

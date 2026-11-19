@@ -420,6 +420,7 @@
         "venue_invalid": "Venue must be text.",
         "venue_too_long": "Venue must not exceed 255 characters.",
         "publication_year_invalid": "Publication year must be a year between 1000 and 9999.",
+        "publication_year_date_mismatch": "Publication year must match the publication date.",
         "publication_date_required": "Publication date is required.",
         "publication_date_invalid": "Enter a valid publication date as YYYY, YYYY-MM, YYYY-MM-DD, or DD-MM-YYYY.",
         "doi_invalid": "Enter a valid DOI.",

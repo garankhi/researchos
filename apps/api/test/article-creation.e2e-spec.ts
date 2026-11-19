@@ -390,6 +390,55 @@ describe('Article creation', () => {
     await update('PAPER').expect(400);
   });
 
+  it('updates draft dates at the submitted precision and protects them from year-only edits', async () => {
+    const update = (body: object) =>
+      http
+        .request(app.getHttpServer())
+        .patch(`/outputs/${legacyOutput}/revision`)
+        .set('Cookie', cookies.get('owner')!)
+        .send(body);
+
+    const fullDate = await update({ publicationDate: ' 29-02-2024 ' }).expect(
+      200,
+    );
+    expect(fullDate.body.data).toMatchObject({
+      id: aliasRevision,
+      publicationDate: '2024-02-29',
+      publicationYear: 2024,
+    });
+
+    const yearOnly = await update({ publicationYear: 2025 }).expect(400);
+    expect(yearOnly.body.errors).toContainEqual({
+      field: 'publicationDate',
+      messages: ['publication_date_required'],
+    });
+    const mismatch = await update({
+      publicationYear: 2025,
+      publicationDate: '2024-06',
+    }).expect(400);
+    expect(mismatch.body.errors).toContainEqual({
+      field: 'publicationYear',
+      messages: ['publication_year_date_mismatch'],
+    });
+    for (const publicationDate of ['29-02-2025', 2026, null]) {
+      await update({ publicationDate }).expect(400);
+    }
+
+    const titleEdit = await update({ title: 'Corrected draft title' }).expect(
+      200,
+    );
+    expect(titleEdit.body.data.publicationDate).toBe('2024-02-29');
+
+    for (const publicationDate of ['2025-02', '2025']) {
+      const response = await update({ publicationDate }).expect(200);
+      expect(response.body.data).toMatchObject({
+        publicationDate,
+        publicationYear: 2025,
+      });
+    }
+    expect((await readLegacyRevision()).title).toBe(originalRevision.title);
+  });
+
   it('rejects invalid metadata and unselectable author and Topic IDs', async () => {
     for (const patch of [
       { title: '   ' },
