@@ -93,14 +93,8 @@
       "label": "Presentation",
       "description": "Add a presentation"
     },
-    "poster": {
-      "label": "Poster",
-      "description": "Add a conference poster"
-    },
-    "data": {
-      "label": "Data",
-      "description": "Table, image, sequence, etc."
-    },
+    "poster": { "label": "Poster", "description": "Add a conference poster" },
+    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
     "other": {
       "label": "Other",
       "description": "Methods, proposal, code, etc."
@@ -191,12 +185,47 @@
     "profileEmpty": "No profile yet",
     "profileEmptyDesc": "This researcher has not set up a profile yet.",
     "unauthenticatedNotice": "Please sign in to view your profile.",
+    "follow": "Follow",
+    "following": "Following",
+    "followedToast": "Now following {name}.",
+    "unfollowedToast": "Unfollowed {name}.",
+    "followError": "Could not update follow status.",
+    "message": "Message",
+    "messageError": "Could not open conversation.",
     "tabs": {
-      "applications": "Applications",
+      "overview": "Profile",
+      "outputs": "Research",
       "groups": "Groups",
-      "outputs": "Outputs",
-      "interests": "Interests",
-      "openalex": "OpenAlex Queue"
+      "interests": "Disciplines",
+      "applications": "Applications",
+      "openalex": "OpenAlex"
+    },
+    "overview": {
+      "aboutTitle": "About",
+      "noBioOwner": "Add a brief research statement and academic background so colleagues across FPTU can understand your work.",
+      "noBioVisitor": "No research summary has been added yet.",
+      "addBioAction": "Add research summary",
+      "skillsTitle": "Disciplines & Research Topics",
+      "noTopics": "No research topics listed yet.",
+      "manageTopics": "Manage topics",
+      "featuredResearchTitle": "Research",
+      "viewAll": "View all",
+      "statsTitle": "Academic Summary",
+      "statsPublications": "Publications",
+      "statsDrafts": "{count} draft(s)",
+      "statsGroups": "Groups",
+      "statsTopics": "Topics",
+      "pendingClaimsNotice": "{count} OpenAlex candidate(s) awaiting review",
+      "reviewNow": "Review",
+      "affiliationTitle": "Affiliation & Identifiers",
+      "departmentLabel": "Department",
+      "positionLabel": "Academic rank",
+      "emailLabel": "Email",
+      "externalIdsLabel": "Academic profiles",
+      "noExternalIdsOwner": "Link your ORCID, Google Scholar, or Scopus ID in Edit profile.",
+      "coAuthorsTitle": "Co-authors",
+      "coAuthoredCount": "{count} shared work(s)",
+      "groupsSidebarTitle": "Affiliated Labs & Groups"
     },
     "availability": {
       "OPEN_FOR_COLLABORATION": "Open for Collaboration",
@@ -264,7 +293,27 @@
       "visibilityUpdateError": "Could not update the visibility. Please try again.",
       "visibilityLockedReason": "Only the owner can change this",
       "visibilityPublic": "FPTU community",
-      "visibilityGroupOnly": "Group only"
+      "visibilityGroupOnly": "Group only",
+      "filterAll": "All ({count})",
+      "filterPublished": "Published ({count})",
+      "filterDrafts": "Drafts ({count})",
+      "draftBadge": "Draft",
+      "viewPublication": "View source",
+      "viewDetails": "Full details",
+      "share": "Share",
+      "linkCopied": "Publication link copied.",
+      "copyError": "Could not copy link.",
+      "corresponding": "corresponding",
+      "types": {
+        "PAPER": "Article",
+        "PREPRINT": "Preprint",
+        "REVIEW": "Review",
+        "EDITORIAL": "Editorial",
+        "BOOK_CHAPTER": "Book chapter",
+        "BOOK": "Book",
+        "DATASET": "Dataset",
+        "DISSERTATION": "Dissertation"
+      }
     },
     "interestsTab": {
       "title": "Research Interests",
@@ -362,7 +411,32 @@
       "notFoundTitle": "Publication not found.",
       "notFoundMessage": "The publication you are looking for does not exist or was removed.",
       "noRevisionTitle": "No released revision",
-      "noRevisionMessage": "This output has no released revision to display yet."
+      "noRevisionMessage": "This output has no released revision to display yet.",
+      "draftBadge": "Draft",
+      "metadataTitle": "Publication Details",
+      "venueRowLabel": "Venue / Journal",
+      "publisherRowLabel": "Publisher",
+      "visibilityRowLabel": "Visibility",
+      "visibilityPublic": "FPTU community",
+      "visibilityGroupOnly": "Affiliated group only",
+      "visibilityPrivate": "Private draft",
+      "topicsTitle": "Disciplines & Topics",
+      "affiliatedGroupTitle": "Affiliated Lab / Group",
+      "authorsCardTitle": "Authors ({count})",
+      "labInlineLabel": "Lab:",
+      "copyCitation": "Copy citation",
+      "citationCopied": "Formatted citation copied to clipboard.",
+      "viewSource": "View source",
+      "types": {
+        "PAPER": "Article",
+        "PREPRINT": "Preprint",
+        "REVIEW": "Review",
+        "EDITORIAL": "Editorial",
+        "BOOK_CHAPTER": "Book chapter",
+        "BOOK": "Book",
+        "DATASET": "Dataset",
+        "DISSERTATION": "Dissertation"
+      }
     }
   },
   "errors": {
