@@ -5,15 +5,18 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from '@tanstack/react-query';
@@ -21,6 +24,7 @@ import type {
 import type {
   ApiErrorResponseDto,
   PaginatedTopicsResponseDtoEnvelope,
+  RequestTopicSuggestionsDto,
   TaxonomyControllerFindAllFieldsEnvelope,
   TaxonomyControllerFindAllFieldsParams,
   TaxonomyControllerFindAllTopicsParams,
@@ -29,6 +33,8 @@ import type {
   TaxonomyControllerGetTreeEnvelope,
   TaxonomyControllerGetTreeParams,
   TopicDetailResponseDtoEnvelope,
+  TopicSuggestionRequestDtoEnvelope,
+  TopicSuggestionStatusDtoEnvelope,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -910,6 +916,277 @@ export function useTaxonomyControllerFindOneTopic<
 } {
   const queryOptions = getTaxonomyControllerFindOneTopicQueryOptions(
     topicId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Request Topic suggestions for an Article draft
+ */
+export const topicSuggestionsControllerRequest = (
+  requestTopicSuggestionsDto: RequestTopicSuggestionsDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<TopicSuggestionRequestDtoEnvelope>(
+    {
+      url: `/taxonomy/topic-suggestions`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: requestTopicSuggestionsDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getTopicSuggestionsControllerRequestMutationKey = () =>
+  ['topicSuggestionsControllerRequest'] as const;
+
+export const getTopicSuggestionsControllerRequestMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>,
+    TError,
+    TopicSuggestionsControllerRequestMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>,
+  TError,
+  TopicSuggestionsControllerRequestMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTopicSuggestionsControllerRequestMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>,
+    TopicSuggestionsControllerRequestMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return topicSuggestionsControllerRequest(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TopicSuggestionsControllerRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>
+>;
+export type TopicSuggestionsControllerRequestMutationBody =
+  RequestTopicSuggestionsDto;
+export type TopicSuggestionsControllerRequestMutationError =
+  ApiErrorResponseDto;
+export type TopicSuggestionsControllerRequestMutationVariables = {
+  data: RequestTopicSuggestionsDto;
+};
+
+/**
+ * @summary Request Topic suggestions for an Article draft
+ */
+export const useTopicSuggestionsControllerRequest = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>,
+      TError,
+      TopicSuggestionsControllerRequestMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof topicSuggestionsControllerRequest>>,
+  TError,
+  TopicSuggestionsControllerRequestMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getTopicSuggestionsControllerRequestMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Read the Article Topic suggestion result
+ */
+export const topicSuggestionsControllerGet = (
+  requestId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<TopicSuggestionStatusDtoEnvelope>(
+    { url: `/taxonomy/topic-suggestions/${requestId}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getTopicSuggestionsControllerGetQueryKey = (requestId: string) => {
+  return [`/taxonomy/topic-suggestions/${requestId}`] as const;
+};
+
+export const getTopicSuggestionsControllerGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+  TError = ApiErrorResponseDto,
+>(
+  requestId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getTopicSuggestionsControllerGetQueryKey(requestId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof topicSuggestionsControllerGet>>
+  > = ({ signal }) =>
+    topicSuggestionsControllerGet(requestId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: requestId !== null && requestId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type TopicSuggestionsControllerGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof topicSuggestionsControllerGet>>
+>;
+export type TopicSuggestionsControllerGetQueryError = ApiErrorResponseDto;
+
+export function useTopicSuggestionsControllerGet<
+  TData = Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+  TError = ApiErrorResponseDto,
+>(
+  requestId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+          TError,
+          Awaited<ReturnType<typeof topicSuggestionsControllerGet>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTopicSuggestionsControllerGet<
+  TData = Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+  TError = ApiErrorResponseDto,
+>(
+  requestId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+          TError,
+          Awaited<ReturnType<typeof topicSuggestionsControllerGet>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useTopicSuggestionsControllerGet<
+  TData = Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+  TError = ApiErrorResponseDto,
+>(
+  requestId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Read the Article Topic suggestion result
+ */
+
+export function useTopicSuggestionsControllerGet<
+  TData = Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+  TError = ApiErrorResponseDto,
+>(
+  requestId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof topicSuggestionsControllerGet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getTopicSuggestionsControllerGetQueryOptions(
+    requestId,
     options,
   );
 

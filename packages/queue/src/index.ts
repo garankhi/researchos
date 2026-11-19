@@ -5,10 +5,12 @@ export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
 export const DIGEST_QUEUE = 'digest-jobs';
+export const TOPIC_SUGGESTION_QUEUE = 'topic-suggestion-jobs';
 export const RESEARCH_UPDATES_QUEUE = 'research-updates';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
 export const DIGEST_SEND_JOB = 'digest-send';
+export const TOPIC_SUGGESTION_JOB = 'topic-suggestion';
 export const DIGEST_MAX_ATTEMPTS = 5;
 export const JOB_ATTEMPTS = 3;
 
