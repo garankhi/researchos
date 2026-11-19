@@ -16,6 +16,7 @@ import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
+import { doiUrl } from '@/lib/doi-url';
 import type { OutputDetail } from '../types';
 
 const VISIBLE_AUTHORS = 5;
@@ -190,7 +191,7 @@ export function OutputHeader({
               {t('detail.doiRowLabel')}
             </Text>
             <Link
-              href={`https://doi.org/${doi}`}
+              href={doiUrl(doi)}
               target="_blank"
               rel="noopener noreferrer"
               display="inline-flex"

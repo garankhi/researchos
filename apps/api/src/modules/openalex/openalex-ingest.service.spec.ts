@@ -26,7 +26,7 @@ function makeWork(
     venue: 'A venue',
     publicationYear: 2020,
     rawType: 'article',
-    outputType: 'PAPER',
+    outputType: 'ARTICLE',
     url: 'https://example.org/work',
     authors: [
       {

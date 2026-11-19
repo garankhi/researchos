@@ -2,9 +2,9 @@ import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { normalizeDoi } from '../../common/normalize-doi.js';
 import {
   mapOutputType,
-  normalizeDoi,
   OpenAlexClient,
   reconstructAbstract,
 } from './openalex.client.js';
@@ -53,6 +53,27 @@ describe('normalizeDoi', () => {
     expect(normalizeDoi('10.1234/abc')).toBe('10.1234/abc');
   });
 
+  it.each([
+    ['DOI:10.1000/Res#Test', '10.1000/res#test'],
+    [
+      'http://dx.doi.org/10.1000/Res%23Test?noredirect#copy',
+      '10.1000/res#test',
+    ],
+    ['https://doi.org/10.1000/Res%3FTest', '10.1000/res?test'],
+    ['https://doi.org/10.1000/literal%2523', '10.1000/literal%23'],
+    ['10.1000/literal%23', '10.1000/literal%23'],
+    ['https://doi.org/10.1000/./%C3%89', '10.1000/./É'],
+  ])('normalizes %s to %s', (value, expected) => {
+    expect(normalizeDoi(value)).toBe(expected);
+  });
+
+  it.each(['%xy', '%e9', '%00'])(
+    'rejects an invalid URL path escape %s',
+    (escape) => {
+      expect(normalizeDoi(`https://doi.org/10.1000/res${escape}`)).toBeNull();
+    },
+  );
+
   it('returns null for missing or blank DOIs', () => {
     expect(normalizeDoi(null)).toBeNull();
     expect(normalizeDoi('  ')).toBeNull();
@@ -61,14 +82,14 @@ describe('normalizeDoi', () => {
 
 describe('mapOutputType', () => {
   it('maps known OpenAlex types', () => {
-    expect(mapOutputType('article')).toBe('PAPER');
+    expect(mapOutputType('article')).toBe('ARTICLE');
     expect(mapOutputType('dataset')).toBe('DATASET');
     expect(mapOutputType('book')).toBe('BOOK');
   });
 
-  it('defaults unknown and missing types to PAPER', () => {
-    expect(mapOutputType('something-new')).toBe('PAPER');
-    expect(mapOutputType(null)).toBe('PAPER');
+  it('defaults unknown and missing types to ARTICLE', () => {
+    expect(mapOutputType('something-new')).toBe('ARTICLE');
+    expect(mapOutputType(null)).toBe('ARTICLE');
   });
 });
 
@@ -145,7 +166,7 @@ describe('OpenAlexClient', () => {
           results: [
             {
               id: 'https://openalex.org/W2741809807',
-              doi: 'https://doi.org/10.1234/ABC',
+              doi: 'https://doi.org/10.1234/ABC%23edition',
               title: '  Some title  ',
               abstract_inverted_index: { Some: [0], title: [1] },
               primary_location: { source: { display_name: 'Nature' } },
@@ -174,12 +195,12 @@ describe('OpenAlexClient', () => {
     expect(page.total).toBe(1);
     expect(page.works[0]).toMatchObject({
       shortId: 'W2741809807',
-      doi: '10.1234/abc',
+      doi: '10.1234/abc#edition',
       title: 'Some title',
       abstract: 'Some title',
       venue: 'Nature',
       publicationYear: 2020,
-      outputType: 'PAPER',
+      outputType: 'ARTICLE',
     });
     expect(page.works[0].authors).toEqual([
       {

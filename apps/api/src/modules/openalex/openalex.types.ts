@@ -61,7 +61,7 @@ export interface OpenAlexWork {
   /** Raw OpenAlex `type`, e.g. `article`. */
   rawType: string | null;
   /**
-   * Platform `output_type` vocabulary. Defaults to `PAPER`; see
+   * Platform `output_type` vocabulary. Defaults to `ARTICLE`; see
    * `OPENALEX_TYPE_MAP` for the mapping.
    */
   outputType: string;

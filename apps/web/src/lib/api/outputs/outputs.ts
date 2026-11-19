@@ -23,9 +23,12 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  CreateArticleDto,
+  CreateArticleResponseDtoEnvelope,
   HomeFeedResponseDtoEnvelope,
   OutputResponseDtoEnvelope,
   OutputRevisionResponseDtoEnvelope,
+  OutputsControllerCreateArticleHeaders,
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
   OutputsControllerFindHomeFeedParams,
@@ -58,6 +61,107 @@ const withQueryKey = <T extends object, K>(
   return result;
 };
 
+/**
+ * Creates a metadata-only Article and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.
+ * @summary Create and release an Article
+ */
+export const outputsControllerCreateArticle = (
+  createArticleDto: CreateArticleDto,
+  headers: OutputsControllerCreateArticleHeaders,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<CreateArticleResponseDtoEnvelope>(
+    {
+      url: `/outputs`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      data: createArticleDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerCreateArticleMutationKey = () =>
+  ['outputsControllerCreateArticle'] as const;
+
+export const getOutputsControllerCreateArticleMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
+    TError,
+    OutputsControllerCreateArticleMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
+  TError,
+  OutputsControllerCreateArticleMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerCreateArticleMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
+    OutputsControllerCreateArticleMutationVariables
+  > = (props) => {
+    const { data, headers } = props ?? {};
+
+    return outputsControllerCreateArticle(data, headers, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerCreateArticleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerCreateArticle>>
+>;
+export type OutputsControllerCreateArticleMutationBody = CreateArticleDto;
+export type OutputsControllerCreateArticleMutationError = ApiErrorResponseDto;
+export type OutputsControllerCreateArticleMutationVariables = {
+  data: CreateArticleDto;
+  headers: OutputsControllerCreateArticleHeaders;
+};
+
+/**
+ * @summary Create and release an Article
+ */
+export const useOutputsControllerCreateArticle = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
+      TError,
+      OutputsControllerCreateArticleMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerCreateArticle>>,
+  TError,
+  OutputsControllerCreateArticleMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerCreateArticleMutationOptions(options),
+    queryClient,
+  );
+};
 /**
  * Returns a paginated list of research outputs visible to the caller (shared community works, member group works, or the caller own working copy draft works).
  * @summary List visible research outputs
