@@ -110,4 +110,16 @@ describe('ApiResponseInterceptor', () => {
 
     expect(result.data).toEqual({ success: 'yes', data: 'payload' });
   });
+
+  it('passes WebSocket acknowledgements through without HTTP envelope wrapping', async () => {
+    const wsAck = { ok: true, data: { messageId: 'm1' } };
+    const result = await lastValueFrom(
+      interceptor.intercept(
+        { getType: () => 'ws' } as never,
+        handlerFor(wsAck),
+      ),
+    );
+
+    expect(result).toEqual(wsAck);
+  });
 });

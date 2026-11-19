@@ -57,6 +57,11 @@ services:
       S3_BUCKET: ${S3_BUCKET:-researchos-local}
     ports:
       - "127.0.0.1:${S3_PORT:-8333}:8333"
+      # SeaweedFS web UIs: filer on 8888 (file browser, drag-and-drop upload),
+      # master on 9333 (cluster status). Bound to loopback because they are
+      # unauthenticated.
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:9333:9333"
     volumes:
       - seaweedfs_data:/data
     healthcheck:

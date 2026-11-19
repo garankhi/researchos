@@ -77,9 +77,9 @@ export function ProfileEditDialog({
         data: {
           fullName: data.fullName,
           departmentUnit: data.departmentUnit,
-          academicTitle: data.academicTitle || undefined,
-          academicDegree: data.academicDegree || undefined,
-          bio: data.bio || undefined,
+          academicTitle: data.academicTitle ?? '',
+          academicDegree: data.academicDegree ?? '',
+          bio: data.bio ?? '',
           availabilityStatus: data.availabilityStatus,
           googleScholarUrl: data.googleScholarUrl || undefined,
           scopusAuthorId: data.scopusAuthorId || undefined,
@@ -106,7 +106,7 @@ export function ProfileEditDialog({
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content>
+          <Dialog.Content boxShadow="overlayPanel">
             <Dialog.Header
               flexDirection="column"
               alignItems="flex-start"

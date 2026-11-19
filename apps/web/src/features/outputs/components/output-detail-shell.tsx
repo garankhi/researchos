@@ -5,9 +5,10 @@ import {
   Button,
   Container,
   Flex,
+  Grid,
+  Heading,
   Stack,
   Tabs,
-  Text,
 } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -27,7 +28,14 @@ import {
 import { OutputDetailActionsMenu } from './output-detail-actions-menu';
 import { OutputHeader } from './output-header';
 import { OutputReferences } from './output-references';
+import { OutputSidebar } from './output-sidebar';
 import { OutputDetailSkeleton } from './output-skeletons';
+
+const sourceButtonProps = {
+  variant: 'outline',
+  size: 'xs',
+  layerStyle: 'researchAccess',
+} as const;
 
 export function OutputDetailShell({ outputId }: { outputId?: string }) {
   const t = useTranslations('outputs');
@@ -52,21 +60,25 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
   });
 
   if (isLoading) {
-    return (
-      <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <OutputDetailSkeleton />
-      </Container>
-    );
+    return <OutputDetailSkeleton />;
   }
 
   if (isFailed) {
     return (
-      <Container maxW="6xl" py={{ base: '4', md: '8' }}>
-        <ErrorState
-          title={t('detail.loadError')}
-          onRetry={() => void refetch()}
-        />
-      </Container>
+      <Box flex="1" bg="home.background">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          py={{ base: '4', md: '8' }}
+        >
+          <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
+            <ErrorState
+              title={t('detail.loadError')}
+              onRetry={() => void refetch()}
+            />
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
@@ -102,70 +114,122 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
 
   const files = filesQuery.files;
   const primaryFile = files?.[0];
+  const sourceUrl = output.doi
+    ? `https://doi.org/${output.doi}`
+    : (output.revision?.externalUrl ?? null);
 
   return (
-    <Tabs.Root defaultValue="overview" variant="line">
-      <Stack gap="0">
-        <Box w="full" bg="bg">
-          <Container maxW="6xl" pt={{ base: '4', md: '8' }} pb="4">
-            <Stack gap="4" minW="0">
-              <OutputHeader
-                output={output}
-                groupName={groupQuery.groupName}
-                groupLoading={groupQuery.isLoading}
-                hasFullText={Boolean(files && files.length > 0)}
-                followSlot={<OutputFollowButton output={output} />}
-              />
+    <Tabs.Root
+      as="main"
+      flex="1"
+      bg="home.background"
+      defaultValue="overview"
+      variant="line"
+      colorPalette="blue"
+    >
+      {/* Full-bleed white ResearchGate-style publication hero banner */}
+      <Box bg="bg.panel" borderBottomWidth="1px" borderColor="border">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          pt={{ base: '5', md: '8' }}
+        >
+          <Stack gap="5" minW="0">
+            <OutputHeader
+              output={output}
+              groupName={groupQuery.groupName}
+              groupLoading={groupQuery.isLoading}
+              hasFullText={Boolean(files && files.length > 0)}
+              followSlot={<OutputFollowButton output={output} />}
+            />
+
+            <Flex
+              direction={{ base: 'column', sm: 'row' }}
+              gap="3"
+              align={{ base: 'stretch', sm: 'center' }}
+              justify="space-between"
+            >
+              <Tabs.List
+                gap={{ base: '5', md: '7' }}
+                borderBottomWidth="0"
+                flexWrap="wrap"
+              >
+                <Tabs.Trigger value="overview" height="12" px="0">
+                  {t('detail.tabsOverview')}
+                </Tabs.Trigger>
+                <Tabs.Trigger value="references" height="12" px="0">
+                  {t('detail.tabsReferences')}
+                </Tabs.Trigger>
+              </Tabs.List>
 
               <Flex
-                direction={{ base: 'column', sm: 'row' }}
-                gap="3"
-                align={{ base: 'stretch', sm: 'center' }}
-                justify="space-between"
+                gap="2"
+                flexShrink={0}
+                align="center"
+                wrap="wrap"
+                pb={{ base: '3', sm: '0' }}
               >
-                <Tabs.List flex="1" overflowX="auto">
-                  <Tabs.Trigger value="overview">
-                    {t('detail.tabsOverview')}
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="references">
-                    {t('detail.tabsReferences')}
-                  </Tabs.Trigger>
-                </Tabs.List>
-                <Flex gap="2" flexShrink={0} alignItems="center">
+                {primaryFile ? (
                   <OutputDownloadPrimaryButton file={primaryFile} />
-                  <OutputShareButton />
+                ) : sourceUrl ? (
+                  <Button asChild {...sourceButtonProps}>
+                    <a
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {t('detail.viewSource')}
+                    </a>
+                  </Button>
+                ) : null}
+                <OutputShareButton />
+                {capability.role !== 'reader' ? (
                   <OutputDetailActionsMenu
                     output={output}
                     capability={capability}
                   />
-                </Flex>
+                ) : null}
               </Flex>
-            </Stack>
-          </Container>
-        </Box>
+            </Flex>
+          </Stack>
+        </Container>
+      </Box>
 
-        <Box w="full" bg="bg.subtle">
-          <Container maxW="6xl" py={{ base: '4', md: '6' }}>
-            <Tabs.Content value="overview">
+      {/* Two-column ResearchGate academic content area on #f6f6f6 canvas */}
+      <Container
+        maxW="64rem"
+        px={{ base: '4', md: '6' }}
+        py={{ base: '4', lg: '6' }}
+      >
+        <Grid
+          templateColumns={{
+            base: 'minmax(0, 1fr)',
+            lg: 'minmax(0, 1.95fr) minmax(0, 1fr)',
+          }}
+          alignItems="start"
+          gap="4"
+        >
+          <Box minW="0">
+            <Tabs.Content value="overview" pt="0">
               <Stack gap="4">
-                <Box
-                  bg="bg.panel"
-                  borderWidth="1px"
-                  borderRadius="md"
-                  p={{ base: '4', md: '5' }}
-                >
+                <Box bg="bg.panel" boxShadow="xs">
                   <OutputAbstract
                     abstract={output.revision?.abstract ?? null}
                   />
                 </Box>
-                <Box
-                  bg="bg.panel"
-                  borderWidth="1px"
-                  borderRadius="md"
-                  p={{ base: '4', md: '5' }}
-                >
-                  <Stack gap="2">
-                    <Text fontWeight="semibold">{t('detail.filesTitle')}</Text>
+
+                <Box bg="bg.panel" boxShadow="xs">
+                  <Box
+                    px={{ base: '4', md: '6' }}
+                    py="4"
+                    borderBottomWidth="1px"
+                    borderColor="border"
+                  >
+                    <Heading as="h2" size="md" fontWeight="bold">
+                      {t('detail.filesTitle')}
+                    </Heading>
+                  </Box>
+                  <Box p={{ base: '4', md: '6' }}>
                     <OutputFiles
                       files={files}
                       hasRestrictedPdf={output.hasRestrictedPdf}
@@ -173,24 +237,25 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                       isFailed={filesQuery.isFailed}
                       onRetry={() => void filesQuery.refetch()}
                     />
-                  </Stack>
+                  </Box>
                 </Box>
               </Stack>
             </Tabs.Content>
 
-            <Tabs.Content value="references">
-              <Box
-                bg="bg.panel"
-                borderWidth="1px"
-                borderRadius="md"
-                p={{ base: '4', md: '5' }}
-              >
+            <Tabs.Content value="references" pt="0">
+              <Box bg="bg.panel" boxShadow="xs">
                 <OutputReferences />
               </Box>
             </Tabs.Content>
-          </Container>
-        </Box>
-      </Stack>
+          </Box>
+
+          <OutputSidebar
+            output={output}
+            groupName={groupQuery.groupName}
+            groupLoading={groupQuery.isLoading}
+          />
+        </Grid>
+      </Container>
     </Tabs.Root>
   );
 }
