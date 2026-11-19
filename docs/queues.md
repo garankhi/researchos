@@ -104,6 +104,16 @@ Outbox/job/DLQ được giữ để phục vụ idempotency và điều tra; ch�
 prune tự động. Khi bổ sung retention cần quyết định rõ thời hạn idempotency,
 không chỉ xóa theo retention của BullMQ.
 
+### Trích xuất metadata PDF Article (RES-178)
+
+Xác nhận upload tạo job `article-pdf-metadata` trong cùng transaction với
+trạng thái upload. Dispatcher dùng một scope riêng trong PostgreSQL, suy ra
+từ `QUEUE_PREFIX`, rồi phát job vào queue `article-pdf-metadata`. API và
+worker phải dùng cùng `QUEUE_PREFIX`. Nếu API mới lên trước worker, job chờ
+trong outbox tới khi dispatcher mới chạy. Dispatcher và consumer cũ vẫn
+phục vụ các queue hiện tại và không nhận job PDF. Job PDF thất bại dùng
+`dead-letter-jobs` và cơ chế retry theo generation hiện có.
+
 ## Chạy và thử thủ công
 
 Sau khi có `.env` từ `.env.example`:

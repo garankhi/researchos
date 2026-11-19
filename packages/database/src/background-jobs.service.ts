@@ -34,11 +34,12 @@ export class BackgroundJobsService {
     kind: string,
     idempotencyKey: string,
     payload: Prisma.InputJsonObject,
+    queueScope = this.queuePrefix,
   ) {
     // Native ON CONFLICT avoids Prisma's read/create race for a nested upsert.
     await tx.$executeRaw`
       INSERT INTO background_jobs (owner_id, kind, idempotency_key, payload, queue_prefix)
-      VALUES (${ownerId}::uuid, ${kind}, ${idempotencyKey}, ${JSON.stringify(payload)}::jsonb, ${this.queuePrefix})
+      VALUES (${ownerId}::uuid, ${kind}, ${idempotencyKey}, ${JSON.stringify(payload)}::jsonb, ${queueScope})
       ON CONFLICT (owner_id, kind, idempotency_key)
       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
     `;

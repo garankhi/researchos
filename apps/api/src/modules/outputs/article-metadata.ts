@@ -1,27 +1,19 @@
 import { BadRequestException } from '@nestjs/common';
-import { normalizeDoi } from '../../common/normalize-doi.js';
+import {
+  normalizeArticleDoi,
+  parsePublicationDate,
+} from '@researchos/publication-metadata';
 import type { CreateArticleDto } from './dto/create-article.dto.js';
 
 const DAY_FIRST_DATE = /^(\d{2})-(\d{2})-([1-9]\d{3})$/;
-const PUBLICATION_DATE =
-  /^([1-9]\d{3})(?:-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?)?$/;
-const DOI = /^10\.\d{4,}(?:\.\d+)*\/\S+$/u;
 
 export function normalizePublicationDate(value: string): string {
   const dayFirst = DAY_FIRST_DATE.exec(value);
   const normalized = dayFirst
     ? [dayFirst[3], dayFirst[2], dayFirst[1]].join('-')
     : value;
-  const parts = PUBLICATION_DATE.exec(normalized);
-  if (parts) {
-    const [, year, month, day] = parts;
-    if (
-      !day ||
-      Number(day) <= new Date(Date.UTC(+year, +month, 0)).getUTCDate()
-    ) {
-      return normalized;
-    }
-  }
+  const date = parsePublicationDate(normalized);
+  if (date) return date;
   throw new BadRequestException({
     message: { publicationDate: ['publication_date_invalid'] },
   });
@@ -29,8 +21,8 @@ export function normalizePublicationDate(value: string): string {
 
 /** Build the stored values in a stable order for the idempotency fingerprint. */
 export function normalizeArticleMetadata(dto: CreateArticleDto) {
-  const doi = normalizeDoi(dto.doi);
-  if (dto.doi && (!doi || doi.length > 255 || !DOI.test(doi))) {
+  const doi = normalizeArticleDoi(dto.doi);
+  if (dto.doi && !doi) {
     throw new BadRequestException({ message: { doi: ['doi_invalid'] } });
   }
 

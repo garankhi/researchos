@@ -1,8 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { normalizeDoi } from '@researchos/publication-metadata';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
-import { normalizeDoi } from '../../common/normalize-doi.js';
 import {
   mapOutputType,
   OpenAlexClient,

@@ -2,8 +2,8 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OutputType } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
+import { normalizeDoi } from '@researchos/publication-metadata';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
-import { normalizeDoi } from '../../common/normalize-doi.js';
 import type {
   OpenAlexAuthor,
   OpenAlexWork,
