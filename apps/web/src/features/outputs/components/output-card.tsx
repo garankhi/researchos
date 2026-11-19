@@ -132,7 +132,12 @@ export function toOutputCardData({
   externalUrl?: unknown;
   sharingStatus?: string;
   visibility?: string | null;
-  authors?: { id: string; authorNameString: string; authorOrder: number; userId?: unknown }[];
+  authors?: {
+    id: string;
+    authorNameString: string;
+    authorOrder: number;
+    userId?: unknown;
+  }[];
   topics?: { topicId: string; topicName: string }[];
 }): OutputCardData {
   const abstractStr = asTrimmedString(abstract);
@@ -310,7 +315,12 @@ export function OutputCard({
           >
             {data.authors.map((author) => (
               <Flex as="li" key={author.id} align="center" gap="1.5">
-                <Icon as={UserRound} boxSize="3.5" color="fg.muted" aria-hidden />
+                <Icon
+                  as={UserRound}
+                  boxSize="3.5"
+                  color="fg.muted"
+                  aria-hidden
+                />
                 {author.userId ? (
                   <Link asChild layerStyle="researchTextLink">
                     <NextLink href={`/profile/${author.userId}`}>
@@ -392,7 +402,12 @@ export function OutputCard({
               {t('share')}
             </Button>
             {copyFailed ? (
-              <Text id={copyErrorId} role="alert" textStyle="xs" color="fg.error">
+              <Text
+                id={copyErrorId}
+                role="alert"
+                textStyle="xs"
+                color="fg.error"
+              >
                 {t('copyError')}
               </Text>
             ) : null}

@@ -47,10 +47,7 @@ export function ProfileOutputItem({
       showBottomBorder={showBottomBorder}
       headerSlot={
         showMenu ? (
-          <ProfileOutputActionsMenu
-            output={output}
-            capability={capability}
-          />
+          <ProfileOutputActionsMenu output={output} capability={capability} />
         ) : null
       }
     />

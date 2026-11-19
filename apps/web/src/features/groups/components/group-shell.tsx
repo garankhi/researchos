@@ -39,9 +39,7 @@ export function GroupShell({
 }: {
   groupId: string;
   group: NonNullable<ReturnType<typeof useGroupHub>['group']['data']>;
-  permissions: NonNullable<
-    ReturnType<typeof useGroupHub>['permissions']
-  >;
+  permissions: NonNullable<ReturnType<typeof useGroupHub>['permissions']>;
   hub: ReturnType<typeof useGroupHub>;
 }) {
   const t = useTranslations('groups');
@@ -175,8 +173,7 @@ export function GroupShell({
               {permissions.manageOpportunities ? (
                 <Tabs.Trigger value="applications" height="12" px="0">
                   {t('applications')}
-                  {hub.applications.data &&
-                  hub.applications.data.length > 0 ? (
+                  {hub.applications.data && hub.applications.data.length > 0 ? (
                     <Badge colorPalette="blue">
                       {hub.applications.data.length}
                     </Badge>
@@ -241,10 +238,7 @@ export function GroupShell({
 
             {permissions.manageOpportunities ? (
               <Tabs.Content value="applications" pt="0">
-                <GroupApplications
-                  groupId={groupId}
-                  query={hub.applications}
-                />
+                <GroupApplications groupId={groupId} query={hub.applications} />
               </Tabs.Content>
             ) : null}
           </Box>

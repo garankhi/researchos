@@ -130,9 +130,13 @@ function GroupOutputCard({
                         groupId={groupId}
                         label={t('accept')}
                         action={() =>
-                          groupOutputLinksControllerDecide(groupId, link.outputId, {
-                            status: 'ACCEPTED',
-                          })
+                          groupOutputLinksControllerDecide(
+                            groupId,
+                            link.outputId,
+                            {
+                              status: 'ACCEPTED',
+                            },
+                          )
                         }
                       />
                       <HubAction
@@ -141,9 +145,13 @@ function GroupOutputCard({
                         confirm
                         danger
                         action={() =>
-                          groupOutputLinksControllerDecide(groupId, link.outputId, {
-                            status: 'REJECTED',
-                          })
+                          groupOutputLinksControllerDecide(
+                            groupId,
+                            link.outputId,
+                            {
+                              status: 'REJECTED',
+                            },
+                          )
                         }
                       />
                     </>

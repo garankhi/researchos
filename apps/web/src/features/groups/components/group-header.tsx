@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Badge,
-  Flex,
-  Heading,
-  Icon,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Flex, Heading, Icon, Stack, Text } from '@chakra-ui/react';
 import { Hash, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { Group } from '../types';
@@ -34,10 +27,7 @@ export function GroupHeader({
   return (
     <Stack gap="3" minW="0">
       <Flex gap="2" align="center" flexWrap="wrap">
-        <Badge
-          variant="subtle"
-          colorPalette={active ? 'green' : 'gray'}
-        >
+        <Badge variant="subtle" colorPalette={active ? 'green' : 'gray'}>
           {t(active ? 'active' : 'archived')}
         </Badge>
         {isLeader ? (
@@ -64,9 +54,7 @@ export function GroupHeader({
         </Flex>
         <Flex align="center" gap="1.5" color="fg.muted">
           <Icon as={Users} boxSize="3.5" aria-hidden />
-          <Text as="span">
-            {t('memberCount', { count: memberCount })}
-          </Text>
+          <Text as="span">{t('memberCount', { count: memberCount })}</Text>
         </Flex>
       </Flex>
 

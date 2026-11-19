@@ -25,7 +25,11 @@ function HubContent({ groupId }: { groupId: string }) {
     if (status === 401) unauthorized();
     if (status === 403) forbidden();
     return (
-      <Container maxW="64rem" px={{ base: '4', md: '6' }} py={{ base: '4', md: '8' }}>
+      <Container
+        maxW="64rem"
+        px={{ base: '4', md: '6' }}
+        py={{ base: '4', md: '8' }}
+      >
         <ErrorState
           title={t('loadError')}
           message={resolveErrorCode(
@@ -39,7 +43,14 @@ function HubContent({ groupId }: { groupId: string }) {
     );
   }
   if (!group || !permissions) return null;
-  return <GroupShell groupId={groupId} group={group} permissions={permissions} hub={hub} />;
+  return (
+    <GroupShell
+      groupId={groupId}
+      group={group}
+      permissions={permissions}
+      hub={hub}
+    />
+  );
 }
 
 export function GroupHub({ groupId }: { groupId: string }) {

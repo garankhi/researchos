@@ -138,9 +138,7 @@ export function GroupOpportunities({
   return (
     <HubSection
       title={t('opportunities')}
-      action={
-        canManage ? <OpportunityEditor groupId={groupId} /> : null
-      }
+      action={canManage ? <OpportunityEditor groupId={groupId} /> : null}
     >
       <HubList query={query}>
         {(items) =>
@@ -148,9 +146,7 @@ export function GroupOpportunities({
             <Box
               key={opportunity.id}
               position="relative"
-              borderBottomWidth={
-                index < items.length - 1 ? '1px' : '0'
-              }
+              borderBottomWidth={index < items.length - 1 ? '1px' : '0'}
               borderColor="border"
               pb={index < items.length - 1 ? '4' : '0'}
             >

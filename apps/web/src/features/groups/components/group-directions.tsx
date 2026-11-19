@@ -172,9 +172,7 @@ export function GroupDirections({
   return (
     <HubSection
       title={t('directions')}
-      action={
-        canPublish ? <DirectionEditor groupId={groupId} /> : null
-      }
+      action={canPublish ? <DirectionEditor groupId={groupId} /> : null}
     >
       <HubList query={query}>
         {(directions) =>
@@ -182,9 +180,7 @@ export function GroupDirections({
             <Box
               key={direction.id}
               position="relative"
-              borderBottomWidth={
-                index < directions.length - 1 ? '1px' : '0'
-              }
+              borderBottomWidth={index < directions.length - 1 ? '1px' : '0'}
               borderColor="border"
               pb={index < directions.length - 1 ? '4' : '0'}
             >

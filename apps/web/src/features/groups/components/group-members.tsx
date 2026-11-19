@@ -83,13 +83,15 @@ export function GroupMembers({
             <Box
               key={member.userId}
               position="relative"
-              borderBottomWidth={
-                index < members.length - 1 ? '1px' : '0'
-              }
+              borderBottomWidth={index < members.length - 1 ? '1px' : '0'}
               borderColor="border"
               pb={index < members.length - 1 ? '4' : '0'}
             >
-              <Flex direction={{ base: 'column', sm: 'row' }} gap="4" align="start">
+              <Flex
+                direction={{ base: 'column', sm: 'row' }}
+                gap="4"
+                align="start"
+              >
                 <Avatar.Root>
                   <Avatar.Fallback name={member.fullName} />
                 </Avatar.Root>
@@ -126,11 +128,7 @@ export function GroupMembers({
                       {member.bio}
                     </Text>
                   ) : null}
-                  <Badge
-                    alignSelf="start"
-                    variant="subtle"
-                    colorPalette="gray"
-                  >
+                  <Badge alignSelf="start" variant="subtle" colorPalette="gray">
                     {t(`roles.${member.role}`)}
                   </Badge>
                   {canManage ? (
