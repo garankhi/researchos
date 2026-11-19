@@ -59,6 +59,10 @@ import type {
 } from '../types';
 import { resolveAuthorizedAttachmentUrl } from '../utils/attachment-upload';
 import { initialsForChatName } from '../utils/message-state';
+import {
+  ImagePreviewModal,
+  type ImagePreviewTarget,
+} from './image-preview-modal';
 
 export function ConversationDetailsPanel({
   conversation,
@@ -111,6 +115,9 @@ export function ConversationDetailsPanel({
   const [searchTerm, setSearchTerm] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [directLoadingUserId, setDirectLoadingUserId] = useState<string | null>(
+    null,
+  );
+  const [previewTarget, setPreviewTarget] = useState<ImagePreviewTarget | null>(
     null,
   );
 
@@ -307,7 +314,10 @@ export function ConversationDetailsPanel({
       {/* Top Close / Title Bar */}
       <Flex
         px="4"
-        py="3"
+        h="64px"
+        minH="64px"
+        maxH="64px"
+        boxSizing="border-box"
         align="center"
         justify="space-between"
         borderBottomWidth="1px"
@@ -749,16 +759,23 @@ export function ConversationDetailsPanel({
                           return (
                             <Box
                               key={img.id}
+                              asChild
                               aspectRatio="square"
                               borderWidth="1px"
                               borderColor="border"
                               overflow="hidden"
                               bg="bg.muted"
+                              cursor="pointer"
+                              _hover={{ opacity: 0.85 }}
                             >
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewTarget({
+                                    url: href,
+                                    fileName: img.fileName,
+                                  })
+                                }
                               >
                                 <Image
                                   src={href}
@@ -768,7 +785,7 @@ export function ConversationDetailsPanel({
                                   objectFit="cover"
                                   loading="lazy"
                                 />
-                              </a>
+                              </button>
                             </Box>
                           );
                         })}
@@ -786,15 +803,20 @@ export function ConversationDetailsPanel({
                           file.downloadPath,
                         );
                         return (
-                          <Flex
+                          <Link
                             key={file.id}
-                            align="center"
-                            justify="space-between"
+                            href={href}
+                            download={file.fileName}
+                            _hover={{ bg: 'bg.muted', textDecoration: 'none' }}
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="space-between"
                             gap="2"
                             p="2"
                             borderWidth="1px"
                             borderColor="border"
                             bg="bg.subtle"
+                            rounded="sm"
                           >
                             <HStack gap="2" minW="0">
                               <FileText size={14} />
@@ -802,14 +824,10 @@ export function ConversationDetailsPanel({
                                 {file.fileName}
                               </Text>
                             </HStack>
-                            <Link
-                              href={href}
-                              download={file.fileName}
-                              flexShrink={0}
-                            >
+                            <Box flexShrink={0}>
                               <Download size={14} />
-                            </Link>
-                          </Flex>
+                            </Box>
+                          </Link>
                         );
                       })}
                     </Stack>
@@ -820,6 +838,11 @@ export function ConversationDetailsPanel({
           )}
         </Box>
       </Box>
+
+      <ImagePreviewModal
+        target={previewTarget}
+        onClose={() => setPreviewTarget(null)}
+      />
     </Flex>
   );
 }

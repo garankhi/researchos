@@ -8,6 +8,7 @@ import {
   isAllowedChatReaction,
   isChatImageMimeType,
   parseMentionTokens,
+  stripMentionIdsForPreview,
   tokenizeMessageBody,
 } from "./index.js";
 
@@ -55,6 +56,37 @@ describe("@researchos/chat shared contracts", () => {
       { kind: "all", text: "@all" },
       { kind: "text", text: "!" },
     ]);
+  });
+
+  it("tokenizes mention without UUID as a clean user segment", () => {
+    const body = "Hello @[Do Quan] check this out";
+    const segments = tokenizeMessageBody(body);
+    expect(segments).toEqual([
+      { kind: "text", text: "Hello " },
+      {
+        kind: "user",
+        text: "@Do Quan",
+        displayName: "Do Quan",
+        userId: undefined,
+      },
+      { kind: "text", text: " check this out" },
+    ]);
+  });
+
+  it("strips UUIDs from mentions for sidebar preview display", () => {
+    const aliceId = "11111111-1111-4111-8111-111111111111";
+    const preview = stripMentionIdsForPreview(
+      `Hello @[Alice](${aliceId}) and @[Bob]!`,
+    );
+    expect(preview).toBe("Hello @Alice and @Bob!");
+  });
+
+  it("parses user mentions when candidates are provided", () => {
+    const aliceId = "11111111-1111-4111-8111-111111111111";
+    const parsed = parseMentionTokens("Hello @[Alice]!", [
+      { id: aliceId, fullName: "Alice" },
+    ]);
+    expect(parsed.userIds).toEqual([aliceId]);
   });
 
   it("validates allowed reactions and attachment MIME types", () => {

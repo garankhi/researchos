@@ -49,6 +49,10 @@ import {
 } from './conversation-list';
 import { MessageComposer } from './message-composer';
 import { MessageItem } from './message-item';
+import {
+  ImagePreviewModal,
+  type ImagePreviewTarget,
+} from './image-preview-modal';
 import { NewConversationDialog } from './new-conversation-dialog';
 
 type RoomEventBridge = {
@@ -127,6 +131,8 @@ function ActiveConversationPane({
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandMembersKey, setExpandMembersKey] = useState(0);
+  const [previewImageTarget, setPreviewImageTarget] =
+    useState<ImagePreviewTarget | null>(null);
 
   const room = useChatRoom({
     conversationId,
@@ -260,7 +266,10 @@ function ActiveConversationPane({
       >
         <Flex
           px="4"
-          py="3"
+          h="64px"
+          minH="64px"
+          maxH="64px"
+          boxSizing="border-box"
           align="center"
           justify="space-between"
           borderBottomWidth="1px"
@@ -402,52 +411,86 @@ function ActiveConversationPane({
                 </Flex>
               )}
 
-              {visibleMessages.map((msg) => (
-                <MessageItem
-                  key={msg.id}
-                  message={msg}
-                  currentUserId={currentUser.id}
-                  canModerate={isGroup && isOwner}
-                  participants={activeParticipants}
-                  onToggleReaction={(messageId, emoji) => {
-                    void room
-                      .toggleReactionOptimistic(messageId, emoji)
-                      .then((errCode) => {
-                        if (errCode) {
-                          showSnackbar({
-                            severity: 'error',
-                            message: resolveErrorCode(
-                              tErrors,
-                              errCode,
-                              t('errors.reactionFailed'),
-                            ),
-                          });
-                        }
-                      });
-                  }}
-                  onEditMessage={room.editExistingMessage}
-                  onDeleteMessage={(messageId) => {
-                    void room
-                      .deleteExistingMessage(messageId)
-                      .then((errCode) => {
-                        if (errCode) {
-                          showSnackbar({
-                            severity: 'error',
-                            message: resolveErrorCode(
-                              tErrors,
-                              errCode,
-                              tErrors('unknown'),
-                            ),
-                          });
-                        }
-                      });
-                  }}
-                  onHideMessageForMe={onHideMessageForMe}
-                  onRetrySend={(failed) => {
-                    void room.retryFailedMessage(failed);
-                  }}
-                />
-              ))}
+              {visibleMessages.map((msg, index) => {
+                const prev = visibleMessages[index - 1];
+                const next = visibleMessages[index + 1];
+
+                const isSameSenderAsPrev = Boolean(
+                  prev &&
+                  prev.senderId === msg.senderId &&
+                  !prev.deletedAt &&
+                  !msg.deletedAt &&
+                  new Date(msg.createdAt).getTime() -
+                    new Date(prev.createdAt).getTime() <
+                    5 * 60 * 1000,
+                );
+
+                const isSameSenderAsNext = Boolean(
+                  next &&
+                  next.senderId === msg.senderId &&
+                  !next.deletedAt &&
+                  !msg.deletedAt &&
+                  new Date(next.createdAt).getTime() -
+                    new Date(msg.createdAt).getTime() <
+                    5 * 60 * 1000,
+                );
+
+                const isFirstInGroup = !isSameSenderAsPrev;
+                const isLastInGroup = !isSameSenderAsNext;
+
+                return (
+                  <MessageItem
+                    key={msg.id}
+                    message={msg}
+                    currentUserId={currentUser.id}
+                    canModerate={isGroup && isOwner}
+                    isGroup={isGroup}
+                    participants={activeParticipants}
+                    isFirstInGroup={isFirstInGroup}
+                    isLastInGroup={isLastInGroup}
+                    onPreviewImage={(url, fileName) =>
+                      setPreviewImageTarget({ url, fileName })
+                    }
+                    onToggleReaction={(messageId, emoji) => {
+                      void room
+                        .toggleReactionOptimistic(messageId, emoji)
+                        .then((errCode) => {
+                          if (errCode) {
+                            showSnackbar({
+                              severity: 'error',
+                              message: resolveErrorCode(
+                                tErrors,
+                                errCode,
+                                t('errors.reactionFailed'),
+                              ),
+                            });
+                          }
+                        });
+                    }}
+                    onEditMessage={room.editExistingMessage}
+                    onDeleteMessage={(messageId) => {
+                      void room
+                        .deleteExistingMessage(messageId)
+                        .then((errCode) => {
+                          if (errCode) {
+                            showSnackbar({
+                              severity: 'error',
+                              message: resolveErrorCode(
+                                tErrors,
+                                errCode,
+                                tErrors('unknown'),
+                              ),
+                            });
+                          }
+                        });
+                    }}
+                    onHideMessageForMe={onHideMessageForMe}
+                    onRetrySend={(failed) => {
+                      void room.retryFailedMessage(failed);
+                    }}
+                  />
+                );
+              })}
             </Stack>
           )}
         </Box>
@@ -501,6 +544,11 @@ function ActiveConversationPane({
           />
         </Box>
       ) : null}
+
+      <ImagePreviewModal
+        target={previewImageTarget}
+        onClose={() => setPreviewImageTarget(null)}
+      />
     </Flex>
   );
 }

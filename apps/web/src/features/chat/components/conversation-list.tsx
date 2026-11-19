@@ -12,6 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { MessageSquarePlus } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+import { stripMentionIdsForPreview } from '@researchos/chat';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode } from '@/lib/api-error';
 import type { ChatConversationResponseDto } from '@/lib/api/models';
@@ -81,7 +82,10 @@ export function ConversationList({
     >
       <Flex
         px="4"
-        py="3"
+        h="64px"
+        minH="64px"
+        maxH="64px"
+        boxSizing="border-box"
         align="center"
         justify="space-between"
         borderBottomWidth="1px"
@@ -149,10 +153,13 @@ export function ConversationList({
               );
               const isSelected = conv.id === selectedId;
               const lastMsg = conv.lastMessage;
+              const rawBody = lastMsg?.body
+                ? stripMentionIdsForPreview(lastMsg.body).trim()
+                : '';
               const previewText = lastMsg
                 ? lastMsg.deletedAt
                   ? t('messageDeleted')
-                  : lastMsg.body.trim() ||
+                  : rawBody ||
                     (lastMsg.attachments.length > 0
                       ? `📎 ${lastMsg.attachments[0]?.fileName ?? ''}`
                       : '')

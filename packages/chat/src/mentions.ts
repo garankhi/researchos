@@ -7,7 +7,7 @@
  */
 
 const USER_MENTION_PATTERN =
-  /@\[([^\]]{1,255})\]\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)/gi;
+  /@\[([^\]]{1,255})\](?:\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\))?/gi;
 
 const ALL_MENTION_PATTERN = /(?:^|[\s(])@all(?=$|[\s.,!?;:)])/i;
 
@@ -28,14 +28,30 @@ export interface ChatMentionSegment {
 /** Formats a user mention token for insertion into message body text. */
 export function formatUserMentionToken(
   displayName: string,
-  userId: string,
+  userId?: string,
 ): string {
   const safeName = displayName.replace(/[[\]]/g, "").trim() || "User";
-  return `@[${safeName}](${userId.toLowerCase()})`;
+  return userId ? `@[${safeName}](${userId.toLowerCase()})` : `@[${safeName}]`;
+}
+
+/** Strips UUIDs from mention tokens for clean single-line preview display. */
+export function stripMentionIdsForPreview(body: string): string {
+  if (!body) return "";
+  return body.replace(
+    /@\[([^\]]{1,255})\](?:\([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\))?/gi,
+    "@$1",
+  );
 }
 
 /** Extracts distinct user mention UUIDs and `@all` presence from a message body. */
-export function parseMentionTokens(body: string): ParsedMentions {
+export function parseMentionTokens(
+  body: string,
+  candidateParticipants?: Array<{
+    id: string;
+    fullName?: string;
+    user?: { fullName: string };
+  }>,
+): ParsedMentions {
   if (!body) {
     return { userIds: [], mentionsAll: false };
   }
@@ -44,7 +60,17 @@ export function parseMentionTokens(body: string): ParsedMentions {
   const userIds: string[] = [];
 
   for (const match of body.matchAll(USER_MENTION_PATTERN)) {
-    const id = match[2]?.toLowerCase();
+    let id = match[2]?.toLowerCase();
+    if (!id && candidateParticipants && match[1]) {
+      const targetName = match[1].trim().toLowerCase();
+      const matched = candidateParticipants.find((p) => {
+        const name = p.fullName ?? p.user?.fullName;
+        return name?.trim().toLowerCase() === targetName;
+      });
+      if (matched) {
+        id = matched.id.toLowerCase();
+      }
+    }
     if (id && !seen.has(id)) {
       seen.add(id);
       userIds.push(id);
@@ -67,7 +93,7 @@ export function tokenizeMessageBody(body: string): ChatMentionSegment[] {
   }
 
   const combined =
-    /@\[([^\]]{1,255})\]\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)|((?:^|[\s(]))(@all)(?=$|[\s.,!?;:)])/gi;
+    /@\[([^\]]{1,255})\](?:\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\))?|((?:^|[\s(]))(@all)(?=$|[\s.,!?;:)])/gi;
 
   const segments: ChatMentionSegment[] = [];
   let cursor = 0;
@@ -75,7 +101,7 @@ export function tokenizeMessageBody(body: string): ChatMentionSegment[] {
   for (const match of body.matchAll(combined)) {
     const matchIndex = match.index ?? 0;
 
-    if (match[1] !== undefined && match[2] !== undefined) {
+    if (match[1] !== undefined) {
       if (matchIndex > cursor) {
         segments.push({ kind: "text", text: body.slice(cursor, matchIndex) });
       }
@@ -83,7 +109,7 @@ export function tokenizeMessageBody(body: string): ChatMentionSegment[] {
         kind: "user",
         text: `@${match[1]}`,
         displayName: match[1],
-        userId: match[2].toLowerCase(),
+        userId: match[2]?.toLowerCase(),
       });
       cursor = matchIndex + match[0].length;
     } else if (match[4] !== undefined) {

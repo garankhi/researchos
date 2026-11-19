@@ -270,4 +270,13 @@ describe('chat client state, merging, reactions, and upload helpers', () => {
     expect(CHAT_RECONNECT_CONFIG.reconnectionDelay).toBe(1000);
     expect(CHAT_RECONNECT_CONFIG.reconnectionDelayMax).toBe(15000);
   });
+
+  it('formats mention tokens cleanly for conversation list preview without user IDs', async () => {
+    const { stripMentionIdsForPreview } = await import('@researchos/chat');
+    const input =
+      'Hi @[Do Quan](11111111-1111-4111-8111-111111111111) and @[Tran Quang](22222222-2222-4222-8222-222222222222)!';
+    expect(stripMentionIdsForPreview(input)).toBe(
+      'Hi @Do Quan and @Tran Quang!',
+    );
+  });
 });

@@ -4,10 +4,10 @@ import {
   Badge,
   Box,
   Button,
-  FileUpload,
   Flex,
   HStack,
   IconButton,
+  Input,
   Progress,
   Stack,
   Text,
@@ -19,7 +19,7 @@ import {
   MAX_CHAT_MESSAGE_BODY_LENGTH,
   formatUserMentionToken,
 } from '@researchos/chat';
-import { AtSign, Paperclip, Send, X } from 'lucide-react';
+import { Paperclip, Send, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useRef, useState } from 'react';
 import { FieldError } from '@/components/ui/feedback';
@@ -80,6 +80,7 @@ export function MessageComposer({
   const [isSending, setIsSending] = useState(false);
   const lastTypingEmitRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeMention = useMemo(
     () => detectActiveMention(body, caretPos),
@@ -148,14 +149,24 @@ export function MessageComposer({
     );
     if (body.trim().length === 0 && !hasReadyAttachments) return;
 
-    const currentBody = body;
+    let wireBody = body;
+    for (const p of participants) {
+      const token = `@[${p.user.fullName}]`;
+      if (wireBody.includes(token)) {
+        wireBody = wireBody.replaceAll(
+          token,
+          formatUserMentionToken(p.user.fullName, p.userId),
+        );
+      }
+    }
+
     setIsSending(true);
     onStopTyping();
     lastTypingEmitRef.current = 0;
     setBody('');
     setCaretPos(0);
 
-    const ok = await onSendMessage(currentBody);
+    const ok = await onSendMessage(wireBody);
     setIsSending(false);
     if (!ok) {
       // Message stays visible in message list with Failed + Retry action.
@@ -232,17 +243,17 @@ export function MessageComposer({
             >
               <button
                 type="button"
-                onClick={() =>
-                  insertMentionToken(
-                    formatUserMentionToken(p.user.fullName, p.userId),
-                  )
-                }
+                onClick={() => insertMentionToken(`@[${p.user.fullName}]`)}
               >
                 <HStack gap="2" minW="0">
-                  <AtSign size={14} />
-                  <Text textStyle="sm" fontWeight="medium" truncate>
-                    {p.user.fullName}
-                  </Text>
+                  <Badge
+                    variant="subtle"
+                    colorPalette="blue"
+                    fontWeight="bold"
+                    textStyle="xs"
+                  >
+                    @{p.user.fullName}
+                  </Badge>
                 </HStack>
                 <Text textStyle="xs" color="fg.muted" truncate>
                   {p.user.email}
@@ -319,33 +330,33 @@ export function MessageComposer({
         )}
 
         <Flex gap="2" align="end" w="full" minW="0">
-          <FileUpload.Root
-            w="auto"
-            flexShrink={0}
-            maxFiles={MAX_CHAT_ATTACHMENTS_PER_MESSAGE}
-            accept={[...ALLOWED_CHAT_ATTACHMENT_MIME_TYPES]}
+          <Input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={[...ALLOWED_CHAT_ATTACHMENT_MIME_TYPES].join(',')}
+            display="none"
             disabled={attachDisabled}
-            onFileAccept={(details) => {
-              if (details.files.length > 0) {
-                onStageFiles(details.files);
+            onChange={(e) => {
+              const files = e.target.files ? Array.from(e.target.files) : [];
+              e.target.value = '';
+              if (files.length > 0) {
+                onStageFiles(files);
               }
             }}
+          />
+          <IconButton
+            type="button"
+            variant="outline"
+            size="sm"
+            flexShrink={0}
+            disabled={attachDisabled}
+            aria-label={t('attachFiles')}
+            title={t('attachFiles')}
+            onClick={() => fileInputRef.current?.click()}
           >
-            <FileUpload.HiddenInput />
-            <FileUpload.Trigger asChild>
-              <IconButton
-                type="button"
-                variant="outline"
-                size="sm"
-                flexShrink={0}
-                disabled={attachDisabled}
-                aria-label={t('attachFiles')}
-                title={t('attachFiles')}
-              >
-                <Paperclip size={16} />
-              </IconButton>
-            </FileUpload.Trigger>
-          </FileUpload.Root>
+            <Paperclip size={16} />
+          </IconButton>
 
           <Textarea
             ref={textareaRef}

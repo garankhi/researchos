@@ -695,6 +695,12 @@ export class ChatService {
     const participantIds = conv.chat_conversation_participants.map(
       (p) => p.user_id,
     );
+    const candidateParticipants = conv.chat_conversation_participants.map(
+      (p) => ({
+        id: p.user_id,
+        fullName: p.users.full_name,
+      }),
+    );
     const clientNonce = dto.clientNonce?.trim() || null;
 
     // Idempotent retry check for client_nonce.
@@ -741,6 +747,7 @@ export class ChatService {
       senderParticipant.role,
       conv.type,
       participantIds,
+      candidateParticipants,
     );
 
     if (attachmentIds.length > 0) {
@@ -994,12 +1001,19 @@ export class ChatService {
     const participantIds = conv.chat_conversation_participants.map(
       (p) => p.user_id,
     );
+    const candidateParticipants = conv.chat_conversation_participants.map(
+      (p) => ({
+        id: p.user_id,
+        fullName: p.users.full_name,
+      }),
+    );
     const { targetMentionIds, mentionsAll } = this.resolveValidatedMentions(
       dto.body,
       userId,
       caller.role,
       conv.type,
       participantIds,
+      candidateParticipants,
     );
 
     const previouslyMentioned = new Set(
@@ -1361,8 +1375,9 @@ export class ChatService {
     senderRole: ChatParticipantRole,
     conversationType: ChatConversationType,
     participantIds: string[],
+    candidateParticipants?: Array<{ id: string; fullName: string }>,
   ): { targetMentionIds: string[]; mentionsAll: boolean } {
-    const parsed = parseMentionTokens(body);
+    const parsed = parseMentionTokens(body, candidateParticipants);
     const participantSet = new Set(
       participantIds.map((id) => id.toLowerCase()),
     );
