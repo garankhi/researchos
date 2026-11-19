@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsInt,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { trimText } from './submitted-value.js';
 
 /**
  * The editable metadata of a work's draft revision.
@@ -59,7 +61,7 @@ export class UpdateOutputRevisionDto {
 
   @ApiPropertyOptional({
     description:
-      'Calendar year of publication. Send null to clear the stored year.',
+      'Year-only metadata for drafts without a stored publication date. If sent with publicationDate, it must match the year in that date.',
     type: Number,
     nullable: true,
     minimum: 1000,
@@ -74,6 +76,19 @@ export class UpdateOutputRevisionDto {
 
   @ApiPropertyOptional({
     description:
+      'Publication date as YYYY, YYYY-MM, YYYY-MM-DD or DD-MM-YYYY. The supplied precision is preserved and the year is derived from the date.',
+    type: String,
+    maxLength: 10,
+    example: '28-02-2025',
+  })
+  @Transform(trimText)
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsString({ message: 'publication_date_invalid' })
+  @MaxLength(10, { message: 'publication_date_invalid' })
+  publicationDate?: string;
+
+  @ApiPropertyOptional({
+    description:
       'External URL pointing to the publication source. Send null to clear the stored link.',
     type: String,
     nullable: true,
@@ -85,10 +100,10 @@ export class UpdateOutputRevisionDto {
 
   @ApiPropertyOptional({
     description:
-      'Type classification of the work (e.g. PAPER, DATASET, PREPRINT).',
+      'Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT).',
     type: String,
     maxLength: 50,
-    example: 'PAPER',
+    example: 'ARTICLE',
   })
   @IsOptional()
   @IsString({ message: 'output_type_invalid' })

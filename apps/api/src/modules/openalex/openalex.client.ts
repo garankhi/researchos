@@ -1,7 +1,9 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OutputType } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { normalizeDoi } from '../../common/normalize-doi.js';
 import type {
   OpenAlexAuthor,
   OpenAlexWork,
@@ -16,24 +18,16 @@ import type {
  */
 export const DEFAULT_OPENALEX_API_URL = 'https://api.openalex.org';
 
-/**
- * Maps an OpenAlex work `type` onto the platform `output_type` vocabulary.
- *
- * `output_revisions.output_type` is a free `varchar(50)` defaulting to
- * `PAPER`; OpenAlex uses lowercase kinds (`article`, `book`, `preprint`,
- * `dataset`, …). Unknown types fall back to `PAPER`, which is also the
- * database default.
- */
-export const OPENALEX_TYPE_MAP: Record<string, string> = {
-  article: 'PAPER',
-  preprint: 'PREPRINT',
-  review: 'REVIEW',
-  editorial: 'EDITORIAL',
-  'book-chapter': 'BOOK_CHAPTER',
-  book: 'BOOK',
-  dataset: 'DATASET',
-  dissertation: 'DISSERTATION',
-};
+const OPENALEX_TYPE_MAP = new Map<string, OutputType>([
+  ['article', OutputType.ARTICLE],
+  ['preprint', OutputType.PREPRINT],
+  ['review', OutputType.REVIEW],
+  ['editorial', OutputType.EDITORIAL],
+  ['book-chapter', OutputType.BOOK_CHAPTER],
+  ['book', OutputType.BOOK],
+  ['dataset', OutputType.DATASET],
+  ['dissertation', OutputType.DISSERTATION],
+]);
 
 /** Maximum works per page OpenAlex allows. */
 const MAX_PER_PAGE = 200;
@@ -113,24 +107,6 @@ export function reconstructAbstract(
   return text === '' ? null : text;
 }
 
-/**
- * Normalises a DOI at the client boundary.
- *
- * OpenAlex returns the DOI as a URL (`https://doi.org/10.xxxx/...`); the
- * ingest stores the bare form (`10.xxxx/...`). The database trigger
- * `normalize_output_doi` normalises again, so this is a best-effort mirror
- * of it: strip the URL/`doi:` prefix, trim, lowercase. Empty means none.
- */
-export function normalizeDoi(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  let doi = value.trim();
-  doi = doi.replace(/^(https?:\/\/(dx\.)?doi\.org\/|doi:\s*)/i, '').trim();
-  doi = doi.toLowerCase();
-  return doi === '' ? null : doi;
-}
-
 /** Short OpenAlex id (`W2741809807`) from a canonical URL or bare id. */
 function shortId(value: unknown): string | null {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -144,11 +120,10 @@ function shortId(value: unknown): string | null {
 }
 
 /** Maps a raw OpenAlex `type` onto the platform vocabulary. */
-export function mapOutputType(rawType: unknown): string {
-  if (typeof rawType !== 'string') {
-    return 'PAPER';
-  }
-  return OPENALEX_TYPE_MAP[rawType] ?? 'PAPER';
+export function mapOutputType(rawType: unknown): OutputType {
+  const mapped =
+    typeof rawType === 'string' ? OPENALEX_TYPE_MAP.get(rawType) : undefined;
+  return mapped ?? OutputType.ARTICLE;
 }
 
 /** Normalises paging options shared by the works list methods. */

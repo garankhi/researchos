@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../dist/generated/prisma/client.js';
+import { OutputType } from '../dist/output-type.js';
 import { redactDatabaseUrl, resolveDatabaseUrl } from './database-url.mjs';
 import { fail, log } from './openalex.mjs';
 
@@ -842,7 +843,6 @@ const OUTPUTS = [
     venue: 'Journal of Industrial Informatics',
     publisher: 'FPTU Press',
     publication_year: 2025,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0001',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -863,7 +863,6 @@ const OUTPUTS = [
     venue: 'Proceedings of the National Conference on Language Technology',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0002',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -884,7 +883,6 @@ const OUTPUTS = [
     venue: 'Journal of Sustainable Finance',
     publisher: 'FPTU Press',
     publication_year: 2025,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0003',
     visibility: 'RESEARCH_GROUP',
     group_code: 'FPTU-SUSTAIN',
@@ -904,7 +902,6 @@ const OUTPUTS = [
     venue: 'International Journal of Energy Systems',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0004',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -925,7 +922,6 @@ const OUTPUTS = [
     venue: 'Conference on Industrial Machine Vision',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0005',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -946,7 +942,6 @@ const OUTPUTS = [
     venue: 'Journal of Corporate Governance',
     publisher: 'FPTU Press',
     publication_year: 2025,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0006',
     visibility: 'RESEARCH_GROUP',
     group_code: 'FPTU-GREENFIN',
@@ -967,7 +962,6 @@ const OUTPUTS = [
     venue: 'Journal of Supply Chain Management',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0007',
     visibility: 'RESEARCH_GROUP',
     group_code: 'FPTU-FORECAST',
@@ -988,7 +982,6 @@ const OUTPUTS = [
     venue: 'Proceedings of the National Conference on Language Technology',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0008',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -1008,7 +1001,6 @@ const OUTPUTS = [
     venue: 'International Conference on Robotics and Automation',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0009',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -1028,7 +1020,6 @@ const OUTPUTS = [
     venue: 'Journal of Industrial Informatics',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0010',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -1048,7 +1039,6 @@ const OUTPUTS = [
     venue: 'Journal of Sustainable Finance',
     publisher: 'FPTU Press',
     publication_year: 2026,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0011',
     visibility: 'RESEARCH_GROUP',
     group_code: 'FPTU-GREENFIN',
@@ -1068,7 +1058,6 @@ const OUTPUTS = [
     venue: 'Proceedings of the National Conference on Language Technology',
     publisher: 'FPTU Press',
     publication_year: 2025,
-    output_type: 'PAPER',
     external_url: 'https://doi.org/10.5555/researchos.demo.0012',
     visibility: 'FPTU_COMMUNITY',
     group_code: null,
@@ -2021,6 +2010,8 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
     const authorsSnapshot = output.authors.map((author) => ({
       name: author.name,
       order: author.order,
+      userId: idsByEmail.get(author.email) ?? null,
+      isCorresponding: author.corresponding === true,
     }));
 
     // The revision is found by its number rather than upserted, so that the
@@ -2042,7 +2033,7 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
           publisher: output.publisher,
           publication_year: output.publication_year,
           publication_status: 'PUBLISHED',
-          output_type: output.output_type,
+          output_type: OutputType.ARTICLE,
           external_url: output.external_url,
           authors_snapshot: authorsSnapshot,
           created_by: ownerId,

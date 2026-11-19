@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -12,9 +13,11 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiBearerAuth,
   ApiConflictResponse,
+  ApiCookieAuth,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -24,6 +27,10 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import {
+  CreateArticleDto,
+  CreateArticleResponseDto,
+} from './dto/create-article.dto.js';
 import { HomeFeedQueryDto, HomeFeedResponseDto } from './dto/home-feed.dto.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputFileResponseDto } from './dto/output-file-response.dto.js';
@@ -38,14 +45,50 @@ import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js
 import { OutputsService } from './outputs.service.js';
 
 /**
- * Controller exposing endpoints for reading research outputs metadata,
- * revisions history, and associated files.
+ * Controller for research outputs, their revisions and associated files.
  */
 @ApiTags('outputs')
-@ApiBearerAuth()
+@ApiCookieAuth()
 @Controller('outputs')
 export class OutputsController {
   constructor(private readonly outputsService: OutputsService) {}
+
+  @ApiOperation({
+    summary: 'Create and release an Article',
+    description:
+      'Creates a metadata-only Article and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.',
+  })
+  @ApiHeader({
+    name: 'idempotency-key',
+    required: true,
+    description: 'An actor-scoped key for retrying the same submission.',
+    schema: { type: 'string', maxLength: 200 },
+  })
+  @ApiCreatedResponse({
+    description:
+      'The Article and first release identifiers for a new submission or replay.',
+    type: CreateArticleResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid Article metadata or idempotency key.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher account is required.',
+  })
+  @ApiConflictResponse({
+    description:
+      'output_idempotency_key_conflict for a changed submission using the same key, or output_doi_conflict for an existing DOI.',
+  })
+  @Post()
+  @Roles('RESEARCHER')
+  async createArticle(
+    @CurrentUserId() callerId: string,
+    @Body() dto: CreateArticleDto,
+    @Headers('idempotency-key') key?: string,
+  ): Promise<CreateArticleResponseDto> {
+    return this.outputsService.createArticle(callerId, dto, key);
+  }
 
   @ApiOperation({
     summary: 'List visible research outputs',

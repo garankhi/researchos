@@ -20,7 +20,7 @@ DECLARE
  recipient uuid=gen_random_uuid(); student uuid=gen_random_uuid(); guest uuid=gen_random_uuid();
  work uuid=gen_random_uuid(); revision uuid=gen_random_uuid(); grp uuid=gen_random_uuid(); other_grp uuid=gen_random_uuid();
  log1 uuid=gen_random_uuid(); session1 uuid=gen_random_uuid(); actor_sql text;
- other_work uuid=gen_random_uuid(); doi_variant text;
+ other_work uuid=gen_random_uuid(); encoded_work uuid=gen_random_uuid(); doi_variant text;
 BEGIN
  INSERT INTO users(id,user_type,email,full_name,department_unit) VALUES
  (admin1,'STAFF','policy-admin1@test.invalid','Admin One','FPTU'),
@@ -56,6 +56,17 @@ BEGIN
  PERFORM pg_temp.policy_assert((SELECT doi='10.1234/policy.article' FROM research_outputs WHERE id=work),'DOI UPDATE trims outer whitespace too');
  INSERT INTO research_outputs(id,owner_id,created_by,doi) VALUES(other_work,owner1,owner1,E'\t\r\n ');
  PERFORM pg_temp.policy_assert((SELECT doi IS NULL FROM research_outputs WHERE id=other_work),'blank whitespace DOI becomes NULL');
+ INSERT INTO research_outputs(id,owner_id,created_by,doi)
+ VALUES(encoded_work,owner1,owner1,'https://doi.org/10.1000/Res%23Test%2523%C3%89?noredirect#copy');
+ PERFORM pg_temp.policy_assert(
+   (SELECT doi='10.1000/res#test%23É' FROM research_outputs WHERE id=encoded_work),
+   'DOI resolver path is decoded once');
+ PERFORM pg_temp.policy_error(
+   format('INSERT INTO research_outputs(owner_id,doi) VALUES(%L,%L)',recipient,'10.1000/res#test%23É'),
+   '23505');
+ PERFORM pg_temp.policy_error(
+   format('INSERT INTO research_outputs(owner_id,doi) VALUES(%L,%L)',recipient,'https://doi.org/10.1000/invalid%00'),
+   '22023');
  INSERT INTO output_revisions(id,output_id,revision_no,title,created_by) VALUES(revision,work,1,'Shared policy fixture',owner1);
  UPDATE output_revisions SET released_by=owner1,released_at=clock_timestamp() WHERE id=revision;
  UPDATE research_outputs SET sharing_status='SHARED',current_release_id=revision,first_shared_at=clock_timestamp() WHERE id=work;

@@ -24,19 +24,24 @@ export interface UpdateOutputRevisionDto {
    */
   venue?: string | null;
   /**
-   * Calendar year of publication. Send null to clear the stored year.
+   * Year-only metadata for drafts without a stored publication date. If sent with publicationDate, it must match the year in that date.
    * @minimum 1000
    * @maximum 9999
    * @nullable
    */
   publicationYear?: number | null;
   /**
+   * Publication date as YYYY, YYYY-MM, YYYY-MM-DD or DD-MM-YYYY. The supplied precision is preserved and the year is derived from the date.
+   * @maxLength 10
+   */
+  publicationDate?: string;
+  /**
    * External URL pointing to the publication source. Send null to clear the stored link.
    * @nullable
    */
   externalUrl?: string | null;
   /**
-   * Type classification of the work (e.g. PAPER, DATASET, PREPRINT).
+   * Type classification of the work (e.g. ARTICLE, DATASET, PREPRINT).
    * @maxLength 50
    */
   outputType?: string;

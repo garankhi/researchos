@@ -4,6 +4,7 @@ import type { AxiosAdapter, AxiosResponse } from 'axios';
 import { AXIOS_INSTANCE, axiosInstance, isEnvelope } from './axios-instance';
 import { apiErrorCode } from './api-error';
 import type { Unwrap } from './axios-instance';
+import { outputsControllerCreateArticle } from '@/lib/api';
 import type {
   HealthStatusDto,
   HealthStatusDtoEnvelope,
@@ -64,6 +65,37 @@ function adapterFor(body: unknown, status = 200): AxiosAdapter {
 function defaultValidateStatus(status: number): boolean {
   return status >= 200 && status < 300;
 }
+
+it('preserves the generated Article request alongside custom options', async () => {
+  const body = {
+    title: 'Article',
+    publicationDate: '2026',
+    authors: [{ displayName: 'An' }],
+  };
+  const created = { outputId: 'output', revisionId: 'revision' };
+
+  for (const key of ['article-one', 'article-two']) {
+    const result = await outputsControllerCreateArticle(
+      body,
+      { 'idempotency-key': key },
+      {
+        headers: { 'x-request-id': 'test-request' },
+        adapter: async (config) => {
+          expect(config.url).toBe('/outputs');
+          expect(config.method).toBe('post');
+          expect(JSON.parse(config.data as string)).toEqual(body);
+          expect(config.headers.get('idempotency-key')).toBe(key);
+          expect(config.headers.get('x-request-id')).toBe('test-request');
+          return adapterFor(
+            { success: true, data: created, message: 'Created' },
+            201,
+          )(config);
+        },
+      },
+    );
+    expect(result).toEqual(created);
+  }
+});
 
 describe('isEnvelope', () => {
   it('recognises a success envelope', () => {

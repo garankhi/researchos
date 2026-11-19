@@ -23,7 +23,7 @@ function makeWork(
     venue: null,
     publicationYear: 2020,
     rawType: 'article',
-    outputType: 'PAPER',
+    outputType: 'ARTICLE',
     url: null,
     authors: [],
     ...overrides,

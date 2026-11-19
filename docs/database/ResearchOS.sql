@@ -496,12 +496,15 @@ CREATE TABLE "research_outputs" (
   "last_synced_at" timestamptz,
   "first_shared_at" timestamptz,
   "archived_at" timestamptz,
+  "create_idempotency_key" varchar(200),
+  "create_request_hash" char(64),
   "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_shared_output" CHECK (sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)),
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
   CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
-  CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL)
+  CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL),
+  CONSTRAINT "ck_output_create_request" CHECK ((create_idempotency_key IS NULL AND create_request_hash IS NULL) OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL))
 );
 
 CREATE TABLE "resource_handovers" (
@@ -530,8 +533,13 @@ CREATE TABLE "output_revisions" (
   "venue" varchar(255),
   "publisher" varchar(255),
   "publication_year" int,
+  "publication_date" varchar(10),
   "publication_status" publication_status NOT NULL DEFAULT 'UNPUBLISHED',
-  "output_type" varchar(50) NOT NULL DEFAULT 'PAPER',
+  "output_type" varchar(50) NOT NULL DEFAULT 'ARTICLE',
+  "volume" varchar(50),
+  "issue" varchar(50),
+  "pages" varchar(100),
+  "peer_reviewed" boolean,
   "external_url" text,
   "authors_snapshot" jsonb NOT NULL DEFAULT ('[]'::jsonb),
   "created_by" uuid NOT NULL,
@@ -541,6 +549,7 @@ CREATE TABLE "output_revisions" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_output_revision_no" CHECK (revision_no > 0),
   CONSTRAINT "ck_publication_year" CHECK (publication_year IS NULL OR publication_year BETWEEN 1000 AND 9999),
+  CONSTRAINT "ck_output_publication_date" CHECK (publication_date IS NULL OR (publication_year IS NOT NULL AND left(publication_date, 4) = publication_year::text AND publication_date ~ '^[1-9][0-9]{3}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$')),
   CONSTRAINT "ck_revision_authors" CHECK (jsonb_typeof(authors_snapshot) = 'array'),
   CONSTRAINT "ck_revision_release" CHECK ((released_at IS NULL AND released_by IS NULL) OR (released_at IS NOT NULL AND released_by IS NOT NULL AND released_at >= created_at))
 );
@@ -955,6 +964,8 @@ CREATE UNIQUE INDEX ON "group_directions" ("id", "group_id");
 
 CREATE INDEX ON "research_outputs" ("owner_id");
 
+CREATE UNIQUE INDEX "uq_output_creator_create_key" ON "research_outputs" ("created_by", "create_idempotency_key");
+
 CREATE INDEX ON "resource_handovers" ("performed_by", "performed_at");
 
 CREATE UNIQUE INDEX ON "output_revisions" ("output_id", "revision_no");
@@ -1057,7 +1068,7 @@ COMMENT ON COLUMN "research_groups"."lead_id" IS 'Single authority for group lea
 
 COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
 
-COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes whitespace/case and strips doi.org/doi: prefixes. Duplicate DOI reuses existing work; backend checks visibility and offers authorship claim, never ownership. No DOI: warn on suspected duplicates, do not auto-merge.';
+COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes DOI names and decodes doi.org resolver paths. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.';
 
 COMMENT ON COLUMN "research_outputs"."owner_id" IS 'MVP researcher explicitly adds a work they manage; backend sets authenticated creator as owner. Ownerless import is reserved for a future verified assignment flow and cannot be shared. Claim never grants ownership. Handover uses resource_handovers.';
 
@@ -1068,6 +1079,8 @@ COMMENT ON TABLE "resource_handovers" IS 'Append-only owner/Leader handover ledg
 COMMENT ON COLUMN "resource_handovers"."authorization_reference" IS 'Reference to verified consent/official authorization, not a client assertion. Backend verifies evidence before insert.';
 
 COMMENT ON TABLE "output_revisions" IS 'NULL released_at = editable draft. Release is an owner action, not a review. SQL freezes released metadata and revision-topic/file links. Publish revision and current_release_id atomically. New draft does not change current personal/group release.';
+
+COMMENT ON COLUMN "output_revisions"."publication_date" IS 'Canonical YYYY, YYYY-MM or YYYY-MM-DD at the recorded precision.';
 
 COMMENT ON COLUMN "output_external_ids"."source" IS 'E.g. OPENALEX, SCOPUS. Presence here records metadata origin, not a quality certification.';
 
@@ -1538,12 +1551,59 @@ CREATE TRIGGER revoke_deactivated_sessions AFTER UPDATE OF is_active ON users
  FOR EACH ROW WHEN (OLD.is_active AND NOT NEW.is_active)
  EXECUTE FUNCTION revoke_sessions_after_deactivation();
 
+-- Decode the path bytes only for a resolver URL. Bare DOI names can contain a
+-- literal percent sign. Keep this in sync with normalizeDoi in the API.
+CREATE FUNCTION doi_name_from_resolver_path(resolver_path text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+DECLARE
+  segment text;
+  decoded bytea := ''::bytea;
+BEGIN
+  IF resolver_path ~ '%(?![0-9a-fA-F]{2})' THEN
+    RETURN NULL;
+  END IF;
+
+  FOR segment IN
+    SELECT parts[1] FROM regexp_matches(resolver_path, '(%[0-9a-fA-F]{2}|[^%]+)', 'g') AS match(parts)
+  LOOP
+    IF left(segment, 1) = '%' THEN
+      decoded := decoded || decode(substr(segment, 2), 'hex');
+    ELSE
+      decoded := decoded || convert_to(segment, 'UTF8');
+    END IF;
+  END LOOP;
+
+  RETURN convert_from(decoded, 'UTF8');
+EXCEPTION
+  WHEN character_not_in_repertoire THEN RETURN NULL;
+END $$;
+
+CREATE FUNCTION canonical_output_doi(value text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+DECLARE
+  name text := regexp_replace(value, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+  resolver_path text := substring(name COLLATE "C" FROM '(?i)^https?://(?:dx\.)?doi\.org/([^?#]*)');
+BEGIN
+  IF resolver_path IS NOT NULL THEN
+    name := doi_name_from_resolver_path(resolver_path);
+    IF name IS NULL THEN
+      RAISE EXCEPTION 'Invalid DOI URL path' USING ERRCODE = '22023';
+    END IF;
+  ELSE
+    name := regexp_replace(name COLLATE "C", '^doi:[[:space:]]*', '', 'i');
+  END IF;
+
+  IF name ~ '[[:cntrl:]]' THEN
+    RAISE EXCEPTION 'Invalid DOI control character' USING ERRCODE = '22023';
+  END IF;
+
+  RETURN nullif(lower(regexp_replace(name, '^[[:space:]]+|[[:space:]]+$', '', 'g') COLLATE "C"), '');
+END $$;
+
 CREATE FUNCTION normalize_output_doi() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- NEW.doi=lower(regexp_replace(NEW.doi,'^[[:space:]]+|[[:space:]]+$','','g'));
- NEW.doi=regexp_replace(NEW.doi,'^(https?://(dx\.)?doi\.org/|doi:[[:space:]]*)','','i');
- NEW.doi=nullif(regexp_replace(NEW.doi,'^[[:space:]]+|[[:space:]]+$','','g'),'');
- RETURN NEW;
+  NEW.doi := canonical_output_doi(NEW.doi);
+  RETURN NEW;
 END $$;
 CREATE TRIGGER normalize_output_doi BEFORE INSERT OR UPDATE OF doi ON research_outputs
  FOR EACH ROW EXECUTE FUNCTION normalize_output_doi();
