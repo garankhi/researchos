@@ -760,7 +760,7 @@
         ]
       },
       "patch": {
-        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.",
+        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Requires researcher access and either designated leadership or an active GROUP_LEADER membership in this group.",
         "operationId": "GroupsController_update",
         "parameters": [
           {
@@ -1417,7 +1417,7 @@
             "bearer": []
           }
         ],
-        "summary": "Publish a direction as the group lead or a core member",
+        "summary": "Publish a direction as the designated lead or an active GROUP_LEADER",
         "tags": [
           "group-directions"
         ]
@@ -1525,7 +1525,7 @@
             "bearer": []
           }
         ],
-        "summary": "Edit a direction as the group lead",
+        "summary": "Edit a direction as a group leader",
         "tags": [
           "group-directions"
         ]
@@ -1614,7 +1614,7 @@
             "bearer": []
           }
         ],
-        "summary": "Archive a direction as the group lead, retaining the row and project references",
+        "summary": "Archive a direction as a group leader, retaining the row and project references",
         "tags": [
           "group-directions"
         ]
@@ -1716,7 +1716,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1813,7 +1813,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1856,7 +1856,7 @@
     },
     "/research-groups/{groupId}/outputs/{outputId}": {
       "patch": {
-        "description": "Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.",
+        "description": "Only group leaders may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.",
         "operationId": "GroupOutputLinksController_decide",
         "parameters": [
           {
@@ -1922,7 +1922,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2019,7 +2019,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {

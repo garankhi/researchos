@@ -26,7 +26,14 @@ import { ErrorState } from '@/components/ui/feedback';
 import { FormSelect } from '@/components/ui/form';
 import { useHubCollection } from '../hooks/use-group-hub';
 import type { OutputLink } from '../types';
-import { HubAction, HubEditor, HubList, HubSection } from './hub-controls';
+import {
+  HubAction,
+  HubForm,
+  HubList,
+  HubMenu,
+  HubModal,
+  HubSection,
+} from './hub-controls';
 
 function OutputCard({
   groupId,
@@ -50,7 +57,7 @@ function OutputCard({
   const revision = revisions.data?.find((row) => row.id === revisionId);
   // Never substitute the current release for the revision accepted by the group.
   return (
-    <Box borderWidth="1px" borderRadius="md" p="4">
+    <Box position="relative" borderWidth="1px" borderRadius="0" p="4">
       <Stack gap="3">
         {output.isPending || (output.isSuccess && revisions.isPending) ? (
           <GroupLineSkeleton />
@@ -69,7 +76,7 @@ function OutputCard({
           />
         ) : (
           <>
-            <Heading as="h3" size="md">
+            <Heading as="h3" size="md" pe={canManage ? '8' : '0'}>
               {revision.title}
             </Heading>
             <Text color="fg.muted">
@@ -95,38 +102,42 @@ function OutputCard({
         </Badge>
         {link.decisionNote ? <Text>{link.decisionNote}</Text> : null}
         {canManage ? (
-          review ? (
-            <Stack direction={{ base: 'column', sm: 'row' }}>
+          <HubMenu>
+            {review ? (
+              <>
+                <HubAction
+                  groupId={groupId}
+                  label={t('accept')}
+                  action={() =>
+                    groupOutputLinksControllerDecide(groupId, link.outputId, {
+                      status: 'ACCEPTED',
+                    })
+                  }
+                />
+                <HubAction
+                  groupId={groupId}
+                  label={t('reject')}
+                  confirm
+                  danger
+                  action={() =>
+                    groupOutputLinksControllerDecide(groupId, link.outputId, {
+                      status: 'REJECTED',
+                    })
+                  }
+                />
+              </>
+            ) : (
               <HubAction
                 groupId={groupId}
-                label={t('accept')}
-                action={() =>
-                  groupOutputLinksControllerDecide(groupId, link.outputId, {
-                    status: 'ACCEPTED',
-                  })
-                }
-              />
-              <HubAction
-                groupId={groupId}
-                label={t('reject')}
+                label={t('removeOutput')}
                 confirm
+                danger
                 action={() =>
-                  groupOutputLinksControllerDecide(groupId, link.outputId, {
-                    status: 'REJECTED',
-                  })
+                  groupOutputLinksControllerRemove(groupId, link.outputId)
                 }
               />
-            </Stack>
-          ) : (
-            <HubAction
-              groupId={groupId}
-              label={t('removeOutput')}
-              confirm
-              action={() =>
-                groupOutputLinksControllerRemove(groupId, link.outputId)
-              }
-            />
-          )
+            )}
+          </HubMenu>
         ) : null}
       </Stack>
     </Box>
@@ -134,6 +145,21 @@ function OutputCard({
 }
 
 function LinkOutput({ groupId }: { groupId: string }) {
+  const t = useTranslations('groups');
+  return (
+    <HubModal label={t('linkOutput')} title={t('linkOutput')}>
+      {(close) => <LinkOutputForm groupId={groupId} onSaved={close} />}
+    </HubModal>
+  );
+}
+
+function LinkOutputForm({
+  groupId,
+  onSaved,
+}: {
+  groupId: string;
+  onSaved: () => void;
+}) {
   const t = useTranslations('groups');
   const user = useCurrentUser();
   const selection = useForm({ defaultValues: { outputId: '' } });
@@ -191,10 +217,10 @@ function LinkOutput({ groupId }: { groupId: string }) {
         />
       ) : null}
       {outputId && revisions.data ? (
-        <HubEditor
+        <HubForm
           key={outputId}
           groupId={groupId}
-          label={t('linkOutput')}
+          onSaved={onSaved}
           title={t('linkOutput')}
           fields={[
             {

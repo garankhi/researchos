@@ -2,11 +2,23 @@
 
 import { GroupListSkeleton } from './group-skeletons';
 
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Box, Button, Heading, Stack } from '@chakra-ui/react';
+import {
+  Box,
+  Button,
+  Dialog,
+  Heading,
+  IconButton,
+  Menu,
+  Portal,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
+import { Ellipsis } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
   FormSelect,
@@ -28,6 +40,135 @@ export type HubField = {
   max?: number;
   options?: { value: string; label: string }[];
 };
+
+const MenuContext = createContext<{
+  close: () => void;
+  container: HTMLDivElement | null;
+} | null>(null);
+
+export function HubMenu({ children }: { children: ReactNode }) {
+  const t = useTranslations('groups');
+  const [open, setOpen] = useState(false);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  return (
+    <Box position="absolute" top="3" right="3">
+      <Menu.Root
+        open={open}
+        onOpenChange={(details) => setOpen(details.open)}
+        positioning={{ placement: 'bottom-end' }}
+        closeOnSelect={false}
+      >
+        <Menu.Trigger asChild>
+          <IconButton size="sm" variant="ghost" aria-label={t('actions')}>
+            <Ellipsis />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <Menu.Content
+              ref={setContainer}
+              shadow="overlayPanel"
+              borderRadius="0"
+            />
+          </Menu.Positioner>
+        </Portal>
+        {/* Keep dialogs mounted outside the menu content when selection closes it. */}
+        <MenuContext.Provider
+          value={{ close: () => setOpen(false), container }}
+        >
+          {children}
+        </MenuContext.Provider>
+      </Menu.Root>
+    </Box>
+  );
+}
+
+function HubTrigger({
+  label,
+  onClick,
+  disabled = false,
+  danger = false,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  const menu = useContext(MenuContext);
+  if (menu)
+    return menu.container
+      ? createPortal(
+          <Menu.Item
+            value={label}
+            disabled={disabled}
+            color={danger ? 'fg.error' : undefined}
+            layerStyle="interactiveRow"
+            onSelect={() => {
+              menu.close();
+              onClick();
+            }}
+          >
+            {label}
+          </Menu.Item>,
+          menu.container,
+        )
+      : null;
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      alignSelf="start"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
+export function HubModal({
+  label,
+  title,
+  children,
+}: {
+  label: string;
+  title: string;
+  children: (close: () => void) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const t = useTranslations('groups');
+  return (
+    <>
+      <HubTrigger label={label} onClick={() => setOpen(true)} />
+      <Dialog.Root
+        open={open}
+        onOpenChange={(details) => setOpen(details.open)}
+        placement="center"
+        size="lg"
+        scrollBehavior="inside"
+        lazyMount
+        unmountOnExit
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content borderRadius="0" shadow="overlayPanel" mx="4">
+              <Dialog.Header>
+                <Dialog.Title>{title}</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>{children(() => setOpen(false))}</Dialog.Body>
+              <Dialog.Footer>
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  {t('cancel')}
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    </>
+  );
+}
 
 export function HubForm({
   groupId,
@@ -89,10 +230,7 @@ export function HubForm({
     }
   });
   return (
-    <Box borderWidth="1px" borderRadius="lg" p="4">
-      <Heading as="h3" size="sm" mb="4">
-        {title}
-      </Heading>
+    <Box aria-label={title}>
       <FormProvider {...methods}>
         <form onSubmit={onSubmit} noValidate>
           <Stack gap="4">
@@ -163,56 +301,86 @@ export function HubAction({
   action,
   confirm = false,
   disabled = false,
+  danger = false,
 }: {
   groupId: string;
   label: string;
   action: () => Promise<unknown>;
   confirm?: boolean;
   disabled?: boolean;
+  danger?: boolean;
 }) {
   const t = useTranslations('groups');
   const errors = useTranslations('errors');
   const [confirming, setConfirming] = useState(false);
   const mutation = useHubMutation(groupId, action);
   return (
-    <Stack gap="2" align="start">
-      {confirming ? (
-        <Stack direction="row">
-          <Button
-            size="sm"
-            colorPalette="red"
-            loading={mutation.isPending}
-            onClick={() =>
-              mutation.mutate(undefined, {
-                onSuccess: () => setConfirming(false),
-              })
-            }
-          >
-            {t('confirmAction', { action: label })}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={mutation.isPending}
-            onClick={() => setConfirming(false)}
-          >
-            {t('cancel')}
-          </Button>
-        </Stack>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          loading={mutation.isPending}
-          onClick={() =>
-            confirm ? setConfirming(true) : mutation.mutate(undefined)
-          }
-        >
-          {label}
-        </Button>
-      )}
-      {mutation.isError ? (
+    <>
+      <HubTrigger
+        label={label}
+        disabled={disabled || mutation.isPending}
+        danger={danger}
+        onClick={() =>
+          confirm ? setConfirming(true) : mutation.mutate(undefined)
+        }
+      />
+      <Dialog.Root
+        open={confirming}
+        onOpenChange={(details) => {
+          if (!mutation.isPending) setConfirming(details.open);
+        }}
+        role="alertdialog"
+        placement="center"
+        closeOnEscape={!mutation.isPending}
+        closeOnInteractOutside={!mutation.isPending}
+      >
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content borderRadius="0" shadow="overlayPanel" mx="4">
+              <Dialog.Header>
+                <Dialog.Title>{label}</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Text>{t('confirmAction', { action: label })}</Text>
+                {mutation.isError ? (
+                  <ErrorState
+                    title={t('saveError')}
+                    message={resolveErrorCode(
+                      errors,
+                      apiErrorCode(mutation.error),
+                      errors('unknown'),
+                    )}
+                  />
+                ) : null}
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={mutation.isPending}
+                  onClick={() => setConfirming(false)}
+                >
+                  {t('cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  colorPalette={danger ? 'red' : undefined}
+                  loading={mutation.isPending}
+                  onClick={() =>
+                    mutation.mutate(undefined, {
+                      onSuccess: () => setConfirming(false),
+                    })
+                  }
+                >
+                  {t('confirmAction', { action: label })}
+                </Button>
+              </Dialog.Footer>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+      {mutation.isError && !confirm ? (
         <ErrorState
           title={t('saveError')}
           message={resolveErrorCode(
@@ -222,7 +390,7 @@ export function HubAction({
           )}
         />
       ) : null}
-    </Stack>
+    </>
   );
 }
 
@@ -287,12 +455,13 @@ export function HubSection({
   return (
     <Box
       as="section"
+      position="relative"
       bg="bg.panel"
       borderWidth="1px"
-      borderRadius="lg"
+      borderRadius="0"
       p={{ base: '4', md: '6' }}
     >
-      <Heading as="h2" size="lg" mb="5">
+      <Heading as="h2" size="lg" mb="5" pe="10">
         {title}
       </Heading>
       <Stack gap="4">{children}</Stack>
@@ -303,26 +472,17 @@ export function HubSection({
 export function HubEditor(
   props: Parameters<typeof HubForm>[0] & { label: string },
 ) {
-  const [open, setOpen] = useState(false);
-  const t = useTranslations('groups');
   return (
-    <Stack gap="3">
-      <Button
-        variant="outline"
-        alignSelf="start"
-        onClick={() => setOpen(!open)}
-      >
-        {open ? t('cancel') : props.label}
-      </Button>
-      {open ? (
+    <HubModal label={props.label} title={props.title}>
+      {(close) => (
         <HubForm
           {...props}
           onSaved={() => {
-            setOpen(false);
+            close();
             props.onSaved?.();
           }}
         />
-      ) : null}
-    </Stack>
+      )}
+    </HubModal>
   );
 }

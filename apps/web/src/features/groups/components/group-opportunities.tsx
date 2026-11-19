@@ -10,7 +10,13 @@ import {
   opportunitiesControllerClose,
 } from '@/lib/api';
 import type { Opportunity } from '../types';
-import { HubAction, HubEditor, HubList, HubSection } from './hub-controls';
+import {
+  HubAction,
+  HubEditor,
+  HubList,
+  HubMenu,
+  HubSection,
+} from './hub-controls';
 
 function localDateTime(value: string | null) {
   if (!value) return '';
@@ -135,9 +141,15 @@ export function GroupOpportunities({
       <HubList query={query}>
         {(items) =>
           items.map((opportunity) => (
-            <Box key={opportunity.id} borderWidth="1px" borderRadius="md" p="4">
+            <Box
+              key={opportunity.id}
+              position="relative"
+              borderWidth="1px"
+              borderRadius="0"
+              p="4"
+            >
               <Stack gap="3">
-                <Heading as="h3" size="md">
+                <Heading as="h3" size="md" pe={canManage ? '8' : '0'}>
                   {opportunity.title}
                 </Heading>
                 <Badge alignSelf="start">
@@ -163,8 +175,10 @@ export function GroupOpportunities({
                     })}
                   </Text>
                 ) : null}
-                {opportunity.canManage === true && !opportunity.archivedAt ? (
-                  <>
+                {canManage &&
+                opportunity.canManage === true &&
+                !opportunity.archivedAt ? (
+                  <HubMenu>
                     <OpportunityEditor
                       groupId={groupId}
                       opportunity={opportunity}
@@ -202,13 +216,14 @@ export function GroupOpportunities({
                       groupId={groupId}
                       label={t('archiveOpportunity')}
                       confirm
+                      danger
                       action={() =>
                         opportunitiesControllerUpdate(opportunity.id, {
                           archivedAt: new Date().toISOString(),
                         })
                       }
                     />
-                  </>
+                  </HubMenu>
                 ) : null}
               </Stack>
             </Box>

@@ -58,7 +58,7 @@ import { GroupOutputLinksService } from './group-output-links.service.js';
 @ApiUnauthorizedResponse({ description: 'Authentication required.' })
 @ApiForbiddenResponse({
   description:
-    'Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.',
+    'Group leadership is required to request, decide or remove a link; requests also require visibility of the work.',
 })
 @ApiNotFoundResponse({
   description: 'Group, research output, or group output link does not exist.',
@@ -118,7 +118,7 @@ export class GroupOutputLinksController {
   @ApiOperation({
     summary: 'Accept or reject a pending group content request',
     description:
-      'Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.',
+      'Only group leaders may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.',
   })
   @ApiOkResponse({
     description: 'Decision recorded.',

@@ -17,7 +17,13 @@ import {
   groupMembersControllerUpdate,
 } from '@/lib/api';
 import type { Member } from '../types';
-import { HubAction, HubEditor, HubList, HubSection } from './hub-controls';
+import {
+  HubAction,
+  HubEditor,
+  HubList,
+  HubMenu,
+  HubSection,
+} from './hub-controls';
 
 export function GroupMembers({
   groupId,
@@ -69,7 +75,13 @@ export function GroupMembers({
       <HubList query={query}>
         {(members) =>
           members.map((member) => (
-            <Box key={member.userId} borderWidth="1px" borderRadius="md" p="4">
+            <Box
+              key={member.userId}
+              position="relative"
+              borderWidth="1px"
+              borderRadius="0"
+              p="4"
+            >
               <Stack
                 direction={{ base: 'column', sm: 'row' }}
                 gap="4"
@@ -79,7 +91,7 @@ export function GroupMembers({
                   <Avatar.Fallback name={member.fullName} />
                 </Avatar.Root>
                 <Stack flex="1" minW="0" gap="2">
-                  <Heading as="h3" size="sm">
+                  <Heading as="h3" size="sm" pe={canManage ? '8' : '0'}>
                     <Link asChild>
                       <NextLink href={`/profile/${member.userId}`}>
                         {member.fullName}
@@ -101,7 +113,7 @@ export function GroupMembers({
                   ) : null}
                   <Badge alignSelf="start">{t(`roles.${member.role}`)}</Badge>
                   {canManage ? (
-                    <Stack gap="3">
+                    <HubMenu>
                       <HubEditor
                         groupId={groupId}
                         label={t('changeRole')}
@@ -124,12 +136,13 @@ export function GroupMembers({
                         groupId={groupId}
                         label={t('removeMember')}
                         confirm
+                        danger
                         disabled={active && member.userId === leadId}
                         action={() =>
                           groupMembersControllerRemove(groupId, member.userId)
                         }
                       />
-                    </Stack>
+                    </HubMenu>
                   ) : null}
                 </Stack>
               </Stack>

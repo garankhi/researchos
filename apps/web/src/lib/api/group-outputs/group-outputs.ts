@@ -346,7 +346,7 @@ export const useGroupOutputLinksControllerRequest = <
   );
 };
 /**
- * Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.
+ * Only group leaders may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.
  * @summary Accept or reject a pending group content request
  */
 export const groupOutputLinksControllerDecide = (

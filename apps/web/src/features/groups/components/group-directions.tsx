@@ -16,7 +16,14 @@ import {
 import { FormTextField } from '@/components/ui/form';
 import { ErrorState } from '@/components/ui/feedback';
 import type { Direction } from '../types';
-import { HubAction, HubForm, HubList, HubSection } from './hub-controls';
+import {
+  HubAction,
+  HubForm,
+  HubList,
+  HubMenu,
+  HubModal,
+  HubSection,
+} from './hub-controls';
 
 function DirectionEditor({
   groupId,
@@ -26,24 +33,19 @@ function DirectionEditor({
   direction?: Direction;
 }) {
   const t = useTranslations('groups');
-  const [open, setOpen] = useState(false);
   return (
-    <Stack gap="3">
-      <Button
-        alignSelf="start"
-        variant="outline"
-        onClick={() => setOpen(!open)}
-      >
-        {open ? t('cancel') : direction ? t('edit') : t('publishDirection')}
-      </Button>
-      {open ? (
+    <HubModal
+      label={direction ? t('edit') : t('publishDirection')}
+      title={direction ? t('editDirection') : t('publishDirection')}
+    >
+      {(close) => (
         <DirectionForm
           groupId={groupId}
           direction={direction}
-          onSaved={() => setOpen(false)}
+          onSaved={close}
         />
-      ) : null}
-    </Stack>
+      )}
+    </HubModal>
   );
 }
 
@@ -173,9 +175,15 @@ export function GroupDirections({
       <HubList query={query}>
         {(directions) =>
           directions.map((direction) => (
-            <Box key={direction.id} borderWidth="1px" borderRadius="md" p="4">
+            <Box
+              key={direction.id}
+              position="relative"
+              borderWidth="1px"
+              borderRadius="0"
+              p="4"
+            >
               <Stack gap="3">
-                <Heading as="h3" size="md">
+                <Heading as="h3" size="md" pe={canEdit ? '8' : '0'}>
                   {direction.title}
                 </Heading>
                 {direction.topicPath ? (
@@ -189,17 +197,18 @@ export function GroupDirections({
                 ) : null}
                 <Text whiteSpace="pre-wrap">{direction.description}</Text>
                 {canEdit ? (
-                  <>
+                  <HubMenu>
                     <DirectionEditor groupId={groupId} direction={direction} />
                     <HubAction
                       groupId={groupId}
                       label={t('removeDirection')}
                       confirm
+                      danger
                       action={() =>
                         groupDirectionsControllerRemove(groupId, direction.id)
                       }
                     />
-                  </>
+                  </HubMenu>
                 ) : null}
               </Stack>
             </Box>

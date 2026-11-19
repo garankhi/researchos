@@ -2,7 +2,7 @@
 
 import { GroupHubSkeleton } from './group-skeletons';
 
-import { Badge, Container, Heading, Stack, Text } from '@chakra-ui/react';
+import { Badge, Container, Grid, Heading, Stack, Text } from '@chakra-ui/react';
 import { forbidden, notFound, unauthorized } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { RequireAuth } from '@/features/identity';
@@ -11,7 +11,7 @@ import { apiErrorCode, apiStatusCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { ErrorState } from '@/components/ui/feedback';
 import { useGroupHub } from '../hooks/use-group-hub';
-import { HubAction, HubEditor, HubSection } from './hub-controls';
+import { HubAction, HubEditor, HubMenu, HubSection } from './hub-controls';
 import { GroupMembers } from './group-members';
 import { GroupDirections } from './group-directions';
 import { GroupOutputs } from './group-outputs';
@@ -46,11 +46,18 @@ function HubContent({ groupId }: { groupId: string }) {
   const active = group.isActive && !group.archivedAt;
   return (
     <Stack gap="6">
+      <Badge
+        alignSelf="start"
+        colorPalette={permissions.editInfo ? 'blue' : 'gray'}
+      >
+        {t(permissions.editInfo ? 'managementView' : 'readonlyView')}
+      </Badge>
       <HubSection title={t('info')}>
         <Heading
           as="h1"
           size={{ base: '2xl', md: '3xl' }}
           overflowWrap="anywhere"
+          pe="10"
         >
           {group.name}
         </Heading>
@@ -60,7 +67,7 @@ function HubContent({ groupId }: { groupId: string }) {
         </Badge>
         <Text whiteSpace="pre-wrap">{group.description}</Text>
         {permissions.editInfo ? (
-          <>
+          <HubMenu>
             <HubEditor
               groupId={groupId}
               label={t('editGroup')}
@@ -99,40 +106,52 @@ function HubContent({ groupId }: { groupId: string }) {
               groupId={groupId}
               label={t(active ? 'archiveGroup' : 'restoreGroup')}
               confirm
+              danger={active}
               action={() =>
                 groupsControllerUpdate(groupId, { isActive: !active })
               }
             />
-          </>
+          </HubMenu>
         ) : null}
       </HubSection>
-      <GroupMembers
-        groupId={groupId}
-        leadId={group.leadId}
-        active={active}
-        canManage={permissions.manageMembers}
-        query={hub.members}
-      />
-      <GroupDirections
-        groupId={groupId}
-        canPublish={permissions.publishDirections}
-        canEdit={permissions.editDirections}
-        query={hub.directions}
-      />
-      <GroupOutputs
-        groupId={groupId}
-        canManage={permissions.manageOutputs}
-        query={hub.outputs}
-        pendingQuery={hub.pendingOutputs}
-      />
-      <GroupOpportunities
-        groupId={groupId}
-        canManage={permissions.manageOpportunities}
-        query={hub.opportunities}
-      />
-      {permissions.manageOpportunities ? (
-        <GroupApplications groupId={groupId} query={hub.applications} />
-      ) : null}
+      <Grid
+        templateColumns={{
+          base: 'minmax(0, 1fr)',
+          lg: 'minmax(0, 2fr) minmax(300px, 1fr)',
+        }}
+        gap="6"
+        alignItems="start"
+      >
+        <GroupOutputs
+          groupId={groupId}
+          canManage={permissions.manageOutputs}
+          query={hub.outputs}
+          pendingQuery={hub.pendingOutputs}
+        />
+        <Stack gap="6" minW="0">
+          <GroupMembers
+            groupId={groupId}
+            leadId={group.leadId}
+            active={active}
+            canManage={permissions.manageMembers}
+            query={hub.members}
+          />
+          <GroupDirections
+            groupId={groupId}
+            canPublish={permissions.publishDirections}
+            canEdit={permissions.editDirections}
+            query={hub.directions}
+          />
+          <GroupOpportunities
+            groupId={groupId}
+            canManage={permissions.manageOpportunities}
+            query={hub.opportunities}
+          />
+          {permissions.manageOpportunities ? (
+            <GroupApplications groupId={groupId} query={hub.applications} />
+          ) : null}
+        </Stack>
+      </Grid>
     </Stack>
   );
 }

@@ -374,7 +374,7 @@ describe('GroupsController', () => {
       });
     });
 
-    it('throws 403 when a non-leader non-admin attempts to update the group', async () => {
+    it('throws 403 when a non-leader attempts to update the group', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
 
@@ -386,6 +386,52 @@ describe('GroupsController', () => {
         status: HttpStatus.FORBIDDEN,
         code: domainErrorCodes.groups.accessDenied,
       });
+    });
+
+    it('allows an active GROUP_LEADER to edit and archive the group', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
+      prismaMock.group_members.findUnique.mockResolvedValue({
+        role: 'GROUP_LEADER',
+        archived_at: null,
+      });
+      prismaMock.research_groups.update.mockResolvedValue({
+        ...mockGroup,
+        is_active: false,
+      });
+      const controller = await setupController(prismaMock);
+      await controller.update(
+        groupId,
+        { name: 'Updated', isActive: false },
+        memberId,
+      );
+      expect(prismaMock.research_groups.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Updated', is_active: false }),
+        }),
+      );
+    });
+
+    it('denies ordinary/archived members and unrelated admins without writing', async () => {
+      for (const membership of [
+        null,
+        { role: 'MEMBER', archived_at: null },
+        { role: 'GROUP_LEADER', archived_at: new Date() },
+      ]) {
+        const prismaMock = createPrismaMock();
+        prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
+        prismaMock.group_members.findUnique.mockResolvedValue(membership);
+        const access = createAccessServiceMock();
+        access.effectiveRoles.mockResolvedValue({
+          isResearcher: true,
+          isAdmin: true,
+        });
+        const controller = await setupController(prismaMock, access);
+        await expect(
+          controller.update(groupId, { isActive: false }, outsiderId),
+        ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
+        expect(prismaMock.research_groups.update).not.toHaveBeenCalled();
+      }
     });
 
     it('rejects explicit null for non-nullable fields (code, name, leadId, isActive) with 400', async () => {

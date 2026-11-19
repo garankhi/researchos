@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
+import { QueryProvider } from '@/components/providers/query-provider';
+import { SnackbarProvider } from '@/components/providers/snackbar-provider';
+import en from '@/messages/en.json';
+import vi from '@/messages/vi.json';
 import { GroupMembers } from './group-members';
 
 const groupId = '10000000-0000-4000-8000-000000000001';
@@ -30,11 +34,58 @@ const query = {
 const meta = {
   title: 'Groups/Member roster',
   component: GroupMembers,
+  decorators: [
+    (Story) => (
+      <QueryProvider>
+        <SnackbarProvider>
+          <Story />
+        </SnackbarProvider>
+      </QueryProvider>
+    ),
+  ],
   args: { groupId, leadId, active: true, canManage: false, query },
 } satisfies Meta<typeof GroupMembers>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+export const ManagementActions: Story = {
+  args: { canManage: true, leadId: 'another-lead' },
+  play: async ({ canvas, userEvent, globals }) => {
+    const t = (globals.locale === 'en' ? en : vi).groups;
+    const body = within(document.body);
+    await expect(
+      canvas.queryByRole('button', { name: t.changeRole }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: t.actions }));
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: t.changeRole }),
+    );
+    const editor = await body.findByRole('dialog', {
+      name: t.changeRole,
+    });
+    await userEvent.selectOptions(
+      within(editor).getByRole('combobox'),
+      'MEMBER',
+    );
+    await userEvent.click(
+      within(editor).getByRole('button', { name: t.cancel }),
+    );
+    await userEvent.click(canvas.getByRole('button', { name: t.actions }));
+    const items = await body.findAllByRole('menuitem');
+    await expect(items.at(-1)).toHaveTextContent(t.removeMember);
+    await userEvent.click(body.getByRole('menuitem', { name: t.removeMember }));
+    const confirmation = await body.findByRole('alertdialog', {
+      name: t.removeMember,
+    });
+    await userEvent.click(
+      within(confirmation).getByRole('button', { name: t.cancel }),
+    );
+    await expect(
+      canvas.getByRole('link', { name: 'Sample Researcher' }),
+    ).toBeVisible();
+  },
+};
 
 export const ReadonlyRoster: Story = {
   play: async ({ canvas }) => {

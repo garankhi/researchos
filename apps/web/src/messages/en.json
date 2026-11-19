@@ -522,6 +522,9 @@
     }
   },
   "groups": {
+    "actions": "Group actions",
+    "managementView": "Management view",
+    "readonlyView": "Read-only view",
     "info": "Group information",
     "members": "Members",
     "directions": "Research directions",

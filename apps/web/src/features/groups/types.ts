@@ -27,12 +27,13 @@ export function groupPermissions(
     members.some(
       (member) => member.userId === user.id && member.role === 'GROUP_LEADER',
     );
+  const manager = researcher && (lead || leader);
   return {
-    editInfo: user.roles.includes('ADMIN') || (researcher && lead),
-    manageMembers: researcher && (lead || leader),
-    publishDirections: researcher && active && (lead || leader),
-    editDirections: researcher && active && lead,
-    manageOutputs: researcher && active && lead,
-    manageOpportunities: researcher && active && (lead || leader),
+    editInfo: manager,
+    manageMembers: manager,
+    publishDirections: manager && active,
+    editDirections: manager && active,
+    manageOutputs: manager && active,
+    manageOpportunities: manager && active,
   };
 }

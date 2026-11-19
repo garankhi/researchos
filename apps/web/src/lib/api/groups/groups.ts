@@ -488,7 +488,7 @@ export function useGroupsControllerFindOne<
 }
 
 /**
- * Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.
+ * Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Requires researcher access and either designated leadership or an active GROUP_LEADER membership in this group.
  * @summary Update or archive a research group
  */
 export const groupsControllerUpdate = (

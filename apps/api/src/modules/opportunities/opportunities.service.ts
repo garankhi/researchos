@@ -148,7 +148,7 @@ export class OpportunitiesService {
         SELECT group_id AS "groupId", lead_id AS "leadId" FROM research_projects
         WHERE id = ${dto.projectId}::uuid AND archived_at IS NULL
       `;
-      if (!project || project.leadId !== actorId)
+      if (!project || (!dto.groupId && project.leadId !== actorId))
         throw new CodedHttpException(
           domainErrorCodes.opportunities.accessDenied,
           HttpStatus.FORBIDDEN,

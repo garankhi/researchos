@@ -79,6 +79,14 @@ const browser = await chromium.launch({
     : {}),
 });
 const results = [];
+async function menuAction(page, heading, action, last = false) {
+  const headings = page.getByRole('heading', { name: heading, exact: true });
+  const card = (last ? headings.last() : headings.first()).locator('..');
+  await card
+    .getByRole('button', { name: 'Group actions', exact: true })
+    .click();
+  await page.getByRole('menuitem', { name: action, exact: true }).click();
+}
 try {
   async function scenario(
     role,
@@ -114,7 +122,12 @@ try {
       code: 'RG',
       name: 'Research Group Hub',
       leadId,
-      callerMembershipRole: role === 'leader' ? 'GROUP_LEADER' : undefined,
+      callerMembershipRole:
+        role === 'leader'
+          ? 'GROUP_LEADER'
+          : role === 'member'
+            ? 'MEMBER'
+            : undefined,
       description: 'Group research description',
       isActive: !archived,
       archivedAt: archived ? now : null,
@@ -125,7 +138,8 @@ try {
       id: opportunityId,
       groupId,
       projectId: projectRestricted ? id(20) : null,
-      canManage: role !== 'outsider' && !projectRestricted,
+      // Even a stale/permissive per-record flag must not expose actions in a readonly hub.
+      canManage: !projectRestricted,
       creatorId: leadId,
       title: 'Research collaboration',
       opportunityKind: 'RESEARCH_COLLABORATION',
@@ -162,7 +176,9 @@ try {
       ? []
       : [
           link(outputId, oldRevision, 'ACCEPTED'),
-          ...(role === 'lead' ? [link(pendingId, newRevision, 'PENDING')] : []),
+          ...(['lead', 'leader'].includes(role)
+            ? [link(pendingId, newRevision, 'PENDING')]
+            : []),
         ];
     let fail = failMembers;
     const members = [
@@ -229,7 +245,7 @@ try {
           id:
             role === 'lead'
               ? leadId
-              : role === 'leader'
+              : ['leader', 'member'].includes(role)
                 ? memberId
                 : outsiderId,
           fullName: 'Test Researcher',
@@ -238,7 +254,7 @@ try {
           departmentUnit: 'Computing',
           academicTitle: null,
           academicDegree: null,
-          roles: ['RESEARCHER'],
+          roles: role === 'admin' ? ['RESEARCHER', 'ADMIN'] : ['RESEARCHER'],
           onboardingCompleted: true,
           profileConfirmed: true,
           mustChangePassword: false,
@@ -410,7 +426,9 @@ try {
         ),
       });
     });
-    await page.goto(`http://localhost:3100/${locale}/groups/${groupId}`);
+    await page.goto(
+      `${process.env.RES159_WEB_ORIGIN ?? 'http://localhost:3100'}/${locale}/groups/${groupId}`,
+    );
     if (slow) {
       await page.getByTestId('loading-skeleton').first().waitFor();
       results.push('loading skeleton');
@@ -468,13 +486,44 @@ try {
     'readonly access, open filter, no inbound request, pinned revision',
   );
 
+  for (const role of ['member', 'admin']) {
+    const viewer = await scenario(role);
+    await viewer.page.getByText('Read-only view', { exact: true }).waitFor();
+    assert.equal(
+      await viewer.page
+        .getByRole('button', { name: 'Group actions', exact: true })
+        .count(),
+      0,
+    );
+    assert.equal(
+      await viewer.page
+        .getByRole('button', { name: 'Create opportunity', exact: true })
+        .count(),
+      0,
+    );
+    assert.equal(
+      viewer.requests.some(
+        (request) =>
+          request.path.endsWith('/applications') ||
+          request.search.includes('status=PENDING'),
+      ),
+      false,
+    );
+    assert.equal(viewer.writes.length, 0);
+    await viewer.context.close();
+  }
+  results.push(
+    'ordinary members and unrelated admins remain readonly despite per-posting flags',
+  );
+
   const lead = await scenario('lead');
   await lead.page
     .getByRole('heading', { name: 'Pending requested title' })
     .waitFor();
+  await menuAction(lead.page, 'Research Group Hub', 'Edit group information');
   await lead.page
-    .getByRole('button', { name: 'Edit group information', exact: true })
-    .click();
+    .getByRole('dialog', { name: 'Edit group information', exact: true })
+    .waitFor();
   await lead.page
     .getByRole('textbox', { name: 'Group name', exact: true })
     .fill('');
@@ -490,19 +539,23 @@ try {
   await lead.page
     .getByRole('heading', { name: 'Updated Research Group', exact: true })
     .waitFor();
-  await lead.page.getByRole('button', { name: 'Accept', exact: true }).click();
+  await menuAction(lead.page, 'Pending requested title', 'Accept');
+  await menuAction(
+    lead.page,
+    'Research collaboration',
+    'Open for applications',
+  );
+  await menuAction(lead.page, 'Research collaboration', 'Mark as filled');
   await lead.page
-    .getByRole('button', { name: 'Accept', exact: true })
-    .waitFor({ state: 'detached' });
-  await lead.page
-    .getByRole('button', { name: 'Open for applications', exact: true })
-    .click();
-  await lead.page
-    .getByRole('button', { name: 'Mark as filled', exact: true })
+    .getByRole('alertdialog', { name: 'Mark as filled', exact: true })
     .waitFor();
-  await lead.page
-    .getByRole('button', { name: 'Respond to application', exact: true })
-    .click();
+  await lead.page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await menuAction(
+    lead.page,
+    'Research collaboration',
+    'Respond to application',
+    true,
+  );
   await lead.page
     .getByRole('combobox', { name: 'Decision', exact: true })
     .selectOption('DECLINED');
@@ -521,11 +574,11 @@ try {
     ),
   );
   await lead.page
-    .getByRole('combobox', { name: 'Research output', exact: true })
-    .selectOption(id(14));
-  await lead.page
     .getByRole('button', { name: 'Request an output link', exact: true })
     .click();
+  await lead.page
+    .getByRole('combobox', { name: 'Research output', exact: true })
+    .selectOption(id(14));
   await lead.page
     .getByRole('combobox', { name: 'Choose a released revision', exact: true })
     .selectOption(id(15));
@@ -542,28 +595,24 @@ try {
         request.data.revisionId === id(15),
     ),
   );
+  await menuAction(lead.page, 'Research Member', 'Archive membership');
   await lead.page
-    .getByRole('button', { name: 'Archive membership', exact: true })
-    .last()
-    .click();
+    .getByRole('alertdialog', { name: 'Archive membership', exact: true })
+    .waitFor();
   await lead.page
     .getByRole('button', { name: 'Confirm: Archive membership', exact: true })
     .click();
   await lead.page
     .getByText('Research Member', { exact: true })
     .waitFor({ state: 'detached' });
-  await lead.page
-    .getByRole('button', { name: 'Archive direction', exact: true })
-    .click();
+  await menuAction(lead.page, 'Responsible AI', 'Archive direction');
   await lead.page
     .getByRole('button', { name: 'Confirm: Archive direction', exact: true })
     .click();
   await lead.page
     .getByRole('heading', { name: 'Responsible AI', exact: true })
     .waitFor({ state: 'detached' });
-  await lead.page
-    .getByRole('button', { name: 'Archive group', exact: true })
-    .click();
+  await menuAction(lead.page, 'Updated Research Group', 'Archive group');
   assert.equal(
     lead.writes.some((request) => request.data?.isActive === false),
     false,
@@ -587,14 +636,22 @@ try {
     await leader.page
       .getByRole('button', { name: 'Request an output link', exact: true })
       .count(),
-    0,
+    1,
   );
-  assert.equal(
-    await leader.page
-      .getByRole('button', { name: 'Edit group information', exact: true })
-      .count(),
-    0,
-  );
+  await menuAction(leader.page, 'Research Group Hub', 'Edit group information');
+  await leader.page
+    .getByRole('dialog', { name: 'Edit group information', exact: true })
+    .waitFor();
+  await leader.page
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
+  await menuAction(leader.page, 'Pending requested title', 'Reject');
+  await leader.page
+    .getByRole('alertdialog', { name: 'Reject', exact: true })
+    .waitFor();
+  await leader.page
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
   await leader.page
     .getByRole('button', { name: 'Publish direction', exact: true })
     .click();
@@ -704,9 +761,13 @@ try {
   results.push('section error and retry recovery');
 
   const archived = await scenario('lead', { archived: true });
+  await menuAction(archived.page, 'Research Group Hub', 'Restore group');
   await archived.page
-    .getByRole('button', { name: 'Restore group', exact: true })
+    .getByRole('alertdialog', { name: 'Restore group', exact: true })
     .waitFor();
+  await archived.page
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
   assert.equal(
     await archived.page
       .getByRole('button', { name: 'Create opportunity', exact: true })

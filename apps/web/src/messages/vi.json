@@ -528,6 +528,9 @@
     }
   },
   "groups": {
+    "actions": "Thao tác nhóm",
+    "managementView": "Chế độ quản lý",
+    "readonlyView": "Chế độ chỉ xem",
     "info": "Thông tin nhóm",
     "members": "Thành viên",
     "directions": "Định hướng nghiên cứu",

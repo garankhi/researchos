@@ -1,4 +1,4 @@
-import { Box, Stack } from '@chakra-ui/react';
+import { Box, Grid, Stack } from '@chakra-ui/react';
 import type { SkeletonResult } from 'boneyard-js';
 import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 
@@ -84,7 +84,16 @@ export function GroupHubSkeleton() {
       <Box borderWidth="1px" p={{ base: '4', md: '6' }}>
         <DelayedSkeleton layout={header} />
       </Box>
-      <GroupListSkeleton announce={false} />
+      <Grid
+        templateColumns={{
+          base: 'minmax(0, 1fr)',
+          lg: 'minmax(0, 2fr) minmax(300px, 1fr)',
+        }}
+        gap="6"
+      >
+        <GroupListSkeleton announce={false} />
+        <GroupListSkeleton announce={false} />
+      </Grid>
     </Stack>
   );
 }

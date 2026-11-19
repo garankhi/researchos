@@ -177,6 +177,16 @@ describe('OpportunitiesService', () => {
     expect(tx.research_opportunities.create).toHaveBeenCalled();
   });
 
+  it('allows group leaders to create postings for an active project in their own group', async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([{ leadId: 'another-project-lead', groupId: id }]);
+    await expect(
+      service.create(actor, { ...draft, groupId: id, projectId: id }),
+    ).resolves.toMatchObject({ id });
+  });
+
   it('still rejects a project scoped to a genuinely different group', async () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ allowed: true }])

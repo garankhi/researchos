@@ -80,7 +80,8 @@ export class GroupDirectionsController {
   @Post()
   @Roles('RESEARCHER')
   @ApiOperation({
-    summary: 'Publish a direction as the group lead or a core member',
+    summary:
+      'Publish a direction as the designated lead or an active GROUP_LEADER',
   })
   @ApiCreatedResponse({
     description: 'Direction published immediately.',
@@ -101,7 +102,7 @@ export class GroupDirectionsController {
     format: 'uuid',
     description: 'Direction belonging to this group.',
   })
-  @ApiOperation({ summary: 'Edit a direction as the group lead' })
+  @ApiOperation({ summary: 'Edit a direction as a group leader' })
   @ApiOkResponse({
     description: 'Direction updated.',
     type: GroupDirectionResponseDto,
@@ -125,7 +126,7 @@ export class GroupDirectionsController {
   })
   @ApiOperation({
     summary:
-      'Archive a direction as the group lead, retaining the row and project references',
+      'Archive a direction as a group leader, retaining the row and project references',
   })
   @ApiNoContentResponse({
     description:

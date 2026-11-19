@@ -219,8 +219,7 @@ export class GroupsService {
    * Updates research group attributes or archives/restores the group.
    *
    * - Throws `404 group_not_found` when the group does not exist.
-   * - Throws `403 Forbidden` when the caller is neither the group lead (with active
-   *   `RESEARCHER` access) nor an `ADMIN`.
+   * - Requires active researcher access and leadership of this group.
    * - Setting `isActive: false` archives the group (`is_active = false`, `archived_at = now`).
    * - Setting `isActive: true` restores the group (`is_active = true`, `archived_at = null`).
    */
@@ -241,9 +240,13 @@ export class GroupsService {
     }
 
     const callerAccess = await this.accessService.effectiveRoles(callerId);
+    const membership = await this.prisma.group_members.findUnique({
+      where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
+    });
     const canManage =
-      callerAccess.isAdmin ||
-      (callerAccess.isResearcher && existing.lead_id === callerId);
+      callerAccess.isResearcher &&
+      (existing.lead_id === callerId.toLowerCase() ||
+        (membership?.role === 'GROUP_LEADER' && !membership.archived_at));
 
     if (!canManage) {
       throw new CodedHttpException(

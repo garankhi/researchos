@@ -154,7 +154,7 @@ describe('Group directions HTTP contract', () => {
     });
   });
 
-  it('allows group leaders to publish, but forbids their edit/delete operations', async () => {
+  it('allows delegated group leaders to publish, edit and archive directions', async () => {
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,
       lead_id: otherId,
@@ -171,11 +171,11 @@ describe('Group directions HTTP contract', () => {
       .patch(`${base}/${directionId}`)
       .set('Cookie', cookie)
       .send({ title: 'Changed' })
-      .expect(403);
+      .expect(200);
     await request()
       .delete(`${base}/${directionId}`)
       .set('Cookie', cookie)
-      .expect(403);
+      .expect(204);
   });
 
   it('forbids publishing by plain members, outsiders and unrelated admins', async () => {
@@ -183,15 +183,29 @@ describe('Group directions HTTP contract', () => {
       ...group,
       lead_id: otherId,
     });
-    for (const member of [null, { role: GroupMemberRole.MEMBER }]) {
+    for (const member of [
+      null,
+      { role: GroupMemberRole.MEMBER },
+      { role: GroupMemberRole.GROUP_LEADER, archived_at: new Date() },
+    ]) {
       tx.group_members.findUnique.mockResolvedValue(member);
       await request()
         .post(base)
         .set('Cookie', cookie)
         .send({ title: 'Attempt' })
         .expect(403);
+      await request()
+        .patch(`${base}/${directionId}`)
+        .set('Cookie', cookie)
+        .send({ title: 'Attempt' })
+        .expect(403);
+      await request()
+        .delete(`${base}/${directionId}`)
+        .set('Cookie', cookie)
+        .expect(403);
     }
     expect(tx.group_directions.create).not.toHaveBeenCalled();
+    expect(tx.group_directions.update).not.toHaveBeenCalled();
   });
 
   it('returns full field/subfield/topic paths and pagination to authenticated readers', async () => {

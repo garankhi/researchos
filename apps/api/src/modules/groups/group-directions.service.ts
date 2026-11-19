@@ -54,13 +54,7 @@ export class GroupDirectionsService {
       if (!lead && !activeMember) throw new ForbiddenException();
       return;
     }
-    if (
-      !lead &&
-      !(
-        action === 'publish' &&
-        activeMember?.role === GroupMemberRole.GROUP_LEADER
-      )
-    )
+    if (!lead && activeMember?.role !== GroupMemberRole.GROUP_LEADER)
       throw new ForbiddenException();
     if (!active)
       throw new ConflictException(

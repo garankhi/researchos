@@ -255,8 +255,8 @@ describe('Group output links HTTP contract', () => {
     });
   });
 
-  it('requests a pending link for a member who does not own the work', async () => {
-    mockPolicy({ can_manage_group: false, can_manage_output: false });
+  it('requests a pending link for a group leader who does not own the work', async () => {
+    mockPolicy({ can_manage_output: false });
     const response = await request()
       .post(base)
       .set('Cookie', cookie)
@@ -312,8 +312,8 @@ describe('Group output links HTTP contract', () => {
       .expect(404);
   });
 
-  it('refuses a request from a caller who is not a member or cannot see the work', async () => {
-    mockPolicy({ is_member: false });
+  it('refuses output requests by ordinary members or callers who cannot see the work', async () => {
+    mockPolicy({ can_manage_group: false });
     await request()
       .post(base)
       .set('Cookie', cookie)
@@ -330,7 +330,7 @@ describe('Group output links HTTP contract', () => {
 
   it('preserves the accepted pin when a new revision is requested', async () => {
     tx.group_output_links.findUnique.mockResolvedValue(acceptedLink);
-    mockPolicy({ can_manage_group: false, can_manage_output: false });
+    mockPolicy({ can_manage_output: false });
     await request()
       .post(base)
       .set('Cookie', cookie)

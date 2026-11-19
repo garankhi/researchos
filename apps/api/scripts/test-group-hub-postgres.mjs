@@ -60,7 +60,7 @@ try {
   for (const entry of (await readdir(migrations, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name === upgrade) continue;
+    if (entry.name >= upgrade) continue;
     await db.query(
       await readFile(
         new URL(`${entry.name}/migration.sql`, migrations),
@@ -102,6 +102,15 @@ try {
   await db.query(
     await readFile(new URL(`${upgrade}/migration.sql`, migrations), 'utf8'),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        '20261118120000_group_leader_management/migration.sql',
+        migrations,
+      ),
+      'utf8',
+    ),
+  );
   const policy = async (actor, opportunity) =>
     (
       await db.query('SELECT can_manage_opportunity($1,$2) AS allowed', [
@@ -131,11 +140,12 @@ try {
     },
   );
   await check(
-    'project scope requires the project lead, without creator or group-manager bypass',
+    'group-linked projects follow group leadership rather than creator or project lead identity',
     async () => {
-      for (const actor of ['lead', 'creator', 'delegated'])
+      for (const actor of ['lead', 'delegated'])
+        assert.equal(await policy(ids[actor], ids.projectOpportunity), true);
+      for (const actor of ['creator', 'projectLead'])
         assert.equal(await policy(ids[actor], ids.projectOpportunity), false);
-      assert.equal(await policy(ids.projectLead, ids.projectOpportunity), true);
     },
   );
   await check('group scope grants only its active managers', async () => {
@@ -160,6 +170,15 @@ try {
         false,
       );
       assert.equal(await policy(ids.delegated, ids.groupOpportunity), false);
+      assert.equal(
+        (
+          await db.query('SELECT can_manage_group($1,$2) AS allowed', [
+            ids.delegated,
+            ids.group,
+          ])
+        ).rows[0].allowed,
+        false,
+      );
       assert.equal(
         (await db.query('SELECT count(*)::int AS count FROM group_members'))
           .rows[0].count,

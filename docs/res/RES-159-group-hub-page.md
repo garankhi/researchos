@@ -6,6 +6,8 @@ Branch: `RES-159-groups-group-hub-page-info-members-directions-outputs-opportuni
 
 Implemented: 2026-11-15
 
+Updated for [PR #43 review](https://github.com/garankhi/researchos/pull/43#issuecomment-6943230107): 2026-11-18.
+
 ## Confirmed requirements
 
 - The localized `/[locale]/groups/[groupId]` route requires login. Students must
@@ -23,17 +25,24 @@ Implemented: 2026-11-15
 
 | Section | Readonly view | Management |
 | --- | --- | --- |
-| Information | Name, code, description, active/archive state | Lead/admin edits, archive and restore |
+| Information | Name, code, description, active/archive state | Designated lead or active `GROUP_LEADER` edits, archives and restores |
 | Members | Active enriched roster, profile links, avatar initials | Lead or active `GROUP_LEADER` adds, archives, changes roles |
-| Directions | Active directions with field/subfield/topic path | Lead or active `GROUP_LEADER` publishes with topic picker; designated lead edits/archives |
-| Outputs | Accepted links, hydrated at the accepted revision | Designated lead requests links, selects released revisions, accepts/rejects pending requests, removes accepted links |
+| Directions | Active directions with field/subfield/topic path | Lead or active `GROUP_LEADER` publishes, edits and archives with topic picker |
+| Outputs | Accepted links, hydrated at the accepted revision | Lead or active `GROUP_LEADER` requests links, selects released revisions, accepts/rejects pending requests, removes accepted links |
 | Opportunities | Open postings | Group managers create group postings; individual posting controls follow the server's permission flag |
 | Applications | Hidden | Eligible group managers see manageable inbound applications and invite to discuss or decline, with a response note |
 
-All content management requires effective `RESEARCHER` access. Group-info editing
-also supports admins according to the existing API. The designated group lead is
-`research_groups.lead_id`; delegated `GROUP_LEADER` membership does not grant
-designated-lead direction editing or output curation.
+All management requires effective `RESEARCHER` access and either designated
+leadership (`research_groups.lead_id`) or an unarchived `GROUP_LEADER` membership
+in this group. Every such leader has full hub management access, as confirmed
+for the PR review. Ordinary members and unrelated admins remain readonly in both
+the UI and API. Per-opportunity `canManage` never overrides a readonly hub.
+
+The header identifies the readonly/management view. At desktop widths, outputs
+occupy the wider left column and the other sections stack in a narrower right
+column; mobile uses a single column. Card actions live in top-right ellipsis
+menus, with destructive archive/removal entries last and red. All forms and
+confirmation prompts use accessible modal dialogs rather than inline panels.
 
 The shell, feature types, hooks, section components and forms live under
 `apps/web/src/features/groups/`. Its `index.ts` is the public import surface.
@@ -89,16 +98,21 @@ deleted and no seed was run. Other environments still require their own deploy.
 
 ## Opportunity authorization
 
-The previous shared database function permitted a creator/group manager to manage
-a project-scoped opportunity without leading the project. The migration now
-defines scope-specific authority:
+The review follow-up adds the function-only migration
+`20261118120000_group_leader_management`. It changes no tables or records and
+does not rewrite the original soft-delete migration. Deploy it before using the
+expanded leadership controls. It has been verified in disposable databases;
+the application database has not been migrated during this review fix.
+
+The shared authorization functions now define scope-specific authority:
 
 - Personal opportunity: its creator.
 - Group-only opportunity: the active group's lead or an unarchived
   `GROUP_LEADER` member.
-- Project-scoped opportunity: the active project's lead, with matching group
-  scope and an active group when group-scoped. Creator/group-manager shortcuts
-  do not bypass project leadership.
+- Project linked to a group: the active group's designated lead or unarchived
+  `GROUP_LEADER`, with a matching active project. Project-lead/creator identity
+  alone does not grant group management.
+- Independent project: the active project's lead.
 
 The shared function controls API writes, visibility and application response
 authorization. Creation continues to check the supplied group and project scope.
@@ -127,9 +141,12 @@ the latest release for a missing pin. Output visibility remains enforced by the
 output API. N+1 hydration is retained as allowed for the MVP.
 
 The link form now offers visible shared works, including works owned by other
-researchers, and lets the lead select a released revision. Own-work requests can
+researchers, and lets a group leader select a released revision. Own-work requests can
 be auto-accepted; other eligible work requests become `PENDING`. There is no native
 output editor or external ingestion in this feature.
+
+Ordinary members cannot request output links through the API; both requesting
+and reviewing links require group leadership, matching the readonly hub.
 
 Hub collections and the output picker initially fetch 20 records, then fetch more
 only on request. `callerMembershipRole` in group-detail responses determines
@@ -156,7 +173,24 @@ output/revision alias files and eight existing source/test files. There are no
 tracked-file deletions. The one additive soft-delete migration is unchanged;
 no additional schema migration was introduced during scope reduction.
 
-## Verification
+## PR review verification (2026-11-18)
+
+- Full workspace production build and all 13 test tasks passed, including 594
+  API tests and 117 web tests. Follow-up assertions for direction access and
+  group/project opportunity creation also passed (45 targeted API tests).
+- Code generation, workspace lint and API/web formatting checks passed.
+  Existing API lint warnings remain; no lint rules were disabled.
+- Storybook built successfully; all 36 tests across 15 files passed using
+  installed Chrome, including menu-to-modal role editing and archive cancellation.
+- All 11 production-browser scenarios passed, including ordinary-member/admin
+  readonly views, delegated leadership, modal forms/confirmations, pinned outputs,
+  pagination, error recovery and Vietnamese mobile/dark layouts.
+- All six real PostgreSQL integration checks passed. Schema drift reported no
+  drift; all five SQL smoke suites passed against both source and migration-chain
+  builds. Checks used a disposable PostgreSQL container on port 35432 because
+  Windows reserved port 55432. No application migrations or records were changed.
+
+## Initial verification (2026-11-15)
 
 Passed on the final validation run:
 

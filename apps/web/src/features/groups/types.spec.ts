@@ -42,26 +42,26 @@ describe('group hub management visibility', () => {
     ).toBe(true);
   });
 
-  it('allows GROUP_LEADER members only the operations their endpoints permit', () => {
+  it('gives every GROUP_LEADER full management access', () => {
     expect(
       groupPermissions(group, { id: 'leader', roles: ['RESEARCHER'] }, [
         member,
       ]),
     ).toEqual({
-      editInfo: false,
+      editInfo: true,
       manageMembers: true,
       publishDirections: true,
-      editDirections: false,
-      manageOutputs: false,
+      editDirections: true,
+      manageOutputs: true,
       manageOpportunities: true,
     });
   });
 
-  it('allows admins to edit group info without granting content management', () => {
+  it('keeps unrelated admins readonly', () => {
     expect(
       groupPermissions(group, { id: 'admin', roles: ['ADMIN'] }, []),
     ).toEqual({
-      editInfo: true,
+      editInfo: false,
       manageMembers: false,
       publishDirections: false,
       editDirections: false,

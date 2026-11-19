@@ -178,7 +178,7 @@ export class GroupOutputLinksService {
           domainErrorCodes.groups.outputLinkInvalid,
           HttpStatus.BAD_REQUEST,
         );
-      if (!policy.isResearcher || !policy.isMember || !policy.canView)
+      if (!policy.isResearcher || !policy.canManageGroup || !policy.canView)
         throw new CodedHttpException(
           domainErrorCodes.groups.accessDenied,
           HttpStatus.FORBIDDEN,
@@ -276,7 +276,7 @@ export class GroupOutputLinksService {
   /**
    * Accepts or rejects a pending link request.
    *
-   * Only the group lead may decide, and only a pending request can be
+   * Only group leaders may decide, and only a pending request can be
    * decided. Accepting pins the requested revision; rejecting preserves the
    * revision the group already shows.
    */

@@ -242,7 +242,7 @@ export function useGroupDirectionsControllerList<
 }
 
 /**
- * @summary Publish a direction as the group lead or a core member
+ * @summary Publish a direction as the designated lead or an active GROUP_LEADER
  */
 export const groupDirectionsControllerCreate = (
   groupId: string,
@@ -315,7 +315,7 @@ export type GroupDirectionsControllerCreateMutationVariables = {
 };
 
 /**
- * @summary Publish a direction as the group lead or a core member
+ * @summary Publish a direction as the designated lead or an active GROUP_LEADER
  */
 export const useGroupDirectionsControllerCreate = <
   TError = ApiErrorResponseDto,
@@ -343,7 +343,7 @@ export const useGroupDirectionsControllerCreate = <
   );
 };
 /**
- * @summary Edit a direction as the group lead
+ * @summary Edit a direction as a group leader
  */
 export const groupDirectionsControllerUpdate = (
   groupId: string,
@@ -423,7 +423,7 @@ export type GroupDirectionsControllerUpdateMutationVariables = {
 };
 
 /**
- * @summary Edit a direction as the group lead
+ * @summary Edit a direction as a group leader
  */
 export const useGroupDirectionsControllerUpdate = <
   TError = ApiErrorResponseDto,
@@ -451,7 +451,7 @@ export const useGroupDirectionsControllerUpdate = <
   );
 };
 /**
- * @summary Archive a direction as the group lead, retaining the row and project references
+ * @summary Archive a direction as a group leader, retaining the row and project references
  */
 export const groupDirectionsControllerRemove = (
   groupId: string,
@@ -525,7 +525,7 @@ export type GroupDirectionsControllerRemoveMutationVariables = {
 };
 
 /**
- * @summary Archive a direction as the group lead, retaining the row and project references
+ * @summary Archive a direction as a group leader, retaining the row and project references
  */
 export const useGroupDirectionsControllerRemove = <
   TError = ApiErrorResponseDto,
