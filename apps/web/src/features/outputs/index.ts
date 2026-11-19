@@ -15,6 +15,13 @@ export { OutputHeader } from './components/output-header';
 export { OutputAbstract } from './components/output-abstract';
 export { OutputReferences } from './components/output-references';
 export {
+  OutputCard,
+  toOutputCardData,
+  type OutputCardData,
+  type OutputCardAuthor,
+  type OutputCardTopic,
+} from './components/output-card';
+export {
   OutputDownloadPrimaryButton,
   OutputFiles,
   OutputFollowButton,

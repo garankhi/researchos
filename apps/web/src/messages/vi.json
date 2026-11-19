@@ -443,6 +443,26 @@
         "DATASET": "Bộ dữ liệu",
         "DISSERTATION": "Luận án"
       }
+    },
+    "card": {
+      "draftBadge": "Bản nháp",
+      "viewPublication": "Xem nguồn",
+      "viewDetails": "Chi tiết đầy đủ",
+      "share": "Chia sẻ",
+      "linkCopied": "Đã sao chép liên kết bài báo.",
+      "copyError": "Không thể sao chép liên kết.",
+      "visibilityPublic": "Cộng đồng FPTU",
+      "visibilityGroupOnly": "Chỉ nhóm liên quan",
+      "types": {
+        "PAPER": "Bài báo",
+        "PREPRINT": "Bản thảo trước xuất bản",
+        "REVIEW": "Tổng quan",
+        "EDITORIAL": "Biên tập",
+        "BOOK_CHAPTER": "Chương sách",
+        "BOOK": "Sách",
+        "DATASET": "Bộ dữ liệu",
+        "DISSERTATION": "Luận án"
+      }
     }
   },
   "errors": {
@@ -831,6 +851,16 @@
     "responseDue": "Hạn phản hồi: {date}",
     "active": "Đang hoạt động",
     "archived": "Đã lưu trữ",
+    "leaderBadge": "Trưởng nhóm",
+    "memberCount": "{count} thành viên",
+    "statsTitle": "Tổng quan",
+    "statsMembers": "Thành viên",
+    "statsDirections": "Định hướng",
+    "statsOpportunities": "Cơ hội đang mở",
+    "leadTitle": "Trưởng nhóm",
+    "archivedNotice": "Nhóm này đã được lưu trữ. Nội dung chỉ đọc.",
+    "readonlyNotice": "Bạn đang xem nhóm này với tư cách thành viên.",
+    "viewAll": "Xem tất cả",
     "editGroup": "Chỉnh sửa thông tin nhóm",
     "name": "Tên nhóm",
     "code": "Mã nhóm",

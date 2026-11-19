@@ -11,6 +11,7 @@ import {
   Box,
   Button,
   Dialog,
+  Flex,
   Heading,
   IconButton,
   Menu,
@@ -46,12 +47,30 @@ const MenuContext = createContext<{
   container: HTMLDivElement | null;
 } | null>(null);
 
-export function HubMenu({ children }: { children: ReactNode }) {
+/**
+ * The per-row action menu.
+ *
+ * `positioned` keeps the trigger pinned to the top-right of a card, the
+ * way the old hub layout placed it. The default places the trigger inline
+ * so it can sit in a heading row next to a title.
+ */
+export function HubMenu({
+  children,
+  positioned = false,
+}: {
+  children: ReactNode;
+  positioned?: boolean;
+}) {
   const t = useTranslations('groups');
   const [open, setOpen] = useState(false);
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   return (
-    <Box position="absolute" top="3" right="3">
+    <Box
+      position={positioned ? 'absolute' : 'relative'}
+      top={positioned ? '3' : undefined}
+      right={positioned ? '3' : undefined}
+      flexShrink={0}
+    >
       <Menu.Root
         open={open}
         onOpenChange={(details) => setOpen(details.open)}
@@ -430,7 +449,9 @@ export function HubList<T>({
       {!query.data?.length ? (
         <EmptyState title={t('empty')} />
       ) : (
-        children(query.data)
+        // The rows carry their own bottom border, so they stack tightly
+        // and the rule reads as a separator rather than a gap.
+        <Stack gap="4">{children(query.data)}</Stack>
       )}
       {query.hasNextPage ? (
         <Button
@@ -447,24 +468,34 @@ export function HubList<T>({
 
 export function HubSection({
   title,
+  action,
   children,
 }: {
   title: string;
+  /** Rendered on the right of the section heading. */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Box
-      as="section"
-      position="relative"
-      bg="bg.panel"
-      borderWidth="1px"
-      borderRadius="0"
-      p={{ base: '4', md: '6' }}
-    >
-      <Heading as="h2" size="lg" mb="5" pe="10">
-        {title}
-      </Heading>
-      <Stack gap="4">{children}</Stack>
+    <Box as="section" bg="bg.panel" boxShadow="xs">
+      <Flex
+        px={{ base: '4', md: '6' }}
+        py="4"
+        borderBottomWidth="1px"
+        borderColor="border"
+        align="center"
+        justify="space-between"
+        gap="3"
+        flexWrap="wrap"
+      >
+        <Heading as="h2" size="md" fontWeight="bold">
+          {title}
+        </Heading>
+        {action}
+      </Flex>
+      <Box p={{ base: '4', md: '6' }}>
+        <Stack gap="4">{children}</Stack>
+      </Box>
     </Box>
   );
 }

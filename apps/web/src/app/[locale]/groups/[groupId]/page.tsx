@@ -17,7 +17,7 @@ export default function GroupPage(props: {
   return (
     <Suspense
       fallback={
-        <Container maxW="6xl" py="8">
+        <Container maxW="64rem" px={{ base: '4', md: '6' }} py={{ base: '4', md: '8' }}>
           <GroupHubSkeleton />
         </Container>
       }

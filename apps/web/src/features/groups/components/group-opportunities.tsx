@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Box, Heading, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   opportunitiesControllerCreate,
@@ -136,38 +136,58 @@ export function GroupOpportunities({
   const t = useTranslations('groups');
   const locale = useLocale();
   return (
-    <HubSection title={t('opportunities')}>
-      {canManage ? <OpportunityEditor groupId={groupId} /> : null}
+    <HubSection
+      title={t('opportunities')}
+      action={
+        canManage ? <OpportunityEditor groupId={groupId} /> : null
+      }
+    >
       <HubList query={query}>
         {(items) =>
-          items.map((opportunity) => (
+          items.map((opportunity, index) => (
             <Box
               key={opportunity.id}
               position="relative"
-              borderWidth="1px"
-              borderRadius="0"
-              p="4"
+              borderBottomWidth={
+                index < items.length - 1 ? '1px' : '0'
+              }
+              borderColor="border"
+              pb={index < items.length - 1 ? '4' : '0'}
             >
               <Stack gap="3">
                 <Heading as="h3" size="md" pe={canManage ? '8' : '0'}>
                   {opportunity.title}
                 </Heading>
-                <Badge alignSelf="start">
-                  {t(`statuses.${opportunity.status}`)}
-                </Badge>
-                <Text color="fg.muted">
-                  {t(`kinds.${opportunity.opportunityKind}`)} ·{' '}
-                  {t(`audiences.${opportunity.targetAudience}`)}
-                </Text>
-                <Text whiteSpace="pre-wrap">{opportunity.description}</Text>
+                <Flex gap="2" align="center" flexWrap="wrap">
+                  <Badge
+                    variant="subtle"
+                    colorPalette={
+                      opportunity.status === 'OPEN'
+                        ? 'green'
+                        : opportunity.status === 'FILLED'
+                          ? 'blue'
+                          : 'gray'
+                    }
+                  >
+                    {t(`statuses.${opportunity.status}`)}
+                  </Badge>
+                  <Text textStyle="sm" color="fg.muted">
+                    {t(`kinds.${opportunity.opportunityKind}`)} ·{' '}
+                    {t(`audiences.${opportunity.targetAudience}`)}
+                  </Text>
+                </Flex>
+                {opportunity.description ? (
+                  <Text textStyle="sm" color="fg.muted" lineClamp={3}>
+                    {opportunity.description}
+                  </Text>
+                ) : null}
                 {opportunity.expectedRole ? (
-                  <Text>
+                  <Text textStyle="sm" color="fg.muted">
                     {t('expectedRole')}: {opportunity.expectedRole}
                   </Text>
                 ) : null}
-                <Text>{opportunity.requiredExpertiseTags.join(' · ')}</Text>
                 {opportunity.applicationDeadline ? (
-                  <Text>
+                  <Text textStyle="sm" color="fg.muted">
                     {t('deadline', {
                       date: new Date(
                         opportunity.applicationDeadline,
@@ -178,7 +198,7 @@ export function GroupOpportunities({
                 {canManage &&
                 opportunity.canManage === true &&
                 !opportunity.archivedAt ? (
-                  <HubMenu>
+                  <HubMenu positioned>
                     <OpportunityEditor
                       groupId={groupId}
                       opportunity={opportunity}

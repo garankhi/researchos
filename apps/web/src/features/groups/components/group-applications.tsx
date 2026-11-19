@@ -20,30 +20,45 @@ export function GroupApplications({
     <HubSection title={t('applications')}>
       <HubList query={query}>
         {(items) =>
-          items.map((application) => (
+          items.map((application, index) => (
             <Box
               key={application.id}
               position="relative"
-              borderWidth="1px"
-              borderRadius="0"
-              p="4"
+              borderBottomWidth={index < items.length - 1 ? '1px' : '0'}
+              borderColor="border"
+              pb={index < items.length - 1 ? '4' : '0'}
             >
               <Stack gap="3">
                 <Heading as="h3" size="md" pe="8">
                   {application.opportunityTitle ?? t('untitledOpportunity')}
                 </Heading>
-                <Link asChild>
+                <Link asChild layerStyle="researchTextLink" textStyle="sm">
                   <NextLink href={`/profile/${application.applicantId}`}>
                     {t('viewApplicant')}
                   </NextLink>
                 </Link>
-                <Badge alignSelf="start">
+                <Badge
+                  alignSelf="start"
+                  variant="subtle"
+                  colorPalette={
+                    application.status === 'PENDING'
+                      ? 'orange'
+                      : application.status === 'INVITED_TO_DISCUSS'
+                        ? 'green'
+                        : 'gray'
+                  }
+                >
                   {t(`statuses.${application.status}`)}
                 </Badge>
-                <Text whiteSpace="pre-wrap">{application.applicantNote}</Text>
+                {application.applicantNote ? (
+                  <Text textStyle="sm" color="fg.muted" lineClamp={3}>
+                    {application.applicantNote}
+                  </Text>
+                ) : null}
                 {application.status === 'PENDING' ? (
                   <>
                     <Text
+                      textStyle="sm"
                       color={application.isOverdue ? 'fg.error' : 'fg.muted'}
                     >
                       {t(application.isOverdue ? 'overdue' : 'responseDue', {
@@ -52,7 +67,7 @@ export function GroupApplications({
                         ).toLocaleString(locale),
                       })}
                     </Text>
-                    <HubMenu>
+                    <HubMenu positioned>
                       <HubEditor
                         groupId={groupId}
                         label={t('respond')}
@@ -86,9 +101,11 @@ export function GroupApplications({
                       />
                     </HubMenu>
                   </>
-                ) : (
-                  <Text whiteSpace="pre-wrap">{application.responseNote}</Text>
-                )}
+                ) : application.responseNote ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    {application.responseNote}
+                  </Text>
+                ) : null}
               </Stack>
             </Box>
           ))

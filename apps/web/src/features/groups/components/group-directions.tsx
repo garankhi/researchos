@@ -170,24 +170,30 @@ export function GroupDirections({
 }) {
   const t = useTranslations('groups');
   return (
-    <HubSection title={t('directions')}>
-      {canPublish ? <DirectionEditor groupId={groupId} /> : null}
+    <HubSection
+      title={t('directions')}
+      action={
+        canPublish ? <DirectionEditor groupId={groupId} /> : null
+      }
+    >
       <HubList query={query}>
         {(directions) =>
-          directions.map((direction) => (
+          directions.map((direction, index) => (
             <Box
               key={direction.id}
               position="relative"
-              borderWidth="1px"
-              borderRadius="0"
-              p="4"
+              borderBottomWidth={
+                index < directions.length - 1 ? '1px' : '0'
+              }
+              borderColor="border"
+              pb={index < directions.length - 1 ? '4' : '0'}
             >
               <Stack gap="3">
                 <Heading as="h3" size="md" pe={canEdit ? '8' : '0'}>
                   {direction.title}
                 </Heading>
                 {direction.topicPath ? (
-                  <Text color="fg.muted">
+                  <Text textStyle="sm" color="fg.muted">
                     {[
                       direction.topicPath.field.name,
                       direction.topicPath.subfield.name,
@@ -195,9 +201,13 @@ export function GroupDirections({
                     ].join(' / ')}
                   </Text>
                 ) : null}
-                <Text whiteSpace="pre-wrap">{direction.description}</Text>
+                {direction.description ? (
+                  <Text textStyle="sm" color="fg.muted" lineClamp={3}>
+                    {direction.description}
+                  </Text>
+                ) : null}
                 {canEdit ? (
-                  <HubMenu>
+                  <HubMenu positioned>
                     <DirectionEditor groupId={groupId} direction={direction} />
                     <HubAction
                       groupId={groupId}

@@ -14,6 +14,14 @@ export type OutputLink = GroupOutputLinkResponseDto;
 export type Opportunity = OpportunityResponseDto;
 export type Application = GroupApplicationResponseDto;
 
+/** The tabs of the group workspace, in the order they appear. */
+export type GroupTab =
+  | 'outputs'
+  | 'members'
+  | 'directions'
+  | 'opportunities'
+  | 'applications';
+
 export function groupPermissions(
   group: Group,
   user: { id: string; roles: string[] },

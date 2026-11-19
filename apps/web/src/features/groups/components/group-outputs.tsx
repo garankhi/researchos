@@ -8,12 +8,13 @@ import {
   Box,
   Button,
   Heading,
-  Link,
+  HStack,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { useCurrentUser } from '@/features/identity';
+import { OutputCard, toOutputCardData } from '@/features/outputs';
 import {
   useOutputsControllerFindOne,
   useOutputsControllerFindRevisions,
@@ -35,7 +36,15 @@ import {
   HubSection,
 } from './hub-controls';
 
-function OutputCard({
+/**
+ * One linked work inside the group's showcase or review queue.
+ *
+ * The card itself is shared with the profile page — see
+ * `features/outputs/components/output-card.tsx`. The group contributes
+ * two things the profile does not have: the link's status, and the
+ * review decision.
+ */
+function GroupOutputCard({
   groupId,
   link,
   review,
@@ -57,89 +66,111 @@ function OutputCard({
   const revision = revisions.data?.find((row) => row.id === revisionId);
   // Never substitute the current release for the revision accepted by the group.
   return (
-    <Box position="relative" borderWidth="1px" borderRadius="0" p="4">
-      <Stack gap="3">
-        {output.isPending || (output.isSuccess && revisions.isPending) ? (
-          <GroupLineSkeleton />
-        ) : output.isError || revisions.isError ? (
-          <ErrorState
-            title={t('outputUnavailable')}
-            onRetry={() => {
-              void output.refetch();
-              void revisions.refetch();
-            }}
-          />
-        ) : !revision ? (
-          <ErrorState
-            title={t('revisionUnavailable')}
-            onRetry={() => void revisions.refetch()}
-          />
-        ) : (
-          <>
-            <Heading as="h3" size="md" pe={canManage ? '8' : '0'}>
-              {revision.title}
-            </Heading>
-            <Text color="fg.muted">
-              {t('revision', { number: revision.revisionNo })}
-            </Text>
-            <Text whiteSpace="pre-wrap">
-              {typeof revision.abstract === 'string' ? revision.abstract : null}
-            </Text>
-            {typeof revision.externalUrl === 'string' &&
-            /^https?:\/\//i.test(revision.externalUrl) ? (
-              <Link
-                href={revision.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t('viewOutput')}
-              </Link>
-            ) : null}
-          </>
-        )}
-        <Badge alignSelf="start">
-          {t(`statuses.${review ? link.status : 'ACCEPTED'}`)}
-        </Badge>
-        {link.decisionNote ? <Text>{link.decisionNote}</Text> : null}
-        {canManage ? (
-          <HubMenu>
-            {review ? (
-              <>
-                <HubAction
-                  groupId={groupId}
-                  label={t('accept')}
-                  action={() =>
-                    groupOutputLinksControllerDecide(groupId, link.outputId, {
-                      status: 'ACCEPTED',
-                    })
-                  }
-                />
-                <HubAction
-                  groupId={groupId}
-                  label={t('reject')}
-                  confirm
-                  danger
-                  action={() =>
-                    groupOutputLinksControllerDecide(groupId, link.outputId, {
-                      status: 'REJECTED',
-                    })
-                  }
-                />
-              </>
-            ) : (
-              <HubAction
-                groupId={groupId}
-                label={t('removeOutput')}
-                confirm
-                danger
-                action={() =>
-                  groupOutputLinksControllerRemove(groupId, link.outputId)
+    <Box
+      position="relative"
+      borderBottomWidth="1px"
+      borderColor="border"
+      pb="4"
+    >
+      {output.isPending || (output.isSuccess && revisions.isPending) ? (
+        <GroupLineSkeleton />
+      ) : output.isError || revisions.isError ? (
+        <ErrorState
+          title={t('outputUnavailable')}
+          onRetry={() => {
+            void output.refetch();
+            void revisions.refetch();
+          }}
+        />
+      ) : !revision ? (
+        <ErrorState
+          title={t('revisionUnavailable')}
+          onRetry={() => void revisions.refetch()}
+        />
+      ) : (
+        <OutputCard
+          data={toOutputCardData({
+            id: output.data?.id ?? link.outputId,
+            title: revision.title,
+            outputType: revision.outputType,
+            abstract: revision.abstract,
+            venue: revision.venue,
+            publisher: revision.publisher,
+            releasedAt: revision.releasedAt,
+            firstSharedAt: output.data?.firstSharedAt,
+            publicationYear: revision.publicationYear,
+            doi: output.data?.doi,
+            externalUrl: revision.externalUrl,
+            sharingStatus: output.data?.sharingStatus,
+            visibility: output.data?.visibility,
+            authors: output.data?.authors,
+            topics: output.data?.topics,
+          })}
+          showBottomBorder={false}
+          flush
+          headerSlot={
+            <HStack gap="2">
+              <Badge
+                variant="subtle"
+                colorPalette={
+                  link.status === 'ACCEPTED'
+                    ? 'green'
+                    : link.status === 'PENDING'
+                      ? 'orange'
+                      : 'gray'
                 }
-              />
-            )}
-          </HubMenu>
-        ) : null}
-      </Stack>
+              >
+                {t(`statuses.${review ? link.status : 'ACCEPTED'}`)}
+              </Badge>
+              {canManage ? (
+                <HubMenu positioned>
+                  {review ? (
+                    <>
+                      <HubAction
+                        groupId={groupId}
+                        label={t('accept')}
+                        action={() =>
+                          groupOutputLinksControllerDecide(groupId, link.outputId, {
+                            status: 'ACCEPTED',
+                          })
+                        }
+                      />
+                      <HubAction
+                        groupId={groupId}
+                        label={t('reject')}
+                        confirm
+                        danger
+                        action={() =>
+                          groupOutputLinksControllerDecide(groupId, link.outputId, {
+                            status: 'REJECTED',
+                          })
+                        }
+                      />
+                    </>
+                  ) : (
+                    <HubAction
+                      groupId={groupId}
+                      label={t('removeOutput')}
+                      confirm
+                      danger
+                      action={() =>
+                        groupOutputLinksControllerRemove(groupId, link.outputId)
+                      }
+                    />
+                  )}
+                </HubMenu>
+              ) : null}
+            </HStack>
+          }
+          footerSlot={
+            link.decisionNote ? (
+              <Text textStyle="sm" color="fg.muted">
+                {link.decisionNote}
+              </Text>
+            ) : null
+          }
+        />
+      )}
     </Box>
   );
 }
@@ -273,8 +304,10 @@ export function GroupOutputs({
 }) {
   const t = useTranslations('groups');
   return (
-    <HubSection title={t('outputs')}>
-      {canManage ? <LinkOutput groupId={groupId} /> : null}
+    <HubSection
+      title={t('outputs')}
+      action={canManage ? <LinkOutput groupId={groupId} /> : null}
+    >
       <HubList
         query={{
           ...query,
@@ -283,7 +316,7 @@ export function GroupOutputs({
       >
         {(links) =>
           links.map((link) => (
-            <OutputCard
+            <GroupOutputCard
               key={link.outputId}
               groupId={groupId}
               link={link}
@@ -308,7 +341,7 @@ export function GroupOutputs({
           >
             {(links) =>
               links.map((link) => (
-                <OutputCard
+                <GroupOutputCard
                   key={link.outputId}
                   groupId={groupId}
                   link={link}

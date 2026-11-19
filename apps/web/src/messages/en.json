@@ -437,6 +437,26 @@
         "DATASET": "Dataset",
         "DISSERTATION": "Dissertation"
       }
+    },
+    "card": {
+      "draftBadge": "Draft",
+      "viewPublication": "View source",
+      "viewDetails": "Full details",
+      "share": "Share",
+      "linkCopied": "Publication link copied.",
+      "copyError": "Could not copy link.",
+      "visibilityPublic": "FPTU community",
+      "visibilityGroupOnly": "Group only",
+      "types": {
+        "PAPER": "Article",
+        "PREPRINT": "Preprint",
+        "REVIEW": "Review",
+        "EDITORIAL": "Editorial",
+        "BOOK_CHAPTER": "Book chapter",
+        "BOOK": "Book",
+        "DATASET": "Dataset",
+        "DISSERTATION": "Dissertation"
+      }
     }
   },
   "errors": {
@@ -825,6 +845,16 @@
     "responseDue": "Response due: {date}",
     "active": "Active",
     "archived": "Archived",
+    "leaderBadge": "Leader",
+    "memberCount": "{count} members",
+    "statsTitle": "At a glance",
+    "statsMembers": "Members",
+    "statsDirections": "Directions",
+    "statsOpportunities": "Open calls",
+    "leadTitle": "Group lead",
+    "archivedNotice": "This group is archived. Its content is read-only.",
+    "readonlyNotice": "You are viewing this group as a member.",
+    "viewAll": "View all",
     "editGroup": "Edit group information",
     "name": "Group name",
     "code": "Group code",

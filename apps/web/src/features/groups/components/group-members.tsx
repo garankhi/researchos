@@ -4,6 +4,7 @@ import {
   Avatar,
   Badge,
   Box,
+  Flex,
   Heading,
   Link,
   Stack,
@@ -44,76 +45,96 @@ export function GroupMembers({
     label: t(`roles.${value}`),
   }));
   return (
-    <HubSection title={t('members')}>
-      {canManage ? (
-        <HubEditor
-          groupId={groupId}
-          label={t('addMember')}
-          title={t('addMember')}
-          fields={[
-            {
-              name: 'userId',
-              label: t('userId'),
-              type: 'uuid',
-              required: true,
-            },
-            {
-              name: 'role',
-              label: t('role'),
-              initial: 'MEMBER',
-              options: roles,
-            },
-          ]}
-          submit={(values) =>
-            groupMembersControllerAdd(groupId, {
-              userId: values.userId,
-              role: values.role as Member['role'],
-            })
-          }
-        />
-      ) : null}
+    <HubSection
+      title={t('members')}
+      action={
+        canManage ? (
+          <HubEditor
+            groupId={groupId}
+            label={t('addMember')}
+            title={t('addMember')}
+            fields={[
+              {
+                name: 'userId',
+                label: t('userId'),
+                type: 'uuid',
+                required: true,
+              },
+              {
+                name: 'role',
+                label: t('role'),
+                initial: 'MEMBER',
+                options: roles,
+              },
+            ]}
+            submit={(values) =>
+              groupMembersControllerAdd(groupId, {
+                userId: values.userId,
+                role: values.role as Member['role'],
+              })
+            }
+          />
+        ) : null
+      }
+    >
       <HubList query={query}>
         {(members) =>
-          members.map((member) => (
+          members.map((member, index) => (
             <Box
               key={member.userId}
               position="relative"
-              borderWidth="1px"
-              borderRadius="0"
-              p="4"
+              borderBottomWidth={
+                index < members.length - 1 ? '1px' : '0'
+              }
+              borderColor="border"
+              pb={index < members.length - 1 ? '4' : '0'}
             >
-              <Stack
-                direction={{ base: 'column', sm: 'row' }}
-                gap="4"
-                align="start"
-              >
+              <Flex direction={{ base: 'column', sm: 'row' }} gap="4" align="start">
                 <Avatar.Root>
                   <Avatar.Fallback name={member.fullName} />
                 </Avatar.Root>
                 <Stack flex="1" minW="0" gap="2">
                   <Heading as="h3" size="sm" pe={canManage ? '8' : '0'}>
-                    <Link asChild>
+                    <Link asChild layerStyle="researchTextLink">
                       <NextLink href={`/profile/${member.userId}`}>
                         {member.fullName}
                       </NextLink>
                     </Link>
                   </Heading>
-                  <Text overflowWrap="anywhere">{member.email}</Text>
-                  <Text color="fg.muted">
-                    {[
-                      member.academicTitle,
-                      member.academicDegree,
-                      member.departmentUnit,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
+                  <Text textStyle="sm" color="fg.muted" overflowWrap="anywhere">
+                    {member.email}
                   </Text>
-                  {member.bio ? (
-                    <Text whiteSpace="pre-wrap">{member.bio}</Text>
+                  {[
+                    member.academicTitle,
+                    member.academicDegree,
+                    member.departmentUnit,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') ? (
+                    <Text textStyle="sm" color="fg.muted">
+                      {[
+                        member.academicTitle,
+                        member.academicDegree,
+                        member.departmentUnit,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
                   ) : null}
-                  <Badge alignSelf="start">{t(`roles.${member.role}`)}</Badge>
+                  {member.bio ? (
+                    <Text textStyle="sm" color="fg.muted" lineClamp={2}>
+                      {member.bio}
+                    </Text>
+                  ) : null}
+                  <Badge
+                    alignSelf="start"
+                    variant="subtle"
+                    colorPalette="gray"
+                  >
+                    {t(`roles.${member.role}`)}
+                  </Badge>
                   {canManage ? (
-                    <HubMenu>
+                    <HubMenu positioned>
                       <HubEditor
                         groupId={groupId}
                         label={t('changeRole')}
@@ -145,7 +166,7 @@ export function GroupMembers({
                     </HubMenu>
                   ) : null}
                 </Stack>
-              </Stack>
+              </Flex>
             </Box>
           ))
         }
