@@ -5,8 +5,11 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { ResearchGroupResponseDtoCallerMembershipRole } from './researchGroupResponseDtoCallerMembershipRole';
 
 export interface ResearchGroupResponseDto {
+  /** The current caller’s active membership role, if a member. Detail reads only. */
+  callerMembershipRole?: ResearchGroupResponseDtoCallerMembershipRole;
   /** Unique identifier of the research group (UUID). */
   id: string;
   /** Unique short code of the research group. */

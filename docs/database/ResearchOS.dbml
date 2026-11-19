@@ -504,6 +504,7 @@ Table group_members {
   user_id uuid [not null]
   role group_member_role [not null, default: 'MEMBER']
   joined_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  archived_at timestamptz [note: 'Removed memberships are retained; only unarchived rows grant access.']
   indexes {
     (group_id, user_id) [pk]
     (user_id, group_id)
@@ -517,6 +518,7 @@ Table group_directions {
   title varchar(255) [not null]
   description text
   created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  archived_at timestamptz [note: 'UI deletion archives the direction and preserves project references.']
   indexes { (id, group_id) [unique] }
 }
 

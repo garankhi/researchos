@@ -25,6 +25,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
 import {
   AddGroupMemberDto,
@@ -59,7 +60,7 @@ export class GroupMembersController {
   @ApiOperation({
     summary: 'List group members',
     description:
-      'The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.',
+      'The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.',
   })
   @ApiOkResponse({
     description: 'Paginated group member list.',
@@ -74,6 +75,7 @@ export class GroupMembersController {
   }
 
   @Post()
+  @Roles('RESEARCHER')
   @ApiOperation({ summary: 'Add an existing user to a group' })
   @ApiCreatedResponse({
     description: 'Member added.',
@@ -91,6 +93,7 @@ export class GroupMembersController {
   }
 
   @Patch(':userId')
+  @Roles('RESEARCHER')
   @ApiOperation({ summary: 'Change a group member role' })
   @ApiParam({
     name: 'userId',
@@ -111,14 +114,20 @@ export class GroupMembersController {
   }
 
   @Delete(':userId')
+  @Roles('RESEARCHER')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove a group member' })
+  @ApiOperation({
+    summary: 'Archive a group membership and revoke its group access',
+  })
   @ApiParam({
     name: 'userId',
     description: 'User whose membership is being removed.',
     format: 'uuid',
   })
-  @ApiNoContentResponse({ description: 'Member removed.' })
+  @ApiNoContentResponse({
+    description:
+      'Membership archived; its row is retained and adding the member again restores it.',
+  })
   @ApiConflictResponse({
     description: 'The lead cannot be removed while the group is active.',
   })

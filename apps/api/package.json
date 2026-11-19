@@ -26,7 +26,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "test:queue": "vitest run --config ./vitest.config.queue-e2e.ts",
     "queue:probe": "node dist/queue-probe.js",
-    "test:postgres": "nest build && node scripts/test-opportunities-postgres.mjs"
+    "test:postgres": "nest build && node scripts/test-opportunities-postgres.mjs",
+    "test:group-hub:postgres": "node scripts/test-group-hub-postgres.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

@@ -116,7 +116,7 @@ export class GroupsService {
         OR: [
           { is_active: true, archived_at: null },
           { lead_id: callerId },
-          { group_members: { some: { user_id: callerId } } },
+          { group_members: { some: { user_id: callerId, archived_at: null } } },
         ],
       },
     ];
@@ -141,7 +141,7 @@ export class GroupsService {
       // filter, not a visibility grant: the public/lead/member clause above
       // still decides which groups the caller may see at all.
       andConditions.push({
-        group_members: { some: { user_id: query.memberId } },
+        group_members: { some: { user_id: query.memberId, archived_at: null } },
       });
     }
 
@@ -191,18 +191,17 @@ export class GroupsService {
       );
     }
 
+    const membership = await this.prisma.group_members.findUnique({
+      where: {
+        group_id_user_id: {
+          group_id: groupId,
+          user_id: callerId,
+        },
+      },
+    });
     const isPublic = group.is_active && group.archived_at === null;
     if (!isPublic && group.lead_id !== callerId) {
-      const membership = await this.prisma.group_members.findUnique({
-        where: {
-          group_id_user_id: {
-            group_id: groupId,
-            user_id: callerId,
-          },
-        },
-      });
-
-      if (!membership) {
+      if (!membership || membership.archived_at) {
         throw new CodedHttpException(
           domainErrorCodes.groups.accessDenied,
           HttpStatus.FORBIDDEN,
@@ -210,15 +209,17 @@ export class GroupsService {
       }
     }
 
-    return this.mapToResponse(group);
+    const response = this.mapToResponse(group);
+    if (membership && !membership.archived_at)
+      response.callerMembershipRole = membership.role;
+    return response;
   }
 
   /**
    * Updates research group attributes or archives/restores the group.
    *
    * - Throws `404 group_not_found` when the group does not exist.
-   * - Throws `403 Forbidden` when the caller is neither the group lead (with active
-   *   `RESEARCHER` access) nor an `ADMIN`.
+   * - Requires active researcher access and leadership of this group.
    * - Setting `isActive: false` archives the group (`is_active = false`, `archived_at = now`).
    * - Setting `isActive: true` restores the group (`is_active = true`, `archived_at = null`).
    */
@@ -239,9 +240,13 @@ export class GroupsService {
     }
 
     const callerAccess = await this.accessService.effectiveRoles(callerId);
+    const membership = await this.prisma.group_members.findUnique({
+      where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
+    });
     const canManage =
-      callerAccess.isAdmin ||
-      (callerAccess.isResearcher && existing.lead_id === callerId);
+      callerAccess.isResearcher &&
+      (existing.lead_id === callerId.toLowerCase() ||
+        (membership?.role === 'GROUP_LEADER' && !membership.archived_at));
 
     if (!canManage) {
       throw new CodedHttpException(

@@ -3,7 +3,6 @@ import { GroupOutputStatus, Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
   buildPaginationMeta,
-  PaginationQueryDto,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import {
@@ -11,6 +10,7 @@ import {
   readDatabaseFailure,
 } from '../../common/errors/database-errors.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import type { ListGroupOutputLinksQueryDto } from './dto/list-group-output-links.query.dto.js';
 import type {
   CreateGroupOutputLinkDto,
   DecideGroupOutputLinkDto,
@@ -55,12 +55,12 @@ export class GroupOutputLinksService {
   /**
    * Lists the group's content links.
    *
-   * A group member reads the list; an outsider does not, because the list
-   * names the works the group curated and the requests it is deciding.
+   * Active groups expose their accepted showcase to signed-in readers.
+   * Only group managers see the review queue; archived groups stay private.
    */
   async list(
     groupId: string,
-    query: PaginationQueryDto,
+    query: ListGroupOutputLinksQueryDto,
     callerId: string,
   ): Promise<GroupOutputLinkPageDto> {
     const orderBy = parseSortParam(query.sort, LINK_SORT_FIELDS, {
@@ -73,13 +73,27 @@ export class GroupOutputLinksService {
       );
 
     return this.prisma.$transaction(async (tx) => {
+      // Keep visibility stable until the links and their count have been read.
+      // Group archive/lead updates take an incompatible row lock.
+      await tx.$queryRaw`SELECT id FROM research_groups WHERE id = ${groupId}::uuid FOR SHARE`;
       const [access] = await tx.$queryRaw<
-        { group_exists: boolean; is_member: boolean }[]
+        {
+          group_exists: boolean;
+          is_member: boolean;
+          is_active: boolean;
+          can_manage_group: boolean;
+        }[]
       >`
         SELECT
           EXISTS (SELECT 1 FROM research_groups g WHERE g.id = ${groupId}::uuid)
             AS group_exists,
-          is_group_member(${callerId}::uuid, ${groupId}::uuid) AS is_member
+          EXISTS (SELECT 1 FROM research_groups g WHERE g.id = ${groupId}::uuid
+            AND (g.lead_id = ${callerId}::uuid OR EXISTS (
+              SELECT 1 FROM group_members m WHERE m.group_id = g.id
+                AND m.user_id = ${callerId}::uuid AND m.archived_at IS NULL))) AS is_member,
+          can_manage_group(${callerId}::uuid, ${groupId}::uuid) AS can_manage_group,
+          EXISTS (SELECT 1 FROM research_groups g WHERE g.id = ${groupId}::uuid
+            AND g.is_active AND g.archived_at IS NULL) AS is_active
       `;
 
       if (!access?.group_exists)
@@ -87,13 +101,26 @@ export class GroupOutputLinksService {
           domainErrorCodes.groups.groupNotFound,
           HttpStatus.NOT_FOUND,
         );
-      if (!access.is_member)
+      if (!access.is_active && !access.is_member && !access.can_manage_group)
         throw new CodedHttpException(
           domainErrorCodes.groups.accessDenied,
           HttpStatus.FORBIDDEN,
         );
 
-      const where = { group_id: groupId };
+      if (query.status === 'PENDING' && !access.can_manage_group)
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+
+      const where: Prisma.group_output_linksWhereInput = {
+        group_id: groupId,
+        ...(access.can_manage_group
+          ? query.status
+            ? { status: query.status }
+            : {}
+          : { status: GroupOutputStatus.ACCEPTED }),
+      };
       const rows = await tx.group_output_links.findMany({
         where,
         orderBy: [orderBy, { output_id: 'asc' }],
@@ -151,7 +178,7 @@ export class GroupOutputLinksService {
           domainErrorCodes.groups.outputLinkInvalid,
           HttpStatus.BAD_REQUEST,
         );
-      if (!policy.isResearcher || !policy.isMember || !policy.canView)
+      if (!policy.isResearcher || !policy.canManageGroup || !policy.canView)
         throw new CodedHttpException(
           domainErrorCodes.groups.accessDenied,
           HttpStatus.FORBIDDEN,
@@ -249,7 +276,7 @@ export class GroupOutputLinksService {
   /**
    * Accepts or rejects a pending link request.
    *
-   * Only the group lead may decide, and only a pending request can be
+   * Only group leaders may decide, and only a pending request can be
    * decided. Accepting pins the requested revision; rejecting preserves the
    * revision the group already shows.
    */

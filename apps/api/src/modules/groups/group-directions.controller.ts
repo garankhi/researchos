@@ -80,7 +80,8 @@ export class GroupDirectionsController {
   @Post()
   @Roles('RESEARCHER')
   @ApiOperation({
-    summary: 'Publish a direction as the group lead or a core member',
+    summary:
+      'Publish a direction as the designated lead or an active GROUP_LEADER',
   })
   @ApiCreatedResponse({
     description: 'Direction published immediately.',
@@ -101,7 +102,7 @@ export class GroupDirectionsController {
     format: 'uuid',
     description: 'Direction belonging to this group.',
   })
-  @ApiOperation({ summary: 'Edit a direction as the group lead' })
+  @ApiOperation({ summary: 'Edit a direction as a group leader' })
   @ApiOkResponse({
     description: 'Direction updated.',
     type: GroupDirectionResponseDto,
@@ -123,8 +124,14 @@ export class GroupDirectionsController {
     format: 'uuid',
     description: 'Direction belonging to this group.',
   })
-  @ApiOperation({ summary: 'Delete an unused direction as the group lead' })
-  @ApiNoContentResponse({ description: 'Direction deleted.' })
+  @ApiOperation({
+    summary:
+      'Archive a direction as a group leader, retaining the row and project references',
+  })
+  @ApiNoContentResponse({
+    description:
+      'Direction archived; permanently deleting records is not exposed by this route.',
+  })
   remove(
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @Param('directionId', ParseUUIDPipe) directionId: string,

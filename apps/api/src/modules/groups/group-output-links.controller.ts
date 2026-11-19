@@ -26,7 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
+import { ListGroupOutputLinksQueryDto } from './dto/list-group-output-links.query.dto.js';
 import {
   CreateGroupOutputLinkDto,
   DecideGroupOutputLinkDto,
@@ -58,7 +58,7 @@ import { GroupOutputLinksService } from './group-output-links.service.js';
 @ApiUnauthorizedResponse({ description: 'Authentication required.' })
 @ApiForbiddenResponse({
   description:
-    'Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.',
+    'Group leadership is required to request, decide or remove a link; requests also require visibility of the work.',
 })
 @ApiNotFoundResponse({
   description: 'Group, research output, or group output link does not exist.',
@@ -75,7 +75,7 @@ export class GroupOutputLinksController {
   @ApiOperation({
     summary: 'List the research outputs linked to the group',
     description:
-      'Returns the group links with their status, the revision each group shows, and the revision the pending request asks for.',
+      'Active groups expose accepted links to signed-in readers. Only group managers see all link states and the pending review queue. Inactive or archived groups require membership or management access.',
   })
   @ApiOkResponse({
     description: 'Paginated group output links.',
@@ -83,7 +83,7 @@ export class GroupOutputLinksController {
   })
   list(
     @Param('groupId', ParseUUIDPipe) groupId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListGroupOutputLinksQueryDto,
     @CurrentUserId() callerId: string,
   ): Promise<GroupOutputLinkPageDto> {
     return this.links.list(groupId, query, callerId);
@@ -118,7 +118,7 @@ export class GroupOutputLinksController {
   @ApiOperation({
     summary: 'Accept or reject a pending group content request',
     description:
-      'Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.',
+      'Only group leaders may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.',
   })
   @ApiOkResponse({
     description: 'Decision recorded.',

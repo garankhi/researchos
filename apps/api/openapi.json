@@ -2955,7 +2955,7 @@
         ]
       },
       "patch": {
-        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Only the group leader or an administrator may update the group.",
+        "description": "Updates research group details or archives the group (`isActive: false` sets `is_active = false` and `archived_at`). Requires researcher access and either designated leadership or an active GROUP_LEADER membership in this group.",
         "operationId": "GroupsController_update",
         "parameters": [
           {
@@ -3044,7 +3044,7 @@
     },
     "/research-groups/{groupId}/members": {
       "get": {
-        "description": "The roster of an active group is readable by any signed-in researcher. An archived or inactive group keeps its roster private to the lead and its members.",
+        "description": "The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.",
         "operationId": "GroupMembersController_findAll",
         "parameters": [
           {
@@ -3345,7 +3345,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Member removed."
+            "description": "Membership archived; its row is retained and adding the member again restores it."
           },
           "400": {
             "description": "Invalid UUID, role or pagination parameters.",
@@ -3393,7 +3393,7 @@
             "bearer": []
           }
         ],
-        "summary": "Remove a group member",
+        "summary": "Archive a group membership and revoke its group access",
         "tags": [
           "groups"
         ]
@@ -3612,7 +3612,7 @@
             "bearer": []
           }
         ],
-        "summary": "Publish a direction as the group lead or a core member",
+        "summary": "Publish a direction as the designated lead or an active GROUP_LEADER",
         "tags": [
           "group-directions"
         ]
@@ -3720,7 +3720,7 @@
             "bearer": []
           }
         ],
-        "summary": "Edit a direction as the group lead",
+        "summary": "Edit a direction as a group leader",
         "tags": [
           "group-directions"
         ]
@@ -3751,7 +3751,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Direction deleted."
+            "description": "Direction archived; permanently deleting records is not exposed by this route."
           },
           "400": {
             "description": "Invalid UUID, topic, payload or pagination.",
@@ -3809,7 +3809,7 @@
             "bearer": []
           }
         ],
-        "summary": "Delete an unused direction as the group lead",
+        "summary": "Archive a direction as a group leader, retaining the row and project references",
         "tags": [
           "group-directions"
         ]
@@ -3817,7 +3817,7 @@
     },
     "/research-groups/{groupId}/outputs": {
       "get": {
-        "description": "Returns the group links with their status, the revision each group shows, and the revision the pending request asks for.",
+        "description": "Active groups expose accepted links to signed-in readers. Only group managers see all link states and the pending review queue. Inactive or archived groups require membership or management access.",
         "operationId": "GroupOutputLinksController_list",
         "parameters": [
           {
@@ -3864,6 +3864,19 @@
               "example": "-createdAt",
               "type": "string"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter the showcase or review queue before pagination. PENDING requires group management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACCEPTED",
+                "PENDING"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3898,7 +3911,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3995,7 +4008,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4038,7 +4051,7 @@
     },
     "/research-groups/{groupId}/outputs/{outputId}": {
       "patch": {
-        "description": "Only the group lead may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.",
+        "description": "Only group leaders may decide. Accepting pins the requested revision; rejecting keeps the revision the group already shows.",
         "operationId": "GroupOutputLinksController_decide",
         "parameters": [
           {
@@ -4104,7 +4117,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4201,7 +4214,7 @@
             }
           },
           "403": {
-            "description": "Only the group lead may decide or remove a link; a request needs group membership and visibility of the work.",
+            "description": "Group leadership is required to request, decide or remove a link; requests also require visibility of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9296,6 +9309,14 @@
       "ResearchGroupResponseDto": {
         "type": "object",
         "properties": {
+          "callerMembershipRole": {
+            "type": "string",
+            "description": "The current caller’s active membership role, if a member. Detail reads only.",
+            "enum": [
+              "MEMBER",
+              "GROUP_LEADER"
+            ]
+          },
           "id": {
             "type": "string",
             "description": "Unique identifier of the research group (UUID).",
@@ -10253,6 +10274,10 @@
       "OpportunityResponseDto": {
         "type": "object",
         "properties": {
+          "canManage": {
+            "type": "boolean",
+            "description": "Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes."
+          },
           "id": {
             "type": "string",
             "description": "Opportunity identifier.",

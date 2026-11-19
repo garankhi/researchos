@@ -1,9 +1,15 @@
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const cwd = fileURLToPath(new URL('..', import.meta.url));
 const eslint = new ESLint({ cwd });
+
+// Load the full Next.js lint configuration outside each five-second assertion.
+// Cold configuration loading is slow under concurrent workspace test runs.
+beforeAll(async () => {
+  await eslint.calculateConfigForFile('src/example-form.tsx');
+}, 60_000);
 
 describe('form-control-must-be-wired', () => {
   it.each([

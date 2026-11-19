@@ -49,14 +49,12 @@ export class GroupDirectionsService {
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: actorId } },
     });
+    const activeMember = member && !member.archived_at ? member : null;
     if (action === 'read') {
-      if (!lead && !member) throw new ForbiddenException();
+      if (!lead && !activeMember) throw new ForbiddenException();
       return;
     }
-    if (
-      !lead &&
-      !(action === 'publish' && member?.role === GroupMemberRole.GROUP_LEADER)
-    )
+    if (!lead && activeMember?.role !== GroupMemberRole.GROUP_LEADER)
       throw new ForbiddenException();
     if (!active)
       throw new ConflictException(
@@ -106,7 +104,7 @@ export class GroupDirectionsService {
       throw new BadRequestException('Unsupported direction sort field');
     return this.run(async (tx) => {
       await this.authorize(tx, groupId, actorId, 'read');
-      const where = { group_id: groupId };
+      const where = { group_id: groupId, archived_at: null };
       const rows = await tx.group_directions.findMany({
         where,
         include,
@@ -155,12 +153,15 @@ export class GroupDirectionsService {
       const existing = await tx.group_directions.findUnique({
         where: { id_group_id: { id: directionId, group_id: groupId } },
       });
-      if (!existing)
+      if (!existing || existing.archived_at)
         throw new NotFoundException('Direction not found in this group');
       await this.topic(tx, dto.topicId);
       return this.response(
         await tx.group_directions.update({
-          where: { id_group_id: { id: directionId, group_id: groupId } },
+          where: {
+            id_group_id: { id: directionId, group_id: groupId },
+            archived_at: null,
+          },
           data: {
             title: dto.title,
             topic_id: dto.topicId,
@@ -182,8 +183,12 @@ export class GroupDirectionsService {
   ): Promise<void> {
     await this.run(async (tx) => {
       await this.authorize(tx, groupId, actorId, 'edit');
-      await tx.group_directions.delete({
-        where: { id_group_id: { id: directionId, group_id: groupId } },
+      await tx.group_directions.update({
+        where: {
+          id_group_id: { id: directionId, group_id: groupId },
+          archived_at: null,
+        },
+        data: { archived_at: new Date() },
       });
     });
   }

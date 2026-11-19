@@ -59,7 +59,7 @@ export class GroupMembersService {
       if (!orderBy) throw new BadRequestException('validation_failed');
       const page = query.page ?? 1;
       const limit = query.limit ?? 20;
-      const where = { group_id: groupId };
+      const where = { group_id: groupId, archived_at: null };
       const total = await tx.group_members.count({ where });
       const rows = await tx.group_members.findMany({
         where,
@@ -99,12 +99,31 @@ export class GroupMembersService {
           domainErrorCodes.groups.memberNotFound,
           HttpStatus.NOT_FOUND,
         );
-      const row = await tx.group_members.create({
-        data: { group_id: groupId, user_id: dto.userId, role: dto.role },
-        include: {
-          users: { include: { researcher_profiles: true } },
-        },
+      const previous = await tx.group_members.findUnique({
+        where: { group_id_user_id: { group_id: groupId, user_id: dto.userId } },
       });
+      if (previous && !previous.archived_at)
+        throw new CodedHttpException(
+          domainErrorCodes.groups.memberAlreadyExists,
+          HttpStatus.CONFLICT,
+        );
+      const include = {
+        users: { include: { researcher_profiles: true } },
+      } as const;
+      const row = previous
+        ? await tx.group_members.update({
+            where: {
+              group_id_user_id: { group_id: groupId, user_id: dto.userId },
+            },
+            data: { archived_at: null, role: dto.role },
+            include,
+          })
+        : await tx.group_members.create({
+            data: { group_id: groupId, user_id: dto.userId, role: dto.role },
+            include: {
+              users: { include: { researcher_profiles: true } },
+            },
+          });
       return this.toResponse(row);
     });
   }
@@ -118,7 +137,10 @@ export class GroupMembersService {
     return this.write(async (tx) => {
       await this.authorize(tx, groupId, callerId, true);
       const row = await tx.group_members.update({
-        where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+        where: {
+          group_id_user_id: { group_id: groupId, user_id: userId },
+          archived_at: null,
+        },
         data: { role: dto.role },
         include: {
           users: { include: { researcher_profiles: true } },
@@ -140,8 +162,12 @@ export class GroupMembersService {
           domainErrorCodes.groups.leadRemovalDenied,
           HttpStatus.FORBIDDEN,
         );
-      await tx.group_members.delete({
-        where: { group_id_user_id: { group_id: groupId, user_id: userId } },
+      await tx.group_members.update({
+        where: {
+          group_id_user_id: { group_id: groupId, user_id: userId },
+          archived_at: null,
+        },
+        data: { archived_at: new Date() },
       });
     });
   }
@@ -174,7 +200,11 @@ export class GroupMembersService {
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (!member || (write && member.role !== GroupMemberRole.GROUP_LEADER))
+    if (
+      !member ||
+      member.archived_at ||
+      (write && member.role !== GroupMemberRole.GROUP_LEADER)
+    )
       throw new CodedHttpException(
         domainErrorCodes.groups.accessDenied,
         HttpStatus.FORBIDDEN,
