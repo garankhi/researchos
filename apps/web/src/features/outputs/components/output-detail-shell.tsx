@@ -22,6 +22,7 @@ import { OutputAbstract } from './output-abstract';
 import {
   OutputDownloadPrimaryButton,
   OutputFiles,
+  OutputFollowButton,
   OutputShareButton,
 } from './output-actions';
 import { OutputDetailActionsMenu } from './output-detail-actions-menu';
@@ -136,7 +137,10 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
           <Stack gap="5" minW="0">
             <OutputHeader
               output={output}
+              groupName={groupQuery.groupName}
+              groupLoading={groupQuery.isLoading}
               hasFullText={Boolean(files && files.length > 0)}
+              followSlot={<OutputFollowButton output={output} />}
             />
 
             <Flex

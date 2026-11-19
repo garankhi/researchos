@@ -17,6 +17,7 @@ import { BookOpen, ExternalLink, UserRound } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { doiUrl } from '@/lib/doi-url';
 import { useProfileOutputCapability } from '../hooks/use-profile-output-capability';
 import type { OutputResponseDto } from '../types';
 import { ProfileOutputActionsMenu } from './profile-output-actions-menu';
@@ -79,7 +80,7 @@ export function ProfileOutputItem({
 
   const doiStr = asTrimmedString(output.doi);
   const externalUrlStr = asTrimmedString(rev?.externalUrl);
-  const sourceUrl = doiStr ? `https://doi.org/${doiStr}` : externalUrlStr;
+  const sourceUrl = doiStr ? doiUrl(doiStr) : externalUrlStr;
 
   const releasedStr =
     typeof rev?.releasedAt === 'string' ? rev.releasedAt : null;
@@ -257,7 +258,7 @@ export function ProfileOutputItem({
             </Link>
             {doiStr ? (
               <Link
-                href={`https://doi.org/${doiStr}`}
+                href={doiUrl(doiStr)}
                 target="_blank"
                 rel="noopener noreferrer"
                 display="inline-flex"
