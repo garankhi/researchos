@@ -1387,6 +1387,116 @@ export const useChatAttachmentsControllerConfirmUpload = <
   );
 };
 /**
+ * Removes an uploaded attachment that has not been linked to a message, together with its stored object. Used when the sender discards a file in the composer.
+ * @summary Discard a staged chat attachment that was never sent
+ */
+export const chatAttachmentsControllerDeleteStagedAttachment = (
+  conversationId: string,
+  attachmentId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ChatAttachmentResponseDtoEnvelope>(
+    {
+      url: `/chat/conversations/${conversationId}/attachments/${attachmentId}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getChatAttachmentsControllerDeleteStagedAttachmentMutationKey =
+  () => ['chatAttachmentsControllerDeleteStagedAttachment'] as const;
+
+export const getChatAttachmentsControllerDeleteStagedAttachmentMutationOptions =
+  <TError = ApiErrorResponseDto, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>
+      >,
+      TError,
+      ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  }): UseMutationOptions<
+    Awaited<ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>>,
+    TError,
+    ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables,
+    TContext
+  > => {
+    const mutationKey =
+      getChatAttachmentsControllerDeleteStagedAttachmentMutationKey();
+    const { mutation: mutationOptions, request: requestOptions } = options
+      ? options.mutation &&
+        'mutationKey' in options.mutation &&
+        options.mutation.mutationKey
+        ? options
+        : { ...options, mutation: { ...options.mutation, mutationKey } }
+      : { mutation: { mutationKey }, request: undefined };
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>
+      >,
+      ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables
+    > = (props) => {
+      const { conversationId, attachmentId } = props ?? {};
+
+      return chatAttachmentsControllerDeleteStagedAttachment(
+        conversationId,
+        attachmentId,
+        requestOptions,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type ChatAttachmentsControllerDeleteStagedAttachmentMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>>
+  >;
+
+export type ChatAttachmentsControllerDeleteStagedAttachmentMutationError =
+  ApiErrorResponseDto;
+export type ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables = {
+  conversationId: string;
+  attachmentId: string;
+};
+
+/**
+ * @summary Discard a staged chat attachment that was never sent
+ */
+export const useChatAttachmentsControllerDeleteStagedAttachment = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>
+      >,
+      TError,
+      ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof chatAttachmentsControllerDeleteStagedAttachment>>,
+  TError,
+  ChatAttachmentsControllerDeleteStagedAttachmentMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getChatAttachmentsControllerDeleteStagedAttachmentMutationOptions(options),
+    queryClient,
+  );
+};
+/**
  * Verifies conversation membership and stored SHA-256 integrity before streaming the private S3 attachment.
  * @summary Download or preview a verified chat attachment
  */

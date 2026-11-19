@@ -319,6 +319,109 @@ export class ChatAttachmentsService {
     await this.deleteObjectsBestEffort(rows.map((r) => r.storage_key));
   }
 
+  /**
+   * Drops a staged attachment that was uploaded but never sent.
+   *
+   * Only an unlinked row the caller uploaded is removable: once the
+   * attachment belongs to a message the message owns it, and deleting it
+   * here would strip a file from a conversation the other participants
+   * can still read.
+   */
+  async deleteStagedAttachment(
+    userId: string,
+    conversationId: string,
+    attachmentId: string,
+  ): Promise<ChatAttachmentResponseDto> {
+    const attachment = await this.prisma.chat_message_attachments.findUnique({
+      where: { id: attachmentId },
+    });
+
+    if (
+      !attachment ||
+      attachment.conversation_id !== conversationId ||
+      attachment.uploaded_by !== userId
+    ) {
+      throw new CodedHttpException(
+        domainErrorCodes.chat.attachmentNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (attachment.message_id !== null) {
+      throw new CodedHttpException(
+        domainErrorCodes.chat.attachmentAlreadyLinked,
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    await this.prisma.chat_message_attachments
+      .deleteMany({
+        where: { id: attachment.id, message_id: null },
+      })
+      .catch(() => undefined);
+
+    await this.deleteObjectsBestEffort([attachment.storage_key]);
+
+    return mapChatAttachmentToDto(attachment);
+  }
+
+  /**
+   * Removes attachments that were uploaded but never linked to a message.
+   *
+   * A composer that is closed, navigated away from or abandoned leaves the
+   * uploaded object and its row behind: the row exists from the moment the
+   * upload is confirmed, while only sending the message links it. Those
+   * rows are orphans, and this sweep collects them.
+   *
+   * The window is deliberately wide. A staged attachment is cheap to keep
+   * for a while — the user may still be composing the message — and the
+   * cost of deleting one too early is a broken send, while the cost of
+   * keeping one too long is a little storage.
+   */
+  async sweepOrphanAttachments(
+    olderThan: Date,
+    limit = 200,
+  ): Promise<{ rows: number; objects: number }> {
+    const rows = await this.prisma.chat_message_attachments.findMany({
+      where: {
+        message_id: null,
+        created_at: { lt: olderThan },
+      },
+      select: { id: true, storage_key: true },
+      orderBy: { created_at: 'asc' },
+      take: limit,
+    });
+    if (rows.length === 0) return { rows: 0, objects: 0 };
+
+    const deleted = await this.prisma.chat_message_attachments
+      .deleteMany({
+        where: {
+          id: { in: rows.map((r) => r.id) },
+          message_id: null,
+        },
+      })
+      .catch(() => null);
+
+    // The rows may have been linked to a message between the read and the
+    // delete; only the objects of rows that are actually gone are removed.
+    const remaining = await this.prisma.chat_message_attachments
+      .findMany({
+        where: { id: { in: rows.map((r) => r.id) } },
+        select: { id: true, storage_key: true },
+      })
+      .catch(() => rows);
+    const removedIds = new Set(remaining.map((r) => r.id));
+    const orphanedKeys = rows
+      .filter((r) => !removedIds.has(r.id))
+      .map((r) => r.storage_key);
+
+    if (orphanedKeys.length > 0) {
+      await this.deleteObjectsBestEffort(orphanedKeys);
+    }
+
+    return { rows: deleted?.count ?? 0, objects: orphanedKeys.length };
+  }
+
   async deleteObjectsBestEffort(keys: string[]): Promise<void> {
     await Promise.all(
       keys.map(async (key) => {

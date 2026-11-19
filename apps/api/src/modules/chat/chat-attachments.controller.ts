@@ -4,6 +4,7 @@ import { pipeline } from 'node:stream/promises';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -128,6 +129,52 @@ export class ChatAttachmentsController {
       userId,
       conversationId,
       input.uploadToken,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Discard a staged chat attachment that was never sent',
+    description:
+      'Removes an uploaded attachment that has not been linked to a message, together with its stored object. Used when the sender discards a file in the composer.',
+  })
+  @ApiParam({
+    name: 'conversationId',
+    description: 'Identifier of the target chat conversation.',
+    format: 'uuid',
+  })
+  @ApiParam({
+    name: 'attachmentId',
+    description: 'Identifier of the staged chat attachment.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'The discarded chat attachment metadata.',
+    type: ChatAttachmentResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'The attachment identifier is invalid.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'The caller is not a participant in the attachment conversation.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The staged attachment does not exist.',
+  })
+  @ApiConflictResponse({
+    description: 'The attachment already belongs to a sent message.',
+  })
+  @Delete('conversations/:conversationId/attachments/:attachmentId')
+  @HttpCode(HttpStatus.OK)
+  async deleteStagedAttachment(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    @CurrentUserId() userId: string,
+  ): Promise<ChatAttachmentResponseDto> {
+    return this.attachments.deleteStagedAttachment(
+      userId,
+      conversationId,
+      attachmentId,
     );
   }
 

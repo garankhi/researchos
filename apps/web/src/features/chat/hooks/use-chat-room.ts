@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   chatAttachmentsControllerConfirmUpload,
+  chatAttachmentsControllerDeleteStagedAttachment,
   chatAttachmentsControllerPrepareUpload,
   chatControllerListMessages,
   getChatControllerGetConversationQueryKey,
@@ -504,11 +505,37 @@ export function useChatRoom({
     [conversationId, pendingAttachments.length],
   );
 
-  const removePendingAttachment = useCallback((localId: string) => {
-    setPendingAttachments((prev) =>
-      prev.filter((item) => item.localId !== localId),
-    );
-  }, []);
+  /**
+   * Discards an attachment the user picked but never sent.
+   *
+   * The upload already reached storage when the file was chosen, so the
+   * row and the stored object are removed here as well — otherwise every
+   * discarded file would sit in storage until the sweeper collects it.
+   */
+  const removePendingAttachment = useCallback(
+    async (localId: string) => {
+      const item = pendingAttachments.find((a) => a.localId === localId);
+      setPendingAttachments((prev) =>
+        prev.filter((entry) => entry.localId !== localId),
+      );
+
+      // Only a confirmed upload has a server-side row to delete. An upload
+      // still in flight has no row yet; the sweep collects it later.
+      const confirmedId = item?.confirmed?.id;
+      if (!conversationId || !confirmedId) return;
+
+      try {
+        await chatAttachmentsControllerDeleteStagedAttachment(
+          conversationId,
+          confirmedId,
+        );
+      } catch {
+        // The row stays until the sweeper removes it; discarding the file
+        // locally must never fail because the server was unreachable.
+      }
+    },
+    [conversationId, pendingAttachments],
+  );
 
   const hasUploadingAttachments = pendingAttachments.some(
     (a) =>

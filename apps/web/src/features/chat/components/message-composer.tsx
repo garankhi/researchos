@@ -26,6 +26,16 @@ import { FieldError } from '@/components/ui/feedback';
 import { resolveErrorCode } from '@/utils/error-messages';
 import type { ChatParticipantPayload, PendingAttachmentItem } from '../types';
 
+/**
+ * The height the composer row shares.
+ *
+ * The attachment button, the text field and the send button are all given
+ * this height, so the row reads as one control instead of three mismatched
+ * ones. It is the height of the text field: a two-line field with the
+ * default padding and border (1px + 8px + 2 lines of 20px + 8px + 1px).
+ */
+const CONTROL_HEIGHT = '58px';
+
 interface ActiveMentionQuery {
   triggerIndex: number;
   query: string;
@@ -67,7 +77,7 @@ export function MessageComposer({
   errorCode: string | null;
   onClearError: () => void;
   onStageFiles: (files: File[]) => void;
-  onRemoveAttachment: (localId: string) => void;
+  onRemoveAttachment: (localId: string) => void | Promise<void>;
   onSendMessage: (body: string) => Promise<boolean>;
   onStartTyping: () => void;
   onStopTyping: () => void;
@@ -349,6 +359,8 @@ export function MessageComposer({
             type="button"
             variant="outline"
             size="sm"
+            h={CONTROL_HEIGHT}
+            w={CONTROL_HEIGHT}
             flexShrink={0}
             disabled={attachDisabled}
             aria-label={t('attachFiles')}
@@ -389,12 +401,14 @@ export function MessageComposer({
             disabled={disabled}
             flex="1"
             minW="0"
+            h={CONTROL_HEIGHT}
           />
 
           <Button
             type="button"
             size="sm"
             flexShrink={0}
+            h={CONTROL_HEIGHT}
             onClick={() => void handleSubmit()}
             disabled={!canSend}
             loading={isSending}

@@ -290,6 +290,158 @@ describe('ChatAttachmentsService', () => {
       status: HttpStatus.FORBIDDEN,
     });
   });
+
+  it('discards a staged attachment and its stored object', async () => {
+    const { service, prisma, adapter } = makeHarness();
+    (
+      prisma.chat_message_attachments.findUnique as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      id: ATT_ID,
+      message_id: null,
+      conversation_id: CONV_ID,
+      uploaded_by: ALICE_ID,
+      storage_key: `chat/${CONV_ID}/staged-1`,
+      file_name: 'notes.txt',
+      mime_type: 'text/plain',
+      size_bytes: 42n,
+      sha256: 'a'.repeat(64),
+      width: null,
+      height: null,
+      created_at: new Date(),
+    });
+
+    const discarded = await service.deleteStagedAttachment(
+      ALICE_ID,
+      CONV_ID,
+      ATT_ID,
+    );
+
+    expect(discarded.id).toBe(ATT_ID);
+    expect(discarded.messageId).toBeNull();
+    expect(
+      prisma.chat_message_attachments.deleteMany as ReturnType<typeof vi.fn>,
+    ).toHaveBeenCalledWith({
+      where: { id: ATT_ID, message_id: null },
+    });
+    expect(adapter.deleteObject).toHaveBeenCalledWith(
+      `chat/${CONV_ID}/staged-1`,
+    );
+  });
+
+  it('refuses to discard an attachment owned by someone else or already sent', async () => {
+    const { service, prisma, adapter } = makeHarness();
+    (
+      prisma.chat_message_attachments.findUnique as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      id: ATT_ID,
+      message_id: null,
+      conversation_id: CONV_ID,
+      uploaded_by: BOB_ID,
+      storage_key: `chat/${CONV_ID}/staged-2`,
+      file_name: 'notes.txt',
+      mime_type: 'text/plain',
+      size_bytes: 42n,
+      sha256: 'a'.repeat(64),
+      width: null,
+      height: null,
+      created_at: new Date(),
+    });
+
+    await expect(
+      service.deleteStagedAttachment(ALICE_ID, CONV_ID, ATT_ID),
+    ).rejects.toMatchObject({
+      code: domainErrorCodes.chat.attachmentNotFound,
+      status: HttpStatus.NOT_FOUND,
+    });
+
+    (
+      prisma.chat_message_attachments.findUnique as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      id: ATT_ID,
+      message_id: MSG_ID,
+      conversation_id: CONV_ID,
+      uploaded_by: ALICE_ID,
+      storage_key: `chat/${CONV_ID}/staged-2`,
+      file_name: 'notes.txt',
+      mime_type: 'text/plain',
+      size_bytes: 42n,
+      sha256: 'a'.repeat(64),
+      width: null,
+      height: null,
+      created_at: new Date(),
+    });
+
+    await expect(
+      service.deleteStagedAttachment(ALICE_ID, CONV_ID, ATT_ID),
+    ).rejects.toMatchObject({
+      code: domainErrorCodes.chat.attachmentAlreadyLinked,
+      status: HttpStatus.CONFLICT,
+    });
+    expect(adapter.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('sweeps only unlinked attachments older than the window and removes their objects', async () => {
+    const { service, prisma, adapter } = makeHarness();
+    const orphanId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    (prisma.chat_message_attachments.findMany as ReturnType<typeof vi.fn>)
+      // The first read selects the orphans.
+      .mockResolvedValueOnce([
+        {
+          id: orphanId,
+          storage_key: `chat/${CONV_ID}/orphan-1`,
+        },
+      ])
+      // The second read confirms the rows are gone.
+      .mockResolvedValueOnce([]);
+
+    (
+      prisma.chat_message_attachments.deleteMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({ count: 1 });
+
+    const result = await service.sweepOrphanAttachments(
+      new Date('2026-11-18T00:00:00.000Z'),
+    );
+
+    expect(result.rows).toBe(1);
+    expect(result.objects).toBe(1);
+    expect(adapter.deleteObject).toHaveBeenCalledWith(
+      `chat/${CONV_ID}/orphan-1`,
+    );
+    // Only unlinked rows are eligible for the sweep.
+    expect(
+      prisma.chat_message_attachments.findMany as ReturnType<typeof vi.fn>,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ message_id: null }),
+      }),
+    );
+  });
+
+  it('keeps the stored object when the row was linked to a message during the sweep', async () => {
+    const { service, prisma, adapter } = makeHarness();
+    const orphanId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+    (prisma.chat_message_attachments.findMany as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        { id: orphanId, storage_key: `chat/${CONV_ID}/orphan-2` },
+      ])
+      // The row survived because a message claimed it in between.
+      .mockResolvedValueOnce([
+        { id: orphanId, storage_key: `chat/${CONV_ID}/orphan-2` },
+      ]);
+
+    (
+      prisma.chat_message_attachments.deleteMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({ count: 0 });
+
+    const result = await service.sweepOrphanAttachments(
+      new Date('2026-11-18T00:00:00.000Z'),
+    );
+
+    expect(result.objects).toBe(0);
+    expect(adapter.deleteObject).not.toHaveBeenCalled();
+  });
 });
 
 describe('ChatService & ChatGateway', () => {
@@ -784,5 +936,36 @@ describe('ChatService & ChatGateway', () => {
     expect(conv.id).toBe(CONV_ID);
     expect(prisma.chat_conversations.create).not.toHaveBeenCalled();
     expect(conv.participants[0]?.role).toBe(ChatParticipantRoleEnum.OWNER);
+  });
+
+  it('deletes the attachment rows and stored objects when a message is deleted', async () => {
+    const { chatService, prisma, tx, attachments } = makeChatHarness();
+    const storageKey = `chat/${CONV_ID}/attached-1`;
+
+    (
+      prisma.chat_messages.findFirst as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      id: MSG_ID,
+      conversation_id: CONV_ID,
+      sender_id: ALICE_ID,
+      deleted_at: null,
+      deleted_by: null,
+      chat_message_attachments: [{ id: ATT_ID, storage_key: storageKey }],
+    });
+
+    const result = await chatService.deleteMessage(ALICE_ID, {
+      conversationId: CONV_ID,
+      messageId: MSG_ID,
+    });
+
+    expect(result.deleted.messageId).toBe(MSG_ID);
+    // The row goes with the message.
+    expect(
+      tx.chat_message_attachments.deleteMany as ReturnType<typeof vi.fn>,
+    ).toHaveBeenCalledWith({ where: { message_id: MSG_ID } });
+    // And so does the stored object.
+    expect(attachments.deleteObjectsBestEffort).toHaveBeenCalledWith([
+      storageKey,
+    ]);
   });
 });
