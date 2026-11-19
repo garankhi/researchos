@@ -85,11 +85,11 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 
 SeaweedFS có sẵn web UI và compose đã publish ra loopback:
 
-| URL | Dùng để |
-| --- | --- |
+| URL                              | Dùng để                                            |
+| -------------------------------- | -------------------------------------------------- |
 | `http://localhost:8888/buckets/` | Duyệt file trong bucket, upload bằng drag-and-drop |
-| `http://localhost:8888/` | Filer: duyệt cây thư mục |
-| `http://localhost:9333/` | Master: cluster status, volume, số liệu |
+| `http://localhost:8888/`         | Filer: duyệt cây thư mục                           |
+| `http://localhost:9333/`         | Master: cluster status, volume, số liệu            |
 
 Hai UI này không có authentication, nên chỉ bind vào `127.0.0.1`. Đổi port thì sửa
 mục `ports` của service `seaweedfs` trong `compose.yaml`.
@@ -122,12 +122,12 @@ Các tài khoản cho local login (FPTU SSO chưa có tài liệu) được `pnp
 tạo luôn. Chúng dùng chung một mật khẩu đã biết, nên chỉ có ý nghĩa ở máy
 local:
 
-| Email | `user_type` | Quyền |
-| --- | --- | --- |
-| `admin@researchos.local` | `STAFF` | `ADMIN` + `RESEARCHER` |
-| `faculty@researchos.local` | `FACULTY` | researcher qua luật nền, không có dòng grant |
-| `student@researchos.local` | `STUDENT` | `RESEARCHER` |
-| `guest@researchos.local` | `STAFF` | không có quyền |
+| Email                      | `user_type` | Quyền                                        |
+| -------------------------- | ----------- | -------------------------------------------- |
+| `admin@researchos.local`   | `STAFF`     | `ADMIN` + `RESEARCHER`                       |
+| `faculty@researchos.local` | `FACULTY`   | researcher qua luật nền, không có dòng grant |
+| `student@researchos.local` | `STUDENT`   | `RESEARCHER`                                 |
+| `guest@researchos.local`   | `STAFF`     | không có quyền                               |
 
 Mật khẩu của cả bốn tài khoản là `ResearchOS!Dev2026`. Seed tài khoản chạy
 luôn cùng taxonomy, nên `pnpm db:seed` và `pnpm db:seed:online` luôn tạo tài
@@ -135,30 +135,30 @@ khoản.
 
 ## Lệnh thường dùng
 
-| Lệnh | Tác dụng |
-| --- | --- |
-| `pnpm setup` | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen |
-| `pnpm infra:up` | Chạy PostgreSQL, Redis và SeaweedFS, rồi chờ healthcheck |
-| `pnpm infra:down` | Dừng hạ tầng local, giữ dữ liệu |
-| `pnpm infra:status` | Xem trạng thái hạ tầng local |
-| `pnpm infra:logs` | Xem log hạ tầng local |
-| `pnpm dev` | Chạy web và API |
-| `pnpm dev:worker` | Chạy worker |
-| `pnpm build` | Build toàn workspace |
-| `pnpm lint` | Lint toàn workspace |
-| `pnpm test` | Test toàn workspace |
-| `pnpm --filter web test` | Test riêng frontend (vitest) |
-| `pnpm --filter api test` | Test riêng backend |
-| `pnpm test:queue` | Test API → Redis → worker thật, tự khởi động worker thử |
-| `pnpm queue:probe` | Gửi một job kiểm tra đến worker đang chạy |
-| `pnpm codegen` | Sinh OpenAPI rồi client Orval cho web |
-| `pnpm db:setup` | Dựng database: tạo database, áp migration, seed taxonomy |
-| `pnpm db:seed` | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
-| `pnpm db:seed:online` | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development |
-| `pnpm db:migrate` | Tạo và áp dụng migration (chỉ ở máy dev) |
-| `pnpm db:migrate:deploy` | Áp dụng migration đã có (CI, production) |
-| `pnpm db:studio` | Prisma Studio |
-| `pnpm jira:commit-report` | Sinh nội dung comment Jira từ commit trong range |
+| Lệnh                      | Tác dụng                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm setup`              | Thiết lập toàn bộ máy local: `.env`, dependency, Docker, database, build, codegen  |
+| `pnpm infra:up`           | Chạy PostgreSQL, Redis và SeaweedFS, rồi chờ healthcheck                           |
+| `pnpm infra:down`         | Dừng hạ tầng local, giữ dữ liệu                                                    |
+| `pnpm infra:status`       | Xem trạng thái hạ tầng local                                                       |
+| `pnpm infra:logs`         | Xem log hạ tầng local                                                              |
+| `pnpm dev`                | Chạy web và API                                                                    |
+| `pnpm dev:worker`         | Chạy worker                                                                        |
+| `pnpm build`              | Build toàn workspace                                                               |
+| `pnpm lint`               | Lint toàn workspace                                                                |
+| `pnpm test`               | Test toàn workspace                                                                |
+| `pnpm --filter web test`  | Test riêng frontend (vitest)                                                       |
+| `pnpm --filter api test`  | Test riêng backend                                                                 |
+| `pnpm test:queue`         | Test API → Redis → worker thật, tự khởi động worker thử                            |
+| `pnpm queue:probe`        | Gửi một job kiểm tra đến worker đang chạy                                          |
+| `pnpm codegen`            | Sinh OpenAPI rồi client Orval cho web                                              |
+| `pnpm db:setup`           | Dựng database: tạo database, áp migration, seed taxonomy                           |
+| `pnpm db:seed`            | Nhập taxonomy OpenAlex từ snapshot có sẵn trong repo, và tạo tài khoản development |
+| `pnpm db:seed:online`     | Nhập taxonomy bằng cách tải trực tiếp từ OpenAlex, và tạo tài khoản development    |
+| `pnpm db:migrate`         | Tạo và áp dụng migration (chỉ ở máy dev)                                           |
+| `pnpm db:migrate:deploy`  | Áp dụng migration đã có (CI, production)                                           |
+| `pnpm db:studio`          | Prisma Studio                                                                      |
+| `pnpm jira:commit-report` | Sinh nội dung comment Jira từ commit trong range                                   |
 
 ## Quy trình làm một feature
 
@@ -237,8 +237,20 @@ pnpm codegen && pnpm build && pnpm lint && pnpm format:check && pnpm test
 là bất ngờ khi mở PR. Nếu đổi DTO mà quên `pnpm codegen`, bước `build` ở
 trên vẫn pass — CI sẽ fail, nhưng muộn hơn là ở đây.
 
-`pnpm format:check` chỉ *báo* file chưa đúng format (không sửa). Muốn tự
+`pnpm format:check` chỉ _báo_ file chưa đúng format (không sửa). Muốn tự
 sửa thì chạy `pnpm format`.
+
+Nhưng CI vẫn fail vì format là thứ dễ quên nhất, nên repo có sẵn một
+**pre-commit hook** ở `.githooks/pre-commit`: nó chạy Prettier lên các file
+đang staged và tự động `git add` lại bản đã sửa, trước khi commit được ghi.
+Nếu máy bạn chưa có hook:
+
+```powershell
+pnpm setup:hooks
+```
+
+`pnpm setup` cũng cài luôn hook này. Hook chỉ đụng vào file staged, nên
+một file chưa format ở chỗ khác trong repo không chặn commit của bạn.
 
 Nếu bạn đụng tới phần API ↔ Redis ↔ worker, chạy thêm bộ e2e — CI cũng
 chạy nó, trong một job riêng có Postgres và Redis:
@@ -256,14 +268,14 @@ git commit -m "feat(web): <mô tả ngắn> RES-<n>"
 
 Quy ước commit: `<type>(<scope>): <mô tả> RES-<n>`.
 
-| Type | Dùng khi |
-| --- | --- |
-| `feat` | Thêm tính năng |
-| `fix` | Sửa lỗi |
+| Type       | Dùng khi                        |
+| ---------- | ------------------------------- |
+| `feat`     | Thêm tính năng                  |
+| `fix`      | Sửa lỗi                         |
 | `refactor` | Đổi cấu trúc, không đổi hành vi |
-| `docs` | Chỉ tài liệu |
-| `ci` | Workflow, script, tooling |
-| `chore` | Việc bảo trì khác |
+| `docs`     | Chỉ tài liệu                    |
+| `ci`       | Workflow, script, tooling       |
+| `chore`    | Việc bảo trì khác               |
 
 Scope là phần bị ảnh hưởng: `web`, `api`, `database`, `worker`, `queue`, `skills`.
 Một thay đổi có thể có nhiều scope: `feat(api,web): ...`.
@@ -290,11 +302,11 @@ test, build, và schema drift. Đợi CI xanh rồi mới merge.
 
 CI chia làm ba job:
 
-| Job | Chạy gì | Cần service |
-| --- | --- | --- |
-| `checks` | codegen, drift check, lint, format check, test, build, skill links | không |
-| `e2e` | bộ e2e API ↔ Redis ↔ worker | Postgres, Redis |
-| `schema-drift` | datamodel đã commit có khớp schema nguồn | Postgres |
+| Job            | Chạy gì                                                            | Cần service     |
+| -------------- | ------------------------------------------------------------------ | --------------- |
+| `checks`       | codegen, drift check, lint, format check, test, build, skill links | không           |
+| `e2e`          | bộ e2e API ↔ Redis ↔ worker                                        | Postgres, Redis |
+| `schema-drift` | datamodel đã commit có khớp schema nguồn                           | Postgres        |
 
 ### 8. Sau khi merge
 
@@ -327,7 +339,7 @@ máy dev).
 
 > **Nguồn sự thật là file SQL, không phải Prisma.** Schema nghiệp vụ nằm ở
 > `docs/database/ResearchOS.sql`; `packages/database/prisma/schema.prisma` là
-> một bản *copy* được dùng để sinh client. Sửa schema thì sửa SQL, rồi
+> một bản _copy_ được dùng để sinh client. Sửa schema thì sửa SQL, rồi
 > introspect lại datamodel — không sửa datamodel rồi migration, vì hai bên
 > sẽ lệch nhau. CI có job `schema-drift` dựng lại database từ SQL rồi so với
 > datamodel đã commit, nên quên bước này sẽ fail ở CI.

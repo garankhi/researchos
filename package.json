@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "setup:hooks": "git config core.hooksPath .githooks",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "infra:status": "docker compose ps",

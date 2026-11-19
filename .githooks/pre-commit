@@ -1,0 +1,113 @@
+#!/usr/bin/env sh
+#
+# Format the staged files before the commit is written.
+#
+# CI runs `pnpm format:check`, which *reports* drift and fails. This hook
+# runs the same formatter over the staged files and rewrites them, so the
+# drift is fixed at the moment it is introduced instead of being
+# discovered on a pull request two commits later.
+#
+# Only the staged files are touched, so an unrelated unformatted file
+# elsewhere in the tree does not block the commit.
+#
+# Installed by `pnpm setup` through `git config core.hooksPath .githooks`.
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+# Files staged for this commit that Prettier is responsible for.
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|css|js|jsx|mjs|json|md|ya?ml)$' || true)
+
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+# Prettier is a dependency of the workspace packages, not of the root, so
+# the binary is looked up in the packages that declare it.
+prettier=""
+for candidate in \
+  apps/web/node_modules/.bin/prettier \
+  apps/api/node_modules/.bin/prettier \
+  apps/worker/node_modules/.bin/prettier \
+  packages/*/node_modules/.bin/prettier \
+  node_modules/.bin/prettier
+do
+  if [ -x "$candidate" ]; then
+    prettier="$candidate"
+    break
+  fi
+done
+
+if [ -z "$prettier" ]; then
+  echo "pre-commit: prettier was not found, skipping the format step" >&2
+  echo "pre-commit: run 'pnpm install' to install it" >&2
+  exit 0
+fi
+
+# The format is resolved *per package*, not for the repository as a whole.
+#
+# Each workspace has its own `.prettierrc`, and there is none at the root,
+# so running Prettier from the root would apply the defaults to files that
+# belong to a package — a different print width, and double quotes where
+# the package asks for single ones. The files are grouped by the package
+# that owns them and each group is formatted from inside that package, so
+# the config that applies is the one CI applies.
+#
+# A file that belongs to no package falls back to the root, which has no
+# config of its own.
+format_group() {
+  package_dir="$1"
+  shift
+
+  # `--config` names the config explicitly. Without it, Prettier would
+  # search upwards from the working directory, which is what makes the
+  # root-level run wrong in the first place.
+  config_path=$(cd "$package_dir" 2>/dev/null && node_modules/.bin/prettier --find-config-path . 2>/dev/null || true)
+
+  if [ -n "$config_path" ]; then
+    (cd "$package_dir" && "$prettier" --config "$config_path" --write --ignore-unknown --log-level warn "$@")
+  else
+    "$prettier" --write --ignore-unknown --log-level warn "$@"
+  fi
+}
+
+# Split the staged files by the workspace that owns them.
+for package_dir in apps/web apps/api apps/worker packages/database packages/error-codes packages/chat; do
+  [ -d "$package_dir" ] || continue
+
+  group=""
+  for file in $staged; do
+    case "$file" in
+      "$package_dir"/*) group="$group $file" ;;
+    esac
+  done
+
+  if [ -n "$group" ]; then
+    format_group "$package_dir" $group
+  fi
+done
+
+# Anything left belongs to the repository root (README, docs, workflows).
+root_group=""
+for file in $staged; do
+  matched="false"
+  for package_dir in apps/web apps/api apps/worker packages/database packages/error-codes packages/chat; do
+    case "$file" in
+      "$package_dir"/*) matched="true" ;;
+    esac
+  done
+  if [ "$matched" = "false" ]; then
+    root_group="$root_group $file"
+  fi
+done
+
+if [ -n "$root_group" ]; then
+  "$prettier" --write --ignore-unknown --log-level warn $root_group
+fi
+
+# Stage whatever the formatter rewrote.
+git add -- $staged
+
+exit 0

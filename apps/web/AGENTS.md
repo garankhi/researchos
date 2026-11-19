@@ -8,6 +8,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Formatting
+
+- Run `pnpm --filter web format` after editing files here. The pre-commit hook does this for staged files, but it only covers what is staged — a file you edited but did not stage stays unformatted.
+- `pnpm --filter web format:check` is what CI runs. It reports drift; it does not fix it.
+
 ## Chakra UI v3
 
 - Use the shared Chakra system in `src/theme/theme.ts`. Prefer semantic tokens and mobile-first responsive props.

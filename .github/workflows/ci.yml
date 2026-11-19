@@ -56,6 +56,10 @@ jobs:
       # Prettier only rewrites files; nothing checked that the tree was
       # already formatted, so the drift accumulated unnoticed. `--check`
       # fails instead of writing, which is what a CI step needs.
+      #
+      # The pre-commit hook in `.githooks` formats the staged files, so
+      # this step should rarely fire. The message names the fix, because a
+      # bare "code style issues found" is a puzzle.
       - name: Check the formatting
         run: pnpm format:check
       - name: Test
