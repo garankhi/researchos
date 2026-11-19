@@ -75,6 +75,7 @@ export function ImagePreviewModal({
                     type="button"
                     size="xs"
                     variant="ghost"
+                    position="static"
                     aria-label={tCommon('close')}
                     onClick={onClose}
                   >

@@ -10,6 +10,7 @@ import {
   IconButton,
   Image,
   Link,
+  Menu,
   Popover,
   Portal,
   Stack,
@@ -82,7 +83,8 @@ export function MessageItem({
   const isDeleted = Boolean(message.deletedAt);
   const [isEditing, setIsEditing] = useState(false);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
-  const [removeMenuOpen, setRemoveMenuOpen] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [removePromptOpen, setRemovePromptOpen] = useState(false);
   const [editDraft, setEditDraft] = useState(message.body);
   const [editErrorCode, setEditErrorCode] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -168,7 +170,7 @@ export function MessageItem({
     }
   })();
 
-  const isToolbarVisible = reactionPickerOpen || removeMenuOpen;
+  const isToolbarVisible = reactionPickerOpen || actionsMenuOpen;
 
   const renderFloatingToolbar = () => {
     if (isDeleted || message.localState || isEditing) return null;
@@ -224,38 +226,69 @@ export function MessageItem({
           </Portal>
         </Popover.Root>
 
-        {isOwn && (
-          <IconButton
-            type="button"
-            size="2xs"
-            variant="ghost"
-            aria-label={t('editAction')}
-            title={t('editAction')}
-            onClick={() => {
-              setEditDraft(message.body);
-              setIsEditing(true);
-            }}
-          >
-            <Pencil size={13} />
-          </IconButton>
-        )}
-
+        {/*
+          The removal prompt hangs off the actions button, so the button is
+          its anchor. Without an anchor the popover has no reference to
+          position against and lands outside the viewport.
+        */}
         <Popover.Root
-          open={removeMenuOpen}
-          onOpenChange={(details) => setRemoveMenuOpen(details.open)}
+          open={removePromptOpen}
+          onOpenChange={(details) => setRemovePromptOpen(details.open)}
           positioning={{ placement: 'top' }}
         >
-          <Popover.Trigger asChild>
-            <IconButton
-              type="button"
-              size="2xs"
-              variant="ghost"
-              aria-label={t('deleteAction')}
-              title={t('deleteAction')}
+          <Popover.Anchor>
+            <Menu.Root
+              open={actionsMenuOpen}
+              onOpenChange={(details) => setActionsMenuOpen(details.open)}
+              positioning={{ placement: 'top' }}
             >
-              <MoreHorizontal size={14} />
-            </IconButton>
-          </Popover.Trigger>
+              <Menu.Trigger asChild>
+                <IconButton
+                  type="button"
+                  size="2xs"
+                  variant="ghost"
+                  aria-label={t('messageActions')}
+                  title={t('messageActions')}
+                >
+                  <MoreHorizontal size={14} />
+                </IconButton>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <Menu.Content boxShadow="overlayPanel" w="auto" p="1">
+                    {isOwn && (
+                      <Menu.Item
+                        value="edit"
+                        layerStyle="interactiveRow"
+                        onSelect={() => {
+                          setEditDraft(message.body);
+                          setIsEditing(true);
+                        }}
+                      >
+                        <Pencil size={13} />
+                        <Menu.ItemText>{t('editAction')}</Menu.ItemText>
+                      </Menu.Item>
+                    )}
+
+                    {isOwn && <Menu.Separator />}
+
+                    <Menu.Item
+                      value="delete"
+                      layerStyle="interactiveRow"
+                      onSelect={() => {
+                        setActionsMenuOpen(false);
+                        setRemovePromptOpen(true);
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      <Menu.ItemText>{t('deleteAction')}</Menu.ItemText>
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </Popover.Anchor>
+
           <Portal>
             <Popover.Positioner>
               <Popover.Content boxShadow="overlayPanel" w="276px" p="3">
@@ -273,7 +306,7 @@ export function MessageItem({
                         colorPalette="red"
                         w="full"
                         onClick={() => {
-                          setRemoveMenuOpen(false);
+                          setRemovePromptOpen(false);
                           onDeleteMessage(message.id);
                         }}
                       >
@@ -293,7 +326,7 @@ export function MessageItem({
                       variant={isOwn ? 'outline' : 'solid'}
                       w="full"
                       onClick={() => {
-                        setRemoveMenuOpen(false);
+                        setRemovePromptOpen(false);
                         onHideMessageForMe(message.id);
                       }}
                     >
@@ -312,7 +345,7 @@ export function MessageItem({
                       colorPalette="red"
                       w="full"
                       onClick={() => {
-                        setRemoveMenuOpen(false);
+                        setRemovePromptOpen(false);
                         onDeleteMessage(message.id);
                       }}
                     >
@@ -326,7 +359,7 @@ export function MessageItem({
                     size="2xs"
                     variant="ghost"
                     w="full"
-                    onClick={() => setRemoveMenuOpen(false)}
+                    onClick={() => setRemovePromptOpen(false)}
                   >
                     {tRemove('cancel')}
                   </Button>
@@ -342,6 +375,7 @@ export function MessageItem({
   return (
     <Flex
       role="group"
+      className="group"
       direction="column"
       w="full"
       mt={isFirstInGroup ? '3' : '1px'}
@@ -379,7 +413,7 @@ export function MessageItem({
       >
         {/* If incoming: avatar on last message of group, or empty spacer to keep alignment */}
         {!isOwn && (
-          <Box w="32px" h="32px" flexShrink={0} mb="0.5">
+          <Box w="32px" h="32px" flexShrink={0} mb="0.5" me="1.5">
             {isLastInGroup ? (
               <Link
                 asChild

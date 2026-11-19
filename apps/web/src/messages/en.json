@@ -640,6 +640,7 @@
     "editedBadge": "edited",
     "editAction": "Edit",
     "deleteAction": "Remove",
+    "messageActions": "Message actions",
     "removeMenu": {
       "title": "Who do you want to remove this message for?",
       "titleOther": "Remove message from your view?",

@@ -646,6 +646,7 @@
     "editedBadge": "đã chỉnh sửa",
     "editAction": "Chỉnh sửa",
     "deleteAction": "Gỡ tin nhắn",
+    "messageActions": "Thao tác với tin nhắn",
     "removeMenu": {
       "title": "Bạn muốn gỡ tin nhắn này ở đâu?",
       "titleOther": "Ẩn tin nhắn này ở phía bạn?",
