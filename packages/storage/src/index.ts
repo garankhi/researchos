@@ -33,7 +33,9 @@ export interface ObjectMetadata {
 
 export interface StorageAdapter {
   createUploadUrl(request: UploadRequest): Promise<PresignedUpload>;
-  headObject(key: string): Promise<ObjectMetadata | null>;
+  /** Deleting a missing object succeeds. */
+  deleteObject(key: string, signal?: AbortSignal): Promise<void>;
+  headObject(key: string, signal?: AbortSignal): Promise<ObjectMetadata | null>;
   /** The caller owns the stream and compares its digest with application metadata. */
   getObject(key: string, signal?: AbortSignal): Promise<Readable>;
   putObject(
@@ -41,7 +43,6 @@ export interface StorageAdapter {
     body: Uint8Array,
     contentType: string,
   ): Promise<ObjectMetadata>;
-  deleteObject(key: string): Promise<void>;
 }
 
 export class StorageObjectNotFoundError extends Error {
@@ -149,7 +150,18 @@ class S3Storage implements StorageAdapter {
     };
   }
 
-  async headObject(key: string): Promise<ObjectMetadata | null> {
+  async deleteObject(key: string, signal?: AbortSignal): Promise<void> {
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+        { abortSignal: signal },
+      );
+    } catch (error) {
+      if (!isObjectNotFound(error)) throw error;
+    }
+  }
+
+  async headObject(key: string, signal?: AbortSignal): Promise<ObjectMetadata | null> {
     let result;
     try {
       result = await this.client.send(
@@ -158,6 +170,7 @@ class S3Storage implements StorageAdapter {
           Key: key,
           ChecksumMode: 'ENABLED',
         }),
+        { abortSignal: signal },
       );
     } catch (error) {
       if (isObjectNotFound(error)) {
@@ -224,22 +237,6 @@ class S3Storage implements StorageAdapter {
       contentType,
       sha256: checksum.toString('hex'),
     };
-  }
-
-  async deleteObject(key: string): Promise<void> {
-    try {
-      await this.client.send(
-        new DeleteObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-        }),
-      );
-    } catch (error) {
-      if (isObjectNotFound(error)) {
-        return;
-      }
-      throw error;
-    }
   }
 }
 

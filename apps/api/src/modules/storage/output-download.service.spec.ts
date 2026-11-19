@@ -23,6 +23,7 @@ function setup() {
   const storage = new ObjectStorageService();
   vi.spyOn(storage, 'adapter', 'get').mockReturnValue({
     createUploadUrl: vi.fn(),
+    deleteObject: vi.fn(),
     getObject,
     headObject: vi.fn(),
     putObject: vi.fn(),

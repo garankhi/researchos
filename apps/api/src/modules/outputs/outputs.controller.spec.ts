@@ -10,6 +10,7 @@ import {
 } from '@researchos/database';
 import { describe, expect, it, vi } from 'vitest';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { ArticleCreationUploadService } from '../storage/article-creation-upload.service.js';
 import { ListOutputsQueryDto } from './dto/list-outputs-query.dto.js';
 import { OutputsController } from './outputs.controller.js';
 import { OutputsService } from './outputs.service.js';
@@ -129,6 +130,7 @@ describe('OutputsController & OutputsService', () => {
         OutputsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: ProvenanceService, useValue: { confirmField: vi.fn() } },
+        { provide: ArticleCreationUploadService, useValue: {} },
       ],
     }).compile();
 
@@ -516,6 +518,7 @@ describe('OutputsController & OutputsService', () => {
             visibility: OutputFileVisibility.FPTU_COMMUNITY,
             access_group_id: null,
             uploaded_at: new Date('2026-11-11T00:00:00.000Z'),
+            is_current_release_attachment: true,
           },
         ]);
 
@@ -533,6 +536,7 @@ describe('OutputsController & OutputsService', () => {
         visibility: OutputFileVisibility.FPTU_COMMUNITY,
         accessGroupId: null,
         uploadedAt: '2026-11-11T00:00:00.000Z',
+        isCurrentReleaseAttachment: true,
       });
     });
   });

@@ -2,13 +2,19 @@ import 'reflect-metadata';
 import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { Readable } from 'node:stream';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@researchos/database';
+import {
+  createS3Storage,
+  StorageObjectNotFoundError,
+  type StorageAdapter,
+} from '@researchos/storage';
 import cookieParser from 'cookie-parser';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createHttpTestClient } from './http-test-client.js';
 
 const { Client } = createRequire(import.meta.resolve('@researchos/database'))(
@@ -19,6 +25,41 @@ const migrationRoot = new URL(
   import.meta.url,
 );
 const articleMigration = '20261118150000_article_creation';
+const pdf = Buffer.from(
+  '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n',
+);
+const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
+
+function createTestStorage(): StorageAdapter {
+  const objects = new Map<string, { bytes: Buffer; contentType: string }>();
+  return {
+    async createUploadUrl({ contentType }) {
+      return {
+        url: 'https://storage.article.test.invalid/upload',
+        headers: { 'content-type': contentType },
+      };
+    },
+    async headObject(key) {
+      const object = objects.get(key);
+      return object
+        ? { sizeBytes: object.bytes.length, contentType: object.contentType }
+        : null;
+    },
+    async getObject(key, signal) {
+      signal?.throwIfAborted();
+      const object = objects.get(key);
+      if (!object) throw new StorageObjectNotFoundError(undefined);
+      return Readable.from([object.bytes]);
+    },
+    async putObject(key, bytes, contentType) {
+      objects.set(key, { bytes: Buffer.from(bytes), contentType });
+      return { sizeBytes: bytes.length, contentType };
+    },
+    async deleteObject(key) {
+      objects.delete(key);
+    },
+  };
+}
 
 describe('Article creation', () => {
   const actors = {
@@ -53,6 +94,10 @@ describe('Article creation', () => {
   let app: INestApplication;
   let originalRevision: Record<string, unknown>;
   let originalSearchTimestamp: string;
+  let storage: StorageAdapter;
+  let sweepExpiredUploads: () => Promise<void>;
+  const objectKeys = new Set<string>();
+  const useLocalS3 = process.env.ARTICLE_UPLOAD_E2E_STORAGE === 'seaweedfs';
 
   async function readLegacyRevision() {
     const result = await db.query(
@@ -207,12 +252,29 @@ describe('Article creation', () => {
       await import('../dist/modules/identity/identity.module.js');
     const { OutputsModule } =
       await import('../dist/modules/outputs/outputs.module.js');
+    const { ObjectStorageService } =
+      await import('../dist/modules/storage/object-storage.service.js');
+    const { StorageModule } =
+      await import('../dist/modules/storage/storage.module.js');
+    const { ArticleCreationUploadCleanupService } =
+      await import('../dist/modules/storage/article-creation-upload-cleanup.service.js');
     const { OpenAlexModule } =
       await import('../dist/modules/openalex/openalex.module.js');
     const { HttpExceptionFilter } =
       await import('../dist/common/filters/http-exception.filter.js');
     const { ApiResponseInterceptor } =
       await import('../dist/common/interceptors/api-response.interceptor.js');
+    if (useLocalS3) {
+      const endpoint = new URL(process.env.S3_ENDPOINT ?? '');
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)) {
+        throw new Error(
+          'SeaweedFS integration tests need a loopback S3 endpoint',
+        );
+      }
+    }
+    storage = useLocalS3 ? createS3Storage() : createTestStorage();
+    const objectStorage = new ObjectStorageService();
+    vi.spyOn(objectStorage, 'adapter', 'get').mockReturnValue(storage);
     const fixture = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
@@ -222,9 +284,15 @@ describe('Article creation', () => {
         PrismaModule,
         IdentityModule,
         OutputsModule,
+        StorageModule,
         OpenAlexModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(ObjectStorageService)
+      .useValue(objectStorage)
+      .compile();
+    const cleanup = fixture.get(ArticleCreationUploadCleanupService);
+    sweepExpiredUploads = () => cleanup.sweepExpiredUploads();
     app = fixture.createNestApplication({ logger: false });
     app.use(cookieParser());
     app.useGlobalPipes(
@@ -245,13 +313,22 @@ describe('Article creation', () => {
     http.close();
     try {
       await app?.close();
-      await db?.end();
-      if (databaseCreated)
-        await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+      if (useLocalS3) {
+        await Promise.all(
+          [...objectKeys].map((key) => storage.deleteObject(key)),
+        );
+      }
     } finally {
-      await admin?.end();
-      if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
-      else process.env.DATABASE_URL = originalDatabaseUrl;
+      await db?.end();
+      try {
+        if (databaseCreated) {
+          await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+        }
+      } finally {
+        await admin?.end();
+        if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+        else process.env.DATABASE_URL = originalDatabaseUrl;
+      }
     }
   });
 
@@ -274,6 +351,454 @@ describe('Article creation', () => {
       .get(`/outputs/${id}`)
       .set('Cookie', cookies.get('reader')!);
   }
+
+  const uploadEndpoint = '/outputs/creation-uploads';
+  const pdfInput = {
+    fileName: 'article.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: pdf.length,
+    sha256: pdfSha256,
+  };
+
+  function request(actor: Actor) {
+    const cookie = cookies.get(actor)!;
+    const client = http.request(app.getHttpServer());
+    return {
+      get: (path: string) => client.get(path).set('Cookie', cookie),
+      post: (path: string) => client.post(path).set('Cookie', cookie),
+      put: (path: string) => client.put(path).set('Cookie', cookie),
+      patch: (path: string) => client.patch(path).set('Cookie', cookie),
+      delete: (path: string) => client.delete(path).set('Cookie', cookie),
+    };
+  }
+
+  async function preparePdf(details = pdfInput) {
+    const { body } = await request('owner')
+      .post(uploadEndpoint)
+      .send(details)
+      .expect(201);
+    const { uploadId, uploadUrl, headers, expiresAt } = body.data as {
+      uploadId: string;
+      uploadUrl: string;
+      headers: Record<string, string>;
+      expiresAt: string;
+    };
+    expect(Date.parse(expiresAt)).toBeGreaterThan(Date.now());
+    const { rows } = await db.query(
+      'SELECT storage_key FROM article_creation_uploads WHERE id = $1',
+      [uploadId],
+    );
+    const key: string = rows[0].storage_key;
+    objectKeys.add(key);
+    return { uploadId, uploadUrl, headers, key };
+  }
+
+  async function putPdf(upload: Awaited<ReturnType<typeof preparePdf>>) {
+    if (useLocalS3) {
+      const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+      const preflight = await fetch(upload.uploadUrl, {
+        method: 'OPTIONS',
+        headers: {
+          origin,
+          'access-control-request-method': 'PUT',
+          'access-control-request-headers': Object.keys(upload.headers).join(
+            ',',
+          ),
+        },
+      });
+      expect(preflight.ok).toBe(true);
+      expect([origin, '*']).toContain(
+        preflight.headers.get('access-control-allow-origin'),
+      );
+      const allowedMethods = preflight.headers
+        .get('access-control-allow-methods')
+        ?.split(/\s*,\s*/);
+      expect(
+        allowedMethods?.some((method) => method === 'PUT' || method === '*'),
+      ).toBe(true);
+      const allowedHeaders = preflight.headers
+        .get('access-control-allow-headers')
+        ?.toLowerCase()
+        .split(/\s*,\s*/);
+      expect(
+        allowedHeaders?.includes('*') ||
+          Object.keys(upload.headers).every((header) =>
+            allowedHeaders?.includes(header.toLowerCase()),
+          ),
+      ).toBe(true);
+      const response = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: upload.headers,
+        body: pdf,
+      });
+      if (!response.ok) {
+        throw new Error(`SeaweedFS presigned PUT failed (${response.status})`);
+      }
+      return;
+    }
+    await storage.putObject(upload.key, pdf, pdfInput.mimeType);
+  }
+
+  async function verifiedPdf() {
+    const upload = await preparePdf();
+    await putPdf(upload);
+    await request('owner')
+      .post(`${uploadEndpoint}/${upload.uploadId}/confirm`)
+      .expect(200);
+    return upload;
+  }
+
+  it('rejects invalid PDF upload JSON with a translatable code for each field', async () => {
+    const response = await request('owner')
+      .post(uploadEndpoint)
+      .send({
+        fileName: 123,
+        mimeType: 'text/plain',
+        sizeBytes: true,
+        sha256: 'bad',
+      })
+      .expect(400);
+    expect(response.body.message).toBe('validation_failed');
+    expect(response.body.errors).toHaveLength(4);
+    expect(response.body.errors).toEqual(
+      expect.arrayContaining([
+        { field: 'fileName', messages: ['article_pdf_file_name_invalid'] },
+        { field: 'mimeType', messages: ['article_pdf_mime_type_invalid'] },
+        { field: 'sizeBytes', messages: ['article_pdf_size_invalid'] },
+        { field: 'sha256', messages: ['article_pdf_sha256_invalid'] },
+      ]),
+    );
+
+    for (const sizeBytes of [
+      String(pdfInput.sizeBytes),
+      0,
+      1.5,
+      50 * 1024 ** 2 + 1,
+    ]) {
+      const invalid = await request('owner')
+        .post(uploadEndpoint)
+        .send({ ...pdfInput, sizeBytes })
+        .expect(400);
+      expect(invalid.body.errors).toEqual([
+        { field: 'sizeBytes', messages: ['article_pdf_size_invalid'] },
+      ]);
+    }
+  });
+
+  it('verifies an owner upload and atomically releases a Private PDF with exactly-once create', async () => {
+    await request('reader').post(uploadEndpoint).send(pdfInput).expect(403);
+    const upload = await preparePdf();
+    const path = `${uploadEndpoint}/${upload.uploadId}`;
+    const submission = {
+      ...input,
+      uploadId: upload.uploadId,
+      fileVisibility: 'PRIVATE',
+    };
+    await request('researcher').get(path).expect(404);
+    await request('researcher').post(`${path}/confirm`).expect(404);
+    await submit(submission, randomUUID(), 'researcher').expect(404);
+    const pending = await request('owner').get(path).expect(200);
+    expect(pending.body.data).toMatchObject({
+      status: 'PENDING',
+      metadataStatus: 'NOT_STARTED',
+    });
+    await submit(submission).expect(409);
+
+    await putPdf(upload);
+    if (useLocalS3) {
+      const duplicatePut = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: upload.headers,
+        body: pdf,
+      });
+      expect(duplicatePut.status).toBe(412);
+      await duplicatePut.body?.cancel();
+    }
+    const confirms = await Promise.all([
+      request('owner').post(`${path}/confirm`).expect(200),
+      request('owner').post(`${path}/confirm`).expect(200),
+    ]);
+    expect(confirms[0].body.data).toEqual(confirms[1].body.data);
+    expect(confirms[0].body.data.status).toBe('VERIFIED');
+
+    const key = randomUUID();
+    const [original, replay] = await Promise.all([
+      submit(submission, key).expect(201),
+      submit(submission, key).expect(201),
+    ]);
+    expect(original.body.data).toEqual(replay.body.data);
+    await submit(
+      { ...submission, fileVisibility: 'FPTU_COMMUNITY' },
+      key,
+    ).expect(409);
+    await submit(submission).expect(409);
+    const consumed = await request('owner').get(path).expect(200);
+    expect(consumed.body.data.status).toBe('CONSUMED');
+
+    const { outputId, revisionId } = original.body.data;
+    const files = await request('owner')
+      .get(`/outputs/${outputId}/files`)
+      .expect(200);
+    expect(files.body.data).toMatchObject([
+      { visibility: 'PRIVATE', isCurrentReleaseAttachment: true },
+    ]);
+    const file = files.body.data[0];
+    const { rows } = await db.query(
+      'SELECT revision_id FROM output_revision_files WHERE file_id = $1',
+      [file.id],
+    );
+    expect(rows).toEqual([{ revision_id: revisionId }]);
+    await db.query(
+      `UPDATE article_creation_uploads
+       SET created_at = now() - interval '2 days', verified_at = now() - interval '36 hours',
+           consumed_at = now() - interval '30 hours', expires_at = now() - interval '1 day'
+       WHERE id = $1`,
+      [upload.uploadId],
+    );
+    await sweepExpiredUploads();
+    await detail(outputId).expect(200);
+    await request('reader')
+      .get(`/output-files/${file.id}/download`)
+      .expect(403);
+    const download = await request('owner')
+      .get(`/output-files/${file.id}/download`)
+      .expect(200);
+    expect(download.body).toEqual(pdf);
+  });
+
+  it('rejects mismatching storage bytes and cleans an expired upload', async () => {
+    const incompatibleObjects = [
+      { bytes: pdf, contentType: 'text/plain' },
+      { bytes: pdf.subarray(0, -1), contentType: pdfInput.mimeType },
+      {
+        bytes: Buffer.from(pdf.toString().replace('Catalog', 'Changed')),
+        contentType: pdfInput.mimeType,
+      },
+    ];
+    for (const object of incompatibleObjects) {
+      const upload = await preparePdf();
+      await storage.putObject(upload.key, object.bytes, object.contentType);
+      await request('owner')
+        .post(`${uploadEndpoint}/${upload.uploadId}/confirm`)
+        .expect(409);
+    }
+
+    const fakePdf = Buffer.from(pdf.toString().replace('%PDF-', 'TEXT-'));
+    const invalid = await preparePdf({
+      ...pdfInput,
+      sha256: createHash('sha256').update(fakePdf).digest('hex'),
+    });
+    await storage.putObject(invalid.key, fakePdf, pdfInput.mimeType);
+    await request('owner')
+      .post(`${uploadEndpoint}/${invalid.uploadId}/confirm`)
+      .expect(409);
+
+    const expired = await verifiedPdf();
+    await db.query(
+      `UPDATE article_creation_uploads
+       SET created_at = now() - interval '2 days', verified_at = now() - interval '1 day',
+           expires_at = now() - interval '10 minutes'
+       WHERE id = $1`,
+      [expired.uploadId],
+    );
+    const path = `${uploadEndpoint}/${expired.uploadId}`;
+    const status = await request('owner').get(path).expect(200);
+    expect(status.body.data.status).toBe('EXPIRED');
+    await request('owner').post(`${path}/confirm`).expect(410);
+    await submit({
+      ...input,
+      uploadId: expired.uploadId,
+      fileVisibility: 'PRIVATE',
+    }).expect(410);
+    const deletion = vi
+      .spyOn(storage, 'deleteObject')
+      .mockRejectedValueOnce(new Error('temporary storage failure'));
+    try {
+      await sweepExpiredUploads();
+      expect(await storage.headObject(expired.key)).not.toBeNull();
+    } finally {
+      deletion.mockRestore();
+    }
+    await sweepExpiredUploads();
+    expect(await storage.headObject(expired.key)).toBeNull();
+    await sweepExpiredUploads();
+  });
+
+  it('allows just one submission to consume an upload across different idempotency keys', async () => {
+    const { uploadId } = await verifiedPdf();
+    const submission = { ...input, uploadId, fileVisibility: 'FPTU_COMMUNITY' };
+    const attempts = await Promise.all([
+      submit(submission),
+      submit(submission),
+    ]);
+    expect(attempts.map(({ status }) => status).sort((a, b) => a - b)).toEqual([
+      201, 409,
+    ]);
+    const winner = attempts.find(({ status }) => status === 201)!;
+    const files = await request('reader')
+      .get(`/outputs/${winner.body.data.outputId}/files`)
+      .expect(200);
+    expect(files.body.data).toMatchObject([
+      { visibility: 'FPTU_COMMUNITY', isCurrentReleaseAttachment: true },
+    ]);
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS file_count FROM output_files f
+       JOIN article_creation_uploads u ON u.storage_key = f.storage_key WHERE u.id = $1`,
+      [uploadId],
+    );
+    expect(rows[0].file_count).toBe(1);
+  });
+
+  it('rolls back upload consumption if releasing the attached revision fails', async () => {
+    const upload = await verifiedPdf();
+    await db.query(`
+      CREATE FUNCTION reject_upload_test_release() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.title = 'Article attachment rollback fixture' AND NEW.released_at IS NOT NULL THEN
+          RAISE EXCEPTION 'test release failure' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER reject_upload_test_release BEFORE UPDATE ON output_revisions
+        FOR EACH ROW EXECUTE FUNCTION reject_upload_test_release();
+    `);
+    const key = randomUUID();
+    const submission = {
+      ...input,
+      title: 'Article attachment rollback fixture',
+      uploadId: upload.uploadId,
+      fileVisibility: 'PRIVATE',
+    };
+    try {
+      const failed = await submit(submission, key);
+      expect(failed.status).toBeGreaterThanOrEqual(400);
+      const { rows } = await db.query(
+        `SELECT f.id, u.consumed_at FROM article_creation_uploads u
+         LEFT JOIN output_files f ON f.storage_key = u.storage_key WHERE u.id = $1`,
+        [upload.uploadId],
+      );
+      expect(rows).toEqual([{ id: null, consumed_at: null }]);
+    } finally {
+      await db.query(`
+        DROP TRIGGER reject_upload_test_release ON output_revisions;
+        DROP FUNCTION reject_upload_test_release();
+      `);
+    }
+    await submit(submission, key).expect(201);
+  });
+
+  it('lets the owner manage an Article PDF and withdraws replaced files from group-pinned revisions', async () => {
+    const created = await submit({ ...input, topicIds: [activeTopic] }).expect(
+      201,
+    );
+    const { outputId, revisionId } = created.body.data;
+    const pdfPath = `/outputs/${outputId}/article-pdf`;
+    const firstSharedAt = async () => {
+      const { rows } = await db.query(
+        'SELECT first_shared_at::text FROM research_outputs WHERE id = $1',
+        [outputId],
+      );
+      return rows[0].first_shared_at;
+    };
+    const firstReleaseTime = await firstSharedAt();
+    const upload = await verifiedPdf();
+    const attachment = {
+      uploadId: upload.uploadId,
+      fileVisibility: 'PRIVATE',
+      expectedRevisionId: revisionId,
+    };
+    await request('researcher').put(pdfPath).send(attachment).expect(403);
+    const added = await request('owner')
+      .put(pdfPath)
+      .send(attachment)
+      .expect(200);
+    const oldFile = added.body.data.fileId;
+    const oldRevision = added.body.data.revisionId;
+    expect(oldRevision).not.toBe(revisionId);
+
+    const publicFile = { fileVisibility: 'FPTU_COMMUNITY' };
+    await request('researcher')
+      .patch(`${pdfPath}/${oldFile}`)
+      .send(publicFile)
+      .expect(403);
+    const changed = await request('owner')
+      .patch(`${pdfPath}/${oldFile}`)
+      .send(publicFile)
+      .expect(200);
+    expect(changed.body.data.visibility).toBe('FPTU_COMMUNITY');
+    await request('reader')
+      .get(`/output-files/${oldFile}/download`)
+      .expect(200);
+
+    const groupId = randomUUID();
+    await db.query(
+      'INSERT INTO research_groups (id, code, name, lead_id) VALUES ($1, $2, $3, $4)',
+      [groupId, 'article-pdf-pin', 'Article PDF group', actors.owner],
+    );
+    await db.query(
+      `INSERT INTO group_output_links (
+         output_id, group_id, requested_revision_id, requested_by, status,
+         decided_by, decided_at, accepted_revision_id, accepted_by, accepted_at
+       ) VALUES ($1, $2, $3, $4, 'ACCEPTED', $4, now(), $3, $4, now())`,
+      [outputId, groupId, oldRevision, actors.owner],
+    );
+
+    const replacement = await verifiedPdf();
+    const replacementInput = {
+      uploadId: replacement.uploadId,
+      fileVisibility: 'FPTU_COMMUNITY',
+      expectedRevisionId: oldRevision,
+      replaceFileId: oldFile,
+    };
+    await request('owner')
+      .put(pdfPath)
+      .send({ ...replacementInput, expectedRevisionId: revisionId })
+      .expect(409);
+    const replaced = await request('owner')
+      .put(pdfPath)
+      .send(replacementInput)
+      .expect(200);
+    const newFile = replaced.body.data.fileId;
+    expect(newFile).not.toBe(oldFile);
+    await request('reader')
+      .get(`/output-files/${newFile}/download`)
+      .expect(200);
+    await request('reader')
+      .get(`/output-files/${oldFile}/download`)
+      .expect(403);
+    await request('owner').get(`/output-files/${oldFile}/download`).expect(403);
+    const history = await db.query(
+      `SELECT pin.accepted_revision_id, f.is_available
+       FROM group_output_links pin
+       JOIN output_revision_files rf ON rf.revision_id = pin.accepted_revision_id
+       JOIN output_files f ON f.id = rf.file_id
+       WHERE pin.group_id = $1 AND f.id = $2`,
+      [groupId, oldFile],
+    );
+    expect(history.rows).toEqual([
+      { accepted_revision_id: oldRevision, is_available: false },
+    ]);
+
+    const removed = await request('owner')
+      .delete(`${pdfPath}/${newFile}`)
+      .expect(200);
+    expect(removed.body.data.revisionId).not.toBe(
+      replaced.body.data.revisionId,
+    );
+    await request('reader')
+      .get(`/output-files/${newFile}/download`)
+      .expect(403);
+    const files = await request('owner')
+      .get(`/outputs/${outputId}/files`)
+      .expect(200);
+    expect(files.body.data).toEqual([]);
+    expect(await firstSharedAt()).toBe(firstReleaseTime);
+    const topics = await db.query(
+      'SELECT topic_id FROM output_topics WHERE revision_id = $1',
+      [removed.body.data.revisionId],
+    );
+    expect(topics.rows).toEqual([{ topic_id: activeTopic }]);
+  });
 
   it('migrates released and draft PAPER revisions and preserves the release lock and other types', async () => {
     expect(await readLegacyRevision()).toEqual({
@@ -333,6 +858,14 @@ describe('Article creation', () => {
   it('releases a metadata-only Article for immediate community access without implicitly linking the owner as author', async () => {
     const created = await submit(input).expect(201);
     const { outputId, revisionId } = created.body.data;
+    const fingerprint = await db.query(
+      'SELECT create_request_hash FROM research_outputs WHERE id = $1',
+      [outputId],
+    );
+    // Existing RES-172 idempotency records use the metadata-only fingerprint.
+    expect(fingerprint.rows[0].create_request_hash).toBe(
+      'ad06951e4788320eab89a31dc489c8e99ae07b29daa81c23fc498489a7c1d28c',
+    );
     const response = await detail(outputId).expect(200);
     expect(response.body.data).toMatchObject({
       ownerId: actors.owner,
@@ -464,7 +997,11 @@ describe('Article creation', () => {
       { outputType: 'DATASET' },
       { outputType: 'PAPER' },
       { visibility: 'PRIVATE' },
-      { uploadId: randomUUID(), fileVisibility: 'PRIVATE' },
+      { uploadId: randomUUID() },
+      { fileVisibility: 'PRIVATE' },
+      { uploadId: null, fileVisibility: 'PRIVATE' },
+      { uploadId: randomUUID(), fileVisibility: null },
+      { uploadId: randomUUID(), fileVisibility: 'RESEARCH_GROUP' },
     ]) {
       const response = await submit({ ...input, ...patch });
       expect(response.status, JSON.stringify(patch)).toBe(400);

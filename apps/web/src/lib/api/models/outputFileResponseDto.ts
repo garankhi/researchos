@@ -30,4 +30,6 @@ export interface OutputFileResponseDto {
   accessGroupId: OutputFileResponseDtoAccessGroupId;
   /** Timestamp when the file was uploaded. */
   uploadedAt: string;
+  /** Whether the file is attached to the current released revision. */
+  isCurrentReleaseAttachment: boolean;
 }

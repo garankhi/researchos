@@ -135,6 +135,10 @@ export const domainErrorCodes = {
     fileAccessDenied: 'output_file_access_denied',
     fileConflict: 'output_file_conflict',
     uploadIntentInvalid: 'output_upload_intent_invalid',
+    articlePdfUploadNotFound: 'article_pdf_upload_not_found',
+    articlePdfUploadExpired: 'article_pdf_upload_expired',
+    articlePdfUploadNotVerified: 'article_pdf_upload_not_verified',
+    articlePdfUploadConsumed: 'article_pdf_upload_consumed',
   },
   profiles: {
     profileNotFound: 'profile_not_found',

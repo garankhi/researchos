@@ -1,21 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import {
-  BadRequestException,
-  HttpStatus,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   OutputFileVisibility,
   Prisma,
   PrismaService,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
-import type { StorageAdapter } from '@researchos/storage';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type {
   CreateOutputUploadDto,
-  OutputFileResponseDto,
+  ConfirmedOutputFileDto,
   OutputUploadResponseDto,
 } from './dto/output-upload.dto.js';
 import { ObjectStorageService } from './object-storage.service.js';
@@ -24,17 +18,12 @@ import {
   signUploadIntent,
   type UploadIntent,
 } from './upload-token.js';
-import {
-  verifyUploadedS3Object,
-  withStorageAdapter,
-} from './verify-stored-object.js';
 
 const confirmationTtlMs = 15 * 60_000;
 type OutputFile = Prisma.output_filesGetPayload<undefined>;
 
 @Injectable()
 export class OutputUploadService {
-  private readonly logger = new Logger(OutputUploadService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: ObjectStorageService,
@@ -68,7 +57,7 @@ export class OutputUploadService {
       expiresAt: Date.now() + confirmationTtlMs,
     };
     const uploadToken = signUploadIntent(intent);
-    const { url, headers } = await this.withStorage((storage) =>
+    const { url, headers } = await this.storage.run((storage) =>
       storage.createUploadUrl({
         key: intent.key,
         contentType: intent.mimeType,
@@ -83,7 +72,7 @@ export class OutputUploadService {
     userId: string,
     outputId: string,
     uploadToken: string,
-  ): Promise<OutputFileResponseDto> {
+  ): Promise<ConfirmedOutputFileDto> {
     let intent: UploadIntent;
     try {
       intent = readUploadIntent(uploadToken);
@@ -114,7 +103,18 @@ export class OutputUploadService {
       );
     }
 
-    await this.verifyObject(intent);
+    const matched = await this.storage.verifyUpload({
+      key: intent.key,
+      contentType: intent.mimeType,
+      sizeBytes: intent.sizeBytes,
+      sha256: intent.sha256,
+    });
+    if (!matched) {
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
+    }
     // Evaluate authorization in the write statement, including when the
     // insert has to wait for a concurrent transaction before it can start.
     const [inserted] = await this.prisma.$queryRaw<OutputFile[]>`
@@ -151,15 +151,6 @@ export class OutputUploadService {
     return this.toResponse(file);
   }
 
-  private async verifyObject(intent: UploadIntent): Promise<void> {
-    await verifyUploadedS3Object(this.storage.adapter, this.logger, {
-      key: intent.key,
-      sizeBytes: intent.sizeBytes,
-      mimeType: intent.mimeType,
-      sha256: intent.sha256,
-    });
-  }
-
   private async assertCanManage(
     userId: string,
     outputId: string,
@@ -184,13 +175,7 @@ export class OutputUploadService {
     }
   }
 
-  private async withStorage<T>(
-    run: (storage: StorageAdapter) => Promise<T>,
-  ): Promise<T> {
-    return withStorageAdapter(this.storage.adapter, this.logger, run);
-  }
-
-  private toResponse(file: OutputFile): OutputFileResponseDto {
+  private toResponse(file: OutputFile): ConfirmedOutputFileDto {
     return {
       id: file.id,
       outputId: file.output_id,

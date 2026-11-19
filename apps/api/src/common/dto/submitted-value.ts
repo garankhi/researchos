@@ -1,5 +1,6 @@
 import type { TransformFnParams } from 'class-transformer';
 
+/** Preserve the original JSON value when implicit conversion is enabled. */
 export function submittedValue({ obj, key }: TransformFnParams): unknown {
   return (obj as Record<string, unknown>)[key];
 }

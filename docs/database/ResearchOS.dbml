@@ -152,6 +152,13 @@ Enum output_import_state {
   CANDIDATE
   ACCEPTED
 }
+Enum article_pdf_metadata_status {
+  NOT_STARTED
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
 Enum search_entity_type {
   OUTPUT
   RESEARCHER
@@ -694,6 +701,29 @@ Table output_files {
   Note: 'Immutable payload metadata; visibility/availability may be restricted immediately. Download requires BOTH output access and file access, plus a released revision attachment unless requester is manager. Group approval never grants file access.'
 }
 
+Table article_creation_uploads {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_id uuid [not null]
+  storage_key text [not null, unique]
+  file_name varchar(255) [not null]
+  mime_type varchar(100) [not null]
+  size_bytes bigint [not null]
+  sha256 varchar(64) [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  expires_at timestamptz [not null]
+  verified_at timestamptz
+  consumed_at timestamptz
+  consumed_file_id uuid [unique]
+  storage_deleted_at timestamptz
+  metadata_status article_pdf_metadata_status [not null, default: 'NOT_STARTED']
+  checks {
+    `length(btrim(file_name)) > 0 AND mime_type = 'application/pdf' AND size_bytes > 0 AND sha256 ~ '^[a-f0-9]{64}$'` [name: 'ck_article_creation_upload_metadata']
+    `expires_at > created_at` [name: 'ck_article_creation_upload_expiry']
+    `(consumed_at IS NULL AND consumed_file_id IS NULL) OR (consumed_at IS NOT NULL AND consumed_file_id IS NOT NULL AND verified_at IS NOT NULL AND storage_deleted_at IS NULL)` [name: 'ck_article_creation_upload_consumption']
+  }
+  Note: 'Owner-scoped temporary Article PDF. Consumption links the verified object to its durable file record. Cleanup deletes only expired unconsumed objects.'
+}
+
 Table output_revision_files {
   output_id uuid [not null]
   revision_id uuid [not null]
@@ -1106,6 +1136,8 @@ Ref: output_topics.added_by > users.id [delete: restrict]
 Ref: output_files.output_id > research_outputs.id [delete: restrict]
 Ref: output_files.uploaded_by > users.id [delete: restrict]
 Ref: output_files.access_group_id >? research_groups.id [delete: restrict]
+Ref: article_creation_uploads.owner_id > users.id [delete: restrict]
+Ref: output_files.id ?-? article_creation_uploads.consumed_file_id [delete: restrict]
 Ref: output_revision_files.(output_id, revision_id) > output_revisions.(output_id, id) [delete: restrict]
 Ref: output_revision_files.(output_id, file_id) > output_files.(output_id, id) [delete: restrict]
 Ref: group_output_links.output_id > research_outputs.id [delete: restrict]
@@ -1195,6 +1227,7 @@ TableGroup Publications {
   publication_claims
   output_topics
   output_files
+  article_creation_uploads
   output_revision_files
   group_output_links
   achievement_posts

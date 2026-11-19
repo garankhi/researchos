@@ -21,11 +21,18 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { ArticleCreationUploadService } from '../storage/article-creation-upload.service.js';
 import { completeArticleByline, readArticleByline } from './article-byline.js';
 import {
   normalizeArticleMetadata,
   normalizePublicationDate,
 } from './article-metadata.js';
+import type {
+  ArticlePdfRevisionResponseDto,
+  AttachArticlePdfDto,
+  AttachArticlePdfResponseDto,
+  UpdateArticlePdfVisibilityDto,
+} from './dto/article-pdf.dto.js';
 import type {
   CreateArticleDto,
   CreateArticleResponseDto,
@@ -69,10 +76,21 @@ interface OutputFileRow {
   mime_type: string;
   size_bytes: bigint | number;
   sha256: string;
-  visibility: any;
+  visibility: OutputFileVisibility;
   access_group_id: string | null;
-  uploaded_at: Date;
+  uploaded_at: Date | string;
+  is_current_release_attachment: boolean;
 }
+
+type ArticleRelease = Prisma.output_revisionsGetPayload<{
+  include: {
+    output_revision_files: {
+      include: {
+        output_files: { select: { mime_type: true; is_available: true } };
+      };
+    };
+  };
+}>;
 
 interface FeedPdfRow {
   output_id: string;
@@ -106,6 +124,7 @@ export class OutputsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly provenance: ProvenanceService,
+    private readonly articleUploads: ArticleCreationUploadService,
   ) {}
 
   async createArticle(
@@ -121,8 +140,15 @@ export class OutputsService {
       );
     }
     const article = normalizeArticleMetadata(dto);
+    const pdf =
+      dto.uploadId && dto.fileVisibility
+        ? {
+            uploadId: dto.uploadId.toLowerCase(),
+            fileVisibility: dto.fileVisibility,
+          }
+        : undefined;
     const hash = createHash('sha256')
-      .update(JSON.stringify(article))
+      .update(JSON.stringify(pdf ? { ...article, pdf } : article))
       .digest('hex');
 
     try {
@@ -226,14 +252,24 @@ export class OutputsService {
             });
           }
 
-          // RES-173 consumes the verified upload and attaches it at this point,
-          // while the revision still accepts attachment writes.
+          if (pdf) {
+            await this.articleUploads.consumeVerifiedUpload(
+              tx,
+              callerId,
+              pdf.uploadId,
+              output.id,
+              revision.id,
+              pdf.fileVisibility,
+            );
+          }
           await this.releaseRevision(tx, {
             outputId: output.id,
             revisionId: revision.id,
             callerId,
-            visibility: OutputFileVisibility.FPTU_COMMUNITY,
-            accessGroupId: null,
+            sharing: {
+              visibility: OutputFileVisibility.FPTU_COMMUNITY,
+              accessGroupId: null,
+            },
           });
           return { outputId: output.id, revisionId: revision.id };
         },
@@ -493,7 +529,15 @@ export class OutputsService {
             })
           : [],
         tx.output_topics.findMany({
-          where: { output_id: { in: outputIds } },
+          where: {
+            OR: [
+              { revision_id: { in: pinnedRevisionIds } },
+              {
+                output_id: { in: draftOutputIds },
+                output_revisions: { released_at: null },
+              },
+            ],
+          },
           include: {
             research_topics: {
               include: {
@@ -527,7 +571,7 @@ export class OutputsService {
       const subfield = topic.research_subfields;
       const field = subfield.research_fields;
 
-      const list = topicMap.get(ot.output_id) ?? [];
+      const list = topicMap.get(ot.revision_id) ?? [];
       list.push({
         topicId: topic.id,
         topicName: topic.name,
@@ -536,7 +580,7 @@ export class OutputsService {
         fieldId: field.id,
         fieldName: field.name,
       });
-      topicMap.set(ot.output_id, list);
+      topicMap.set(ot.revision_id, list);
     }
 
     return orderedOutputs.map((o) => {
@@ -548,7 +592,7 @@ export class OutputsService {
         o,
         pinnedRev ?? null,
         o.output_authors,
-        topicMap.get(o.id) ?? [],
+        (pinnedRev && topicMap.get(pinnedRev.id)) ?? [],
       );
       const downloadablePdf = pdfs.get(o.id);
       return downloadablePdf ? { ...output, downloadablePdf } : output;
@@ -631,20 +675,18 @@ export class OutputsService {
       });
     }
 
-    const outputTopics = await this.prisma.output_topics.findMany({
-      where: { output_id: outputId },
-      include: {
-        research_topics: {
+    const outputTopics = revision
+      ? await this.prisma.output_topics.findMany({
+          where: { revision_id: revision.id },
           include: {
-            research_subfields: {
+            research_topics: {
               include: {
-                research_fields: true,
+                research_subfields: { include: { research_fields: true } },
               },
             },
           },
-        },
-      },
-    });
+        })
+      : [];
 
     const topics: OutputTopicResponseDto[] = outputTopics.map((ot) => ({
       topicId: ot.research_topics.id,
@@ -712,15 +754,23 @@ export class OutputsService {
 
     const files = await this.prisma.$queryRaw<OutputFileRow[]>`
       SELECT f.id, f.output_id, f.file_name, f.mime_type, f.size_bytes, f.sha256,
-             f.visibility, f.access_group_id, f.uploaded_at
-      FROM output_files f
+             f.visibility, f.access_group_id, f.uploaded_at, EXISTS (
+               SELECT 1 FROM output_revision_files rf
+               WHERE rf.output_id = o.id AND rf.revision_id = o.current_release_id
+                 AND rf.file_id = f.id
+             ) AS is_current_release_attachment
+      FROM output_files f JOIN research_outputs o ON o.id = f.output_id
       WHERE f.output_id = ${outputId}::uuid
         AND f.is_available = true
         AND can_view_output_file(${callerId}::uuid, f.id)
       ORDER BY f.uploaded_at DESC, f.id ASC
     `;
 
-    return files.map((f) => ({
+    return files.map((file) => this.mapToFileResponse(file));
+  }
+
+  private mapToFileResponse(f: OutputFileRow): OutputFileResponseDto {
+    return {
       id: f.id,
       outputId: f.output_id,
       fileName: f.file_name,
@@ -729,11 +779,269 @@ export class OutputsService {
       sha256: f.sha256,
       visibility: f.visibility,
       accessGroupId: f.access_group_id,
+      isCurrentReleaseAttachment: f.is_current_release_attachment,
       uploadedAt:
         f.uploaded_at instanceof Date
           ? f.uploaded_at.toISOString()
           : new Date(f.uploaded_at).toISOString(),
-    }));
+    };
+  }
+
+  async attachArticlePdf(
+    outputId: string,
+    callerId: string,
+    dto: AttachArticlePdfDto,
+  ): Promise<AttachArticlePdfResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const release = await this.lockArticleRelease(tx, outputId, callerId);
+      if (release.id !== dto.expectedRevisionId.toLowerCase()) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputRevisionLocked,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const replacedFileId = dto.replaceFileId?.toLowerCase();
+      if (replacedFileId) {
+        this.assertCurrentArticlePdf(release, replacedFileId);
+      } else if (this.currentArticlePdfIds(release).length > 0) {
+        throw new CodedHttpException(
+          domainErrorCodes.storage.fileConflict,
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const revisionId = await this.copyArticleRevisionForPdfEdit(
+        tx,
+        release,
+        callerId,
+        replacedFileId,
+      );
+      const file = await this.articleUploads.consumeVerifiedUpload(
+        tx,
+        callerId,
+        dto.uploadId,
+        release.output_id,
+        revisionId,
+        dto.fileVisibility,
+      );
+      await this.releaseRevision(tx, {
+        outputId: release.output_id,
+        revisionId,
+        callerId,
+        // No `sharing`: the Article is already shared and stays shared.
+      });
+      return { revisionId, fileId: file.id };
+    });
+  }
+
+  async updateArticlePdfVisibility(
+    outputId: string,
+    callerId: string,
+    fileId: string,
+    dto: UpdateArticlePdfVisibilityDto,
+  ): Promise<OutputFileResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const release = await this.lockArticleRelease(tx, outputId, callerId);
+      this.assertCurrentArticlePdf(release, fileId.toLowerCase());
+      const file = await tx.output_files.update({
+        where: { id: fileId },
+        data: { visibility: dto.fileVisibility, access_group_id: null },
+      });
+      return this.mapToFileResponse({
+        ...file,
+        is_current_release_attachment: true,
+      });
+    });
+  }
+
+  async removeArticlePdf(
+    outputId: string,
+    callerId: string,
+    fileId: string,
+  ): Promise<ArticlePdfRevisionResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const release = await this.lockArticleRelease(tx, outputId, callerId);
+      const removedFileId = fileId.toLowerCase();
+      this.assertCurrentArticlePdf(release, removedFileId);
+      const revisionId = await this.copyArticleRevisionForPdfEdit(
+        tx,
+        release,
+        callerId,
+        removedFileId,
+      );
+      await this.releaseRevision(tx, {
+        outputId: release.output_id,
+        revisionId,
+        callerId,
+        // No `sharing`: the Article is already shared and stays shared.
+      });
+      return { revisionId };
+    });
+  }
+
+  private async lockArticleRelease(
+    tx: Prisma.TransactionClient,
+    outputId: string,
+    callerId: string,
+  ): Promise<ArticleRelease> {
+    // Serialize mutations of the current release and its file policy on the
+    // output row. A concurrent caller sees the winning edit's new release.
+    const [output] = await tx.$queryRaw<
+      (Pick<
+        ResearchOutput,
+        'owner_id' | 'sharing_status' | 'current_release_id'
+      > & {
+        researcher: boolean;
+      })[]
+    >`
+      SELECT owner_id, sharing_status, current_release_id,
+             is_researcher(${callerId}::uuid) AS researcher
+      FROM research_outputs
+      WHERE id = ${outputId}::uuid
+      FOR NO KEY UPDATE
+    `;
+    if (!output) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (output.owner_id !== callerId) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotOwner,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (!output.researcher) {
+      throw new CodedHttpException(
+        domainErrorCodes.identity.researcherRequired,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    if (
+      output.sharing_status !== OutputSharingStatus.SHARED ||
+      !output.current_release_id
+    ) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputRevisionLocked,
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const release = await tx.output_revisions.findUniqueOrThrow({
+      where: { id: output.current_release_id },
+      include: {
+        output_revision_files: {
+          include: {
+            output_files: { select: { mime_type: true, is_available: true } },
+          },
+        },
+      },
+    });
+    if (release.output_type !== OutputType.ARTICLE) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputRevisionLocked,
+        HttpStatus.CONFLICT,
+      );
+    }
+    return release;
+  }
+
+  private currentArticlePdfIds(release: ArticleRelease): string[] {
+    return release.output_revision_files
+      .filter(
+        ({ output_files: file }) =>
+          file.is_available &&
+          file.mime_type.toLowerCase() === 'application/pdf',
+      )
+      .map(({ file_id }) => file_id);
+  }
+
+  private assertCurrentArticlePdf(
+    release: ArticleRelease,
+    fileId: string,
+  ): void {
+    if (!this.currentArticlePdfIds(release).includes(fileId)) {
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  private async copyArticleRevisionForPdfEdit(
+    tx: Prisma.TransactionClient,
+    release: ArticleRelease,
+    callerId: string,
+    removedFileId?: string,
+  ): Promise<string> {
+    const outputId = release.output_id;
+    const [revisions] = await tx.$queryRaw<
+      { latest: number; has_draft: boolean }[]
+    >`
+      SELECT max(revision_no) AS latest, bool_or(released_at IS NULL) AS has_draft
+      FROM output_revisions
+      WHERE output_id = ${outputId}::uuid
+    `;
+    if (revisions.has_draft) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputRevisionLocked,
+        HttpStatus.CONFLICT,
+      );
+    }
+    const revision = await tx.output_revisions.create({
+      data: {
+        output_id: outputId,
+        revision_no: revisions.latest + 1,
+        created_by: callerId,
+        title: release.title,
+        abstract: release.abstract,
+        venue: release.venue,
+        publisher: release.publisher,
+        publication_year: release.publication_year,
+        publication_date: release.publication_date,
+        publication_status: release.publication_status,
+        output_type: release.output_type,
+        volume: release.volume,
+        issue: release.issue,
+        pages: release.pages,
+        peer_reviewed: release.peer_reviewed,
+        external_url: release.external_url,
+        authors_snapshot: release.authors_snapshot ?? Prisma.JsonNull,
+      },
+      select: { id: true },
+    });
+
+    const attachments = release.output_revision_files
+      .filter(
+        ({ file_id, output_files }) =>
+          file_id !== removedFileId && output_files.is_available,
+      )
+      .map(({ file_id }) => ({
+        file_id,
+        output_id: outputId,
+        revision_id: revision.id,
+      }));
+    if (attachments.length > 0) {
+      await tx.output_revision_files.createMany({ data: attachments });
+    }
+
+    await tx.$executeRaw`
+      INSERT INTO output_topics (output_id, revision_id, topic_id, added_by, created_at)
+      SELECT output_id, ${revision.id}::uuid, topic_id, added_by, created_at
+      FROM output_topics
+      WHERE revision_id = ${release.id}::uuid
+    `;
+    if (removedFileId) {
+      // Old revision links remain intact. The shared download policy checks
+      // file availability, including when a group points to an older release.
+      await tx.output_files.update({
+        where: { id: removedFileId },
+        data: { is_available: false },
+      });
+    }
+    return revision.id;
   }
 
   /**
@@ -986,8 +1294,10 @@ export class OutputsService {
         outputId,
         revisionId: draft.id,
         callerId,
-        visibility: dto.visibility,
-        accessGroupId: dto.accessGroupId ?? null,
+        sharing: {
+          visibility: dto.visibility,
+          accessGroupId: dto.accessGroupId ?? null,
+        },
         authorsSnapshot,
       });
       return this.loadResponse(tx, outputId);
@@ -1000,15 +1310,35 @@ export class OutputsService {
       outputId,
       revisionId,
       callerId,
-      visibility,
-      accessGroupId,
+      sharing,
       authorsSnapshot,
     }: {
       outputId: string;
       revisionId: string;
       callerId: string;
-      visibility: OutputFileVisibility;
-      accessGroupId: string | null;
+      /**
+       * How the release affects the output's sharing columns.
+       *
+       * `sharing` is optional, and omitting it means "release the revision
+       * without touching the sharing columns". The PDF edit endpoints
+       * (`attachArticlePdf`, `removeArticlePdf`) rely on that: the output is
+       * already SHARED, so re-stamping `first_shared_at` would reset the
+       * shared-since date and trip the `guard_output_release` trigger, which
+       * rejects a change to `first_shared_at` on an already-shared output.
+       *
+       * Pass `sharing` to also publish the output. `createArticle` passes it
+       * because it creates the first release; the draft edit path passes it
+       * because it publishes a draft.
+       *
+       * Omitting `sharing` by mistake releases a revision without sharing it,
+       * and the database will not complain: `guard_output_release` only
+       * checks that `current_release_id` points at a released revision. Pass
+       * `sharing` deliberately.
+       */
+      sharing?: {
+        visibility: OutputFileVisibility;
+        accessGroupId: string | null;
+      };
       authorsSnapshot?: Prisma.InputJsonArray;
     },
   ): Promise<void> {
@@ -1028,10 +1358,12 @@ export class OutputsService {
       where: { id: outputId },
       data: {
         current_release_id: revisionId,
-        sharing_status: OutputSharingStatus.SHARED,
-        first_shared_at: now,
-        visibility,
-        access_group_id: accessGroupId,
+        ...(sharing && {
+          sharing_status: OutputSharingStatus.SHARED,
+          first_shared_at: now,
+          visibility: sharing.visibility,
+          access_group_id: sharing.accessGroupId,
+        }),
       },
     });
   }
@@ -1211,16 +1543,18 @@ export class OutputsService {
         })
       : null;
 
-    const outputTopics = await tx.output_topics.findMany({
-      where: { output_id: outputId },
-      include: {
-        research_topics: {
+    const outputTopics = revision
+      ? await tx.output_topics.findMany({
+          where: { revision_id: revision.id },
           include: {
-            research_subfields: { include: { research_fields: true } },
+            research_topics: {
+              include: {
+                research_subfields: { include: { research_fields: true } },
+              },
+            },
           },
-        },
-      },
-    });
+        })
+      : [];
 
     const topics: OutputTopicResponseDto[] = outputTopics.map((ot) => ({
       topicId: ot.research_topics.id,
