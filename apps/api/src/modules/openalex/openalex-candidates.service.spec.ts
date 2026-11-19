@@ -21,7 +21,7 @@ function makeRevision(
     abstract: 'An abstract',
     venue: 'A venue',
     publication_year: 2020,
-    output_type: 'PAPER',
+    output_type: 'ARTICLE',
     external_url: 'https://example.org/work',
     authors_snapshot: [
       {
@@ -122,7 +122,7 @@ describe('OpenAlexCandidatesService', () => {
       abstract: 'An abstract',
       venue: 'A venue',
       publicationYear: 2020,
-      outputType: 'PAPER',
+      outputType: 'ARTICLE',
       url: 'https://example.org/work',
       // Snapshot order is normalised into author order.
       authors: ['Nguyen Van An', 'Tran Thi B'],

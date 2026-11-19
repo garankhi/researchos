@@ -202,12 +202,59 @@ CREATE TRIGGER revoke_deactivated_sessions AFTER UPDATE OF is_active ON users
  FOR EACH ROW WHEN (OLD.is_active AND NOT NEW.is_active)
  EXECUTE FUNCTION revoke_sessions_after_deactivation();
 
+-- Decode the path bytes only for a resolver URL. Bare DOI names can contain a
+-- literal percent sign. Keep this in sync with normalizeDoi in the API.
+CREATE FUNCTION doi_name_from_resolver_path(resolver_path text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+DECLARE
+  segment text;
+  decoded bytea := ''::bytea;
+BEGIN
+  IF resolver_path ~ '%(?![0-9a-fA-F]{2})' THEN
+    RETURN NULL;
+  END IF;
+
+  FOR segment IN
+    SELECT parts[1] FROM regexp_matches(resolver_path, '(%[0-9a-fA-F]{2}|[^%]+)', 'g') AS match(parts)
+  LOOP
+    IF left(segment, 1) = '%' THEN
+      decoded := decoded || decode(substr(segment, 2), 'hex');
+    ELSE
+      decoded := decoded || convert_to(segment, 'UTF8');
+    END IF;
+  END LOOP;
+
+  RETURN convert_from(decoded, 'UTF8');
+EXCEPTION
+  WHEN character_not_in_repertoire THEN RETURN NULL;
+END $$;
+
+CREATE FUNCTION canonical_output_doi(value text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+DECLARE
+  name text := regexp_replace(value, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+  resolver_path text := substring(name COLLATE "C" FROM '(?i)^https?://(?:dx\.)?doi\.org/([^?#]*)');
+BEGIN
+  IF resolver_path IS NOT NULL THEN
+    name := doi_name_from_resolver_path(resolver_path);
+    IF name IS NULL THEN
+      RAISE EXCEPTION 'Invalid DOI URL path' USING ERRCODE = '22023';
+    END IF;
+  ELSE
+    name := regexp_replace(name COLLATE "C", '^doi:[[:space:]]*', '', 'i');
+  END IF;
+
+  IF name ~ '[[:cntrl:]]' THEN
+    RAISE EXCEPTION 'Invalid DOI control character' USING ERRCODE = '22023';
+  END IF;
+
+  RETURN nullif(lower(regexp_replace(name, '^[[:space:]]+|[[:space:]]+$', '', 'g') COLLATE "C"), '');
+END $$;
+
 CREATE FUNCTION normalize_output_doi() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- NEW.doi=lower(regexp_replace(NEW.doi,'^[[:space:]]+|[[:space:]]+$','','g'));
- NEW.doi=regexp_replace(NEW.doi,'^(https?://(dx\.)?doi\.org/|doi:[[:space:]]*)','','i');
- NEW.doi=nullif(regexp_replace(NEW.doi,'^[[:space:]]+|[[:space:]]+$','','g'),'');
- RETURN NEW;
+  NEW.doi := canonical_output_doi(NEW.doi);
+  RETURN NEW;
 END $$;
 CREATE TRIGGER normalize_output_doi BEFORE INSERT OR UPDATE OF doi ON research_outputs
  FOR EACH ROW EXECUTE FUNCTION normalize_output_doi();

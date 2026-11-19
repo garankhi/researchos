@@ -7,6 +7,7 @@
 
 export { PrismaModule } from './prisma.module.js';
 export { PrismaService } from './prisma.service.js';
+export { OutputType } from './output-type.js';
 export {
   BackgroundJobsService,
   RESEARCH_UPDATE_JOB,

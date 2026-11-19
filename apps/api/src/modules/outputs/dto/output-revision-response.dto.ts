@@ -60,6 +60,15 @@ export class OutputRevisionResponseDto {
   publicationYear: number | null;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '2026-11',
+    description:
+      'Publication date at the recorded precision: YYYY, YYYY-MM or YYYY-MM-DD.',
+  })
+  publicationDate: string | null;
+
+  @ApiProperty({
     description:
       'Publication status of the work (`UNPUBLISHED` or `PUBLISHED`).',
     enum: PublicationStatusEnum,
@@ -68,10 +77,42 @@ export class OutputRevisionResponseDto {
   publicationStatus: PublicationStatusEnum;
 
   @ApiProperty({
-    description: 'Type classification of the output (e.g. PAPER, DATASET).',
-    example: 'PAPER',
+    description: 'Type classification of the output (e.g. ARTICLE, DATASET).',
+    example: 'ARTICLE',
   })
   outputType: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '12',
+    description: 'Journal volume.',
+  })
+  volume: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'S1',
+    description: 'Journal issue.',
+  })
+  issue: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '101–113',
+    description: 'Page range or article number.',
+  })
+  pages: string | null;
+
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Whether the Article was peer-reviewed. Null means unspecified.',
+  })
+  peerReviewed: boolean | null;
 
   @ApiProperty({
     description: 'External URL pointing to the publication source.',

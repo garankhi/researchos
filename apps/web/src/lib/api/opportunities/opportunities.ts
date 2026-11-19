@@ -24,6 +24,7 @@ import type {
 import type {
   ApiErrorResponseDto,
   CreateOpportunityDto,
+  OpportunitiesControllerCreateHeaders,
   OpportunitiesControllerFindAllParams,
   OpportunityPageDtoEnvelope,
   OpportunityResponseDtoEnvelope,
@@ -57,6 +58,7 @@ const withQueryKey = <T extends object, K>(
  */
 export const opportunitiesControllerCreate = (
   createOpportunityDto: CreateOpportunityDto,
+  headers?: OpportunitiesControllerCreateHeaders,
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
@@ -64,7 +66,7 @@ export const opportunitiesControllerCreate = (
     {
       url: `/opportunities`,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       data: createOpportunityDto,
       signal,
     },
@@ -105,9 +107,9 @@ export const getOpportunitiesControllerCreateMutationOptions = <
     Awaited<ReturnType<typeof opportunitiesControllerCreate>>,
     OpportunitiesControllerCreateMutationVariables
   > = (props) => {
-    const { data } = props ?? {};
+    const { data, headers } = props ?? {};
 
-    return opportunitiesControllerCreate(data, requestOptions);
+    return opportunitiesControllerCreate(data, headers, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -120,6 +122,7 @@ export type OpportunitiesControllerCreateMutationBody = CreateOpportunityDto;
 export type OpportunitiesControllerCreateMutationError = unknown;
 export type OpportunitiesControllerCreateMutationVariables = {
   data: CreateOpportunityDto;
+  headers?: OpportunitiesControllerCreateHeaders;
 };
 
 /**

@@ -14,6 +14,7 @@ import { FileText, ExternalLink } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
+import { doiUrl } from '@/lib/doi-url';
 import { useProfileOutputs } from '../../hooks/use-profile-outputs';
 import { useProfileOutputCapability } from '../../hooks/use-profile-output-capability';
 import { ProfileOutputActionsMenu } from '../profile-output-actions-menu';
@@ -114,7 +115,7 @@ function ProfileOutputCard({ output }: { output: OutputResponseDto }) {
 
           {doiStr ? (
             <Link
-              href={`https://doi.org/${doiStr}`}
+              href={doiUrl(doiStr)}
               target="_blank"
               rel="noopener noreferrer"
               display="inline-flex"

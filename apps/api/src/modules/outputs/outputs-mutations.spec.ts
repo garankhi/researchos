@@ -45,7 +45,7 @@ describe('OutputsController mutations', () => {
     publisher: null,
     publication_year: null,
     publication_status: 'UNPUBLISHED',
-    output_type: 'PAPER',
+    output_type: 'ARTICLE',
     external_url: null,
     authors_snapshot: [],
     created_by: ownerId,
@@ -67,7 +67,7 @@ describe('OutputsController mutations', () => {
       update: vi.fn(),
     },
     output_topics: { findMany: vi.fn() },
-    output_authors: { findMany: vi.fn() },
+    output_authors: { findMany: vi.fn().mockResolvedValue([]) },
   });
 
   const createPrismaMock = () => {
@@ -283,14 +283,12 @@ describe('OutputsController mutations', () => {
     it('releases the draft, pins it, shares the work and sets the visibility', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique
-        .mockResolvedValueOnce(mockDraftOutput)
-        .mockResolvedValueOnce({
-          ...mockDraftOutput,
-          sharing_status: OutputSharingStatus.SHARED,
-          current_release_id: draftRevId,
-          first_shared_at: now,
-        });
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
+        ...mockDraftOutput,
+        sharing_status: OutputSharingStatus.SHARED,
+        current_release_id: draftRevId,
+        first_shared_at: now,
+      });
       prismaMock.tx.output_revisions.findFirst.mockResolvedValue(
         mockDraftRevision,
       );
@@ -304,7 +302,9 @@ describe('OutputsController mutations', () => {
         sharing_status: OutputSharingStatus.SHARED,
         current_release_id: draftRevId,
       });
-      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ now }]);
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([mockDraftOutput])
+        .mockResolvedValueOnce([{ now }]);
       prismaMock.tx.output_revisions.findUnique.mockResolvedValue({
         ...mockDraftRevision,
         released_at: now,
@@ -318,7 +318,7 @@ describe('OutputsController mutations', () => {
 
       expect(prismaMock.tx.output_revisions.update).toHaveBeenCalledWith({
         where: { id: draftRevId },
-        data: { released_at: now, released_by: ownerId },
+        data: { released_at: now, released_by: ownerId, authors_snapshot: [] },
       });
       expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
         where: { id: outputId },
@@ -348,6 +348,7 @@ describe('OutputsController mutations', () => {
       });
       prismaMock.tx.research_outputs.update.mockResolvedValue(mockDraftOutput);
       prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([mockDraftOutput])
         .mockResolvedValueOnce([{ allowed: true }])
         .mockResolvedValueOnce([{ now }]);
       prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
@@ -373,10 +374,9 @@ describe('OutputsController mutations', () => {
     it('refuses to scope a work to a group the caller is not a member of', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
-        mockDraftOutput,
-      );
-      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: false }]);
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([mockDraftOutput])
+        .mockResolvedValueOnce([{ allowed: false }]);
 
       const controller = await setupController(prismaMock, provenanceMock);
 
@@ -422,6 +422,7 @@ describe('OutputsController mutations', () => {
       });
       prismaMock.tx.research_outputs.update.mockResolvedValue(mockDraftOutput);
       prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([mockDraftOutput])
         .mockResolvedValueOnce([{ allowed: true }])
         .mockResolvedValueOnce([{ now }]);
       prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
@@ -447,10 +448,9 @@ describe('OutputsController mutations', () => {
     it('refuses a community-affiliated work scoped to a group the caller is not a member of', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
-        mockDraftOutput,
-      );
-      prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: false }]);
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([mockDraftOutput])
+        .mockResolvedValueOnce([{ allowed: false }]);
 
       const controller = await setupController(prismaMock, provenanceMock);
 
@@ -468,10 +468,12 @@ describe('OutputsController mutations', () => {
     it('refuses to publish a work the caller does not own', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
-        ...mockDraftOutput,
-        owner_id: otherUserId,
-      });
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([
+        {
+          ...mockDraftOutput,
+          owner_id: otherUserId,
+        },
+      ]);
 
       const controller = await setupController(prismaMock, provenanceMock);
 
@@ -488,10 +490,12 @@ describe('OutputsController mutations', () => {
     it('refuses to publish a work that is already published', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
-        ...mockDraftOutput,
-        sharing_status: OutputSharingStatus.SHARED,
-      });
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([
+        {
+          ...mockDraftOutput,
+          sharing_status: OutputSharingStatus.SHARED,
+        },
+      ]);
 
       const controller = await setupController(prismaMock, provenanceMock);
 
@@ -508,9 +512,7 @@ describe('OutputsController mutations', () => {
     it('refuses to publish a work with no editable draft', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
-        mockDraftOutput,
-      );
+      prismaMock.tx.$queryRaw.mockResolvedValueOnce([mockDraftOutput]);
       prismaMock.tx.output_revisions.findFirst.mockResolvedValue(null);
 
       const controller = await setupController(prismaMock, provenanceMock);
