@@ -24,8 +24,8 @@ import {
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import {
   ConfirmOutputUploadDto,
+  ConfirmedOutputFileDto,
   CreateOutputUploadDto,
-  OutputFileResponseDto,
   OutputUploadResponseDto,
 } from './dto/output-upload.dto.js';
 import { OutputUploadService } from './output-upload.service.js';
@@ -80,7 +80,7 @@ export class OutputUploadController {
   })
   @ApiOkResponse({
     description: 'The confirmed output file.',
-    type: OutputFileResponseDto,
+    type: ConfirmedOutputFileDto,
   })
   @ApiConflictResponse({
     description: 'The object is missing or does not match the declared upload.',
@@ -91,7 +91,7 @@ export class OutputUploadController {
     @Param('outputId', ParseUUIDPipe) outputId: string,
     @CurrentUserId() userId: string,
     @Body() input: ConfirmOutputUploadDto,
-  ): Promise<OutputFileResponseDto> {
+  ): Promise<ConfirmedOutputFileDto> {
     return this.uploads.confirmUpload(userId, outputId, input.uploadToken);
   }
 }

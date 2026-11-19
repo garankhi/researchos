@@ -66,4 +66,10 @@ export class OutputFileResponseDto {
     example: '2026-11-11T00:00:00.000Z',
   })
   uploadedAt: string;
+
+  @ApiProperty({
+    description:
+      'Whether the file is attached to the current released revision.',
+  })
+  isCurrentReleaseAttachment: boolean;
 }

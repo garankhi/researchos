@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -9,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -17,6 +19,7 @@ import {
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiGoneResponse,
   ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -27,6 +30,12 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import {
+  ArticlePdfRevisionResponseDto,
+  AttachArticlePdfDto,
+  AttachArticlePdfResponseDto,
+  UpdateArticlePdfVisibilityDto,
+} from './dto/article-pdf.dto.js';
 import {
   CreateArticleDto,
   CreateArticleResponseDto,
@@ -56,7 +65,7 @@ export class OutputsController {
   @ApiOperation({
     summary: 'Create and release an Article',
     description:
-      'Creates a metadata-only Article and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.',
+      'Creates an Article with an optional verified PDF and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.',
   })
   @ApiHeader({
     name: 'idempotency-key',
@@ -76,9 +85,11 @@ export class OutputsController {
   @ApiForbiddenResponse({
     description: 'An active researcher account is required.',
   })
+  @ApiNotFoundResponse({ description: 'The caller has no such PDF upload.' })
+  @ApiGoneResponse({ description: 'The PDF upload has expired.' })
   @ApiConflictResponse({
     description:
-      'output_idempotency_key_conflict for a changed submission using the same key, or output_doi_conflict for an existing DOI.',
+      'The idempotency key was reused with a changed submission, the DOI already exists, or the PDF upload is unverified or already used.',
   })
   @Post()
   @Roles('RESEARCHER')
@@ -232,6 +243,110 @@ export class OutputsController {
     @CurrentUserId() callerId: string,
   ): Promise<OutputFileResponseDto[]> {
     return this.outputsService.findFiles(outputId, callerId);
+  }
+
+  @Put(':outputId/article-pdf')
+  @Roles('RESEARCHER')
+  @ApiOperation({
+    summary: 'Add or replace the PDF of a released Article',
+    description:
+      'The owner attaches a verified upload and releases a successor revision. Replacing a PDF revokes access to the replaced file in every revision.',
+  })
+  @ApiParam({ name: 'outputId', format: 'uuid', description: 'Article ID.' })
+  @ApiOkResponse({
+    type: AttachArticlePdfResponseDto,
+    description: 'Newly released revision and attached PDF identifiers.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid PDF attachment request.' })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher owner is required.',
+  })
+  @ApiNotFoundResponse({
+    description:
+      'The output, the targeted current PDF, or the upload was not found.',
+  })
+  @ApiGoneResponse({ description: 'The PDF upload has expired.' })
+  @ApiConflictResponse({
+    description:
+      'The release changed, the existing PDF was not specified, or the upload cannot be attached.',
+  })
+  async attachArticlePdf(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @CurrentUserId() callerId: string,
+    @Body() dto: AttachArticlePdfDto,
+  ): Promise<AttachArticlePdfResponseDto> {
+    return this.outputsService.attachArticlePdf(outputId, callerId, dto);
+  }
+
+  @Patch(':outputId/article-pdf/:fileId')
+  @Roles('RESEARCHER')
+  @ApiOperation({ summary: 'Change the visibility of a released Article PDF' })
+  @ApiParam({ name: 'outputId', format: 'uuid', description: 'Article ID.' })
+  @ApiParam({
+    name: 'fileId',
+    format: 'uuid',
+    description: 'Current PDF file ID.',
+  })
+  @ApiOkResponse({
+    type: OutputFileResponseDto,
+    description: 'Current PDF with the updated visibility.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid PDF visibility request.' })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher owner is required.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The output or its current PDF was not found.',
+  })
+  @ApiConflictResponse({ description: 'The output is not a shared Article.' })
+  async updateArticlePdfVisibility(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+    @CurrentUserId() callerId: string,
+    @Body() dto: UpdateArticlePdfVisibilityDto,
+  ): Promise<OutputFileResponseDto> {
+    return this.outputsService.updateArticlePdfVisibility(
+      outputId,
+      callerId,
+      fileId,
+      dto,
+    );
+  }
+
+  @Delete(':outputId/article-pdf/:fileId')
+  @Roles('RESEARCHER')
+  @ApiOperation({
+    summary: 'Remove a released Article PDF',
+    description:
+      'Releases a successor revision without the PDF and revokes access to that file in every revision.',
+  })
+  @ApiParam({ name: 'outputId', format: 'uuid', description: 'Article ID.' })
+  @ApiParam({
+    name: 'fileId',
+    format: 'uuid',
+    description: 'Current PDF file ID.',
+  })
+  @ApiOkResponse({
+    type: ArticlePdfRevisionResponseDto,
+    description: 'Newly released revision after withdrawing the PDF.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid output or file identifier.' })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher owner is required.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The output or its current PDF was not found.',
+  })
+  @ApiConflictResponse({ description: 'The output is not a shared Article.' })
+  async removeArticlePdf(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<ArticlePdfRevisionResponseDto> {
+    return this.outputsService.removeArticlePdf(outputId, callerId, fileId);
   }
 
   @Patch(':outputId/revision')

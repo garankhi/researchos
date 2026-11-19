@@ -97,7 +97,7 @@ export class OutputUploadResponseDto {
   uploadToken!: string;
 }
 
-export class OutputFileResponseDto {
+export class ConfirmedOutputFileDto {
   @ApiProperty({
     description: 'Identifier of the confirmed file.',
     format: 'uuid',

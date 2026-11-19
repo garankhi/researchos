@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { trimText } from './submitted-value.js';
+import { trimText } from '../../../common/dto/submitted-value.js';
 
 /**
  * The editable metadata of a work's draft revision.

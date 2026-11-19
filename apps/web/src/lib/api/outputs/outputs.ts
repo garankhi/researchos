@@ -23,9 +23,13 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  ArticlePdfRevisionResponseDtoEnvelope,
+  AttachArticlePdfDto,
+  AttachArticlePdfResponseDtoEnvelope,
   CreateArticleDto,
   CreateArticleResponseDtoEnvelope,
   HomeFeedResponseDtoEnvelope,
+  OutputFileResponseDtoEnvelope,
   OutputResponseDtoEnvelope,
   OutputRevisionResponseDtoEnvelope,
   OutputsControllerCreateArticleHeaders,
@@ -35,6 +39,7 @@ import type {
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
+  UpdateArticlePdfVisibilityDto,
   UpdateOutputRevisionDto,
   UpdateOutputVisibilityDto,
 } from '../models';
@@ -62,7 +67,7 @@ const withQueryKey = <T extends object, K>(
 };
 
 /**
- * Creates a metadata-only Article and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.
+ * Creates an Article with an optional verified PDF and releases its first revision to FPTU_COMMUNITY. A replay returns the original identifiers.
  * @summary Create and release an Article
  */
 export const outputsControllerCreateArticle = (
@@ -1008,6 +1013,319 @@ export function useOutputsControllerFindFiles<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+/**
+ * The owner attaches a verified upload and releases a successor revision. Replacing a PDF revokes access to the replaced file in every revision.
+ * @summary Add or replace the PDF of a released Article
+ */
+export const outputsControllerAttachArticlePdf = (
+  outputId: string,
+  attachArticlePdfDto: AttachArticlePdfDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<AttachArticlePdfResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/article-pdf`,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      data: attachArticlePdfDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerAttachArticlePdfMutationKey = () =>
+  ['outputsControllerAttachArticlePdf'] as const;
+
+export const getOutputsControllerAttachArticlePdfMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>,
+    TError,
+    OutputsControllerAttachArticlePdfMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>,
+  TError,
+  OutputsControllerAttachArticlePdfMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerAttachArticlePdfMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>,
+    OutputsControllerAttachArticlePdfMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerAttachArticlePdf(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerAttachArticlePdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>
+>;
+export type OutputsControllerAttachArticlePdfMutationBody = AttachArticlePdfDto;
+export type OutputsControllerAttachArticlePdfMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerAttachArticlePdfMutationVariables = {
+  outputId: string;
+  data: AttachArticlePdfDto;
+};
+
+/**
+ * @summary Add or replace the PDF of a released Article
+ */
+export const useOutputsControllerAttachArticlePdf = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>,
+      TError,
+      OutputsControllerAttachArticlePdfMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerAttachArticlePdf>>,
+  TError,
+  OutputsControllerAttachArticlePdfMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerAttachArticlePdfMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Change the visibility of a released Article PDF
+ */
+export const outputsControllerUpdateArticlePdfVisibility = (
+  outputId: string,
+  fileId: string,
+  updateArticlePdfVisibilityDto: UpdateArticlePdfVisibilityDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputFileResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/article-pdf/${fileId}`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateArticlePdfVisibilityDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateArticlePdfVisibilityMutationKey = () =>
+  ['outputsControllerUpdateArticlePdfVisibility'] as const;
+
+export const getOutputsControllerUpdateArticlePdfVisibilityMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>,
+    TError,
+    OutputsControllerUpdateArticlePdfVisibilityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>,
+  TError,
+  OutputsControllerUpdateArticlePdfVisibilityMutationVariables,
+  TContext
+> => {
+  const mutationKey =
+    getOutputsControllerUpdateArticlePdfVisibilityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>,
+    OutputsControllerUpdateArticlePdfVisibilityMutationVariables
+  > = (props) => {
+    const { outputId, fileId, data } = props ?? {};
+
+    return outputsControllerUpdateArticlePdfVisibility(
+      outputId,
+      fileId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateArticlePdfVisibilityMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>
+  >;
+export type OutputsControllerUpdateArticlePdfVisibilityMutationBody =
+  UpdateArticlePdfVisibilityDto;
+export type OutputsControllerUpdateArticlePdfVisibilityMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerUpdateArticlePdfVisibilityMutationVariables = {
+  outputId: string;
+  fileId: string;
+  data: UpdateArticlePdfVisibilityDto;
+};
+
+/**
+ * @summary Change the visibility of a released Article PDF
+ */
+export const useOutputsControllerUpdateArticlePdfVisibility = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>,
+      TError,
+      OutputsControllerUpdateArticlePdfVisibilityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticlePdfVisibility>>,
+  TError,
+  OutputsControllerUpdateArticlePdfVisibilityMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateArticlePdfVisibilityMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Releases a successor revision without the PDF and revokes access to that file in every revision.
+ * @summary Remove a released Article PDF
+ */
+export const outputsControllerRemoveArticlePdf = (
+  outputId: string,
+  fileId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ArticlePdfRevisionResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/article-pdf/${fileId}`,
+      method: 'DELETE',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerRemoveArticlePdfMutationKey = () =>
+  ['outputsControllerRemoveArticlePdf'] as const;
+
+export const getOutputsControllerRemoveArticlePdfMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>,
+    TError,
+    OutputsControllerRemoveArticlePdfMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>,
+  TError,
+  OutputsControllerRemoveArticlePdfMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerRemoveArticlePdfMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>,
+    OutputsControllerRemoveArticlePdfMutationVariables
+  > = (props) => {
+    const { outputId, fileId } = props ?? {};
+
+    return outputsControllerRemoveArticlePdf(outputId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerRemoveArticlePdfMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>
+>;
+
+export type OutputsControllerRemoveArticlePdfMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerRemoveArticlePdfMutationVariables = {
+  outputId: string;
+  fileId: string;
+};
+
+/**
+ * @summary Remove a released Article PDF
+ */
+export const useOutputsControllerRemoveArticlePdf = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>,
+      TError,
+      OutputsControllerRemoveArticlePdfMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerRemoveArticlePdf>>,
+  TError,
+  OutputsControllerRemoveArticlePdfMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerRemoveArticlePdfMutationOptions(options),
+    queryClient,
+  );
+};
 /**
  * Updates the editable draft revision of a work the caller owns. Only the fields present in the body are changed. Every corrected field is locked against later automated syncs, so a subsequent OpenAlex pull cannot overwrite a value a person stood behind. A released revision is immutable and cannot be edited.
  * @summary Corrects the metadata of a work draft revision

@@ -5,25 +5,54 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
   UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult,
 } from '@tanstack/react-query';
 
 import type {
   ApiErrorResponseDto,
+  ArticlePdfUploadResponseDtoEnvelope,
+  ArticlePdfUploadStatusDtoEnvelope,
   ConfirmOutputUploadDto,
+  ConfirmedOutputFileDtoEnvelope,
+  CreateArticlePdfUploadDto,
   CreateOutputUploadDto,
-  OutputFileResponseDtoEnvelope,
   OutputUploadResponseDtoEnvelope,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+const withQueryKey = <T extends object, K>(
+  query: T,
+  queryKey: K,
+): T & { queryKey: K } => {
+  const result = { queryKey } as T & { queryKey: K };
+  for (const key of Object.keys(query)) {
+    // The explicit queryKey always wins, matching the previous
+    // `{ ...query, queryKey }` spread where it was set last.
+    if (key === 'queryKey') continue;
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => (query as Record<string, unknown>)[key],
+    });
+  }
+  return result;
+};
 
 /**
  * Issues a presigned PUT URL and confirmation token to a user who can manage the output.
@@ -138,7 +167,7 @@ export const outputUploadControllerConfirmUpload = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<OutputFileResponseDtoEnvelope>(
+  return axiosInstance<ConfirmedOutputFileDtoEnvelope>(
     {
       url: `/outputs/${outputId}/file-uploads/confirm`,
       method: 'POST',
@@ -248,5 +277,384 @@ export const outputDownloadControllerDownloadFile = (
       signal,
     },
     options,
+  );
+};
+
+/**
+ * @summary Prepare a private Article PDF upload
+ */
+export const articleCreationUploadControllerCreateUpload = (
+  createArticlePdfUploadDto: CreateArticlePdfUploadDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ArticlePdfUploadResponseDtoEnvelope>(
+    {
+      url: `/outputs/creation-uploads`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: createArticlePdfUploadDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArticleCreationUploadControllerCreateUploadMutationKey = () =>
+  ['articleCreationUploadControllerCreateUpload'] as const;
+
+export const getArticleCreationUploadControllerCreateUploadMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>,
+    TError,
+    ArticleCreationUploadControllerCreateUploadMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>,
+  TError,
+  ArticleCreationUploadControllerCreateUploadMutationVariables,
+  TContext
+> => {
+  const mutationKey =
+    getArticleCreationUploadControllerCreateUploadMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>,
+    ArticleCreationUploadControllerCreateUploadMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return articleCreationUploadControllerCreateUpload(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArticleCreationUploadControllerCreateUploadMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>
+  >;
+export type ArticleCreationUploadControllerCreateUploadMutationBody =
+  CreateArticlePdfUploadDto;
+export type ArticleCreationUploadControllerCreateUploadMutationError =
+  ApiErrorResponseDto;
+export type ArticleCreationUploadControllerCreateUploadMutationVariables = {
+  data: CreateArticlePdfUploadDto;
+};
+
+/**
+ * @summary Prepare a private Article PDF upload
+ */
+export const useArticleCreationUploadControllerCreateUpload = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>,
+      TError,
+      ArticleCreationUploadControllerCreateUploadMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof articleCreationUploadControllerCreateUpload>>,
+  TError,
+  ArticleCreationUploadControllerCreateUploadMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getArticleCreationUploadControllerCreateUploadMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Read an Article PDF upload and metadata processing status
+ */
+export const articleCreationUploadControllerGetUpload = (
+  uploadId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ArticlePdfUploadStatusDtoEnvelope>(
+    { url: `/outputs/creation-uploads/${uploadId}`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getArticleCreationUploadControllerGetUploadQueryKey = (
+  uploadId: string,
+) => {
+  return [`/outputs/creation-uploads/${uploadId}`] as const;
+};
+
+export const getArticleCreationUploadControllerGetUploadQueryOptions = <
+  TData = Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+  TError = ApiErrorResponseDto,
+>(
+  uploadId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getArticleCreationUploadControllerGetUploadQueryKey(uploadId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>
+  > = ({ signal }) =>
+    articleCreationUploadControllerGetUpload(uploadId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: uploadId !== null && uploadId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ArticleCreationUploadControllerGetUploadQueryResult = NonNullable<
+  Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>
+>;
+export type ArticleCreationUploadControllerGetUploadQueryError =
+  ApiErrorResponseDto;
+
+export function useArticleCreationUploadControllerGetUpload<
+  TData = Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+  TError = ApiErrorResponseDto,
+>(
+  uploadId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+          TError,
+          Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArticleCreationUploadControllerGetUpload<
+  TData = Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+  TError = ApiErrorResponseDto,
+>(
+  uploadId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+          TError,
+          Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useArticleCreationUploadControllerGetUpload<
+  TData = Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+  TError = ApiErrorResponseDto,
+>(
+  uploadId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Read an Article PDF upload and metadata processing status
+ */
+
+export function useArticleCreationUploadControllerGetUpload<
+  TData = Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+  TError = ApiErrorResponseDto,
+>(
+  uploadId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof articleCreationUploadControllerGetUpload>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getArticleCreationUploadControllerGetUploadQueryOptions(
+    uploadId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Confirm an Article PDF upload
+ */
+export const articleCreationUploadControllerConfirmUpload = (
+  uploadId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ArticlePdfUploadStatusDtoEnvelope>(
+    {
+      url: `/outputs/creation-uploads/${uploadId}/confirm`,
+      method: 'POST',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getArticleCreationUploadControllerConfirmUploadMutationKey = () =>
+  ['articleCreationUploadControllerConfirmUpload'] as const;
+
+export const getArticleCreationUploadControllerConfirmUploadMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>,
+    TError,
+    ArticleCreationUploadControllerConfirmUploadMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>,
+  TError,
+  ArticleCreationUploadControllerConfirmUploadMutationVariables,
+  TContext
+> => {
+  const mutationKey =
+    getArticleCreationUploadControllerConfirmUploadMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>,
+    ArticleCreationUploadControllerConfirmUploadMutationVariables
+  > = (props) => {
+    const { uploadId } = props ?? {};
+
+    return articleCreationUploadControllerConfirmUpload(
+      uploadId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArticleCreationUploadControllerConfirmUploadMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>
+  >;
+
+export type ArticleCreationUploadControllerConfirmUploadMutationError =
+  ApiErrorResponseDto;
+export type ArticleCreationUploadControllerConfirmUploadMutationVariables = {
+  uploadId: string;
+};
+
+/**
+ * @summary Confirm an Article PDF upload
+ */
+export const useArticleCreationUploadControllerConfirmUpload = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>,
+      TError,
+      ArticleCreationUploadControllerConfirmUploadMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof articleCreationUploadControllerConfirmUpload>>,
+  TError,
+  ArticleCreationUploadControllerConfirmUploadMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getArticleCreationUploadControllerConfirmUploadMutationOptions(options),
+    queryClient,
   );
 };

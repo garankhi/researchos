@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CreateArticleAuthorDto } from './createArticleAuthorDto';
+import type { CreateArticleDtoFileVisibility } from './createArticleDtoFileVisibility';
 import type { CreateArticleDtoOutputType } from './createArticleDtoOutputType';
 
 export interface CreateArticleDto {
@@ -68,4 +69,8 @@ export interface CreateArticleDto {
   peerReviewed?: boolean | null;
   /** Active ResearchOS Topic IDs confirmed by the submitter. */
   topicIds?: string[];
+  /** An unclaimed, verified PDF upload. Requires fileVisibility. */
+  uploadId?: string;
+  /** Visibility of the attached PDF. Requires uploadId. */
+  fileVisibility?: CreateArticleDtoFileVisibility;
 }

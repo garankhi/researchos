@@ -1,22 +1,15 @@
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  BadRequestException,
-  HttpStatus,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   OutputFileVisibility,
   Prisma,
   PrismaService,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
-import type { StorageAdapter } from '@researchos/storage';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type {
   CreateOutputUploadDto,
-  OutputFileResponseDto,
+  ConfirmedOutputFileDto,
   OutputUploadResponseDto,
 } from './dto/output-upload.dto.js';
 import { ObjectStorageService } from './object-storage.service.js';
@@ -31,7 +24,6 @@ type OutputFile = Prisma.output_filesGetPayload<undefined>;
 
 @Injectable()
 export class OutputUploadService {
-  private readonly logger = new Logger(OutputUploadService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: ObjectStorageService,
@@ -65,7 +57,7 @@ export class OutputUploadService {
       expiresAt: Date.now() + confirmationTtlMs,
     };
     const uploadToken = signUploadIntent(intent);
-    const { url, headers } = await this.withStorage((storage) =>
+    const { url, headers } = await this.storage.run((storage) =>
       storage.createUploadUrl({
         key: intent.key,
         contentType: intent.mimeType,
@@ -80,7 +72,7 @@ export class OutputUploadService {
     userId: string,
     outputId: string,
     uploadToken: string,
-  ): Promise<OutputFileResponseDto> {
+  ): Promise<ConfirmedOutputFileDto> {
     let intent: UploadIntent;
     try {
       intent = readUploadIntent(uploadToken);
@@ -111,7 +103,18 @@ export class OutputUploadService {
       );
     }
 
-    await this.verifyObject(intent);
+    const matched = await this.storage.verifyUpload({
+      key: intent.key,
+      contentType: intent.mimeType,
+      sizeBytes: intent.sizeBytes,
+      sha256: intent.sha256,
+    });
+    if (!matched) {
+      throw new CodedHttpException(
+        domainErrorCodes.storage.fileConflict,
+        HttpStatus.CONFLICT,
+      );
+    }
     // Evaluate authorization in the write statement, including when the
     // insert has to wait for a concurrent transaction before it can start.
     const [inserted] = await this.prisma.$queryRaw<OutputFile[]>`
@@ -148,47 +151,6 @@ export class OutputUploadService {
     return this.toResponse(file);
   }
 
-  private async verifyObject(intent: UploadIntent): Promise<void> {
-    const metadata = await this.withStorage((storage) =>
-      storage.headObject(intent.key),
-    );
-    if (
-      !metadata ||
-      metadata.sizeBytes !== intent.sizeBytes ||
-      metadata.contentType !== intent.mimeType
-    ) {
-      throw new CodedHttpException(
-        domainErrorCodes.storage.fileConflict,
-        HttpStatus.CONFLICT,
-      );
-    }
-    const sha256 =
-      metadata.sha256 ??
-      (await this.withStorage(async (storage) => {
-        const body = await storage.getObject(intent.key);
-        const hash = createHash('sha256');
-        let size = 0;
-        try {
-          for await (const chunk of body as AsyncIterable<Buffer>) {
-            size += chunk.byteLength;
-            if (size > intent.sizeBytes) {
-              return undefined;
-            }
-            hash.update(chunk);
-          }
-          return size === intent.sizeBytes ? hash.digest('hex') : undefined;
-        } finally {
-          body.destroy();
-        }
-      }));
-    if (sha256 !== intent.sha256) {
-      throw new CodedHttpException(
-        domainErrorCodes.storage.fileConflict,
-        HttpStatus.CONFLICT,
-      );
-    }
-  }
-
   private async assertCanManage(
     userId: string,
     outputId: string,
@@ -213,20 +175,7 @@ export class OutputUploadService {
     }
   }
 
-  private async withStorage<T>(
-    run: (storage: StorageAdapter) => Promise<T>,
-  ): Promise<T> {
-    try {
-      return await run(this.storage.adapter);
-    } catch (error) {
-      this.logger.warn(
-        `S3 operation failed: ${error instanceof Error ? error.name : 'unknown error'}`,
-      );
-      throw new ServiceUnavailableException();
-    }
-  }
-
-  private toResponse(file: OutputFile): OutputFileResponseDto {
+  private toResponse(file: OutputFile): ConfirmedOutputFileDto {
     return {
       id: file.id,
       outputId: file.output_id,

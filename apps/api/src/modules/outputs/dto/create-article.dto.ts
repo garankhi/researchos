@@ -6,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   Equals,
+  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -15,8 +16,14 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-
-import { submittedValue, trimText } from './submitted-value.js';
+import {
+  submittedValue,
+  trimText,
+} from '../../../common/dto/submitted-value.js';
+import {
+  articlePdfVisibilities,
+  type ArticlePdfVisibility,
+} from './article-pdf.dto.js';
 
 class CreateArticleAuthorDto {
   @ApiProperty({
@@ -177,6 +184,31 @@ export class CreateArticleDto {
   @IsArray({ message: 'article_topics_invalid' })
   @IsUUID(undefined, { each: true, message: 'id_uuid' })
   topicIds?: string[];
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'uuid',
+    description: 'An unclaimed, verified PDF upload. Requires fileVisibility.',
+  })
+  @Transform(submittedValue)
+  @ValidateIf(
+    (dto: CreateArticleDto, value) =>
+      value !== undefined || dto.fileVisibility !== undefined,
+  )
+  @IsUUID(undefined, { message: 'id_uuid' })
+  uploadId?: string;
+
+  @ApiPropertyOptional({
+    enum: [...articlePdfVisibilities],
+    description: 'Visibility of the attached PDF. Requires uploadId.',
+  })
+  @Transform(submittedValue)
+  @ValidateIf(
+    (dto: CreateArticleDto, value) =>
+      value !== undefined || dto.uploadId !== undefined,
+  )
+  @IsIn([...articlePdfVisibilities], { message: 'output_visibility_invalid' })
+  fileVisibility?: ArticlePdfVisibility;
 }
 
 export class CreateArticleResponseDto {

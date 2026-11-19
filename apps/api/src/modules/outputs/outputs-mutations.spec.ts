@@ -8,6 +8,7 @@ import {
 import { domainErrorCodes } from '@researchos/error-codes';
 import { describe, expect, it, vi } from 'vitest';
 import { ProvenanceService } from '../provenance/provenance.service.js';
+import { ArticleCreationUploadService } from '../storage/article-creation-upload.service.js';
 import { OutputsController } from './outputs.controller.js';
 import { OutputsService } from './outputs.service.js';
 
@@ -107,6 +108,7 @@ describe('OutputsController mutations', () => {
         OutputsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: ProvenanceService, useValue: provenanceMock },
+        { provide: ArticleCreationUploadService, useValue: {} },
       ],
     }).compile();
 

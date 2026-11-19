@@ -172,6 +172,14 @@ CREATE TYPE "output_import_state" AS ENUM (
   'ACCEPTED'
 );
 
+CREATE TYPE "article_pdf_metadata_status" AS ENUM (
+  'NOT_STARTED',
+  'QUEUED',
+  'PROCESSING',
+  'READY',
+  'FAILED'
+);
+
 CREATE TYPE "search_entity_type" AS ENUM (
   'OUTPUT',
   'RESEARCHER',
@@ -609,6 +617,26 @@ CREATE TABLE "output_files" (
   "uploaded_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_file_size" CHECK (size_bytes > 0),
   CONSTRAINT "ck_file_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL))
+);
+
+CREATE TABLE "article_creation_uploads" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "owner_id" uuid NOT NULL,
+  "storage_key" text UNIQUE NOT NULL,
+  "file_name" varchar(255) NOT NULL,
+  "mime_type" varchar(100) NOT NULL,
+  "size_bytes" bigint NOT NULL,
+  "sha256" varchar(64) NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  "expires_at" timestamptz NOT NULL,
+  "verified_at" timestamptz,
+  "consumed_at" timestamptz,
+  "consumed_file_id" uuid UNIQUE,
+  "storage_deleted_at" timestamptz,
+  "metadata_status" article_pdf_metadata_status NOT NULL DEFAULT 'NOT_STARTED',
+  CONSTRAINT "ck_article_creation_upload_metadata" CHECK (length(btrim(file_name)) > 0 AND mime_type = 'application/pdf' AND size_bytes > 0 AND sha256 ~ '^[a-f0-9]{64}$'),
+  CONSTRAINT "ck_article_creation_upload_expiry" CHECK (expires_at > created_at),
+  CONSTRAINT "ck_article_creation_upload_consumption" CHECK ((consumed_at IS NULL AND consumed_file_id IS NULL) OR (consumed_at IS NOT NULL AND consumed_file_id IS NOT NULL AND verified_at IS NOT NULL AND storage_deleted_at IS NULL))
 );
 
 CREATE TABLE "output_revision_files" (
@@ -1096,6 +1124,8 @@ COMMENT ON TABLE "output_topics" IS 'Topics of a specific output revision. Filte
 
 COMMENT ON TABLE "output_files" IS 'Immutable payload metadata; visibility/availability may be restricted immediately. Download requires BOTH output access and file access, plus a released revision attachment unless requester is manager. Group approval never grants file access.';
 
+COMMENT ON TABLE "article_creation_uploads" IS 'Owner-scoped temporary Article PDF. Consumption links the verified object to its durable file record. Cleanup deletes only expired unconsumed objects.';
+
 COMMENT ON TABLE "output_revision_files" IS 'Reuse one immutable stored file in multiple revisions. Composite FKs ensure revision and file belong to the same output. Frozen after release.';
 
 COMMENT ON TABLE "group_output_links" IS 'Group curation only. Leader may directly insert ACCEPTED for an owned released work; no self-application. Pending/rejected new request preserves previous accepted pin. Removal clears ONLY this group pin. New released revision needs separate acceptance to replace group content. Root visibility always applies. No minimum group size.';
@@ -1227,6 +1257,10 @@ ALTER TABLE "output_files" ADD FOREIGN KEY ("output_id") REFERENCES "research_ou
 ALTER TABLE "output_files" ADD FOREIGN KEY ("uploaded_by") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "output_files" ADD FOREIGN KEY ("access_group_id") REFERENCES "research_groups" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "article_creation_uploads" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "article_creation_uploads" ADD FOREIGN KEY ("consumed_file_id") REFERENCES "output_files" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "output_revision_files" ADD FOREIGN KEY ("output_id", "revision_id") REFERENCES "output_revisions" ("output_id", "id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -1368,6 +1402,8 @@ CREATE INDEX idx_outbox_ready ON outbox(available_at) WHERE dispatched_at IS NUL
 CREATE UNIQUE INDEX uq_unrevoked_user_role ON user_role_assignments(user_id, role) WHERE revoked_at IS NULL;
 CREATE UNIQUE INDEX uq_local_topic_name ON research_topics(subfield_id, lower(name)) WHERE source = 'LOCAL';
 CREATE UNIQUE INDEX uq_output_editable_draft ON output_revisions(output_id) WHERE released_at IS NULL;
+CREATE INDEX idx_article_creation_uploads_cleanup ON article_creation_uploads(expires_at, id)
+ WHERE consumed_at IS NULL AND storage_deleted_at IS NULL;
 CREATE UNIQUE INDEX uq_application_not_withdrawn ON opportunity_applications(opportunity_id, applicant_id) WHERE status <> 'WITHDRAWN';
 CREATE INDEX idx_topic_search ON research_topics USING gin(name gin_trgm_ops);
 CREATE INDEX idx_revision_title_search ON output_revisions USING gin(title gin_trgm_ops) WHERE released_at IS NOT NULL;

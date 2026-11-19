@@ -8,6 +8,8 @@ CREATE INDEX idx_outbox_ready ON outbox(available_at) WHERE dispatched_at IS NUL
 CREATE UNIQUE INDEX uq_unrevoked_user_role ON user_role_assignments(user_id, role) WHERE revoked_at IS NULL;
 CREATE UNIQUE INDEX uq_local_topic_name ON research_topics(subfield_id, lower(name)) WHERE source = 'LOCAL';
 CREATE UNIQUE INDEX uq_output_editable_draft ON output_revisions(output_id) WHERE released_at IS NULL;
+CREATE INDEX idx_article_creation_uploads_cleanup ON article_creation_uploads(expires_at, id)
+ WHERE consumed_at IS NULL AND storage_deleted_at IS NULL;
 CREATE UNIQUE INDEX uq_application_not_withdrawn ON opportunity_applications(opportunity_id, applicant_id) WHERE status <> 'WITHDRAWN';
 CREATE INDEX idx_topic_search ON research_topics USING gin(name gin_trgm_ops);
 CREATE INDEX idx_revision_title_search ON output_revisions USING gin(title gin_trgm_ops) WHERE released_at IS NOT NULL;
