@@ -212,12 +212,6 @@ export function GroupSidebar({
           </Stack>
         </Box>
       ) : null}
-
-      {isLeader ? null : (
-        <Text textStyle="xs" color="fg.muted">
-          {t('readonlyNotice')}
-        </Text>
-      )}
     </Stack>
   );
 }

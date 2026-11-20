@@ -14,7 +14,8 @@ export class GroupDirectionPreviewDto {
   title: string;
 
   @ApiProperty({
-    description: 'Name of the linked taxonomy topic, or null for an unlinked direction.',
+    description:
+      'Name of the linked taxonomy topic, or null for an unlinked direction.',
     type: String,
     nullable: true,
   })

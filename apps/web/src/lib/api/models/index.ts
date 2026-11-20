@@ -253,6 +253,8 @@ export * from './searchResultItemDtoBody';
 export * from './searchResultItemDtoEntityType';
 export * from './searchResultItemDtoOwnerId';
 export * from './searchResultItemDtoRevisionId';
+export * from './searchResultItemDtoSubtitleEntityId';
+export * from './searchResultItemDtoSubtitleEntityType';
 export * from './searchResultItemDtoVisibility';
 export * from './subfieldResponseDto';
 export * from './subfieldResponseDtoSource';

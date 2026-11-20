@@ -10030,9 +10030,28 @@
           },
           "authorsText": {
             "type": "object",
-            "description": "Formatted author names, researcher full name, group leader name, or opportunity creator name.",
+            "description": "Formatted author names, researcher full name, group leader name, or publishing group name.",
             "nullable": true,
             "example": "Nguyen Van A, Tran Thi B"
+          },
+          "subtitleEntityType": {
+            "type": "string",
+            "description": "Kind of entity the subtitle refers to — `RESEARCHER` for a group leader, `GROUP` for an opportunity publishing group. `null` when the subtitle names no entity, as it does for an output's authors.",
+            "enum": [
+              "OUTPUT",
+              "RESEARCHER",
+              "GROUP",
+              "OPPORTUNITY"
+            ],
+            "nullable": true,
+            "example": "RESEARCHER"
+          },
+          "subtitleEntityId": {
+            "type": "object",
+            "description": "Primary key UUID of the entity the subtitle refers to; `null` when the subtitle names no entity.",
+            "format": "uuid",
+            "nullable": true,
+            "example": "44444444-4444-4444-8444-444444444444"
           },
           "rank": {
             "type": "number",
@@ -10056,6 +10075,8 @@
           "title",
           "body",
           "authorsText",
+          "subtitleEntityType",
+          "subtitleEntityId",
           "rank",
           "updatedAt"
         ]

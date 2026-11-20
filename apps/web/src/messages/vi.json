@@ -72,7 +72,8 @@
     "followed": "Đã theo dõi {title}",
     "unfollowed": "Đã bỏ theo dõi {title}",
     "followError": "Không cập nhật được lượt theo dõi.",
-    "followingLoadError": "Không tải được danh sách đang theo dõi."
+    "followingLoadError": "Không tải được danh sách đang theo dõi.",
+    "groupLeaderLabel": "Chủ nhóm:"
   },
   "entityPreview": {
     "unavailable": "Không có thông tin xem trước.",
