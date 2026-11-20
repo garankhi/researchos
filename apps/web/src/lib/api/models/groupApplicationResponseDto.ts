@@ -19,6 +19,17 @@ export interface GroupApplicationResponseDto {
   opportunityTitle?: string | null;
   /** Researcher submitting the application. */
   applicantId: string;
+  /** Full display name of the applicant. */
+  applicantFullName: string;
+  /** Institutional email address of the applicant. */
+  applicantEmail: string;
+  /** Department or administrative unit of the applicant. */
+  applicantDepartmentUnit: string;
+  /**
+   * Storage key referencing the applicant avatar image.
+   * @nullable
+   */
+  applicantAvatarStorageKey: string | null;
   /** Researcher application note. */
   applicantNote: string;
   /** Current application state. */

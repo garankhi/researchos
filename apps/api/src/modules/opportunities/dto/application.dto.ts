@@ -18,6 +18,19 @@ export class CreateApplicationDto {
   applicantNote: string;
 }
 
+/**
+ * One application, with the display data the screens render.
+ *
+ * The application row itself carries only the relation (`applicant_id`,
+ * `applicant_note`, the status and the timestamps); the applicant's name,
+ * email, department and avatar come from the joined `users` row and its
+ * optional `researcher_profiles` row, so an opportunity's application list
+ * renders a roster without an N+1 walk over the profile endpoints.
+ *
+ * The profile fields are nullable on purpose: the applicant's account row
+ * always exists (the foreign key guarantees it), but the profile row does
+ * not, so the avatar may be absent.
+ */
 export class ApplicationResponseDto {
   @ApiProperty({ description: 'Application identifier.', format: 'uuid' })
   id: string;
@@ -42,6 +55,32 @@ export class ApplicationResponseDto {
     format: 'uuid',
   })
   applicantId: string;
+
+  @ApiProperty({
+    description: 'Full display name of the applicant.',
+    example: 'PGS. TS. Nguyễn Văn A',
+  })
+  applicantFullName: string;
+
+  @ApiProperty({
+    description: 'Institutional email address of the applicant.',
+    example: 'nguyenvana@fpt.edu.vn',
+  })
+  applicantEmail: string;
+
+  @ApiProperty({
+    description: 'Department or administrative unit of the applicant.',
+    example: 'Software Engineering',
+  })
+  applicantDepartmentUnit: string;
+
+  @ApiProperty({
+    description: 'Storage key referencing the applicant avatar image.',
+    example: 'avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png',
+    type: 'string',
+    nullable: true,
+  })
+  applicantAvatarStorageKey: string | null;
 
   @ApiProperty({ description: 'Researcher application note.' })
   applicantNote: string;

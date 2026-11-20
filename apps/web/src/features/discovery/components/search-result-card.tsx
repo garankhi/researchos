@@ -16,6 +16,7 @@ import { FieldError } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import type { FollowTargetDto, SearchResultItemDto } from '@/lib/api/models';
 import { followKey } from '@/features/follow';
+import { entityHref } from '../entity-href';
 import { useChangeSearchFollow } from '../hooks/use-search-follows';
 
 function FollowButton({
@@ -83,6 +84,11 @@ export function SearchResultCard({
   const format = useFormatter();
   const { entityType, entityId } = item;
   const isResearcher = entityType === 'RESEARCHER';
+  /**
+   * Every kind of result has a screen of its own, so every title links
+   * to it. A result the reader cannot open is a dead end.
+   */
+  const href = entityHref(entityType, entityId);
   const target: FollowTargetDto | undefined =
     canFollow &&
     (entityType === 'GROUP' || (isResearcher && entityId !== userId))
@@ -98,11 +104,9 @@ export function SearchResultCard({
             size={{ base: 'sm', lg: 'md' }}
             overflowWrap="anywhere"
           >
-            {isResearcher ? (
+            {href ? (
               <Link asChild color="fg">
-                <NextLink href={`/profile/${item.entityId}`}>
-                  {item.title}
-                </NextLink>
+                <NextLink href={href}>{item.title}</NextLink>
               </Link>
             ) : (
               item.title
