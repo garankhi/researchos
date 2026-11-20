@@ -168,6 +168,18 @@ const openAlexCard: SkeletonResult = {
   ],
 };
 
+const followingRow: SkeletonResult = {
+  name: 'profile-following-row',
+  viewportWidth: 768,
+  width: 640,
+  height: 56,
+  bones: [
+    [0, 0, 40, 40, 0],
+    [48, 4, 44, 16, 0],
+    [48, 28, 24, 12, 0],
+  ],
+};
+
 const applicationAction: SkeletonResult = {
   name: 'profile-application-action',
   viewportWidth: 390,
@@ -329,6 +341,24 @@ export function ProfileTabSkeleton({
             borderColor="border"
           >
             <DelayedSkeleton layout={groupCard} announce={false} />
+          </Box>
+        ))}
+      </Stack>
+    );
+  }
+
+  if (tab === 'following') {
+    return (
+      <Stack gap="4" py="1">
+        <DelayedSkeleton layout={groupHeading} />
+        {[1, 2, 3].map((row) => (
+          <Box
+            key={row}
+            py="3"
+            borderBottomWidth={row < 3 ? '1px' : '0'}
+            borderColor="border"
+          >
+            <DelayedSkeleton layout={followingRow} announce={false} />
           </Box>
         ))}
       </Stack>

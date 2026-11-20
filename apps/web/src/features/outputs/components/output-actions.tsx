@@ -2,20 +2,13 @@
 
 import { useState } from 'react';
 import { Button, Flex, Text, type ButtonProps } from '@chakra-ui/react';
-import { Check, Link2, Share2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import {
-  outputDownloadControllerDownloadFile,
-  useFollowControllerCreate,
-  useFollowControllerFindAll,
-  useFollowControllerRemove,
-} from '@/lib/api';
+import { outputDownloadControllerDownloadFile } from '@/lib/api';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
-import type { OutputDetail, OutputFile } from '../types';
-
-const GROUP_ENTITY_TYPE = 'GROUP' as const;
+import type { OutputFile } from '../types';
 
 function fileSizeLabel(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -268,82 +261,6 @@ export function OutputShareButton() {
       {shareError ? (
         <Text textStyle="xs" color="fg.error" role="alert">
           {shareError}
-        </Text>
-      ) : null}
-    </Flex>
-  );
-}
-
-export function OutputFollowButton({ output }: { output: OutputDetail }) {
-  const t = useTranslations('outputs');
-  const tError = useTranslations('errors');
-  const { showSnackbar } = useSnackbar();
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const groupId = output.accessGroupId;
-
-  const followsQuery = useFollowControllerFindAll(
-    { limit: 100 },
-    { query: { enabled: Boolean(groupId), staleTime: 60 * 1000 } },
-  );
-  const isFollowing = Boolean(
-    groupId &&
-    followsQuery.data?.items?.some(
-      (item) =>
-        item.entityType === GROUP_ENTITY_TYPE && item.entityId === groupId,
-    ),
-  );
-
-  const createFollow = useFollowControllerCreate();
-  const removeFollow = useFollowControllerRemove();
-
-  if (!groupId) return null;
-
-  // Captured into a local so the narrowing survives into the closure
-  // below: TypeScript does not keep a narrowing of a `const` initialized
-  // from a nullable property across an `async` function boundary.
-  const targetGroupId = groupId;
-
-  async function handleToggleFollow() {
-    setActionError(null);
-    try {
-      if (isFollowing) {
-        await removeFollow.mutateAsync({
-          entityType: GROUP_ENTITY_TYPE,
-          entityId: targetGroupId,
-        });
-        showSnackbar({ severity: 'success', message: t('detail.unfollowed') });
-      } else {
-        await createFollow.mutateAsync({
-          data: { entityType: GROUP_ENTITY_TYPE, entityId: targetGroupId },
-        });
-        showSnackbar({ severity: 'success', message: t('detail.followed') });
-      }
-      await followsQuery.refetch();
-    } catch (error) {
-      setActionError(
-        resolveErrorCode(tError, apiErrorCode(error), t('detail.followError')),
-      );
-    }
-  }
-
-  const followPending = createFollow.isPending || removeFollow.isPending;
-
-  return (
-    <Flex direction="column" gap="1" align="flex-end" flexShrink={0}>
-      <Button
-        variant={isFollowing ? 'solid' : 'outline'}
-        size="sm"
-        loading={followPending}
-        loadingText={t('detail.followLoading')}
-        onClick={() => void handleToggleFollow()}
-      >
-        {isFollowing ? <Check /> : <Link2 />}
-        {isFollowing ? t('detail.followingAction') : t('detail.followAction')}
-      </Button>
-      {actionError ? (
-        <Text textStyle="xs" color="fg.error" role="alert">
-          {actionError}
         </Text>
       ) : null}
     </Flex>

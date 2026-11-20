@@ -10,7 +10,13 @@ import type {
 } from '@/lib/api/models';
 
 export type ProfileTab =
-  'overview' | 'outputs' | 'groups' | 'interests' | 'applications' | 'openalex';
+  | 'overview'
+  | 'outputs'
+  | 'groups'
+  | 'interests'
+  | 'following'
+  | 'applications'
+  | 'openalex';
 
 export type PublicProfileTab = 'overview' | 'outputs' | 'groups' | 'interests';
 

@@ -14,8 +14,8 @@ import {
 import { ExternalLink, Users } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
+import { FollowButton } from '@/features/follow';
 import type { OutputDetail } from '../types';
-import { OutputFollowButton } from './output-actions';
 import { formatPublishedDate } from './output-header';
 
 export function OutputSidebar({
@@ -181,7 +181,7 @@ export function OutputSidebar({
             </Flex>
 
             <Box alignSelf="flex-start">
-              <OutputFollowButton output={output} />
+              <FollowButton entityType="GROUP" entityId={groupId} />
             </Box>
           </Stack>
         </Box>

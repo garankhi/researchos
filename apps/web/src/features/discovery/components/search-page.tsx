@@ -22,7 +22,7 @@ import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useRouter } from '@/i18n/navigation';
 import { usePagination } from '@/utils/pagination';
-import { useSearchFollows } from '../hooks/use-search-follows';
+import { useFollowKeys } from '@/features/follow';
 import { useSearchCounts, useSearchResults } from '../hooks/use-search-results';
 import {
   readSearchTab,
@@ -62,12 +62,14 @@ function SearchResultsPanel({
   tab,
   active,
   follows,
+  followsReady,
 }: {
   user: SearchViewer;
   term: string;
   tab: SearchTab;
   active: boolean;
-  follows: readonly string[] | undefined;
+  follows: ReadonlySet<string>;
+  followsReady: boolean;
 }) {
   const t = useTranslations('search');
   const pagination = usePagination({ sort: '-rank' });
@@ -137,6 +139,7 @@ function SearchResultsPanel({
           userId={user.id}
           canFollow={user.canFollow}
           follows={follows}
+          followsReady={followsReady}
         />
       ))}
       {meta && !results.isEmpty && (
@@ -184,19 +187,16 @@ function SearchResults({
   issue: ReturnType<typeof searchTermError>;
 }) {
   const t = useTranslations('search');
-  const follows = useSearchFollows(
-    user.id,
-    !issue && user.canFollow && (tab === 'people' || tab === 'group'),
-  );
+  const follows = useFollowKeys(user.id);
 
   return (
     <>
-      {follows.isFailed && (
+      {follows.error ? (
         <ErrorState
           title={t('followingLoadError')}
-          onRetry={() => void follows.retry()}
+          onRetry={() => void follows.refetch()}
         />
-      )}
+      ) : null}
       {searchTabs.map((name) => (
         <Tabs.Content key={name} value={name} pt="0">
           {issue ? (
@@ -209,7 +209,8 @@ function SearchResults({
               term={term}
               tab={name}
               active={tab === name}
-              follows={follows.targets}
+              follows={follows.keys}
+              followsReady={follows.isReady}
             />
           )}
         </Tabs.Content>

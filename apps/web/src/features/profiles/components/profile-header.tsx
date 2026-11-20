@@ -12,11 +12,11 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { Check, ExternalLink, Mail, Pencil, UserPlus } from 'lucide-react';
+import { ExternalLink, Mail, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { FieldError } from '@/components/ui/feedback';
 import { useRouter } from '@/i18n/navigation';
+import { FollowButton } from '@/features/follow';
 import { useProfileSocial } from '../hooks/use-profile-social';
 import type {
   ProfileResponseDto,
@@ -50,7 +50,6 @@ export function ProfileHeader({
 }) {
   const t = useTranslations('profile');
   const tAvailability = useTranslations('profile.availability');
-  const { showSnackbar } = useSnackbar();
   const router = useRouter();
 
   const social = useProfileSocial({
@@ -65,20 +64,6 @@ export function ProfileHeader({
   ]
     .filter(Boolean)
     .join(' · ');
-
-  const handleToggleFollow = async () => {
-    try {
-      const nowFollowing = await social.toggleFollow();
-      showSnackbar({
-        severity: 'success',
-        message: t(nowFollowing ? 'followedToast' : 'unfollowedToast', {
-          name: profile.fullName,
-        }),
-      });
-    } catch {
-      // Inline FieldError renders below the action group.
-    }
-  };
 
   const handleMessage = async () => {
     try {
@@ -225,19 +210,11 @@ export function ProfileHeader({
           alignSelf={{ base: 'stretch', sm: 'flex-start' }}
         >
           <Flex gap="2" justify={{ base: 'center', sm: 'flex-end' }}>
-            {social.canFollow ? (
-              <Button
-                variant={social.isFollowing ? 'outline' : 'solid'}
-                size="sm"
-                disabled={!social.followReady}
-                loading={social.isTogglingFollow}
-                aria-pressed={social.isFollowing}
-                onClick={() => void handleToggleFollow()}
-              >
-                {social.isFollowing ? <Check /> : <UserPlus />}
-                {t(social.isFollowing ? 'following' : 'follow')}
-              </Button>
-            ) : null}
+            <FollowButton
+              entityType="RESEARCHER"
+              entityId={profile.userId}
+              align="flex-end"
+            />
 
             <Button
               variant="outline"
@@ -250,9 +227,6 @@ export function ProfileHeader({
             </Button>
           </Flex>
 
-          {social.followFailed ? (
-            <FieldError>{t('followError')}</FieldError>
-          ) : null}
           {social.chatFailed ? (
             <FieldError>{t('messageError')}</FieldError>
           ) : null}

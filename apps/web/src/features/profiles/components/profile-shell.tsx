@@ -10,6 +10,7 @@ import {
   RouteFeedback,
 } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
+import { FollowList } from '@/features/follow';
 import { useOpenAlexCandidates } from '../hooks/use-openalex-candidates';
 import { useProfile } from '../hooks/use-profile';
 import { useProfileGroups } from '../hooks/use-profile-groups';
@@ -160,6 +161,12 @@ export function ProfileShell({
         </Tabs.Content>
 
         {isOwner ? (
+          <Tabs.Content value="following" pt="0">
+            <FollowList />
+          </Tabs.Content>
+        ) : null}
+
+        {isOwner ? (
           <Tabs.Content value="applications" pt="0">
             <ProfileApplicationsTab />
           </Tabs.Content>
@@ -237,6 +244,12 @@ export function ProfileShell({
             <Tabs.Trigger value="interests" height="12" px="0">
               {t('tabs.interests')}
             </Tabs.Trigger>
+
+            {isOwner ? (
+              <Tabs.Trigger value="following" height="12" px="0">
+                {t('tabs.following')}
+              </Tabs.Trigger>
+            ) : null}
 
             {isOwner ? (
               <Tabs.Trigger value="applications" height="12" px="0">
