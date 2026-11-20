@@ -45,6 +45,73 @@ const sidebarLayout: SkeletonResult = {
   ],
 };
 
+/**
+ * The heading of the applications panel: its title and the count beside
+ * it.
+ */
+const applicationsHeadingLayout: SkeletonResult = {
+  name: 'opportunity-applications-heading',
+  viewportWidth: 768,
+  width: 640,
+  height: 20,
+  bones: [
+    [0, 2, 46, 16, 0],
+    [48, 2, 8, 16, 0],
+  ],
+};
+
+/**
+ * One application row: the avatar beside the applicant's details.
+ *
+ * The bones mirror the real row — a round avatar on the left, the name
+ * and the department beside it, the email under them.
+ */
+const applicationRowLayout: SkeletonResult = {
+  name: 'opportunity-application-row',
+  viewportWidth: 768,
+  width: 640,
+  height: 72,
+  bones: [
+    [0, 0, 12, 30, '50%'],
+    [16, 2, 38, 16, 0],
+    [16, 24, 26, 12, 0],
+    [16, 42, 44, 12, 0],
+  ],
+};
+
+/**
+ * The applications list while it loads.
+ *
+ * Three rows are drawn, so the panel reserves roughly the space the list
+ * will occupy and the page does not jump when the data lands.
+ */
+export function OpportunityApplicationsSkeleton() {
+  return (
+    <Box bg="bg.panel" boxShadow="xs">
+      <Box
+        px={{ base: '4', md: '6' }}
+        py="4"
+        borderBottomWidth="1px"
+        borderColor="border"
+      >
+        <DelayedSkeleton layout={applicationsHeadingLayout} announce />
+      </Box>
+      <Box px={{ base: '4', md: '6' }}>
+        {[1, 2, 3].map((row) => (
+          <Box
+            key={row}
+            py="4"
+            borderBottomWidth={row < 3 ? '1px' : '0'}
+            borderColor="border"
+          >
+            <DelayedSkeleton layout={applicationRowLayout} announce={false} />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
 /** The skeleton shown while the opportunity detail page is loading. */
 export function OpportunityDetailSkeleton() {
   return (

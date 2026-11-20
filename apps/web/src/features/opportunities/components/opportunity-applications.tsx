@@ -13,6 +13,7 @@ import {
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
+import { OpportunityApplicationsSkeleton } from './opportunity-skeletons';
 import type { Application } from '../types';
 
 /**
@@ -63,13 +64,7 @@ export function OpportunityApplications({
   }
 
   if (isLoading) {
-    return (
-      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
-        <Text textStyle="sm" color="fg.muted">
-          {t('applicationsLoading')}
-        </Text>
-      </Box>
-    );
+    return <OpportunityApplicationsSkeleton />;
   }
 
   if (applications.length === 0) {

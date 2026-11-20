@@ -7,7 +7,10 @@
  */
 
 export { OpportunityDetailShell } from './components/opportunity-detail-shell';
-export { OpportunityDetailSkeleton } from './components/opportunity-skeletons';
+export {
+  OpportunityApplicationsSkeleton,
+  OpportunityDetailSkeleton,
+} from './components/opportunity-skeletons';
 export { OpportunityHeader } from './components/opportunity-header';
 export { OpportunitySidebar } from './components/opportunity-sidebar';
 export { useOpportunity } from './hooks/use-opportunity';

@@ -982,7 +982,6 @@
     "archivedToast": "The opportunity was archived.",
     "applicationsTitle": "Applications received",
     "applicationsLoadError": "Could not load the applications",
-    "applicationsLoading": "Loading the applications…",
     "applicationsEmptyTitle": "No applications yet",
     "applicationsEmptyMessage": "Nobody has applied to this opportunity so far.",
     "viewApplicant": "View the applicant",
