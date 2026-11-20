@@ -32,6 +32,17 @@ const config = defineConfig({
         home: {
           background: { value: { base: '#f6f6f6', _dark: '{colors.bg}' } },
         },
+        // Chakra's default `fg.error` is `red.500`, which reaches only
+        // 3.76:1 against white — below the 4.5:1 that WCAG AA asks of
+        // body text. The error text is the one place a form states what
+        // went wrong, so it has to be readable, not merely red.
+        //
+        // The condition key is `_light`, not `base`: a partial override of
+        // an existing namespace only applies when it uses the same
+        // condition key as the token it replaces.
+        fg: {
+          error: { value: { _light: '#b91c1c', _dark: '#f87171' } },
+        },
         interactiveRow: {
           highlight: { value: { base: '#e8e8e8', _dark: '#303034' } },
           indicator: { value: { base: '#737373', _dark: '#a1a1aa' } },
