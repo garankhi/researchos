@@ -146,8 +146,11 @@ export const Applications: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Trần Thị B' }),
     ).toHaveAttribute('href', '/en/profile/researcher-2');
-    await expect(canvas.getByText('Quantum Optics Lab')).toBeVisible();
-    await expect(canvas.getByText('tranthib@fpt.edu.vn')).toBeVisible();
+    // The department and the email share one metadata line, separated by
+    // a middot.
+    await expect(
+      canvas.getByText('Quantum Optics Lab · tranthib@fpt.edu.vn'),
+    ).toBeVisible();
   },
 };
 

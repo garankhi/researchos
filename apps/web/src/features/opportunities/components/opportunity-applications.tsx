@@ -95,6 +95,13 @@ export function OpportunityApplications({
         {applications.map((application, index) => {
           const name = application.applicantFullName || t('unknownApplicant');
 
+          const applicantMeta = [
+            application.applicantDepartmentUnit,
+            application.applicantEmail,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+
           return (
             <Box
               key={application.id}
@@ -108,14 +115,14 @@ export function OpportunityApplications({
                   <Avatar.Fallback name={name} />
                 </Avatar.Root>
 
-                <Stack gap="2" flex="1" minW="0">
-                  <Flex
-                    direction={{ base: 'column', sm: 'row' }}
-                    gap={{ base: '1', sm: '3' }}
-                    align={{ base: 'flex-start', sm: 'baseline' }}
-                    flexWrap="wrap"
-                  >
-                    <Heading as="h3" size="sm" fontWeight="bold">
+                <Stack gap="2.5" flex="1" minW="0">
+                  <Stack gap="0.5">
+                    <Heading
+                      as="h3"
+                      size="sm"
+                      fontWeight="bold"
+                      lineHeight="1.4"
+                    >
                       <Link asChild color="fg" layerStyle="researchTextLink">
                         <NextLink href={`/profile/${application.applicantId}`}>
                           {name}
@@ -123,22 +130,16 @@ export function OpportunityApplications({
                       </Link>
                     </Heading>
 
-                    {application.applicantDepartmentUnit ? (
-                      <Text textStyle="sm" color="fg.muted">
-                        {application.applicantDepartmentUnit}
+                    {applicantMeta ? (
+                      <Text
+                        textStyle="sm"
+                        color="fg.muted"
+                        overflowWrap="anywhere"
+                      >
+                        {applicantMeta}
                       </Text>
                     ) : null}
-                  </Flex>
-
-                  {application.applicantEmail ? (
-                    <Text
-                      textStyle="sm"
-                      color="fg.muted"
-                      overflowWrap="anywhere"
-                    >
-                      {application.applicantEmail}
-                    </Text>
-                  ) : null}
+                  </Stack>
 
                   <Flex gap="2.5" align="center" flexWrap="wrap">
                     <Badge

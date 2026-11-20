@@ -64,18 +64,19 @@ const applicationsHeadingLayout: SkeletonResult = {
  * One application row: the avatar beside the applicant's details.
  *
  * The bones mirror the real row — a round avatar on the left, the name
- * and the department beside it, the email under them.
+ * on the first line, the metadata line under it, and the status badge
+ * below that.
  */
 const applicationRowLayout: SkeletonResult = {
   name: 'opportunity-application-row',
   viewportWidth: 768,
   width: 640,
-  height: 72,
+  height: 80,
   bones: [
     [0, 0, 12, 30, '50%'],
     [16, 2, 38, 16, 0],
-    [16, 24, 26, 12, 0],
-    [16, 42, 44, 12, 0],
+    [16, 24, 62, 12, 0],
+    [16, 50, 18, 16, 0],
   ],
 };
 
