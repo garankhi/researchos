@@ -52,6 +52,112 @@ function xmpMetadata(fields: string): string {
 }
 
 describe('extractArticlePdfMetadata', () => {
+  it('uses the earliest official date from a first-page bibliography and an anchored publication footer', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [12, 750, 'Published in print: September 2025'],
+        [14, 650, '1. Introduction'],
+        [10, 630, 'Available online 7 April 2025'],
+        [9, 100, 'https://doi.org/10.1234/river-study'],
+        [9, 87, 'Received 31 March 2025; Accepted 10 April 2025'],
+        [9, 74, 'Available online 5 May 2025'],
+      ]),
+    );
+    expect(result).toEqual({
+      doi: '10.1234/river-study',
+      publicationDate: '2025-05-05',
+    });
+  });
+
+  it.each([
+    ['Received 2 May 2025; Accepted 5 May 2025', undefined],
+    ['Published online 2025-05', '2025-05'],
+    ['First published: 30 February 2025', undefined],
+    ['Published online: 05/06/2025', undefined],
+    ['Published in print: 2025', '2025'],
+    ['Published online: 2025; Published in print: 5 September 2025', '2025'],
+    ['Published in print: 2025-09; Published: 12 May 2025', '2025-05-12'],
+    ['Available online: 2025-05; Published online: 5 May 2025', '2025-05-05'],
+    ['Published: 1999; Published: 2002', undefined],
+  ])(
+    'classifies and preserves the precision of %s',
+    async (label, expected) => {
+      expect(
+        (await extractArticlePdfMetadata(pdf([[12, 700, label]])))
+          .publicationDate,
+      ).toBe(expected);
+    },
+  );
+
+  it('prefers the paper title, ordered byline and column abstract over conflicting embedded fields', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [21, 750, 'Title: Calibration of rainfall sensors'],
+          [12, 726, 'Authors: Mai Nguyen and Bao Tran'],
+          [10, 695, 'A R T I C L E  I N F O', 40],
+          [10, 695, 'A B S T R A C T', 220],
+          [9, 672, 'Keywords: Sensors', 40],
+          [10, 672, 'We calibrated rainfall sensors across two sites.', 220],
+          [9, 659, 'Publication notes', 40],
+          [10, 659, 'The readings agreed after calibration.', 220],
+          [13, 630, '1. Introduction'],
+        ],
+        '/Title (Journal of Measurement) /Author (Bao Tran; Mai Nguyen)',
+        xmpMetadata(
+          '<dc:description>Abstract: This describes a different article.</dc:description>',
+        ),
+      ),
+    );
+    expect(result).toEqual({
+      title: 'Calibration of rainfall sensors',
+      authorNames: ['Mai Nguyen', 'Bao Tran'],
+      abstract:
+        'We calibrated rainfall sensors across two sites. The readings agreed after calibration.',
+    });
+  });
+
+  it('prefers a DOI aligned with the paper citation over a stale embedded identifier', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [12, 730, 'DOI: 10.1234/river-study'],
+          [14, 670, '1. Introduction'],
+        ],
+        '',
+        xmpMetadata('<prism:doi>10.1234/previous-figure</prism:doi>'),
+      ),
+    );
+    expect(result.doi).toBe('10.1234/river-study');
+  });
+
+  it('keeps the full visible title and rejects a conflicting middle name', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [18, 730, 'Title: Rainfall in the Mekong Basin'],
+          [12, 700, 'Authors: Mai Anh Nguyen and Bao Tran'],
+        ],
+        '/Title (Rainfall) /Author (Mai Bich Nguyen; Bao Tran)',
+      ),
+    );
+    expect(result).toMatchObject({
+      title: 'Rainfall in the Mekong Basin',
+      authorNames: ['Mai Anh Nguyen', 'Bao Tran'],
+    });
+  });
+
+  it('leaves the date and DOI empty when a cited work appears in the references footer', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [14, 300, 'References'],
+        [9, 100, 'https://doi.org/10.1234/cited-work'],
+        [9, 87, 'Accepted 10 April 2025'],
+        [9, 74, 'Available online 5 May 2025'],
+      ]),
+    );
+    expect(result).toEqual({});
+  });
   it.each([false, true])(
     'uses a grounded multi-paragraph abstract and skips prose after Introduction (%s)',
     async (withIntroduction) => {

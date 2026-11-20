@@ -365,6 +365,19 @@ describe('enrichArticlePdfMetadata', () => {
     ).toEqual({ publicationDate: '2025-05' });
   });
 
+  it('uses the date order established by a Vietnamese publication label', () => {
+    expect(
+      mergeGrobidMetadata(
+        {},
+        {
+          hasText: true,
+          firstPage: page('Water clarity', 'Ngày xuất bản: 05/06/2025'),
+        },
+        tei(''),
+      ),
+    ).toEqual({ publicationDate: '2025-06-05' });
+  });
+
   it.each([undefined, 'Water samples showed improved clarity.'])(
     'replaces a conflicting byline independently of the title (%s)',
     async (abstract) => {

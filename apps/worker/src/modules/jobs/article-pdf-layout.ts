@@ -157,8 +157,8 @@ const nameToken = /^\p{Lu}[\p{L}\p{M}.'’-]*$/u;
 const nameParticle = /^(?:al|da|de|del|der|di|dos|du|la|le|van|von)$/u;
 const affiliationWord =
   /\b(?:academy|center|centre|college|consortium|corporation|department|faculty|foundation|hospital|institute|institution|journal|laboratory|programme|school|university|universit[eé]|universidad)\b|,\s*(?:inc|ltd)\.|(?:trường đại học|viện nghiên cứu|khoa học)/iu;
-const masthead =
-  /^(?:(?:the\s+)?journal\s+of\b|(?:(?:e-?)?issn|vol(?:ume)?)[\s.:])/iu;
+export const publicationMasthead =
+  /^(?:(?:the\s+)?(?:[\p{L}-]+\s+){0,3}journal\s+of\b|(?:(?:e-?)?issn|vol(?:ume)?)[\s.:])/iu;
 const bodyHeading =
   /^(?:(?:\d+(?:\.\d+)*|[ivxlcdm]+)[.)]?\s+)?(?:introduction|nomenclature|materials and methods|methods|results|discussion|references|bibliography|literature cited|giới thiệu|mở đầu|phương pháp|kết quả|tài liệu tham khảo)\s*[:.]?$/iu;
 const captionHeading =
@@ -173,6 +173,52 @@ export type PdfHeaderLine = Pick<
   PdfLine,
   'text' | 'y' | 'height' | 'left' | 'right'
 >;
+
+function spacedAbstractHeading(line: PdfLine): PdfLine | undefined {
+  const starts = [0];
+  for (let index = 1; index < line.runs.length; index++) {
+    const previous = line.runs[index - 1];
+    const current = line.runs[index];
+    if (current.x - previous.x - previous.width >= line.height * 1.5)
+      starts.push(index);
+  }
+  for (const [index, start] of starts.entries()) {
+    const runs = line.runs.slice(start, starts[index + 1]);
+    const text = runs.map((run) => run.text).join(' ');
+    if (
+      /^(?:abstract|tómtắt)$/iu.test(text.replace(/\s+/gu, '')) &&
+      (starts.length > 1 || !/^(?:abstract|tóm tắt)$/iu.test(text))
+    )
+      return toLine(line, runs);
+  }
+  return undefined;
+}
+
+export function readSpacedAbstract(
+  lines: readonly PdfLine[],
+): string | undefined {
+  const page = [...lines].sort((a, b) => a.y - b.y || a.left - b.left);
+  const heading = page
+    .map(spacedAbstractHeading)
+    .find((line) => line !== undefined);
+  if (!heading) return undefined;
+  const paragraphs: string[] = [];
+  let previous = heading;
+  const margin = heading.left - heading.height * 0.65;
+  for (const line of page) {
+    if (line.y <= heading.y) continue;
+    if (line.y - previous.y > previous.height * (paragraphs.length ? 2.2 : 3.5))
+      break;
+    const runs = line.runs.filter(({ x }) => x >= margin);
+    if (!runs.length || runs[0].x > heading.left + heading.height * 2) continue;
+    const part = toLine(line, runs);
+    if (keywords.test(part.text) || endsArticleHeader(part.text)) break;
+    paragraphs.push(part.text);
+    previous = part;
+  }
+  const abstract = paragraphs.join(' ').trim();
+  return abstract && /[.!?]["'”’)]*$/u.test(abstract) ? abstract : undefined;
+}
 
 function finishAbstract(lines: readonly string[]): string | undefined {
   const paragraph = lines
@@ -250,7 +296,10 @@ export function readAbstract(pages: readonly PdfLine[][]): string | undefined {
     let start = 0;
     let column: number | undefined;
     if (!paragraphs) {
-      const heading = page.findIndex(({ text }) => abstractHeading.test(text));
+      const heading = page.findIndex(
+        ({ text }) =>
+          abstractHeading.test(text) && !/^tóm tắt\s+\p{L}/iu.test(text),
+      );
       if (heading < 0) continue;
       paragraphs = [abstractHeading.exec(page[heading].text)?.[1] ?? ''];
       column = page[heading].column;
@@ -374,7 +423,7 @@ function continuesTitle(above: PdfLine, below: PdfLine) {
   );
 }
 
-type FrontMatter = {
+export type FrontMatter = {
   title?: string;
   authorNames?: string[];
   firstByline?: string[];
@@ -388,7 +437,11 @@ function readHeadinglessFrontMatter(
     .filter(({ text }) => !/^\d+(?:\s+\d+)*$/u.test(text))
     .sort((a, b) => a.y - b.y || a.left - b.left);
   const first = lines[0];
-  if (!first || first.column !== undefined || masthead.test(first.text))
+  if (
+    !first ||
+    first.column !== undefined ||
+    publicationMasthead.test(first.text)
+  )
     return {};
 
   let titleEnd = 0;
@@ -453,7 +506,7 @@ export function readFrontMatter(firstPage: readonly PdfLine[]): FrontMatter {
     const next = firstPage[end + 1];
     if (!adjacentBelow(last, next)) continue;
     const title = titleLines.map(({ text }) => text).join(' ');
-    if (masthead.test(title)) continue;
+    if (publicationMasthead.test(title)) continue;
     if (end + 1 === abstractStart) {
       candidates.push({ title });
     } else if (next.height < last.height) {

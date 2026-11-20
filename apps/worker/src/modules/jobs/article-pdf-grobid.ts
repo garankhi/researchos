@@ -4,10 +4,18 @@ import {
   parsePublicationDate,
 } from '@researchos/publication-metadata';
 import type { ArticlePdfMetadata } from '@researchos/queue';
+import { readArticleBibliography } from './article-pdf-bibliography.js';
+import {
+  comparableArticleText as comparable,
+  generatedTitle,
+  selectArticleIdentity,
+} from './article-pdf-identity.js';
+import { selectPublicationDate } from './article-pdf-publication-date.js';
 import { SaxesParser, type SaxesAttributeNS } from 'saxes';
 import {
   endsArticleHeader,
   personName,
+  publicationMasthead,
   readLabeledAuthors,
   type PdfHeaderLine,
 } from './article-pdf-layout.js';
@@ -95,14 +103,6 @@ function oneValue<T extends string>(values: Array<T | null | undefined>) {
     values.filter((value): value is T => Boolean(value)),
   );
   return distinct.size === 1 ? distinct.values().next().value : undefined;
-}
-
-function comparable(value: string) {
-  return value
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
-    .trim();
 }
 
 function nameOnPage(name: string, text: string): string | undefined {
@@ -327,15 +327,6 @@ export function readGrobidHeader(
     ...(doi && { doi }),
   };
 }
-function generatedTitle(title: string | undefined): boolean {
-  return Boolean(
-    title &&
-    /^(?:microsoft word\s*[-:]|untitled$)|\.(?:docx?|dvi|tex|pdf|ps)$/iu.test(
-      title,
-    ),
-  );
-}
-
 function incompleteAbstract(abstract: string | undefined): boolean {
   return Boolean(
     abstract &&
@@ -357,60 +348,6 @@ function unwrapAbstract(value: string): string {
     .normalize('NFKC')
     .replace(/-\s+(?=\p{Ll})/gu, '')
     .replace(/\s+/gu, '');
-}
-
-function showsDoiInHeader(doi: string, lines: readonly PdfHeaderLine[]) {
-  // The PDF parser already handles the publisher's wrapped citation block.
-  // Here TEI can additionally corroborate an isolated bare DOI, but an
-  // occurrence embedded in prose may identify a completely different work.
-  for (const { text } of lines) {
-    if (abstractLabel.test(text) || endsArticleHeader(text)) break;
-    if (normalizeArticleDoi(text) === doi) return true;
-  }
-  return false;
-}
-
-const englishMonths = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-function showsPublicationDate(date: string, lines: readonly PdfHeaderLine[]) {
-  const [year, month, day] = date.split('-');
-  const formats = [date];
-  if (month) {
-    const monthName = englishMonths[Number(month) - 1];
-    for (const name of new Set([monthName, monthName.slice(0, 3)])) {
-      if (day)
-        formats.push(
-          name + ' ' + Number(day) + ' ' + year,
-          Number(day) + ' ' + name + ' ' + year,
-        );
-      else formats.push(name + ' ' + year);
-    }
-    formats.push(day ? day + ' ' + month + ' ' + year : month + ' ' + year);
-  }
-  const publishedDate = new RegExp(
-    '^(?:published|publication date|ngày xuất bản) (?:' +
-      formats.map(comparable).join('|') +
-      ')(?![\\p{L}\\p{N}])',
-    'u',
-  );
-  for (const { text } of lines) {
-    if (endsArticleHeader(text)) break;
-    if (publishedDate.test(comparable(text))) return true;
-  }
-  return false;
 }
 
 function suspectByline(
@@ -456,22 +393,32 @@ export function mergeGrobidMetadata(
     .map(({ text }) => text)
     .join('\n');
   const candidate = readGrobidHeader(xml, firstPageText, evidence.firstPage);
-  const replaceGeneratedTitle = Boolean(
-    generatedTitle(metadata.title) &&
-    candidate.title &&
-    comparable(firstPageText).includes(comparable(candidate.title)),
-  );
-  const title = replaceGeneratedTitle
-    ? candidate.title
-    : (metadata.title ?? candidate.title);
   const visibleBylineText = headerLines(evidence.firstPage)
     .map(({ text }) => text)
     .join('\n');
-  const authorNames =
-    suspectByline(metadata, evidence.firstPage) &&
-    candidate.authorNames?.every((name) => nameOnPage(name, visibleBylineText))
-      ? candidate.authorNames
-      : (metadata.authorNames ?? candidate.authorNames);
+  const suspectAuthors = suspectByline(metadata, evidence.firstPage);
+  const { title, authorNames } = selectArticleIdentity(
+    [
+      {
+        title: metadata.title,
+        authorNames: suspectAuthors ? undefined : metadata.authorNames,
+      },
+      {
+        title:
+          candidate.title && !publicationMasthead.test(candidate.title)
+            ? candidate.title
+            : undefined,
+        authorNames:
+          !suspectAuthors ||
+          candidate.authorNames?.every((name) =>
+            nameOnPage(name, visibleBylineText),
+          )
+            ? candidate.authorNames
+            : undefined,
+      },
+    ],
+    evidence.visibleIdentity ?? {},
+  );
   const visible = evidence.visibleAbstract;
   const tei = candidate.abstract;
   const recoveredAbstract =
@@ -488,17 +435,16 @@ export function mergeGrobidMetadata(
       matchesAbstractText(metadata.abstract, recoveredAbstract))
       ? recoveredAbstract
       : metadata.abstract;
-  const publicationDate =
-    metadata.publicationDate ??
-    (candidate.publicationDate &&
-    showsPublicationDate(candidate.publicationDate, evidence.firstPage)
-      ? candidate.publicationDate
-      : undefined);
-  const doi =
-    metadata.doi ??
-    (candidate.doi && showsDoiInHeader(candidate.doi, evidence.firstPage)
-      ? candidate.doi
-      : undefined);
+  const { doi, dateLines } = readArticleBibliography(
+    evidence.firstPage,
+    evidence.firstPageHeight,
+    metadata.doi,
+    candidate.doi,
+  );
+  const publicationDate = selectPublicationDate(
+    dateLines,
+    metadata.publicationDate,
+  );
   return {
     ...(title && { title }),
     ...(authorNames && { authorNames }),

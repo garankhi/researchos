@@ -1,9 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { domainErrorCodes } from '@researchos/error-codes';
-import {
-  normalizeArticleDoi,
-  parsePublicationDate,
-} from '@researchos/publication-metadata';
+import { normalizeArticleDoi } from '@researchos/publication-metadata';
 import type { ArticlePdfMetadata } from '@researchos/queue';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {
@@ -14,11 +11,22 @@ import {
   readFrontMatter,
   readLabeledAuthors,
   readPdfLines,
+  readSpacedAbstract,
   readVisibleAbstract,
+  type FrontMatter,
   type PdfHeaderLine,
   type PdfLine,
   type PdfTextRun,
 } from './article-pdf-layout.js';
+import { readArticleBibliography } from './article-pdf-bibliography.js';
+import {
+  generatedTitle,
+  selectArticleIdentity,
+} from './article-pdf-identity.js';
+import {
+  readEmbeddedPublicationDate,
+  selectPublicationDate,
+} from './article-pdf-publication-date.js';
 
 const errors = domainErrorCodes.storage;
 const maxPages = 5;
@@ -26,8 +34,10 @@ const maxTextLength = 50_000;
 
 export interface PdfEvidence {
   firstPage: PdfHeaderLine[];
+  firstPageHeight?: number;
   hasText: boolean;
   visibleAbstract?: string;
+  visibleIdentity?: FrontMatter;
 }
 
 type PdfInspection = { metadata: ArticlePdfMetadata; evidence?: PdfEvidence };
@@ -37,106 +47,6 @@ function text(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== 'string') return undefined;
   const cleaned = value.replace(/\s+/gu, ' ').trim();
   return cleaned && cleaned.length <= maxLength ? cleaned : undefined;
-}
-
-function comparableText(value: string): string {
-  return value
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/\p{M}/gu, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-}
-
-function matchesTitle(candidate: string, visibleTitle: string): boolean {
-  const embedded = comparableText(candidate);
-  const visible = comparableText(visibleTitle);
-  // Allow a subtitle or typography that only appears in one source.
-  return (
-    embedded === visible ||
-    embedded.startsWith(`${visible} `) ||
-    visible.startsWith(`${embedded} `)
-  );
-}
-
-function matchesByline(candidate: string[], byline: string[]): boolean {
-  // Require the visible names to agree while allowing initials and inverted
-  // names. Embedded metadata may list additional authors below the first byline.
-  const names = candidate.map((name) => comparableText(name).split(' '));
-  return byline.every((author) => {
-    const [given, ...rest] = comparableText(author).split(' ');
-    const surname = rest.at(-1);
-    return names.some(
-      (words) =>
-        surname &&
-        words.includes(surname) &&
-        words.some(
-          (word) =>
-            word !== surname &&
-            (word === given ||
-              (word.length === 1 && given.startsWith(word)) ||
-              (given.length === 1 && word.startsWith(given))),
-        ),
-    );
-  });
-}
-
-function publicationDate(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const candidate = value.trim();
-  const timestamp =
-    /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$/u.exec(
-      candidate,
-    );
-  // XMP dates describe the calendar day at the source's offset.
-  return parsePublicationDate(timestamp?.[1] ?? candidate);
-}
-
-const doiLine =
-  /^(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)$/iu;
-const citationDoi =
-  /(?:^|\s)(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)/giu;
-const citationHeading = /^(?:citation|cite this article)(?:\s*:|$)/iu;
-const citationEnd =
-  /^(?:editor|received|accepted|published|copyright|funding|competing interests|data availability(?: statement)?)\s*:/iu;
-
-function readArticleDoi(firstPage: readonly PdfLine[]): string | undefined {
-  const candidates = new Set<string>();
-  let citationLine: PdfLine | undefined;
-  for (const line of firstPage) {
-    if (endsArticleHeader(line.text)) break;
-
-    // Publishers can print the article's own citation beside the abstract.
-    // Track wrapped citation lines by their margin when body text interleaves.
-    if (citationHeading.test(line.text)) {
-      citationLine = line;
-    } else if (
-      citationLine &&
-      Math.abs(line.left - citationLine.left) <= citationLine.height
-    ) {
-      const gap = line.y - citationLine.y;
-      citationLine =
-        gap > 0 &&
-        gap <= citationLine.height * 2 &&
-        !citationEnd.test(line.text) &&
-        !abstractHeading.test(line.text)
-          ? line
-          : undefined;
-    }
-
-    const standalone = doiLine.exec(line.text)?.[1];
-    if (standalone) {
-      const doi = normalizeArticleDoi(standalone);
-      if (doi) candidates.add(doi);
-    } else if (line === citationLine) {
-      for (const [, source] of line.text.matchAll(citationDoi)) {
-        // An inline DOI can be followed by the citation's sentence period.
-        const doi = normalizeArticleDoi(source.replace(/\.$/u, ''));
-        if (doi) candidates.add(doi);
-      }
-    }
-  }
-  return candidates.size === 1 ? candidates.values().next().value : undefined;
 }
 
 export async function extractArticlePdfMetadata(
@@ -162,6 +72,7 @@ export async function inspectArticlePdf(
       throw new Error(errors.articlePdfMetadataEncrypted);
 
     const pages: PdfLine[][] = [];
+    let firstPageHeight: number | undefined;
     let characters = 0;
     for (
       let pageNo = 1;
@@ -170,6 +81,7 @@ export async function inspectArticlePdf(
     ) {
       const page = await pdf.getPage(pageNo);
       const viewport = page.getViewport({ scale: 1 });
+      if (pageNo === 1) firstPageHeight = viewport.height;
       const runs: PdfTextRun[] = [];
       const reader = page.streamTextContent().getReader();
       try {
@@ -207,45 +119,72 @@ export async function inspectArticlePdf(
     const body = lines.map(({ text }) => text).join('\n');
     const firstPage = pages[0] ?? [];
     const frontMatter = readFrontMatter(firstPage);
-    const visibleTitle = text(frontMatter.title, 500);
-    const byline = frontMatter.authorNames ?? frontMatter.firstByline;
-    const title =
-      [metadata?.get('dc:title'), infoFields.Title]
-        .map((value) => text(value, 500))
-        .find(
-          (value) =>
-            value && (!visibleTitle || matchesTitle(value, visibleTitle)),
-        ) ??
-      text(/^\s*(?:title|tiêu đề)[ \t]*:[ \t]*(.+)$/imu.exec(body)?.[1], 500) ??
-      visibleTitle;
-    const authorNames =
-      [metadata?.get('dc:creator'), infoFields.Author]
-        .map(readAuthorNames)
-        .find((names) => names && (!byline || matchesByline(names, byline))) ??
-      readLabeledAuthors(
-        /^\s*(?:authors?|tác giả)[ \t]*:[ \t]*(.+)$/imu.exec(body)?.[1],
-      ) ??
-      frontMatter.authorNames;
+    const boundary = firstPage.findIndex(
+      ({ text }) =>
+        /^(?:abstract|tóm tắt)(?:$|[:.—–-]|\s*[:.—–-])/iu.test(text) ||
+        endsArticleHeader(text),
+    );
+    const header = firstPage
+      .slice(0, boundary < 0 ? firstPage.length : boundary)
+      .map(({ text }) => text)
+      .join('\n');
+    const visibleIdentity = {
+      ...frontMatter,
+      title:
+        text(frontMatter.title, 500) ??
+        text(/^(?:title|tiêu đề)[ \t]*:[ \t]*(.+)$/imu.exec(header)?.[1], 500),
+      authorNames:
+        frontMatter.authorNames ??
+        readLabeledAuthors(
+          /^(?:authors?|tác giả)[ \t]*:[ \t]*(.+)$/imu.exec(header)?.[1],
+        ),
+    };
+    const hasVisibleByline = Boolean(
+      visibleIdentity.authorNames ?? visibleIdentity.firstByline,
+    );
+    const sources = [
+      [metadata?.get('dc:title'), metadata?.get('dc:creator')],
+      [infoFields.Title, infoFields.Author],
+    ] as const;
+    const { title, authorNames } = selectArticleIdentity(
+      sources.map(([value, authors]) => {
+        const title = text(value, 500);
+        // Document-editor metadata can contain the machine account as Author.
+        return {
+          title,
+          authorNames:
+            !generatedTitle(title) || hasVisibleByline
+              ? readAuthorNames(authors)
+              : undefined,
+        };
+      }),
+      visibleIdentity,
+    );
+    const printedAbstract = text(
+      readSpacedAbstract(firstPage) ?? readAbstract(pages),
+      20_000,
+    );
     const abstract =
+      printedAbstract ??
       text(metadata?.get('dcterms:abstract'), 20_000) ??
-      text(readAbstract(pages), 20_000) ??
       text(
         abstractHeading.exec(
           text(metadata?.get('dc:description'), 20_000) ?? '',
         )?.[1],
         20_000,
       );
-    const published =
-      publicationDate(metadata?.get('prism:publicationdate')) ??
-      publicationDate(
-        /^\s*(?:published|publication date|ngày xuất bản)[ \t]*:[ \t]*(\d{4}(?:-\d{2}){0,2})[ \t]*$/imu.exec(
-          body,
-        )?.[1],
-      );
-    const articleDoi =
+    const embeddedDoi =
       normalizeArticleDoi(metadata?.get('prism:doi')) ??
-      normalizeArticleDoi(metadata?.get('dc:identifier')) ??
-      readArticleDoi(firstPage);
+      normalizeArticleDoi(metadata?.get('dc:identifier'));
+    const { doi: articleDoi, dateLines } = readArticleBibliography(
+      firstPage,
+      firstPageHeight,
+      embeddedDoi,
+    );
+    const published = selectPublicationDate(
+      dateLines,
+      readEmbeddedPublicationDate(metadata?.get('prism:publicationdate')),
+    );
 
     const result: PdfInspection = {
       metadata: {
@@ -265,6 +204,8 @@ export async function inspectArticlePdf(
           left,
           right,
         })),
+        firstPageHeight,
+        visibleIdentity,
         hasText: (body.match(/\p{L}[\p{L}\p{M}]+/gu)?.length ?? 0) >= 5,
         visibleAbstract: !abstract
           ? text(
