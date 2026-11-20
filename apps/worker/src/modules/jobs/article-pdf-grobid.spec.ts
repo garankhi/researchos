@@ -192,7 +192,8 @@ describe('readGrobidHeader', () => {
 describe('enrichArticlePdfMetadata', () => {
   const settings = {
     endpoint: new URL('http://127.0.0.1:8070/api/processHeaderDocument'),
-    timeoutMs: 100,
+    // Keep the request budget above Vitest's timeout. Deadline tests abort explicitly.
+    timeoutMs: 30_000,
   };
   const pdf = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
   const evidence = {
