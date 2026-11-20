@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { QueueOptions } from 'bullmq';
 import type { RedisOptions } from 'ioredis';
 
@@ -6,11 +7,27 @@ export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
 export const DIGEST_QUEUE = 'digest-jobs';
 export const RESEARCH_UPDATES_QUEUE = 'research-updates';
+export const ARTICLE_PDF_METADATA_QUEUE = 'article-pdf-metadata';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
+export const ARTICLE_PDF_METADATA_JOB = 'article-pdf-metadata';
+export const MAX_ARTICLE_PDF_BYTES = 50 * 1024 * 1024;
 export const DIGEST_SEND_JOB = 'digest-send';
 export const DIGEST_MAX_ATTEMPTS = 5;
 export const JOB_ATTEMPTS = 3;
+
+export function articlePdfMetadataScope(prefix: string): string {
+  // The reserved database namespace is invisible to legacy outbox dispatchers.
+  return `@article-pdf-metadata:${createHash('sha256').update(prefix).digest('hex')}`;
+}
+
+export interface ArticlePdfMetadata {
+  title?: string;
+  authorNames?: string[];
+  abstract?: string;
+  publicationDate?: string;
+  doi?: string;
+}
 
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 

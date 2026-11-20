@@ -9761,6 +9761,37 @@
               "FAILED"
             ],
             "description": "State of optional PDF metadata extraction."
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "authorNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "abstract": {
+                "type": "string"
+              },
+              "publicationDate": {
+                "type": "string",
+                "description": "YYYY, YYYY-MM or YYYY-MM-DD."
+              },
+              "doi": {
+                "type": "string"
+              }
+            },
+            "description": "Editable candidates for a verified upload with ready metadata. May be empty."
+          },
+          "metadataErrorCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Localized error code when extraction has failed."
           }
         },
         "required": [
@@ -9771,7 +9802,9 @@
           "expiresAt",
           "verifiedAt",
           "status",
-          "metadataStatus"
+          "metadataStatus",
+          "metadata",
+          "metadataErrorCode"
         ]
       },
       "SearchCountsResponseDto": {

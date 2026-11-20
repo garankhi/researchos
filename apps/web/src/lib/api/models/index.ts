@@ -26,6 +26,7 @@ export * from './articlePdfUploadResponseDtoEnvelope';
 export * from './articlePdfUploadResponseDtoHeaders';
 export * from './articlePdfUploadStatusDto';
 export * from './articlePdfUploadStatusDtoEnvelope';
+export * from './articlePdfUploadStatusDtoMetadata';
 export * from './articlePdfUploadStatusDtoMetadataStatus';
 export * from './articlePdfUploadStatusDtoMimeType';
 export * from './articlePdfUploadStatusDtoStatus';

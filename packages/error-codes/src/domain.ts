@@ -139,6 +139,11 @@ export const domainErrorCodes = {
     articlePdfUploadExpired: 'article_pdf_upload_expired',
     articlePdfUploadNotVerified: 'article_pdf_upload_not_verified',
     articlePdfUploadConsumed: 'article_pdf_upload_consumed',
+    articlePdfMetadataUnsupported: 'article_pdf_metadata_unsupported',
+    articlePdfMetadataCorrupt: 'article_pdf_metadata_corrupt',
+    articlePdfMetadataEncrypted: 'article_pdf_metadata_encrypted',
+    articlePdfMetadataTimeout: 'article_pdf_metadata_timeout',
+    articlePdfMetadataUnavailable: 'article_pdf_metadata_unavailable',
   },
   profiles: {
     profileNotFound: 'profile_not_found',

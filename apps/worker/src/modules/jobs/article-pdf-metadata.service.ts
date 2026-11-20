@@ -1,0 +1,190 @@
+import { createHash } from 'node:crypto';
+import { Worker } from 'node:worker_threads';
+import { Inject, Injectable } from '@nestjs/common';
+import { PrismaService, type Prisma } from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
+import {
+  ARTICLE_PDF_METADATA_JOB,
+  JOB_ATTEMPTS,
+  MAX_ARTICLE_PDF_BYTES,
+  isJobUuid,
+  type ArticlePdfMetadata,
+  type BackgroundJobPayload,
+} from '@researchos/queue';
+import { createS3Storage, type StorageAdapter } from '@researchos/storage';
+import { UnrecoverableError } from 'bullmq';
+
+const errors = domainErrorCodes.storage;
+const extractionTimeoutMs = 15_000;
+type Extraction = { metadata: ArticlePdfMetadata } | { error: string };
+type VerifiedPdf = { storage_key: string; size_bytes: bigint; sha256: string };
+
+function parsePdf(bytes: Uint8Array, signal: AbortSignal): Promise<Extraction> {
+  signal.throwIfAborted();
+  const worker = new Worker(
+    new URL('./article-pdf-parser.js', import.meta.url),
+    {
+      workerData: bytes,
+      transferList: [bytes.buffer as ArrayBuffer],
+      resourceLimits: { maxOldGenerationSizeMb: 192 },
+    },
+  );
+  let abort: () => void;
+  return new Promise<Extraction>((resolve, reject) => {
+    abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    worker.once('message', resolve);
+    worker.once('error', reject);
+    worker.once('exit', () => reject(new Error('PDF parser exited early')));
+  }).finally(async () => {
+    signal.removeEventListener('abort', abort);
+    await worker.terminate();
+  });
+}
+
+@Injectable()
+export class ArticlePdfMetadataService {
+  private storage?: StorageAdapter;
+
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async process(ref: BackgroundJobPayload, scope: string): Promise<void> {
+    const identity = {
+      id: ref.jobId,
+      generation: ref.generation,
+      queue_prefix: scope,
+      kind: ARTICLE_PDF_METADATA_JOB,
+      status: 'PENDING',
+    };
+    const claim = await this.prisma.$transaction(async (tx) => {
+      const [job] = await tx.$queryRaw<
+        {
+          owner_id: string;
+          idempotency_key: string;
+          attempts: number;
+        }[]
+      >`
+        UPDATE background_jobs SET attempts = attempts + 1, updated_at = now()
+        WHERE id = ${ref.jobId}::uuid AND generation = ${ref.generation}
+          AND queue_prefix = ${scope} AND kind = ${ARTICLE_PDF_METADATA_JOB}
+          AND status = 'PENDING'
+        RETURNING owner_id, idempotency_key, attempts
+      `;
+      if (!job) return null;
+      const uploadId = job.idempotency_key;
+      const [pdf] = isJobUuid(uploadId)
+        ? await tx.$queryRaw<VerifiedPdf[]>`
+        UPDATE article_creation_uploads SET metadata_status = 'PROCESSING'
+        WHERE id = ${uploadId}::uuid AND owner_id = ${job.owner_id}::uuid
+          AND verified_at IS NOT NULL AND consumed_at IS NULL
+          AND storage_deleted_at IS NULL AND expires_at > clock_timestamp()
+        RETURNING storage_key, size_bytes, sha256
+      `
+        : [];
+      if (!pdf) {
+        await tx.background_jobs.update({
+          where: { id: ref.jobId },
+          data: { status: 'COMPLETED' },
+        });
+        return null;
+      }
+      return { pdf, uploadId, ownerId: job.owner_id, attempt: job.attempts };
+    });
+    if (!claim) return;
+
+    let outcome: Extraction;
+    let transient = false;
+    if (claim.attempt > JOB_ATTEMPTS) {
+      outcome = { error: errors.articlePdfMetadataUnavailable };
+    } else {
+      const signal = AbortSignal.timeout(extractionTimeoutMs);
+      try {
+        outcome = await this.extract(claim.pdf, signal);
+      } catch {
+        transient = !signal.aborted;
+        outcome = {
+          error: signal.aborted
+            ? errors.articlePdfMetadataTimeout
+            : errors.articlePdfMetadataUnavailable,
+        };
+      }
+    }
+
+    const error = 'error' in outcome ? outcome.error : null;
+    const retry = transient && claim.attempt < JOB_ATTEMPTS;
+    const recorded = await this.prisma.$transaction(async (tx) => {
+      // Lock the job first, as in the claim. A stalled attempt must not publish
+      // after a new attempt or the outbox has already changed its state.
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM background_jobs WHERE id = ${ref.jobId}::uuid
+          AND generation = ${ref.generation} AND attempts = ${claim.attempt}
+          AND status = 'PENDING' FOR UPDATE
+      `;
+      if (!rows.length) return false;
+      const status = retry ? 'QUEUED' : error ? 'FAILED' : 'READY';
+      const active = await tx.$executeRaw`
+        UPDATE article_creation_uploads SET metadata_status = ${status}::article_pdf_metadata_status
+        WHERE id = ${claim.uploadId}::uuid AND owner_id = ${claim.ownerId}::uuid
+          AND consumed_at IS NULL AND storage_deleted_at IS NULL
+          AND expires_at > clock_timestamp()
+      `;
+      const failed = Boolean(active && error && !retry);
+      await tx.background_jobs.update({
+        where: identity,
+        data: {
+          status: active && retry ? 'PENDING' : failed ? 'FAILED' : 'COMPLETED',
+          updated_at: new Date(),
+          error_code: failed ? error : null,
+          ...(active &&
+            'metadata' in outcome && {
+              result: outcome.metadata as Prisma.InputJsonObject,
+            }),
+          ...(failed && {
+            outbox: {
+              create: { generation: ref.generation, destination: 'DLQ' },
+            },
+          }),
+        },
+      });
+      return Boolean(active);
+    });
+    if (recorded && error) {
+      throw retry ? new Error(error) : new UnrecoverableError(error);
+    }
+  }
+
+  private async extract(
+    pdf: VerifiedPdf,
+    signal: AbortSignal,
+  ): Promise<Extraction> {
+    const size = Number(pdf.size_bytes);
+    if (size < 1 || size > MAX_ARTICLE_PDF_BYTES) {
+      return { error: errors.articlePdfMetadataUnsupported };
+    }
+    const storage = (this.storage ??= createS3Storage());
+    const stream = await storage.getObject(pdf.storage_key, signal);
+    const abortStream = () => stream.destroy(new Error('PDF read timed out'));
+    signal.addEventListener('abort', abortStream, { once: true });
+    const bytes = new Uint8Array(size);
+    const sha256 = createHash('sha256');
+    let offset = 0;
+    try {
+      signal.throwIfAborted();
+      for await (const chunk of stream as AsyncIterable<Buffer>) {
+        signal.throwIfAborted();
+        if (offset + chunk.length > size)
+          return { error: errors.articlePdfMetadataCorrupt };
+        bytes.set(chunk, offset);
+        sha256.update(chunk);
+        offset += chunk.length;
+      }
+    } finally {
+      signal.removeEventListener('abort', abortStream);
+      stream.destroy();
+    }
+    if (offset !== size || sha256.digest('hex') !== pdf.sha256) {
+      return { error: errors.articlePdfMetadataCorrupt };
+    }
+    return parsePdf(bytes, signal);
+  }
+}

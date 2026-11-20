@@ -1,12 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '@researchos/database';
+import { ConfigService } from '@nestjs/config';
+import { BackgroundJobsService, PrismaService } from '@researchos/database';
 import type {
   OutputFile,
   OutputFileVisibility,
   Prisma,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
+import {
+  ARTICLE_PDF_METADATA_JOB,
+  articlePdfMetadataScope,
+  type ArticlePdfMetadata,
+} from '@researchos/queue';
 import type { UploadRequest } from '@researchos/storage';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -18,6 +24,12 @@ import {
 import { ObjectStorageService } from './object-storage.service.js';
 
 type ArticleUpload = Prisma.article_creation_uploadsGetPayload<undefined>;
+type ArticleUploadSnapshot = ArticleUpload & {
+  expired: boolean;
+  job_status: Prisma.background_jobsGetPayload<undefined>['status'] | null;
+  job_result: Prisma.JsonValue;
+  job_error_code: string | null;
+};
 type ArticleFileVisibility = Extract<
   OutputFileVisibility,
   'PRIVATE' | 'FPTU_COMMUNITY'
@@ -28,6 +40,8 @@ export class ArticleCreationUploadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: ObjectStorageService,
+    private readonly jobs: BackgroundJobsService,
+    private readonly config: ConfigService,
   ) {}
 
   async createUpload(
@@ -66,7 +80,7 @@ export class ArticleCreationUploadService {
     uploadId: string,
   ): Promise<ArticlePdfUploadStatusDto> {
     const upload = await this.findOwnerUpload(ownerId, uploadId);
-    return this.toStatus(upload, upload.expired);
+    return this.toStatus(upload);
   }
 
   async confirmUpload(
@@ -74,32 +88,46 @@ export class ArticleCreationUploadService {
     uploadId: string,
   ): Promise<ArticlePdfUploadStatusDto> {
     const upload = await this.findOwnerUpload(ownerId, uploadId);
-    if (upload.consumed_at) return this.toStatus(upload, upload.expired);
+    if (upload.consumed_at) return this.toStatus(upload);
     this.assertUnexpired(upload.expired);
-    if (upload.verified_at) return this.toStatus(upload, false);
+    if (upload.verified_at && upload.metadata_status !== 'NOT_STARTED') {
+      return this.toStatus(upload);
+    }
 
-    const matched = await this.storage.verifyUpload(
-      this.toStorageRequest(upload),
-      true,
-    );
-    return this.prisma.$transaction(async (tx) => {
+    const matched =
+      upload.verified_at ||
+      (await this.storage.verifyUpload(this.toStorageRequest(upload), true));
+    await this.prisma.$transaction(async (tx) => {
       const current = await this.lockOwnerUpload(tx, ownerId, uploadId);
-      if (current.consumed_at) return this.toStatus(current, current.expired);
+      if (current.consumed_at) return;
       this.assertUnexpired(current.expired);
-      if (current.verified_at) return this.toStatus(current, false);
-      if (!matched) {
+      if (!current.verified_at && !matched) {
         throw new CodedHttpException(
           domainErrorCodes.storage.fileConflict,
           HttpStatus.CONFLICT,
         );
       }
 
-      const verified = await tx.article_creation_uploads.update({
+      if (current.metadata_status !== 'NOT_STARTED') return;
+      await tx.article_creation_uploads.update({
         where: { id: current.id },
-        data: { verified_at: current.now },
+        data: {
+          verified_at: current.verified_at ?? current.now,
+          metadata_status: 'QUEUED',
+        },
       });
-      return this.toStatus(verified, false);
+      await this.jobs.submitInTransaction(
+        tx,
+        current.owner_id,
+        ARTICLE_PDF_METADATA_JOB,
+        current.id,
+        { uploadId: current.id },
+        articlePdfMetadataScope(
+          this.config.get<string>('QUEUE_PREFIX') ?? 'researchos',
+        ),
+      );
     });
+    return this.getUpload(ownerId, upload.id);
   }
 
   /** Private storage coordinates for the metadata extraction job. Never return these from an HTTP controller. */
@@ -148,12 +176,17 @@ export class ArticleCreationUploadService {
   private async findOwnerUpload(
     ownerId: string,
     uploadId: string,
-  ): Promise<ArticleUpload & { expired: boolean }> {
-    const [upload] = await this.prisma.$queryRaw<
-      (ArticleUpload & { expired: boolean })[]
-    >`
-      SELECT *, expires_at <= statement_timestamp() OR storage_deleted_at IS NOT NULL AS expired
-      FROM article_creation_uploads WHERE id = ${uploadId}::uuid AND owner_id = ${ownerId}::uuid
+  ): Promise<ArticleUploadSnapshot> {
+    // The join shares a statement snapshot with consumption and job updates.
+    const [upload] = await this.prisma.$queryRaw<ArticleUploadSnapshot[]>`
+      SELECT u.*, u.expires_at <= statement_timestamp() OR u.storage_deleted_at IS NOT NULL AS expired,
+        j.status AS job_status, j.result AS job_result, j.error_code AS job_error_code
+      FROM article_creation_uploads u
+      LEFT JOIN background_jobs j ON j.owner_id = u.owner_id AND j.kind = ${ARTICLE_PDF_METADATA_JOB}
+        AND j.idempotency_key = u.id::text
+        AND u.verified_at IS NOT NULL AND u.consumed_at IS NULL
+        AND u.metadata_status <> 'NOT_STARTED'
+      WHERE u.id = ${uploadId}::uuid AND u.owner_id = ${ownerId}::uuid
     `;
     if (!upload) this.throwNotFound();
     return upload;
@@ -224,15 +257,41 @@ export class ArticleCreationUploadService {
     };
   }
 
-  private toStatus(
-    upload: ArticleUpload,
-    expired: boolean,
-  ): ArticlePdfUploadStatusDto {
+  private toStatus(upload: ArticleUploadSnapshot): ArticlePdfUploadStatusDto {
     let status: ArticlePdfUploadStatusDto['status'] = 'PENDING';
     if (upload.consumed_at) status = 'CONSUMED';
-    else if (expired) status = 'EXPIRED';
+    else if (upload.expired) status = 'EXPIRED';
     else if (upload.verified_at) status = 'VERIFIED';
 
+    let metadataStatus: ArticlePdfUploadStatusDto['metadataStatus'] =
+      'NOT_STARTED';
+    let metadata: ArticlePdfMetadata | null = null;
+    let metadataErrorCode: string | null = null;
+    if (status === 'VERIFIED') {
+      switch (upload.job_status) {
+        case 'FAILED':
+          metadataStatus = 'FAILED';
+          metadataErrorCode =
+            !upload.job_error_code || upload.job_error_code === 'job_failed'
+              ? domainErrorCodes.storage.articlePdfMetadataUnavailable
+              : upload.job_error_code;
+          break;
+        case 'COMPLETED':
+          if (
+            upload.job_result &&
+            typeof upload.job_result === 'object' &&
+            !Array.isArray(upload.job_result)
+          ) {
+            metadataStatus = 'READY';
+            metadata = upload.job_result as ArticlePdfMetadata;
+          }
+          break;
+        case 'PENDING':
+          metadataStatus =
+            upload.metadata_status === 'PROCESSING' ? 'PROCESSING' : 'QUEUED';
+          break;
+      }
+    }
     return {
       uploadId: upload.id,
       fileName: upload.file_name,
@@ -241,7 +300,9 @@ export class ArticleCreationUploadService {
       expiresAt: upload.expires_at.toISOString(),
       verifiedAt: upload.verified_at?.toISOString() ?? null,
       status,
-      metadataStatus: upload.metadata_status,
+      metadataStatus,
+      metadata,
+      metadataErrorCode,
     };
   }
 }

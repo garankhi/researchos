@@ -1,11 +1,14 @@
 import { ApiProperty, PickType } from '@nestjs/swagger';
+import {
+  MAX_ARTICLE_PDF_BYTES,
+  type ArticlePdfMetadata,
+} from '@researchos/queue';
 import { Transform } from 'class-transformer';
 import { Equals, Matches, ValidateBy } from 'class-validator';
 import { submittedValue } from '../../../common/dto/submitted-value.js';
 import { OutputUploadResponseDto } from './output-upload.dto.js';
 
 export const articlePdfMimeType = 'application/pdf';
-const maxArticlePdfBytes = 50 * 1024 * 1024;
 const uploadStatuses = ['PENDING', 'VERIFIED', 'CONSUMED', 'EXPIRED'] as const;
 const metadataStatuses = [
   'NOT_STARTED',
@@ -43,7 +46,7 @@ export class CreateArticlePdfUploadDto {
   @ApiProperty({
     type: 'integer',
     minimum: 1,
-    maximum: maxArticlePdfBytes,
+    maximum: MAX_ARTICLE_PDF_BYTES,
     description: 'Exact size of the PDF in bytes.',
   })
   @Transform(submittedValue)
@@ -55,7 +58,7 @@ export class CreateArticlePdfUploadDto {
           typeof value === 'number' &&
           Number.isInteger(value) &&
           value >= 1 &&
-          value <= maxArticlePdfBytes,
+          value <= MAX_ARTICLE_PDF_BYTES,
       },
     },
     { message: 'article_pdf_size_invalid' },
@@ -125,4 +128,29 @@ export class ArticlePdfUploadStatusDto {
     description: 'State of optional PDF metadata extraction.',
   })
   metadataStatus!: (typeof metadataStatuses)[number];
+
+  @ApiProperty({
+    type: 'object',
+    nullable: true,
+    properties: {
+      title: { type: 'string' },
+      authorNames: { type: 'array', items: { type: 'string' } },
+      abstract: { type: 'string' },
+      publicationDate: {
+        type: 'string',
+        description: 'YYYY, YYYY-MM or YYYY-MM-DD.',
+      },
+      doi: { type: 'string' },
+    } as const satisfies Record<keyof ArticlePdfMetadata, object>,
+    description:
+      'Editable candidates for a verified upload with ready metadata. May be empty.',
+  })
+  metadata!: ArticlePdfMetadata | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Localized error code when extraction has failed.',
+  })
+  metadataErrorCode!: string | null;
 }

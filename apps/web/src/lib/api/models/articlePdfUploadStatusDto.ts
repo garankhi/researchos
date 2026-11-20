@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { ArticlePdfUploadStatusDtoMetadata } from './articlePdfUploadStatusDtoMetadata';
 import type { ArticlePdfUploadStatusDtoMetadataStatus } from './articlePdfUploadStatusDtoMetadataStatus';
 import type { ArticlePdfUploadStatusDtoMimeType } from './articlePdfUploadStatusDtoMimeType';
 import type { ArticlePdfUploadStatusDtoStatus } from './articlePdfUploadStatusDtoStatus';
@@ -29,4 +30,14 @@ export interface ArticlePdfUploadStatusDto {
   status: ArticlePdfUploadStatusDtoStatus;
   /** State of optional PDF metadata extraction. */
   metadataStatus: ArticlePdfUploadStatusDtoMetadataStatus;
+  /**
+   * Editable candidates for a verified upload with ready metadata. May be empty.
+   * @nullable
+   */
+  metadata: ArticlePdfUploadStatusDtoMetadata;
+  /**
+   * Localized error code when extraction has failed.
+   * @nullable
+   */
+  metadataErrorCode: string | null;
 }
