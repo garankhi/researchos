@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { readdir, readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { Socket } from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -546,6 +547,42 @@ describe('Article creation', () => {
     return upload;
   }
 
+  function startArticleWorker(overrides: NodeJS.ProcessEnv = {}) {
+    const worker = spawn(
+      process.execPath,
+      [fileURLToPath(new URL('../../worker/dist/main.js', import.meta.url))],
+      {
+        env: {
+          ...process.env,
+          DIGEST_SMTP_ENABLED: 'false',
+          ARTICLE_PDF_GROBID_URL: '',
+          ...overrides,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    workerStarted ||= Boolean(worker.pid);
+    let logs = '';
+    worker.stdout.on('data', (chunk: Buffer) => {
+      logs += chunk.toString();
+    });
+    worker.stderr.on('data', (chunk: Buffer) => {
+      logs += chunk.toString();
+    });
+    return {
+      get logs() {
+        return logs;
+      },
+      async stop() {
+        if (worker.exitCode === null && worker.signalCode === null) {
+          const exited = once(worker, 'exit');
+          worker.kill();
+          await exited;
+        }
+      },
+    };
+  }
+
   it.runIf(useLocalS3)(
     'extracts PDF suggestions and reports document or storage failures through the owner status API',
     async () => {
@@ -633,22 +670,7 @@ describe('Article creation', () => {
         fileVisibility: 'PRIVATE',
       }).expect(201);
 
-      const worker = spawn(
-        process.execPath,
-        [fileURLToPath(new URL('../../worker/dist/main.js', import.meta.url))],
-        {
-          env: { ...process.env, DIGEST_SMTP_ENABLED: 'false' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        },
-      );
-      workerStarted = Boolean(worker.pid);
-      let logs = '';
-      worker.stdout.on('data', (chunk: Buffer) => {
-        logs += chunk.toString();
-      });
-      worker.stderr.on('data', (chunk: Buffer) => {
-        logs += chunk.toString();
-      });
+      const worker = startArticleWorker();
       try {
         await expect
           .poll(
@@ -755,18 +777,108 @@ describe('Article creation', () => {
           fileVisibility: 'PRIVATE',
         }).expect(201);
       } catch (error) {
-        throw new Error(`PDF metadata test failed. Worker output:\n${logs}`, {
-          cause: error,
-        });
+        throw new Error(
+          `PDF metadata test failed. Worker output:\n${worker.logs}`,
+          {
+            cause: error,
+          },
+        );
       } finally {
-        if (worker.exitCode === null && worker.signalCode === null) {
-          const exited = once(worker, 'exit');
-          worker.kill();
-          await exited;
-        }
+        await worker.stop();
       }
     },
     45_000,
+  );
+
+  it.runIf(useLocalS3)(
+    'enriches verified text PDFs and keeps partial metadata available through GROBID failure and timeout',
+    async () => {
+      const requests: Array<{ path?: string; body: string }> = [];
+      const server = createServer(async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const body = Buffer.concat(chunks).toString();
+        requests.push({ path: req.url, body });
+        if (body.includes('Timeout example')) return;
+        if (body.includes('Unavailable example')) {
+          res.writeHead(503).end();
+          return;
+        }
+        res
+          .writeHead(200, { 'content-type': 'application/xml' })
+          .end(
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader>' +
+              '<profileDesc><abstract><p>Samples showed improved water clarity.</p></abstract></profileDesc>' +
+              '</teiHeader></TEI>',
+          );
+      });
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      const port = (server.address() as { port: number }).port;
+      const worker = startArticleWorker({
+        ARTICLE_PDF_GROBID_URL: `http://127.0.0.1:${port}`,
+        ARTICLE_PDF_GROBID_TIMEOUT_MS: '1000',
+      });
+
+      try {
+        const created = await Promise.all(
+          ['Success', 'Unavailable', 'Timeout'].map((kind) =>
+            verifiedPdf(
+              pdfWithMetadata([
+                `${kind} example with enough readable text.`,
+                'Published: 2024-05',
+              ]),
+            ),
+          ),
+        );
+        for (const [index, upload] of created.entries()) {
+          const path = `${uploadEndpoint}/${upload.uploadId}`;
+          await expect
+            .poll(
+              async () =>
+                (await request('owner').get(path).expect(200)).body.data,
+              { timeout: 12_000, interval: 200 },
+            )
+            .toMatchObject({ status: 'VERIFIED', metadataStatus: 'READY' });
+          const { data } = (await request('owner').get(path).expect(200)).body;
+          expect(data.metadata).toEqual({
+            title: 'Water quality',
+            authorNames: ['Mai Nguyen', 'Bao Tran'],
+            publicationDate: '2024-05',
+            ...(index === 0 && {
+              abstract: 'Samples showed improved water clarity.',
+            }),
+          });
+          await request('researcher').get(path).expect(404);
+        }
+        expect(requests).toHaveLength(3);
+        for (const sent of requests) {
+          expect(sent.path).toBe('/api/processHeaderDocument');
+          expect(sent.body).toContain('%PDF-1.4');
+          expect(sent.body).toContain('name="consolidateHeader"\r\n\r\n0');
+        }
+        await submit({
+          ...input,
+          uploadId: created[1].uploadId,
+          fileVisibility: 'PRIVATE',
+        }).expect(201);
+        await request('owner')
+          .get(`${uploadEndpoint}/${created[1].uploadId}`)
+          .expect(200)
+          .expect(({ body }) => expect(body.data.status).toBe('CONSUMED'));
+      } catch (error) {
+        throw new Error(`GROBID test failed. Worker output:\n${worker.logs}`, {
+          cause: error,
+        });
+      } finally {
+        await worker.stop();
+        const closed = once(server, 'close');
+        server.close();
+        server.closeAllConnections();
+        await closed;
+      }
+    },
+    30_000,
   );
 
   it('distinguishes a completed job without a result from an empty extraction', async () => {

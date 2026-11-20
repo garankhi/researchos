@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractArticlePdfMetadata } from './article-pdf-parser.js';
+import { mergeGrobidMetadata } from './article-pdf-grobid.js';
+import {
+  extractArticlePdfMetadata,
+  inspectArticlePdf,
+} from './article-pdf-parser.js';
 
 function pdf(
   lines: Array<[size: number, y: number, text: string, x?: number]>,
@@ -48,6 +52,66 @@ function xmpMetadata(fields: string): string {
 }
 
 describe('extractArticlePdfMetadata', () => {
+  it.each([false, true])(
+    'uses a grounded multi-paragraph abstract and skips prose after Introduction (%s)',
+    async (withIntroduction) => {
+      const first = [
+        'This abstract explains the context of the river analysis and the main',
+        'purpose of the work before presenting the most important measures and',
+        'observations from each monitoring station during the first portion of',
+        'the study and the corresponding findings from the spring season.',
+      ];
+      const second = [
+        'The second paragraph presents the results in the main watershed and',
+        'describes how the investigators used repeated observations near four',
+        'monitoring stations across the entire valley to estimate changes in',
+        'the water supply and compare their results over the previous years.',
+      ];
+      const lines = (paragraph: string[], y: number) =>
+        paragraph.map((line, index): [number, number, string, number] => [
+          10,
+          y - index * 12,
+          line,
+          85,
+        ]);
+      const { metadata, evidence } = await inspectArticlePdf(
+        pdf([
+          [18, 703, 'Predicting River Floods', 205],
+          [6, 671, '1', 346],
+          [10, 666, 'Mai Nguyen', 268],
+          [10, 654, 'River Analytics, Inc., 5 Mill Road', 220],
+          [10, 626, 'Bao Tran', 270],
+          [10, 614, 'University of Hanoi', 240],
+          ...(withIntroduction
+            ? [[12, 578, '1. Introduction', 85] as const]
+            : lines(first, 578)
+          ).map(([size, y, text, x]): [number, number, string, number] => [
+            size,
+            y,
+            text,
+            x,
+          ]),
+          ...lines(second, 510),
+          [12, 442, withIntroduction ? '2. Nomenclature' : 'Nomenclature', 230],
+        ]),
+        true,
+      );
+      if (!evidence) throw new Error('Missing first-page evidence');
+      const paragraphs = withIntroduction
+        ? ''
+        : [first, second]
+            .map((part) => '<p>' + part.join(' ') + '</p>')
+            .join('');
+      const xml =
+        '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><profileDesc>' +
+        '<abstract>' +
+        paragraphs +
+        '</abstract></profileDesc></teiHeader></TEI>';
+      expect(mergeGrobidMetadata(metadata, evidence, xml).abstract).toBe(
+        withIntroduction ? undefined : [...first, ...second].join(' '),
+      );
+    },
+  );
   it('finds an unlabeled title and byline and ends a multi-paragraph abstract at a numbered heading', async () => {
     const result = await extractArticlePdfMetadata(
       pdf([

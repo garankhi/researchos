@@ -8,11 +8,14 @@ import type { ArticlePdfMetadata } from '@researchos/queue';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {
   abstractHeading,
+  endsArticleHeader,
   readAbstract,
   readAuthorNames,
   readFrontMatter,
   readLabeledAuthors,
   readPdfLines,
+  readVisibleAbstract,
+  type PdfHeaderLine,
   type PdfLine,
   type PdfTextRun,
 } from './article-pdf-layout.js';
@@ -20,6 +23,15 @@ import {
 const errors = domainErrorCodes.storage;
 const maxPages = 5;
 const maxTextLength = 50_000;
+
+export interface PdfEvidence {
+  firstPage: PdfHeaderLine[];
+  hasText: boolean;
+  visibleAbstract?: string;
+}
+
+type PdfInspection = { metadata: ArticlePdfMetadata; evidence?: PdfEvidence };
+export type PdfParserInput = { bytes: Uint8Array; collectEvidence: boolean };
 
 function text(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -87,16 +99,12 @@ const citationDoi =
 const citationHeading = /^(?:citation|cite this article)(?:\s*:|$)/iu;
 const citationEnd =
   /^(?:editor|received|accepted|published|copyright|funding|competing interests|data availability(?: statement)?)\s*:/iu;
-const bodyHeading =
-  /^(?:(?:\d+(?:\.\d+)*|[ivxlcdm]+)[.)]?\s+)?(?:introduction|nomenclature|materials and methods|methods|results|discussion|references|bibliography|literature cited|giới thiệu|mở đầu|phương pháp|kết quả|tài liệu tham khảo)\s*[:.]?$/iu;
-const captionHeading =
-  /^(?:(?:(?:supplementary|supplemental|supporting)\s+)?(?:fig(?:ure)?\.?|table|hình|bảng)\s+(?:[a-z]?\d|[ivxlcdm]+\b)|[a-z]\d+\s+(?:fig(?:ure)?|table)\b)/iu;
 
 function readArticleDoi(firstPage: readonly PdfLine[]): string | undefined {
   const candidates = new Set<string>();
   let citationLine: PdfLine | undefined;
   for (const line of firstPage) {
-    if (bodyHeading.test(line.text) || captionHeading.test(line.text)) break;
+    if (endsArticleHeader(line.text)) break;
 
     // Publishers can print the article's own citation beside the abstract.
     // Track wrapped citation lines by their margin when body text interleaves.
@@ -134,6 +142,13 @@ function readArticleDoi(firstPage: readonly PdfLine[]): string | undefined {
 export async function extractArticlePdfMetadata(
   bytes: Uint8Array,
 ): Promise<ArticlePdfMetadata> {
+  return (await inspectArticlePdf(bytes, false)).metadata;
+}
+
+export async function inspectArticlePdf(
+  bytes: Uint8Array,
+  collectEvidence: boolean,
+): Promise<PdfInspection> {
   const task = getDocument({
     data: bytes,
     stopAtErrors: true,
@@ -190,7 +205,8 @@ export async function extractArticlePdfMetadata(
 
     const lines = pages.flat();
     const body = lines.map(({ text }) => text).join('\n');
-    const frontMatter = readFrontMatter(pages[0] ?? []);
+    const firstPage = pages[0] ?? [];
+    const frontMatter = readFrontMatter(firstPage);
     const visibleTitle = text(frontMatter.title, 500);
     const byline = frontMatter.authorNames ?? frontMatter.firstByline;
     const title =
@@ -229,15 +245,36 @@ export async function extractArticlePdfMetadata(
     const articleDoi =
       normalizeArticleDoi(metadata?.get('prism:doi')) ??
       normalizeArticleDoi(metadata?.get('dc:identifier')) ??
-      readArticleDoi(pages[0] ?? []);
+      readArticleDoi(firstPage);
 
-    return {
-      ...(title && { title }),
-      ...(authorNames && { authorNames }),
-      ...(abstract && { abstract }),
-      ...(published && { publicationDate: published }),
-      ...(articleDoi && { doi: articleDoi }),
+    const result: PdfInspection = {
+      metadata: {
+        ...(title && { title }),
+        ...(authorNames && { authorNames }),
+        ...(abstract && { abstract }),
+        ...(published && { publicationDate: published }),
+        ...(articleDoi && { doi: articleDoi }),
+      },
     };
+    if (collectEvidence) {
+      result.evidence = {
+        firstPage: firstPage.map(({ text, y, height, left, right }) => ({
+          text,
+          y,
+          height,
+          left,
+          right,
+        })),
+        hasText: (body.match(/\p{L}[\p{L}\p{M}]+/gu)?.length ?? 0) >= 5,
+        visibleAbstract: !abstract
+          ? text(
+              readVisibleAbstract(firstPage, Boolean(frontMatter.firstByline)),
+              20_000,
+            )
+          : undefined,
+      };
+    }
+    return result;
   } finally {
     await task.destroy();
   }
@@ -245,14 +282,12 @@ export async function extractArticlePdfMetadata(
 
 if (parentPort) {
   try {
-    const bytes = workerData as Uint8Array;
+    const { bytes, collectEvidence } = workerData as PdfParserInput;
     const header = Buffer.from(bytes.subarray(0, 1024)).toString('latin1');
     if (!header.includes('%PDF-')) {
       parentPort.postMessage({ error: errors.articlePdfMetadataUnsupported });
     } else {
-      parentPort.postMessage({
-        metadata: await extractArticlePdfMetadata(bytes),
-      });
+      parentPort.postMessage(await inspectArticlePdf(bytes, collectEvidence));
     }
   } catch (error) {
     const encrypted =

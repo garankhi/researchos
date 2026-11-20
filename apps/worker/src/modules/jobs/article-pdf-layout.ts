@@ -159,6 +159,89 @@ const affiliationWord =
   /\b(?:academy|center|centre|college|consortium|corporation|department|faculty|foundation|hospital|institute|institution|journal|laboratory|programme|school|university|universit[eé]|universidad)\b|,\s*(?:inc|ltd)\.|(?:trường đại học|viện nghiên cứu|khoa học)/iu;
 const masthead =
   /^(?:(?:the\s+)?journal\s+of\b|(?:(?:e-?)?issn|vol(?:ume)?)[\s.:])/iu;
+const bodyHeading =
+  /^(?:(?:\d+(?:\.\d+)*|[ivxlcdm]+)[.)]?\s+)?(?:introduction|nomenclature|materials and methods|methods|results|discussion|references|bibliography|literature cited|giới thiệu|mở đầu|phương pháp|kết quả|tài liệu tham khảo)\s*[:.]?$/iu;
+const captionHeading =
+  /^(?:(?:(?:supplementary|supplemental|supporting)\s+)?(?:fig(?:ure)?\.?|table|hình|bảng)\s+(?:[a-z]?\d|[ivxlcdm]+\b)|[a-z]\d+\s+(?:fig(?:ure)?|table)\b)/iu;
+const nomenclature = /^(?:(?:\d+|[ivxlcdm]+)[.)]\s+)?nomenclature\s*[:.]?$/iu;
+
+export function endsArticleHeader(text: string): boolean {
+  return bodyHeading.test(text) || captionHeading.test(text);
+}
+
+export type PdfHeaderLine = Pick<
+  PdfLine,
+  'text' | 'y' | 'height' | 'left' | 'right'
+>;
+
+function finishAbstract(lines: readonly string[]): string | undefined {
+  const paragraph = lines
+    .join('\n')
+    .replace(
+      /(\p{L}[\p{L}-]*)-\n(?=(\p{Ll}[\p{L}-]*))/gu,
+      (_match, before: string, after: string) =>
+        before.includes('-') || after.includes('-') ? before + '-' : before,
+    )
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return paragraph.split(' ').length >= 35 && /[.!?]["'”’)]*$/u.test(paragraph)
+    ? paragraph
+    : undefined;
+}
+
+export function readVisibleAbstract(
+  lines: readonly PdfLine[],
+  headingless: boolean,
+): string | undefined {
+  const page = [...lines].sort((a, b) => a.y - b.y || a.left - b.left);
+  if (headingless) {
+    const boundary = page.findIndex(({ text }) => nomenclature.test(text));
+    if (
+      boundary < 3 ||
+      page.slice(0, boundary).some(({ text }) => endsArticleHeader(text))
+    )
+      return undefined;
+    let start = boundary - 1;
+    const last = page[start];
+    const heading = page[boundary];
+    if (heading.y - last.y < last.height * 1.5) return undefined;
+    while (start > 0 && adjacentBelow(page[start - 1], page[start], 1.65)) {
+      start--;
+    }
+    return boundary - start >= 3
+      ? finishAbstract(page.slice(start, boundary).map(({ text }) => text))
+      : undefined;
+  }
+
+  // A centered heading can be assigned to an unrelated column by the page
+  // layout. Anchor the paragraph to its horizontal position instead.
+  const headingIndex = page.findIndex(({ text }) =>
+    /^(?:abstract|tóm tắt)\s*[:.—–-]?\s*$/iu.test(text),
+  );
+  if (headingIndex < 0) return undefined;
+  const heading = page[headingIndex];
+  const midpoint = (heading.left + heading.right) / 2;
+  const firstIndex = page.findIndex(
+    (line, index) =>
+      index > headingIndex &&
+      line.y > heading.y &&
+      line.y - heading.y <= heading.height * 3 &&
+      line.left <= midpoint &&
+      line.right >= midpoint,
+  );
+  if (firstIndex < 0) return undefined;
+  const first = page[firstIndex];
+  const paragraph = [first.text];
+  let previous = first;
+  for (const line of page.slice(firstIndex + 1)) {
+    if (line.y - previous.y > previous.height * 1.8) break;
+    if (Math.abs(line.left - first.left) > first.height * 1.5) continue;
+    if (keywords.test(line.text) || followingSection.test(line.text)) break;
+    paragraph.push(line.text);
+    previous = line;
+  }
+  return finishAbstract(paragraph);
+}
 
 export function readAbstract(pages: readonly PdfLine[][]): string | undefined {
   let paragraphs: string[] | undefined;
@@ -229,7 +312,7 @@ function displayName(value: unknown): string | undefined {
   return name && name.length <= 255 ? name : undefined;
 }
 
-function personName(value: string): boolean {
+export function personName(value: string): boolean {
   const words = value.trim().split(/\s+/u);
   return (
     words.length >= 2 &&
