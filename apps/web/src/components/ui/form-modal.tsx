@@ -69,8 +69,14 @@ export function FormModal<
    * The failure is the caller's to render: a server error that names
    * fields belongs on those fields, and anything else belongs in an
    * inline alert next to the form.
+   *
+   * The second argument puts a message on one of the form's fields, so
+   * a server error that names a field reaches the input that caused it.
    */
-  onSubmitError?: (error: unknown) => void;
+  onSubmitError?: (
+    error: unknown,
+    setFieldError: (name: string, message: string) => void,
+  ) => void;
   /** Whether the submit button shows its spinner. */
   isSubmitting?: boolean;
   /** Whether the submit button is disabled. */
@@ -109,7 +115,9 @@ export function FormModal<
     try {
       await onSubmit(values as TValues);
     } catch (error) {
-      onSubmitError?.(error);
+      onSubmitError?.(error, (name, message) => {
+        methods.setError(name as never, { message });
+      });
     }
   });
 

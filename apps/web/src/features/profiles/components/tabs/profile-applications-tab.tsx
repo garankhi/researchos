@@ -5,17 +5,16 @@ import {
   Badge,
   Box,
   Button,
-  Dialog,
   Flex,
   Heading,
   Link,
-  Portal,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useMyApplications } from '../../hooks/use-my-applications';
 import type { ApplicationResponseDto } from '../../types';
@@ -49,7 +48,6 @@ function formatRemainingTime(seconds: number | null): string | null {
 export function ProfileApplicationsTab() {
   const t = useTranslations('profile');
   const tApplicationStatus = useTranslations('profile.applicationStatus');
-  const tCommon = useTranslations('common');
   const format = useFormatter();
   const { showSnackbar } = useSnackbar();
   const { applications, isLoading, isFailed, refetch, withdraw } =
@@ -232,56 +230,27 @@ export function ProfileApplicationsTab() {
         })}
       </Box>
 
-      <Dialog.Root
+      <ConfirmationModal
         open={Boolean(confirmWithdrawApp)}
-        onOpenChange={(details) => {
-          if (!details.open) setConfirmWithdrawApp(null);
-        }}
-        placement="center"
-        motionPreset="scale"
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content boxShadow="overlayPanel">
-              <Dialog.Header>
-                <Dialog.Title>
-                  {t('applicationsTab.confirmWithdrawTitle')}
-                </Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Stack gap="3">
-                  {withdrawError ? (
-                    <ErrorState
-                      title={t('applicationsTab.withdrawError')}
-                      message={withdrawError}
-                    />
-                  ) : null}
-                  <Text textStyle="sm" color="fg.muted">
-                    {t('applicationsTab.confirmWithdrawDesc')}
-                  </Text>
-                </Stack>
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Button
-                  variant="outline"
-                  onClick={() => setConfirmWithdrawApp(null)}
-                >
-                  {tCommon('cancel')}
-                </Button>
-                <Button
-                  colorPalette="red"
-                  onClick={() => void handleWithdrawConfirm()}
-                  loading={withdrawingId !== null}
-                >
-                  {t('applicationsTab.withdraw')}
-                </Button>
-              </Dialog.Footer>
-              <Dialog.CloseTrigger />
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+        onClose={() => setConfirmWithdrawApp(null)}
+        title={t('applicationsTab.confirmWithdrawTitle')}
+        body={
+          <>
+            {withdrawError ? (
+              <ErrorState
+                title={t('applicationsTab.withdrawError')}
+                message={withdrawError}
+              />
+            ) : null}
+            <Text textStyle="sm" color="fg.muted">
+              {t('applicationsTab.confirmWithdrawDesc')}
+            </Text>
+          </>
+        }
+        confirmLabel={t('applicationsTab.withdraw')}
+        isConfirming={withdrawingId !== null}
+        onConfirm={() => void handleWithdrawConfirm()}
+      />
     </Box>
   );
 }

@@ -21,13 +21,15 @@ import type { ReactNode } from 'react';
  *
  * The confirm button carries the `red` palette by default, because the
  * actions this dialog guards — deleting, withdrawing, removing — are
- * destructive.
+ * destructive. A confirmation that is not destructive picks another
+ * palette.
  */
 export function ConfirmationModal({
   open,
   onClose,
   title,
   description,
+  body,
   confirmLabel,
   onConfirm,
   isConfirming = false,
@@ -35,14 +37,22 @@ export function ConfirmationModal({
   cancelLabel,
   colorPalette = 'red',
   size = 'md',
+  role = 'dialog',
 }: {
   /** Whether the dialog is open. */
   open: boolean;
   /** Called when the dialog asks to close. */
   onClose: () => void;
   title: ReactNode;
-  /** The body of the dialog. */
+  /** A line under the title. */
   description?: ReactNode;
+  /**
+   * The dialog's content.
+   *
+   * A plain `description` is enough for a question the dialog asks. When
+   * the answer is a set of choices, the choices go here instead.
+   */
+  body?: ReactNode;
   /** The confirm button's label. */
   confirmLabel: ReactNode;
   /** Runs the confirmed action. */
@@ -56,6 +66,14 @@ export function ConfirmationModal({
   /** The confirm button's palette. Defaults to `red`. */
   colorPalette?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  /**
+   * The dialog's ARIA role.
+   *
+   * `alertdialog` is the right role for a confirmation that guards a
+   * destructive action: it tells assistive technology the dialog needs
+   * attention before the reader carries on.
+   */
+  role?: 'dialog' | 'alertdialog';
 }) {
   const t = useTranslations('common');
 
@@ -67,6 +85,7 @@ export function ConfirmationModal({
       }}
       placement="center"
       size={size}
+      role={role}
       scrollBehavior="inside"
       lazyMount
       unmountOnExit
@@ -83,18 +102,15 @@ export function ConfirmationModal({
           >
             <Dialog.Header>
               <Dialog.Title>{title}</Dialog.Title>
+              {description ? (
+                <Dialog.Description textStyle="sm" color="fg.muted">
+                  {description}
+                </Dialog.Description>
+              ) : null}
             </Dialog.Header>
 
             <Dialog.Body>
-              <Stack gap="3">
-                {typeof description === 'string' ? (
-                  <Text textStyle="sm" color="fg.muted">
-                    {description}
-                  </Text>
-                ) : (
-                  description
-                )}
-              </Stack>
+              <Stack gap="3">{body}</Stack>
             </Dialog.Body>
 
             <Dialog.Footer>
@@ -124,5 +140,20 @@ export function ConfirmationModal({
         </Dialog.Positioner>
       </Portal>
     </Dialog.Root>
+  );
+}
+
+/**
+ * A description rendered as muted body text.
+ *
+ * The shared modals take their copy as `ReactNode`, so a caller that has
+ * a plain sentence uses this to get the muted styling without repeating
+ * it.
+ */
+export function ModalBodyText({ children }: { children: ReactNode }) {
+  return (
+    <Text textStyle="sm" color="fg.muted">
+      {children}
+    </Text>
   );
 }

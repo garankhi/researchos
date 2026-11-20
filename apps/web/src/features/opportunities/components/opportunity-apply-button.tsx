@@ -1,16 +1,10 @@
 'use client';
 
-import {
-  Button,
-  Dialog,
-  Portal,
-  Stack,
-  Text,
-  Textarea,
-} from '@chakra-ui/react';
+import { Button, Text, Textarea } from '@chakra-ui/react';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ErrorState } from '@/components/ui/feedback';
+import { FormModal } from '@/components/ui/form-modal';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 
@@ -49,76 +43,44 @@ export function OpportunityApplyButton({
   }
 
   return (
-    <Dialog.Root
+    <FormModal
       open={open}
-      onOpenChange={(details) => {
-        if (!isBusy) setOpen(details.open);
-      }}
-      placement="center"
-      size="lg"
-      scrollBehavior="inside"
-      lazyMount
-      unmountOnExit
-    >
-      <Dialog.Trigger asChild>
+      onClose={() => setOpen(false)}
+      title={t('applyTitle')}
+      submitLabel={t('applySubmit')}
+      isSubmitting={isBusy}
+      isSubmitDisabled={note.trim().length === 0}
+      onSubmit={handleApply}
+      trigger={
         <Button size="sm" disabled={!canApply}>
           {t('apply')}
         </Button>
-      </Dialog.Trigger>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content borderRadius="0" shadow="overlayPanel" mx="4">
-            <Dialog.Header>
-              <Dialog.Title>{t('applyTitle')}</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Stack gap="3">
-                <Text textStyle="sm" color="fg.muted">
-                  {t('applyDescription')}
-                </Text>
+      }
+    >
+      <Text textStyle="sm" color="fg.muted">
+        {t('applyDescription')}
+      </Text>
 
-                <Textarea
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder={t('applyNotePlaceholder')}
-                  aria-label={t('applyNoteLabel')}
-                  maxLength={10000}
-                  rows={6}
-                  disabled={isBusy}
-                />
+      <Textarea
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        placeholder={t('applyNotePlaceholder')}
+        aria-label={t('applyNoteLabel')}
+        maxLength={10000}
+        rows={6}
+        disabled={isBusy}
+      />
 
-                {error ? (
-                  <ErrorState
-                    title={t('applyError')}
-                    message={resolveErrorCode(
-                      tErrors,
-                      apiErrorCode(error),
-                      tErrors('unknown'),
-                    )}
-                  />
-                ) : null}
-              </Stack>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Button
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={isBusy}
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                loading={isBusy}
-                disabled={note.trim().length === 0}
-                onClick={() => void handleApply()}
-              >
-                {t('applySubmit')}
-              </Button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+      {error ? (
+        <ErrorState
+          title={t('applyError')}
+          message={resolveErrorCode(
+            tErrors,
+            apiErrorCode(error),
+            tErrors('unknown'),
+          )}
+        />
+      ) : null}
+    </FormModal>
   );
 }
