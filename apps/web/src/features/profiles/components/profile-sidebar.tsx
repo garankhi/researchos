@@ -23,7 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
+import { EntityLink } from '@/features/discovery';
 import type {
   OutputResponseDto,
   ProfileInterestResponseDto,
@@ -368,18 +368,13 @@ export function ProfileSidebar({
                 </Box>
                 <Box minW="0" flex="1">
                   {coAuthor.userId ? (
-                    <Link
-                      asChild
-                      textStyle="sm"
-                      fontWeight="semibold"
-                      layerStyle="researchTextLink"
-                      display="block"
-                      truncate
+                    <EntityLink
+                      entityType="RESEARCHER"
+                      entityId={coAuthor.userId}
+                      href={`/profile/${coAuthor.userId}`}
                     >
-                      <NextLink href={`/profile/${coAuthor.userId}`}>
-                        {coAuthor.name}
-                      </NextLink>
-                    </Link>
+                      {coAuthor.name}
+                    </EntityLink>
                   ) : (
                     <Text textStyle="sm" fontWeight="semibold" truncate>
                       {coAuthor.name}
@@ -435,18 +430,13 @@ export function ProfileSidebar({
                       aria-hidden
                     />
                     <Box minW="0">
-                      <Link
-                        asChild
-                        textStyle="sm"
-                        fontWeight="medium"
-                        layerStyle="researchTextLink"
-                        display="block"
-                        lineClamp={2}
+                      <EntityLink
+                        entityType="GROUP"
+                        entityId={group.id}
+                        href={`/groups/${group.id}`}
                       >
-                        <NextLink href={`/groups/${group.id}`}>
-                          {group.name}
-                        </NextLink>
-                      </Link>
+                        {group.name}
+                      </EntityLink>
                       <Text textStyle="xs" color="fg.muted">
                         {group.code}
                       </Text>

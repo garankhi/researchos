@@ -6,15 +6,14 @@ import {
   Box,
   Flex,
   Heading,
-  Link,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { OpportunityApplicationsSkeleton } from './opportunity-skeletons';
 import type { Application } from '../types';
+import { EntityLink } from '@/features/discovery';
 
 /**
  * The badge colour of an application status.
@@ -123,11 +122,13 @@ export function OpportunityApplications({
                       fontWeight="bold"
                       lineHeight="1.4"
                     >
-                      <Link asChild color="fg" layerStyle="researchTextLink">
-                        <NextLink href={`/profile/${application.applicantId}`}>
-                          {name}
-                        </NextLink>
-                      </Link>
+                      <EntityLink
+                        entityType="RESEARCHER"
+                        entityId={application.applicantId}
+                        href={`/profile/${application.applicantId}`}
+                      >
+                        {name}
+                      </EntityLink>
                     </Heading>
 
                     {applicantMeta ? (

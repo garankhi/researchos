@@ -1,22 +1,14 @@
 'use client';
 
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  Link,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Button, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { FieldError } from '@/components/ui/feedback';
-import NextLink from '@/components/ui/link';
 import type { FollowTargetDto, SearchResultItemDto } from '@/lib/api/models';
 import { followKey } from '@/features/follow';
 import { entityHref } from '../entity-href';
+import { EntityLink } from './entity-link';
 import { useChangeSearchFollow } from '../hooks/use-search-follows';
 
 function FollowButton({
@@ -105,9 +97,13 @@ export function SearchResultCard({
             overflowWrap="anywhere"
           >
             {href ? (
-              <Link asChild color="fg">
-                <NextLink href={href}>{item.title}</NextLink>
-              </Link>
+              <EntityLink
+                entityType={entityType}
+                entityId={entityId}
+                href={href}
+              >
+                {item.title}
+              </EntityLink>
             ) : (
               item.title
             )}

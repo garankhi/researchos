@@ -17,6 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
+import { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import { ProfileResponseDto } from './dto/profile-response.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { ProfilesService } from './profiles.service.js';
@@ -79,6 +80,34 @@ export class ProfilesController {
     @CurrentUserId() callerId: string,
   ): Promise<ProfileResponseDto> {
     return this.profilesService.findProfileById(targetUserId, callerId);
+  }
+
+  @ApiOperation({
+    summary: 'Get the quick information a hover card shows about a researcher',
+    description:
+      "Returns the researcher's name, their unit, their academic title and degree, their bio and their avatar. The card is a summary — the full profile is served by the profile detail endpoint.",
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'Unique identifier of the target user account (UUID).',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Researcher profile preview retrieved successfully.',
+    type: ProfilePreviewResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested researcher profile was not found.',
+  })
+  @ApiForbiddenResponse({
+    description: 'The profile is unconfirmed and the caller is not the owner.',
+  })
+  @Get(':userId/preview')
+  async getPreviewById(
+    @Param('userId', ParseUUIDPipe) targetUserId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<ProfilePreviewResponseDto> {
+    return this.profilesService.findPreviewById(targetUserId, callerId);
   }
 
   @ApiOperation({

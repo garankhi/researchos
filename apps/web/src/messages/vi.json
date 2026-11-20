@@ -74,6 +74,12 @@
     "followError": "Không cập nhật được lượt theo dõi.",
     "followingLoadError": "Không tải được danh sách đang theo dõi."
   },
+  "entityPreview": {
+    "unavailable": "Không có thông tin xem trước.",
+    "directionCount": "{count, plural, other {# hướng nghiên cứu}}",
+    "groupPreviewTitle": "Xem trước nhóm nghiên cứu",
+    "researcherPreviewTitle": "Xem trước nhà nghiên cứu"
+  },
   "addResearch": {
     "trigger": "Thêm mới",
     "title": "Thêm công trình của bạn",

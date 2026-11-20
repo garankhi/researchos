@@ -14,10 +14,37 @@ import { AccessService } from '../identity/access.service.js';
 import type { CreateResearchGroupDto } from './dto/create-research-group.dto.js';
 import type { ListResearchGroupsQueryDto } from './dto/list-research-groups.query.dto.js';
 import type { PaginatedResearchGroupsResponseDto } from './dto/paginated-research-groups-response.dto.js';
+import type { GroupPreviewResponseDto } from './dto/group-preview-response.dto.js';
 import type { ResearchGroupResponseDto } from './dto/research-group-response.dto.js';
 import type { UpdateResearchGroupDto } from './dto/update-research-group.dto.js';
 
 type ResearchGroupRow = Prisma.research_groupsGetPayload<Record<string, never>>;
+
+/**
+ * The group row with its published directions and their linked topic.
+ *
+ * The directions are joined in rather than fetched separately, so the
+ * preview costs one query instead of one per direction.
+ */
+const previewInclude = {
+  group_directions: {
+    where: { archived_at: null },
+    include: { research_topics: true },
+    orderBy: [{ created_at: 'desc' as const }, { id: 'asc' as const }],
+  },
+};
+
+type GroupPreviewRow = Prisma.research_groupsGetPayload<{
+  include: typeof previewInclude;
+}>;
+
+/**
+ * How many published directions a preview shows.
+ *
+ * The card is a summary — enough to see what the group works on, not the
+ * full list, which is one click away.
+ */
+const previewDirectionLimit = 5;
 
 const GROUP_SORT_FIELDS = {
   name: 'name',
@@ -216,6 +243,54 @@ export class GroupsService {
   }
 
   /**
+   * Retrieves the quick information a hover card shows about a group.
+   *
+   * The group and its published directions are read in one query, so the
+   * card costs the same whether the group has one direction or twenty.
+   *
+   * Visibility follows the group detail read exactly: an active,
+   * unarchived group is public, and an archived one is readable only by
+   * its lead and members.
+   */
+  async preview(
+    groupId: string,
+    callerId: string,
+  ): Promise<GroupPreviewResponseDto> {
+    const group = await this.prisma.research_groups.findUnique({
+      where: { id: groupId },
+      include: previewInclude,
+    });
+
+    if (!group) {
+      throw new CodedHttpException(
+        domainErrorCodes.groups.groupNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const isPublic = group.is_active && group.archived_at === null;
+    if (!isPublic && group.lead_id !== callerId) {
+      const membership = await this.prisma.group_members.findUnique({
+        where: {
+          group_id_user_id: {
+            group_id: groupId,
+            user_id: callerId,
+          },
+        },
+      });
+
+      if (!membership || membership.archived_at) {
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    return this.mapToPreview(group);
+  }
+
+  /**
    * Updates research group attributes or archives/restores the group.
    *
    * - Throws `404 group_not_found` when the group does not exist.
@@ -377,6 +452,26 @@ export class GroupsService {
       archivedAt: group.archived_at?.toISOString() ?? null,
       createdAt: group.created_at.toISOString(),
       updatedAt: group.updated_at.toISOString(),
+    };
+  }
+
+  /**
+   * Maps a group and its joined directions to the hover card payload.
+   *
+   * The directions are capped here rather than in the query, so the
+   * database still reads the rows in one round trip and only the
+   * response is trimmed.
+   */
+  private mapToPreview(group: GroupPreviewRow): GroupPreviewResponseDto {
+    return {
+      name: group.name,
+      description: group.description ?? null,
+      directions: group.group_directions
+        .slice(0, previewDirectionLimit)
+        .map((direction) => ({
+          title: direction.title,
+          topic: direction.research_topics?.name ?? null,
+        })),
     };
   }
 }

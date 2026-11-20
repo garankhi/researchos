@@ -4,6 +4,7 @@ import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
 import type { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
+import type { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
 
@@ -87,6 +88,48 @@ export class ProfilesService {
     );
 
     return this.mapToResponse(user);
+  }
+
+  /**
+   * Retrieves the quick information a hover card shows about a researcher.
+   *
+   * Visibility mirrors the profile read exactly: a confirmed profile is
+   * readable by any authenticated user, an unconfirmed one only by its
+   * owner. The rule lives in `assertProfileReadable` so the profile read
+   * and this read can never drift apart.
+   */
+  async findPreviewById(
+    targetUserId: string,
+    callerId: string,
+  ): Promise<ProfilePreviewResponseDto> {
+    const user = await this.prisma.users.findUnique({
+      where: { id: targetUserId },
+      include: { researcher_profiles: true },
+    });
+
+    if (!user) {
+      throw new CodedHttpException(
+        domainErrorCodes.profiles.profileNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    this.assertProfileReadable(
+      targetUserId,
+      callerId,
+      user.researcher_profiles,
+    );
+
+    const profile = user.researcher_profiles;
+
+    return {
+      fullName: user.full_name,
+      departmentUnit: user.department_unit,
+      academicTitle: user.academic_title,
+      academicDegree: user.academic_degree,
+      bio: profile?.bio ?? null,
+      avatarStorageKey: profile?.avatar_storage_key ?? null,
+    };
   }
 
   /**

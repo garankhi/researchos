@@ -63,6 +63,7 @@ import {
   ImagePreviewModal,
   type ImagePreviewTarget,
 } from './image-preview-modal';
+import { EntityLink } from '@/features/discovery';
 
 export function ConversationDetailsPanel({
   conversation,
@@ -352,16 +353,13 @@ export function ConversationDetailsPanel({
 
           <Box minW="0" maxW="full">
             {directPartner ? (
-              <Link
-                asChild
-                fontWeight="bold"
-                textStyle="md"
-                layerStyle="researchTextLink"
+              <EntityLink
+                entityType="RESEARCHER"
+                entityId={directPartner.userId}
+                href={`/profile/${directPartner.userId}`}
               >
-                <NextLink href={`/profile/${directPartner.userId}`}>
-                  {displayTitle}
-                </NextLink>
-              </Link>
+                {displayTitle}
+              </EntityLink>
             ) : (
               <Text fontWeight="bold" textStyle="md" truncate>
                 {displayTitle}

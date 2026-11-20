@@ -23,6 +23,7 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  ProfilePreviewResponseDtoEnvelope,
   ProfileResponseDtoEnvelope,
   ProfilesControllerGetInterestsByUserIdEnvelope,
   UpdateProfileDto,
@@ -464,6 +465,178 @@ export function useProfilesControllerGetProfileById<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getProfilesControllerGetProfileByIdQueryOptions(
+    userId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the researcher's name, their unit, their academic title and degree, their bio and their avatar. The card is a summary — the full profile is served by the profile detail endpoint.
+ * @summary Get the quick information a hover card shows about a researcher
+ */
+export const profilesControllerGetPreviewById = (
+  userId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfilePreviewResponseDtoEnvelope>(
+    { url: `/profiles/${userId}/preview`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getProfilesControllerGetPreviewByIdQueryKey = (userId: string) => {
+  return [`/profiles/${userId}/preview`] as const;
+};
+
+export const getProfilesControllerGetPreviewByIdQueryOptions = <
+  TData = Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProfilesControllerGetPreviewByIdQueryKey(userId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof profilesControllerGetPreviewById>>
+  > = ({ signal }) =>
+    profilesControllerGetPreviewById(userId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: userId !== null && userId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProfilesControllerGetPreviewByIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerGetPreviewById>>
+>;
+export type ProfilesControllerGetPreviewByIdQueryError = ApiErrorResponseDto;
+
+export function useProfilesControllerGetPreviewById<
+  TData = Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetPreviewById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetPreviewById<
+  TData = Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetPreviewById>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetPreviewById<
+  TData = Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the quick information a hover card shows about a researcher
+ */
+
+export function useProfilesControllerGetPreviewById<
+  TData = Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+  TError = ApiErrorResponseDto,
+>(
+  userId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetPreviewById>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getProfilesControllerGetPreviewByIdQueryOptions(
     userId,
     options,
   );

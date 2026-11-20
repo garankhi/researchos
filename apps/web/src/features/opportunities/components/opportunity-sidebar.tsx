@@ -1,19 +1,10 @@
 'use client';
 
-import {
-  Badge,
-  Box,
-  Flex,
-  Heading,
-  Icon,
-  Link,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Icon, Stack, Text } from '@chakra-ui/react';
 import { CalendarClock, Flag, Layers, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import type { Opportunity } from '../types';
+import { EntityLink } from '@/features/discovery';
 
 /**
  * The opportunity's right column.
@@ -133,17 +124,13 @@ export function OpportunitySidebar({
           <Heading as="h2" size="sm" fontWeight="bold" mb="3.5">
             {t('groupTitle')}
           </Heading>
-          <Link
-            asChild
-            textStyle="sm"
-            fontWeight="semibold"
-            layerStyle="researchTextLink"
-            display="block"
+          <EntityLink
+            entityType="GROUP"
+            entityId={opportunity.groupId}
+            href={`/groups/${opportunity.groupId}`}
           >
-            <NextLink href={`/groups/${opportunity.groupId}`}>
-              {groupName ?? t('viewGroup')}
-            </NextLink>
-          </Link>
+            {groupName ?? t('viewGroup')}
+          </EntityLink>
         </Box>
       ) : null}
     </Stack>

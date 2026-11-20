@@ -3335,6 +3335,75 @@
         ]
       }
     },
+    "/research-groups/{groupId}/preview": {
+      "get": {
+        "description": "Returns the group's name, its description and its published research directions. The card is a summary — the full group record is served by the group detail endpoint.",
+        "operationId": "GroupsController_preview",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research group preview retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPreviewResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided groupId is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to view this research group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research group was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the quick information a hover card shows about a group",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
     "/research-groups/{groupId}/members": {
       "get": {
         "description": "The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.",
@@ -7594,6 +7663,65 @@
         ]
       }
     },
+    "/profiles/{userId}/preview": {
+      "get": {
+        "description": "Returns the researcher's name, their unit, their academic title and degree, their bio and their avatar. The card is a summary — the full profile is served by the profile detail endpoint.",
+        "operationId": "ProfilesController_getPreviewById",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the target user account (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Researcher profile preview retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilePreviewResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The profile is unconfirmed and the caller is not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the quick information a hover card shows about a researcher",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
     "/profiles/{userId}/interests": {
       "get": {
         "description": "Returns the interests of the target researcher, each with the taxonomy path of its topic and its review status.",
@@ -10179,6 +10307,50 @@
           "meta"
         ]
       },
+      "GroupDirectionPreviewDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Published research direction title."
+          },
+          "topic": {
+            "type": "string",
+            "description": "Name of the linked taxonomy topic, or null for an unlinked direction.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title",
+          "topic"
+        ]
+      },
+      "GroupPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name of the research group."
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description or research scope of the group.",
+            "nullable": true
+          },
+          "directions": {
+            "description": "Published research directions, newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupDirectionPreviewDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "directions"
+        ]
+      },
       "UpdateResearchGroupDto": {
         "type": "object",
         "properties": {
@@ -12540,6 +12712,53 @@
           "onboardingCompletedAt"
         ]
       },
+      "ProfilePreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit.",
+            "example": "Software Engineering"
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title when applicable.",
+            "example": "PGS",
+            "nullable": true
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree when applicable.",
+            "example": "TS",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Associate professor specializing in distributed systems and AI.",
+            "nullable": true
+          },
+          "avatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the profile avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          }
+        },
+        "required": [
+          "fullName",
+          "departmentUnit",
+          "academicTitle",
+          "academicDegree",
+          "bio",
+          "avatarStorageKey"
+        ]
+      },
       "ProfileInterestResponseDto": {
         "type": "object",
         "properties": {
@@ -13942,6 +14161,30 @@
           "message"
         ]
       },
+      "GroupPreviewResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/GroupPreviewResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "GroupMemberPageDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -14584,6 +14827,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/ProfileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ProfilePreviewResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProfilePreviewResponseDto"
           },
           "message": {
             "type": "string",

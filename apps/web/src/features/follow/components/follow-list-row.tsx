@@ -1,22 +1,14 @@
 'use client';
 
-import {
-  Badge,
-  Button,
-  Flex,
-  Heading,
-  Icon,
-  Link,
-  Stack,
-} from '@chakra-ui/react';
+import { Badge, Button, Flex, Heading, Icon, Stack } from '@chakra-ui/react';
 import { FileText, Hash, UserRound, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { useFollow } from '../hooks/use-follow';
 import type { Follow, FollowableEntityType, FollowEntityType } from '../types';
+import { EntityLink } from '@/features/discovery';
 
 /**
  * The route of a followed entity.
@@ -105,9 +97,13 @@ export function FollowListRow({ follow }: { follow: Follow }) {
       <Stack gap="1" minW="0" flex="1">
         {href ? (
           <Heading as="h3" size="sm" fontWeight="bold" lineHeight="1.35">
-            <Link asChild layerStyle="researchTextLink">
-              <NextLink href={href}>{follow.displayName}</NextLink>
-            </Link>
+            <EntityLink
+              entityType={follow.entityType}
+              entityId={follow.entityId}
+              href={href}
+            >
+              {follow.displayName}
+            </EntityLink>
           </Heading>
         ) : (
           <Heading as="h3" size="sm" fontWeight="bold" lineHeight="1.35">

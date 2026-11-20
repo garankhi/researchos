@@ -74,6 +74,12 @@
     "followError": "Could not update this follow.",
     "followingLoadError": "Could not load followed accounts and groups."
   },
+  "entityPreview": {
+    "unavailable": "No preview available.",
+    "directionCount": "{count, plural, one {# research direction} other {# research directions}}",
+    "groupPreviewTitle": "Group preview",
+    "researcherPreviewTitle": "Researcher preview"
+  },
   "addResearch": {
     "trigger": "Add new",
     "title": "Add your research",

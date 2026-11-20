@@ -15,6 +15,7 @@ import NextLink from '@/components/ui/link';
 import { applicationsControllerRespond } from '@/lib/api';
 import type { Application } from '../types';
 import { HubEditor, HubList, HubMenu, HubSection } from './hub-controls';
+import { EntityLink } from '@/features/discovery';
 
 export function GroupApplications({
   groupId,
@@ -61,16 +62,13 @@ export function GroupApplications({
                     />
                   </Avatar.Root>
                   <Stack gap="1" minW="0">
-                    <Link
-                      asChild
-                      layerStyle="researchTextLink"
-                      textStyle="sm"
-                      fontWeight="semibold"
+                    <EntityLink
+                      entityType="RESEARCHER"
+                      entityId={application.applicantId}
+                      href={`/profile/${application.applicantId}`}
                     >
-                      <NextLink href={`/profile/${application.applicantId}`}>
-                        {application.applicantFullName || t('unknownApplicant')}
-                      </NextLink>
-                    </Link>
+                      {application.applicantFullName || t('unknownApplicant')}
+                    </EntityLink>
                     {application.applicantDepartmentUnit ? (
                       <Text textStyle="xs" color="fg.muted">
                         {application.applicantDepartmentUnit}
