@@ -97,12 +97,13 @@ export function FormModal<
     defaultValues,
   });
 
-  // The form picks up the fresh values whenever the dialog opens on a
-  // different record.
+  // The form picks up the fresh values whenever the dialog opens, and
+  // again when it opens on a different record.
   useEffect(() => {
+    if (!open) return;
     methods.reset(defaultValues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
+  }, [open, resetKey]);
 
   const handleSubmit = methods.handleSubmit(async (values) => {
     try {
