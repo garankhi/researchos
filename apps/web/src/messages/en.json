@@ -858,6 +858,7 @@
     "archiveOpportunity": "Archive opportunity",
     "untitledOpportunity": "Research opportunity",
     "viewApplicant": "View applicant profile",
+    "unknownApplicant": "Unknown applicant",
     "respond": "Respond to application",
     "decision": "Decision",
     "responseNote": "Response note",
@@ -985,6 +986,7 @@
     "applicationsEmptyTitle": "No applications yet",
     "applicationsEmptyMessage": "Nobody has applied to this opportunity so far.",
     "viewApplicant": "View the applicant",
+    "unknownApplicant": "Unknown applicant",
     "responseNoteLabel": "Response",
     "overdue": "Past its response deadline",
     "statuses": {
@@ -1005,11 +1007,11 @@
       "STUDENT": "Students",
       "ANY_RESEARCHER": "Any researcher"
     },
-  "applicationStatuses": {
-    "PENDING": "Pending",
-    "INVITED_TO_DISCUSS": "Invited to discuss",
-    "DECLINED": "Declined",
-    "WITHDRAWN": "Withdrawn"
-  }
+    "applicationStatuses": {
+      "PENDING": "Pending",
+      "INVITED_TO_DISCUSS": "Invited to discuss",
+      "DECLINED": "Declined",
+      "WITHDRAWN": "Withdrawn"
+    }
   }
 }

@@ -11297,6 +11297,27 @@
             "description": "Researcher submitting the application.",
             "format": "uuid"
           },
+          "applicantFullName": {
+            "type": "string",
+            "description": "Full display name of the applicant.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "applicantEmail": {
+            "type": "string",
+            "description": "Institutional email address of the applicant.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "applicantDepartmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit of the applicant.",
+            "example": "Software Engineering"
+          },
+          "applicantAvatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the applicant avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
           "applicantNote": {
             "type": "string",
             "description": "Researcher application note."
@@ -11363,6 +11384,10 @@
           "id",
           "opportunityId",
           "applicantId",
+          "applicantFullName",
+          "applicantEmail",
+          "applicantDepartmentUnit",
+          "applicantAvatarStorageKey",
           "applicantNote",
           "status",
           "responseNote",
@@ -11423,6 +11448,27 @@
             "description": "Researcher submitting the application.",
             "format": "uuid"
           },
+          "applicantFullName": {
+            "type": "string",
+            "description": "Full display name of the applicant.",
+            "example": "PGS. TS. Nguyễn Văn A"
+          },
+          "applicantEmail": {
+            "type": "string",
+            "description": "Institutional email address of the applicant.",
+            "example": "nguyenvana@fpt.edu.vn"
+          },
+          "applicantDepartmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit of the applicant.",
+            "example": "Software Engineering"
+          },
+          "applicantAvatarStorageKey": {
+            "type": "string",
+            "description": "Storage key referencing the applicant avatar image.",
+            "example": "avatars/1f0d2f2e-6f0a-4a2f-9f6b-2d1c9a3b7e11.png",
+            "nullable": true
+          },
           "applicantNote": {
             "type": "string",
             "description": "Researcher application note."
@@ -11489,6 +11535,10 @@
           "id",
           "opportunityId",
           "applicantId",
+          "applicantFullName",
+          "applicantEmail",
+          "applicantDepartmentUnit",
+          "applicantAvatarStorageKey",
           "applicantNote",
           "status",
           "responseNote",

@@ -858,6 +858,7 @@
     "archiveOpportunity": "Lưu trữ cơ hội",
     "untitledOpportunity": "Cơ hội nghiên cứu",
     "viewApplicant": "Xem hồ sơ ứng viên",
+    "unknownApplicant": "Ứng tuyển viên không xác định",
     "respond": "Phản hồi đơn ứng tuyển",
     "decision": "Quyết định",
     "responseNote": "Nội dung phản hồi",
@@ -985,6 +986,7 @@
     "applicationsEmptyTitle": "Chưa có hồ sơ nào",
     "applicationsEmptyMessage": "Chưa có ai ứng tuyển cơ hội này.",
     "viewApplicant": "Xem người ứng tuyển",
+    "unknownApplicant": "Ứng tuyển viên không xác định",
     "responseNoteLabel": "Phản hồi",
     "overdue": "Đã quá hạn phản hồi",
     "statuses": {
@@ -1005,11 +1007,11 @@
       "STUDENT": "Sinh viên",
       "ANY_RESEARCHER": "Mọi nhà nghiên cứu"
     },
-  "applicationStatuses": {
-    "PENDING": "Đang chờ",
-    "INVITED_TO_DISCUSS": "Đã mời trao đổi",
-    "DECLINED": "Đã từ chối",
-    "WITHDRAWN": "Đã rút"
-  }
+    "applicationStatuses": {
+      "PENDING": "Đang chờ",
+      "INVITED_TO_DISCUSS": "Đã mời trao đổi",
+      "DECLINED": "Đã từ chối",
+      "WITHDRAWN": "Đã rút"
+    }
   }
 }

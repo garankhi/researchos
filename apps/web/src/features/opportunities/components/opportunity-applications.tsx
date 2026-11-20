@@ -1,6 +1,15 @@
 'use client';
 
-import { Badge, Box, Flex, Heading, Link, Stack, Text } from '@chakra-ui/react';
+import {
+  Avatar,
+  Badge,
+  Box,
+  Flex,
+  Heading,
+  Link,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
@@ -25,8 +34,10 @@ function statusPalette(status: Application['status']) {
 /**
  * The applications one opportunity received.
  *
- * Only a manager of the opportunity sees this, and it links to each
- * applicant's profile so the applicant can be read in context.
+ * Each row shows who applied — avatar, name, department and email — and
+ * the name links to the applicant's profile. The display fields arrive
+ * with the application, so the list costs one request rather than one
+ * per applicant.
  */
 export function OpportunityApplications({
   applications,
@@ -86,78 +97,105 @@ export function OpportunityApplications({
       </Box>
 
       <Box>
-        {applications.map((application, index) => (
-          <Box
-            key={application.id}
-            py="4"
-            px={{ base: '4', md: '6' }}
-            borderBottomWidth={index < applications.length - 1 ? '1px' : '0'}
-            borderColor="border"
-          >
-            <Flex
-              direction={{ base: 'column', sm: 'row' }}
-              gap="4"
-              justify="space-between"
-              align={{ base: 'flex-start', sm: 'flex-start' }}
+        {applications.map((application, index) => {
+          const name = application.applicantFullName || t('unknownApplicant');
+
+          return (
+            <Box
+              key={application.id}
+              py="4"
+              px={{ base: '4', md: '6' }}
+              borderBottomWidth={index < applications.length - 1 ? '1px' : '0'}
+              borderColor="border"
             >
-              <Stack gap="2" flex="1" minW="0">
-                <Link
-                  asChild
-                  textStyle="sm"
-                  fontWeight="semibold"
-                  layerStyle="researchTextLink"
-                  display="block"
-                >
-                  <NextLink href={`/profile/${application.applicantId}`}>
-                    {t('viewApplicant')}
-                  </NextLink>
-                </Link>
+              <Flex gap="4" align="flex-start" minW="0">
+                <Avatar.Root size="md" flexShrink={0}>
+                  <Avatar.Fallback name={name} />
+                </Avatar.Root>
 
-                <Flex gap="2.5" align="center" flexWrap="wrap">
-                  <Badge
-                    variant="subtle"
-                    colorPalette={statusPalette(application.status)}
+                <Stack gap="2" flex="1" minW="0">
+                  <Flex
+                    direction={{ base: 'column', sm: 'row' }}
+                    gap={{ base: '1', sm: '3' }}
+                    align={{ base: 'flex-start', sm: 'baseline' }}
+                    flexWrap="wrap"
                   >
-                    {t(`applicationStatuses.${application.status}`)}
-                  </Badge>
+                    <Heading as="h3" size="sm" fontWeight="bold">
+                      <Link asChild color="fg" layerStyle="researchTextLink">
+                        <NextLink href={`/profile/${application.applicantId}`}>
+                          {name}
+                        </NextLink>
+                      </Link>
+                    </Heading>
 
-                  {application.isOverdue && application.status === 'PENDING' ? (
-                    <Text textStyle="xs" color="fg.error">
-                      {t('overdue')}
+                    {application.applicantDepartmentUnit ? (
+                      <Text textStyle="sm" color="fg.muted">
+                        {application.applicantDepartmentUnit}
+                      </Text>
+                    ) : null}
+                  </Flex>
+
+                  {application.applicantEmail ? (
+                    <Text
+                      textStyle="sm"
+                      color="fg.muted"
+                      overflowWrap="anywhere"
+                    >
+                      {application.applicantEmail}
                     </Text>
                   ) : null}
-                </Flex>
 
-                {application.applicantNote ? (
-                  <Text
-                    textStyle="sm"
-                    color="fg.muted"
-                    whiteSpace="pre-line"
-                    lineHeight="1.55"
-                  >
-                    {application.applicantNote}
-                  </Text>
-                ) : null}
+                  <Flex gap="2.5" align="center" flexWrap="wrap">
+                    <Badge
+                      variant="subtle"
+                      colorPalette={statusPalette(application.status)}
+                    >
+                      {t(`applicationStatuses.${application.status}`)}
+                    </Badge>
 
-                {application.responseNote ? (
-                  <Box
-                    p="3"
-                    bg="bg.muted"
-                    borderLeftWidth="2px"
-                    borderColor="blue.solid"
-                  >
-                    <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
-                      {t('responseNoteLabel')}
+                    {application.isOverdue &&
+                    application.status === 'PENDING' ? (
+                      <Text textStyle="xs" color="fg.error">
+                        {t('overdue')}
+                      </Text>
+                    ) : null}
+                  </Flex>
+
+                  {application.applicantNote ? (
+                    <Text
+                      textStyle="sm"
+                      color="fg.muted"
+                      whiteSpace="pre-line"
+                      lineHeight="1.55"
+                    >
+                      {application.applicantNote}
                     </Text>
-                    <Text textStyle="sm" mt="0.5">
-                      {application.responseNote}
-                    </Text>
-                  </Box>
-                ) : null}
-              </Stack>
-            </Flex>
-          </Box>
-        ))}
+                  ) : null}
+
+                  {application.responseNote ? (
+                    <Box
+                      p="3"
+                      bg="bg.muted"
+                      borderLeftWidth="2px"
+                      borderColor="blue.solid"
+                    >
+                      <Text
+                        textStyle="xs"
+                        color="fg.muted"
+                        fontWeight="semibold"
+                      >
+                        {t('responseNoteLabel')}
+                      </Text>
+                      <Text textStyle="sm" mt="0.5">
+                        {application.responseNote}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </Stack>
+              </Flex>
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );

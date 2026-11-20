@@ -1,6 +1,15 @@
 'use client';
 
-import { Badge, Box, Heading, Link, Stack, Text } from '@chakra-ui/react';
+import {
+  Avatar,
+  Badge,
+  Box,
+  Flex,
+  Heading,
+  Link,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { useLocale, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { applicationsControllerRespond } from '@/lib/api';
@@ -43,11 +52,41 @@ export function GroupApplications({
                     (application.opportunityTitle ?? t('untitledOpportunity'))
                   )}
                 </Heading>
-                <Link asChild layerStyle="researchTextLink" textStyle="sm">
-                  <NextLink href={`/profile/${application.applicantId}`}>
-                    {t('viewApplicant')}
-                  </NextLink>
-                </Link>
+                <Flex gap="3" align="flex-start" minW="0">
+                  <Avatar.Root size="sm" flexShrink={0}>
+                    <Avatar.Fallback
+                      name={
+                        application.applicantFullName || t('unknownApplicant')
+                      }
+                    />
+                  </Avatar.Root>
+                  <Stack gap="1" minW="0">
+                    <Link
+                      asChild
+                      layerStyle="researchTextLink"
+                      textStyle="sm"
+                      fontWeight="semibold"
+                    >
+                      <NextLink href={`/profile/${application.applicantId}`}>
+                        {application.applicantFullName || t('unknownApplicant')}
+                      </NextLink>
+                    </Link>
+                    {application.applicantDepartmentUnit ? (
+                      <Text textStyle="xs" color="fg.muted">
+                        {application.applicantDepartmentUnit}
+                      </Text>
+                    ) : null}
+                    {application.applicantEmail ? (
+                      <Text
+                        textStyle="xs"
+                        color="fg.muted"
+                        overflowWrap="anywhere"
+                      >
+                        {application.applicantEmail}
+                      </Text>
+                    ) : null}
+                  </Stack>
+                </Flex>
                 <Badge
                   alignSelf="start"
                   variant="subtle"
