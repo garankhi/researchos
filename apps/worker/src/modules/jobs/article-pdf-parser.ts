@@ -27,6 +27,48 @@ function text(value: unknown, maxLength: number): string | undefined {
   return cleaned && cleaned.length <= maxLength ? cleaned : undefined;
 }
 
+function comparableText(value: string): string {
+  return value
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/\p{M}/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function matchesTitle(candidate: string, visibleTitle: string): boolean {
+  const embedded = comparableText(candidate);
+  const visible = comparableText(visibleTitle);
+  // Allow a subtitle or typography that only appears in one source.
+  return (
+    embedded === visible ||
+    embedded.startsWith(`${visible} `) ||
+    visible.startsWith(`${embedded} `)
+  );
+}
+
+function matchesByline(candidate: string[], byline: string[]): boolean {
+  // Require the visible names to agree while allowing initials and inverted
+  // names. Embedded metadata may list additional authors below the first byline.
+  const names = candidate.map((name) => comparableText(name).split(' '));
+  return byline.every((author) => {
+    const [given, ...rest] = comparableText(author).split(' ');
+    const surname = rest.at(-1);
+    return names.some(
+      (words) =>
+        surname &&
+        words.includes(surname) &&
+        words.some(
+          (word) =>
+            word !== surname &&
+            (word === given ||
+              (word.length === 1 && given.startsWith(word)) ||
+              (given.length === 1 && word.startsWith(given))),
+        ),
+    );
+  });
+}
+
 function publicationDate(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const candidate = value.trim();
@@ -36,6 +78,57 @@ function publicationDate(value: unknown): string | undefined {
     );
   // XMP dates describe the calendar day at the source's offset.
   return parsePublicationDate(timestamp?.[1] ?? candidate);
+}
+
+const doiLine =
+  /^(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)$/iu;
+const citationDoi =
+  /(?:^|\s)(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)/giu;
+const citationHeading = /^(?:citation|cite this article)(?:\s*:|$)/iu;
+const citationEnd =
+  /^(?:editor|received|accepted|published|copyright|funding|competing interests|data availability(?: statement)?)\s*:/iu;
+const bodyHeading =
+  /^(?:(?:\d+(?:\.\d+)*|[ivxlcdm]+)[.)]?\s+)?(?:introduction|nomenclature|materials and methods|methods|results|discussion|references|bibliography|literature cited|giới thiệu|mở đầu|phương pháp|kết quả|tài liệu tham khảo)\s*[:.]?$/iu;
+const captionHeading =
+  /^(?:(?:(?:supplementary|supplemental|supporting)\s+)?(?:fig(?:ure)?\.?|table|hình|bảng)\s+(?:[a-z]?\d|[ivxlcdm]+\b)|[a-z]\d+\s+(?:fig(?:ure)?|table)\b)/iu;
+
+function readArticleDoi(firstPage: readonly PdfLine[]): string | undefined {
+  const candidates = new Set<string>();
+  let citationLine: PdfLine | undefined;
+  for (const line of firstPage) {
+    if (bodyHeading.test(line.text) || captionHeading.test(line.text)) break;
+
+    // Publishers can print the article's own citation beside the abstract.
+    // Track wrapped citation lines by their margin when body text interleaves.
+    if (citationHeading.test(line.text)) {
+      citationLine = line;
+    } else if (
+      citationLine &&
+      Math.abs(line.left - citationLine.left) <= citationLine.height
+    ) {
+      const gap = line.y - citationLine.y;
+      citationLine =
+        gap > 0 &&
+        gap <= citationLine.height * 2 &&
+        !citationEnd.test(line.text) &&
+        !abstractHeading.test(line.text)
+          ? line
+          : undefined;
+    }
+
+    const standalone = doiLine.exec(line.text)?.[1];
+    if (standalone) {
+      const doi = normalizeArticleDoi(standalone);
+      if (doi) candidates.add(doi);
+    } else if (line === citationLine) {
+      for (const [, source] of line.text.matchAll(citationDoi)) {
+        // An inline DOI can be followed by the citation's sentence period.
+        const doi = normalizeArticleDoi(source.replace(/\.$/u, ''));
+        if (doi) candidates.add(doi);
+      }
+    }
+  }
+  return candidates.size === 1 ? candidates.values().next().value : undefined;
 }
 
 export async function extractArticlePdfMetadata(
@@ -98,14 +191,21 @@ export async function extractArticlePdfMetadata(
     const lines = pages.flat();
     const body = lines.map(({ text }) => text).join('\n');
     const frontMatter = readFrontMatter(pages[0] ?? []);
+    const visibleTitle = text(frontMatter.title, 500);
+    const byline = frontMatter.authorNames ?? frontMatter.firstByline;
     const title =
-      text(metadata?.get('dc:title'), 500) ??
-      text(infoFields.Title, 500) ??
+      [metadata?.get('dc:title'), infoFields.Title]
+        .map((value) => text(value, 500))
+        .find(
+          (value) =>
+            value && (!visibleTitle || matchesTitle(value, visibleTitle)),
+        ) ??
       text(/^\s*(?:title|tiêu đề)[ \t]*:[ \t]*(.+)$/imu.exec(body)?.[1], 500) ??
-      text(frontMatter.title, 500);
+      visibleTitle;
     const authorNames =
-      readAuthorNames(metadata?.get('dc:creator')) ??
-      readAuthorNames(infoFields.Author) ??
+      [metadata?.get('dc:creator'), infoFields.Author]
+        .map(readAuthorNames)
+        .find((names) => names && (!byline || matchesByline(names, byline))) ??
       readLabeledAuthors(
         /^\s*(?:authors?|tác giả)[ \t]*:[ \t]*(.+)$/imu.exec(body)?.[1],
       ) ??
@@ -129,11 +229,7 @@ export async function extractArticlePdfMetadata(
     const articleDoi =
       normalizeArticleDoi(metadata?.get('prism:doi')) ??
       normalizeArticleDoi(metadata?.get('dc:identifier')) ??
-      normalizeArticleDoi(
-        /^\s*(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)[ \t]*$/imu.exec(
-          body,
-        )?.[1],
-      );
+      readArticleDoi(pages[0] ?? []);
 
     return {
       ...(title && { title }),

@@ -156,7 +156,7 @@ const authorSeparators = /\s*;\s*|\s+(?:and|và|&)\s+/iu;
 const nameToken = /^\p{Lu}[\p{L}\p{M}.'’-]*$/u;
 const nameParticle = /^(?:al|da|de|del|der|di|dos|du|la|le|van|von)$/u;
 const affiliationWord =
-  /\b(?:academy|center|centre|college|consortium|department|faculty|foundation|hospital|institute|institution|journal|laboratory|programme|school|university|universit[eé]|universidad)\b|(?:trường đại học|viện nghiên cứu|khoa học)/iu;
+  /\b(?:academy|center|centre|college|consortium|corporation|department|faculty|foundation|hospital|institute|institution|journal|laboratory|programme|school|university|universit[eé]|universidad)\b|,\s*(?:inc|ltd)\.|(?:trường đại học|viện nghiên cứu|khoa học)/iu;
 const masthead =
   /^(?:(?:the\s+)?journal\s+of\b|(?:(?:e-?)?issn|vol(?:ume)?)[\s.:])/iu;
 
@@ -275,22 +275,80 @@ function readByline(line: PdfLine): { authorNames?: string[] } | undefined {
   return undefined;
 }
 
-function adjacentBelow(above: PdfLine, below: PdfLine) {
+function adjacentBelow(above: PdfLine, below: PdfLine, maxGap = 1.8) {
   return (
     below.y > above.y &&
-    below.y - above.y <= above.height * 1.8 &&
+    below.y - above.y <= above.height * maxGap &&
     below.left <= above.right &&
     above.left <= below.right
   );
 }
 
-type FrontMatter = { title?: string; authorNames?: string[] };
+function continuesTitle(above: PdfLine, below: PdfLine) {
+  return (
+    Math.abs(above.height - below.height) <= below.height * 0.15 &&
+    adjacentBelow(above, below)
+  );
+}
+
+type FrontMatter = {
+  title?: string;
+  authorNames?: string[];
+  firstByline?: string[];
+};
+
+function readHeadinglessFrontMatter(
+  firstPage: readonly PdfLine[],
+): FrontMatter {
+  // Superscript affiliation numbers may form their own rows above the names.
+  const lines = firstPage
+    .filter(({ text }) => !/^\d+(?:\s+\d+)*$/u.test(text))
+    .sort((a, b) => a.y - b.y || a.left - b.left);
+  const first = lines[0];
+  if (!first || first.column !== undefined || masthead.test(first.text))
+    return {};
+
+  let titleEnd = 0;
+  while (
+    lines[titleEnd + 1] &&
+    continuesTitle(lines[titleEnd], lines[titleEnd + 1])
+  ) {
+    titleEnd++;
+  }
+
+  const lastTitleLine = lines[titleEnd];
+  const byline = lines[titleEnd + 1];
+  const affiliation = lines[titleEnd + 2];
+  if (
+    !byline ||
+    !affiliation ||
+    lastTitleLine.height < byline.height * 1.25 ||
+    !adjacentBelow(lastTitleLine, byline, 2.5) ||
+    !adjacentBelow(byline, affiliation) ||
+    !affiliationWord.test(affiliation.text)
+  ) {
+    return {};
+  }
+  const firstByline = readByline(byline)?.authorNames;
+  if (!firstByline) return {};
+
+  // The name and affiliation corroborate the title. Without a boundary for
+  // the header we cannot tell whether this first byline lists every author.
+  return {
+    title: lines
+      .slice(0, titleEnd + 1)
+      .map(({ text }) => text)
+      .join(' '),
+    firstByline,
+  };
+}
 
 export function readFrontMatter(firstPage: readonly PdfLine[]): FrontMatter {
   const abstractStart = firstPage.findIndex(({ text }) =>
     abstractHeading.test(text),
   );
-  if (abstractStart < 1) return {};
+  if (abstractStart < 0) return readHeadinglessFrontMatter(firstPage);
+  if (abstractStart === 0) return {};
   const frontLines = firstPage.slice(0, abstractStart);
   const bodyHeight = firstPage[abstractStart].height;
   const groups: Array<{ start: number; end: number }> = [];
@@ -298,11 +356,7 @@ export function readFrontMatter(firstPage: readonly PdfLine[]): FrontMatter {
     if (line.height < bodyHeight * 1.25) continue;
     const group = groups.at(-1);
     const above = frontLines[index - 1];
-    if (
-      group?.end === index - 1 &&
-      Math.abs(above.height - line.height) <= line.height * 0.15 &&
-      adjacentBelow(above, line)
-    ) {
+    if (group?.end === index - 1 && continuesTitle(above, line)) {
       group.end = index;
     } else {
       groups.push({ start: index, end: index });

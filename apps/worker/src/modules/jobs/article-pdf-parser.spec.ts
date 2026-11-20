@@ -83,6 +83,70 @@ describe('extractArticlePdfMetadata', () => {
     expect(result.authorNames).toEqual(['Nguyen, Mai', 'Bao Tran']);
   });
 
+  it('replaces a template title and drops a conflicting author when the headingless byline is incomplete', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [18, 703, 'Predicting River Floods', 205],
+          [6, 671, '1', 346],
+          [10, 666, 'Mai Nguyen', 268],
+          [10, 654, 'River Analytics, Inc., 5 Mill Road', 220],
+          [10, 626, 'Bao Tran', 270],
+          [10, 614, 'University of Hanoi', 240],
+          [10, 578, 'We present a model for seasonal flooding.'],
+          [12, 540, 'Nomenclature'],
+        ],
+        '/Title (Conference Paper Template) /Author (Template Editor)',
+        xmpMetadata('<dc:title>Conference Paper Template</dc:title>'),
+      ),
+    );
+
+    expect(result).toEqual({ title: 'Predicting River Floods' });
+  });
+
+  it('uses the visible title and byline when embedded fields conflict despite a shared surname', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [20, 700, 'Water quality in the Mekong'],
+          [12, 675, 'Mai Nguyen, Bao Tran'],
+          [11, 630, 'Abstract: A study of river samples.'],
+        ],
+        '/Title (Conference Paper Template) /Author (Hoa Nguyen)',
+      ),
+    );
+
+    expect(result).toEqual({
+      title: 'Water quality in the Mekong',
+      authorNames: ['Mai Nguyen', 'Bao Tran'],
+      abstract: 'A study of river samples.',
+    });
+  });
+
+  it('preserves valid embedded metadata that agrees with the visible title and byline', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [20, 700, 'Water quality'],
+          [20, 675, 'A Mekong study'],
+          [12, 650, 'Mai Nguyen, Bao Tran'],
+          [11, 610, 'Abstract: A study of river samples.'],
+        ],
+        '',
+        xmpMetadata(
+          '<dc:title>Water quality: A Mekong study</dc:title>' +
+            '<dc:creator><rdf:Seq><rdf:li>Nguyen, Mai</rdf:li><rdf:li>B. Tran</rdf:li></rdf:Seq></dc:creator>',
+        ),
+      ),
+    );
+
+    expect(result).toEqual({
+      title: 'Water quality: A Mekong study',
+      authorNames: ['Nguyen, Mai', 'B. Tran'],
+      abstract: 'A study of river samples.',
+    });
+  });
+
   it.each([0, 6])(
     'keeps an abstract in its column when the facing baselines differ by %ipt',
     async (offset) => {
@@ -202,6 +266,78 @@ describe('extractArticlePdfMetadata', () => {
       expect(result.doi).toBe(expected);
     },
   );
+
+  it('reads the article DOI from a wrapped citation beside the abstract', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 740, 'Seasonal oxygen in the Mekong', 200],
+        [11, 680, 'Abstract: We measured river oxygen.', 200],
+        [9, 660, 'Citation: Nguyen M. 2025.', 36],
+        [11, 655, 'Oxygen rose during the summer.', 200],
+        [9, 647, 'River Studies 3. doi:10.1234/study.', 36],
+        [9, 632, 'Editor: Bao Tran', 36],
+        [9, 550, 'Fig 1. Oxygen measurements by site.', 200],
+        [9, 538, 'doi:10.1234/study.g001', 200],
+      ]),
+    );
+    expect(result.doi).toBe('10.1234/study');
+  });
+
+  it.each([
+    ['Figure 1. River locations', 'https://doi.org/10.1234/other-work'],
+    ['Table 1: Measurements', 'https://doi.org/10.1234/other-work'],
+    ['2. References', 'https://doi.org/10.1234/other-work'],
+    ['Figure 2. Survey sites', 'Citation: DOI: 10.1234/other-work'],
+    ['Supplementary Figure S1. Survey sites', 'DOI: 10.1234/other-work'],
+    ['S1 Fig. Survey sites', 'DOI: 10.1234/other-work'],
+  ])('omits a DOI from %s (%s)', async (heading, source) => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 740, 'Seasonal oxygen in the Mekong'],
+        [12, 640, heading],
+        [11, 624, 'Some additional information.'],
+        [11, 612, source],
+      ]),
+    );
+    expect(result.doi).toBeUndefined();
+  });
+
+  it('recognizes a labeled article DOI after the abstract and keywords', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 740, 'Seasonal oxygen in the Mekong'],
+        [11, 690, 'Abstract: We measured river oxygen.'],
+        [11, 670, 'Keywords: water'],
+        [11, 650, 'DOI: https://doi.org/10.1234/water.2024%28supplement%29'],
+        [13, 620, '1. Introduction'],
+      ]),
+    );
+    expect(result.doi).toBe('10.1234/water.2024(supplement)');
+  });
+
+  it('leaves conflicting document DOI candidates empty', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [11, 720, 'DOI: 10.1234/study-one'],
+        [11, 700, 'DOI: 10.1234/study-two'],
+      ]),
+    );
+    expect(result.doi).toBeUndefined();
+  });
+
+  it('preserves a valid embedded article DOI in the presence of a caption DOI', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [12, 640, 'Figure 1. River locations'],
+          [11, 620, 'DOI: 10.1234/fig-001'],
+        ],
+        '',
+        xmpMetadata('<prism:doi>10.1234/study</prism:doi>'),
+      ),
+    );
+    expect(result.doi).toBe('10.1234/study');
+  });
 
   it.each([
     ['2024-05-17T23:30:00-05:00', '2024-05-17'],
