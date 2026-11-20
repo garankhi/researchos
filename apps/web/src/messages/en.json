@@ -93,8 +93,14 @@
       "label": "Presentation",
       "description": "Add a presentation"
     },
-    "poster": { "label": "Poster", "description": "Add a conference poster" },
-    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
+    "poster": {
+      "label": "Poster",
+      "description": "Add a conference poster"
+    },
+    "data": {
+      "label": "Data",
+      "description": "Table, image, sequence, etc."
+    },
     "other": {
       "label": "Other",
       "description": "Methods, proposal, code, etc."
@@ -932,5 +938,78 @@
       "previous": "Previous",
       "next": "Next"
     }
+  },
+  "opportunities": {
+    "loadError": "Could not load this opportunity",
+    "accessDeniedTitle": "You cannot view this opportunity",
+    "accessDeniedMessage": "You do not have access to this opportunity.",
+    "notFoundTitle": "Opportunity not found",
+    "notFoundMessage": "This opportunity does not exist, or it has been removed.",
+    "tabsOverview": "Overview",
+    "tabsApplications": "Applications",
+    "aboutTitle": "About this opportunity",
+    "noDescription": "The group did not add a description.",
+    "roleTitle": "Expected role",
+    "expertiseTitle": "Expertise sought",
+    "detailsTitle": "Details",
+    "kind": "Kind",
+    "audience": "Audience",
+    "deadlineLabel": "Application deadline",
+    "noDeadline": "No deadline",
+    "slaDays": "Response time",
+    "slaDaysValue": "{days, plural, =1 {1 calendar day} other {# calendar days}}",
+    "groupTitle": "Posted by",
+    "viewGroup": "View the group",
+    "archived": "Archived",
+    "deadline": "Applications close: {date}",
+    "apply": "Apply",
+    "applyTitle": "Apply to this opportunity",
+    "applyDescription": "Tell the group why you are a fit. Your note goes to the group that posted the call.",
+    "applyNoteLabel": "Your note",
+    "applyNotePlaceholder": "Describe your background and why you are interested.",
+    "applySubmit": "Send application",
+    "applyError": "Could not send your application",
+    "applySuccess": "Your application was sent.",
+    "cancel": "Cancel",
+    "openForApplications": "Open for applications",
+    "markFilled": "Mark as filled",
+    "close": "Close",
+    "archive": "Archive",
+    "openedToast": "The opportunity is open for applications.",
+    "filledToast": "The opportunity was marked as filled.",
+    "closedToast": "The opportunity was closed.",
+    "archivedToast": "The opportunity was archived.",
+    "applicationsTitle": "Applications received",
+    "applicationsLoadError": "Could not load the applications",
+    "applicationsLoading": "Loading the applications…",
+    "applicationsEmptyTitle": "No applications yet",
+    "applicationsEmptyMessage": "Nobody has applied to this opportunity so far.",
+    "viewApplicant": "View the applicant",
+    "responseNoteLabel": "Response",
+    "overdue": "Past its response deadline",
+    "statuses": {
+      "DRAFT": "Draft",
+      "OPEN": "Open",
+      "FILLED": "Filled",
+      "CLOSED": "Closed",
+      "EXPIRED": "Expired"
+    },
+    "kinds": {
+      "RESEARCH_COLLABORATION": "Research collaboration",
+      "PROJECT_FORMATION": "Project formation",
+      "DATA_METHOD_EXCHANGE": "Data and method exchange",
+      "FUNDING_CALL": "Funding call"
+    },
+    "audiences": {
+      "FACULTY": "Faculty",
+      "STUDENT": "Students",
+      "ANY_RESEARCHER": "Any researcher"
+    },
+  "applicationStatuses": {
+    "PENDING": "Pending",
+    "INVITED_TO_DISCUSS": "Invited to discuss",
+    "DECLINED": "Declined",
+    "WITHDRAWN": "Withdrawn"
+  }
   }
 }

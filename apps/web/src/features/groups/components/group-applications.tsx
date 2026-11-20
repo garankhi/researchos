@@ -30,7 +30,18 @@ export function GroupApplications({
             >
               <Stack gap="3">
                 <Heading as="h3" size="md" pe="8">
-                  {application.opportunityTitle ?? t('untitledOpportunity')}
+                  {application.opportunityId ? (
+                    <Link asChild color="fg">
+                      <NextLink
+                        href={`/opportunities/${application.opportunityId}`}
+                      >
+                        {application.opportunityTitle ??
+                          t('untitledOpportunity')}
+                      </NextLink>
+                    </Link>
+                  ) : (
+                    (application.opportunityTitle ?? t('untitledOpportunity'))
+                  )}
                 </Heading>
                 <Link asChild layerStyle="researchTextLink" textStyle="sm">
                   <NextLink href={`/profile/${application.applicantId}`}>
