@@ -15,7 +15,8 @@ import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { FieldError } from '@/components/ui/feedback';
 import NextLink from '@/components/ui/link';
 import type { FollowTargetDto, SearchResultItemDto } from '@/lib/api/models';
-import { followKey, useChangeSearchFollow } from '../hooks/use-search-follows';
+import { followKey } from '@/features/follow';
+import { useChangeSearchFollow } from '../hooks/use-search-follows';
 
 function FollowButton({
   item,
@@ -71,11 +72,13 @@ export function SearchResultCard({
   userId,
   canFollow,
   follows,
+  followsReady,
 }: {
   item: SearchResultItemDto;
   userId: string;
   canFollow: boolean;
-  follows: readonly string[] | undefined;
+  follows: ReadonlySet<string>;
+  followsReady: boolean;
 }) {
   const format = useFormatter();
   const { entityType, entityId } = item;
@@ -148,8 +151,8 @@ export function SearchResultCard({
           item={item}
           target={target}
           userId={userId}
-          ready={Boolean(follows)}
-          followed={follows?.includes(followKey(target)) ?? false}
+          ready={followsReady}
+          followed={follows.has(followKey(target))}
         />
       )}
     </Stack>

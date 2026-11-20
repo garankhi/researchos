@@ -14,6 +14,7 @@ import { LockKeyhole, SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { ErrorState, RouteFeedback } from '@/components/ui/feedback';
+import { FollowButton } from '@/features/follow';
 import { useOutput } from '../hooks/use-output';
 import { useOutputCapability } from '../hooks/use-output-capability';
 import { useOutputFiles } from '../hooks/use-output-files';
@@ -22,7 +23,6 @@ import { OutputAbstract } from './output-abstract';
 import {
   OutputDownloadPrimaryButton,
   OutputFiles,
-  OutputFollowButton,
   OutputShareButton,
 } from './output-actions';
 import { OutputDetailActionsMenu } from './output-detail-actions-menu';
@@ -140,7 +140,14 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
               groupName={groupQuery.groupName}
               groupLoading={groupQuery.isLoading}
               hasFullText={Boolean(files && files.length > 0)}
-              followSlot={<OutputFollowButton output={output} />}
+              followSlot={
+                output.accessGroupId ? (
+                  <FollowButton
+                    entityType="GROUP"
+                    entityId={output.accessGroupId}
+                  />
+                ) : null
+              }
             />
 
             <Flex

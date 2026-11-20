@@ -203,6 +203,7 @@
       "outputs": "Nghiên cứu",
       "groups": "Nhóm nghiên cứu",
       "interests": "Lĩnh vực",
+      "following": "Đang theo dõi",
       "applications": "Ứng tuyển",
       "openalex": "OpenAlex"
     },
@@ -910,5 +911,32 @@
     },
     "loadMore": "Tải thêm",
     "chooseRevision": "Chọn phiên bản đã phát hành"
+  },
+  "follow": {
+    "follow": "Theo dõi",
+    "following": "Đang theo dõi",
+    "unfollowActionShort": "Bỏ theo dõi",
+    "unfollowAction": "Bỏ theo dõi {name}",
+    "updating": "Đang cập nhật…",
+    "followedToast": "Bạn đang theo dõi mục tiêu này.",
+    "unfollowedToast": "Bạn đã bỏ theo dõi mục tiêu này.",
+    "actionFailed": "Không thể cập nhật theo dõi. Vui lòng thử lại.",
+    "entityTypes": {
+      "RESEARCHER": "Nhà nghiên cứu",
+      "GROUP": "Nhóm",
+      "TOPIC": "Chủ đề",
+      "PROJECT": "Dự án",
+      "OUTPUT": "Công trình"
+    },
+    "list": {
+      "title": "Đang theo dõi",
+      "loadError": "Không thể tải danh sách theo dõi.",
+      "emptyTitle": "Chưa theo dõi mục tiêu nào",
+      "emptyMessage": "Hãy theo dõi một nhà nghiên cứu, một nhóm hoặc một chủ đề để xem tại đây.",
+      "loading": "Đang tải danh sách theo dõi…",
+      "pageInfo": "Trang {page} / {totalPages}",
+      "previous": "Trước",
+      "next": "Sau"
+    }
   }
 }

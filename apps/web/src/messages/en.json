@@ -197,6 +197,7 @@
       "outputs": "Research",
       "groups": "Groups",
       "interests": "Disciplines",
+      "following": "Following",
       "applications": "Applications",
       "openalex": "OpenAlex"
     },
@@ -904,5 +905,32 @@
     },
     "loadMore": "Load more",
     "chooseRevision": "Choose a released revision"
+  },
+  "follow": {
+    "follow": "Follow",
+    "following": "Following",
+    "unfollowActionShort": "Unfollow",
+    "unfollowAction": "Stop following {name}",
+    "updating": "Updating…",
+    "followedToast": "You are now following this target.",
+    "unfollowedToast": "You stopped following this target.",
+    "actionFailed": "Could not update the follow. Please try again.",
+    "entityTypes": {
+      "RESEARCHER": "Researcher",
+      "GROUP": "Group",
+      "TOPIC": "Topic",
+      "PROJECT": "Project",
+      "OUTPUT": "Output"
+    },
+    "list": {
+      "title": "Following",
+      "loadError": "Could not load the following list.",
+      "emptyTitle": "Not following anything yet",
+      "emptyMessage": "Follow a researcher, a group or a topic to see it here.",
+      "loading": "Loading the following list…",
+      "pageInfo": "Page {page} of {totalPages}",
+      "previous": "Previous",
+      "next": "Next"
+    }
   }
 }
