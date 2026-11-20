@@ -12,6 +12,7 @@ export { FollowListRow } from './components/follow-list-row';
 export { useFollow } from './hooks/use-follow';
 export { useFollowKeys, followKey } from './hooks/use-follow-keys';
 export { useFollows } from './hooks/use-follows';
+export { applyFollowToCache } from './hooks/follow-cache';
 export { followListKey } from './hooks/follow-query-keys';
 export type {
   Follow,

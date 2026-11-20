@@ -187,7 +187,7 @@ function SearchResults({
   issue: ReturnType<typeof searchTermError>;
 }) {
   const t = useTranslations('search');
-  const follows = useFollowKeys();
+  const follows = useFollowKeys(user.id);
 
   return (
     <>

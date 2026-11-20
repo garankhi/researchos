@@ -1,13 +1,10 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  followControllerCreate,
-  followControllerRemove,
-} from '@/lib/api';
+import { followControllerCreate, followControllerRemove } from '@/lib/api';
 import { apiStatusCode } from '@/lib/api-error';
 import type { FollowTargetDto } from '@/lib/api/models';
-import { followListKey } from '@/features/follow';
+import { applyFollowToCache } from '@/features/follow';
 
 /**
  * Changes one follow on behalf of the search results.
@@ -19,7 +16,6 @@ import { followListKey } from '@/features/follow';
  */
 export function useChangeSearchFollow(userId: string) {
   const queryClient = useQueryClient();
-  const queryKey = followListKey(userId);
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -43,10 +39,11 @@ export function useChangeSearchFollow(userId: string) {
         if (apiStatusCode(error) !== 409) throw error;
       }
     },
-    onSuccess: async () => {
-      // The follow feature owns the list's shape, so the cache is left to
-      // it: invalidating re-reads the caller's follows from the API.
-      await queryClient.invalidateQueries({ queryKey });
+    onSuccess: async (_, { target, follow }) => {
+      // The cached list is the shared source of truth, so the change is
+      // written to it directly: every surface reading it re-renders at
+      // once, without waiting for a refetch.
+      applyFollowToCache(queryClient, userId, target, follow);
     },
   });
 

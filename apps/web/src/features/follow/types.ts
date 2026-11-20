@@ -5,10 +5,7 @@
  * field rename surfaces here first.
  */
 
-import type {
-  FollowDto,
-  FollowEntityType,
-} from '@/lib/api/models';
+import type { FollowDto, FollowEntityType } from '@/lib/api/models';
 
 /**
  * The kinds of entity a researcher can follow.
@@ -17,7 +14,11 @@ import type {
  * followable today: `PROJECT` and `OUTPUT` are reserved and the API answers
  * `follow_target_type_unsupported` for them.
  */
-export const FOLLOWABLE_ENTITY_TYPES = ['RESEARCHER', 'GROUP', 'TOPIC'] as const;
+export const FOLLOWABLE_ENTITY_TYPES = [
+  'RESEARCHER',
+  'GROUP',
+  'TOPIC',
+] as const;
 
 /** A followable entity type. */
 export type FollowableEntityType = (typeof FOLLOWABLE_ENTITY_TYPES)[number];

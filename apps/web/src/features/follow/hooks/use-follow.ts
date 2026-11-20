@@ -8,6 +8,7 @@ import {
   useFollowControllerFindAll,
 } from '@/lib/api';
 import { apiStatusCode } from '@/lib/api-error';
+import { applyFollowToCache } from './follow-cache';
 import { followListKey, followListParams } from './follow-query-keys';
 import type { FollowableEntityType } from '../types';
 
@@ -60,10 +61,9 @@ export function useFollow({
 
   const isFollowing = Boolean(
     entityId &&
-      listQuery.data?.items?.some(
-        (item) =>
-          item.entityType === entityType && item.entityId === entityId,
-      ),
+    listQuery.data?.items?.some(
+      (item) => item.entityType === entityType && item.entityId === entityId,
+    ),
   );
 
   const createMutation = useMutation({
@@ -91,56 +91,9 @@ export function useFollow({
     target: { entityType: FollowableEntityType; entityId: string },
     following: boolean,
   ) => {
-    if (!viewerId || !listKey) return;
+    if (!viewerId) return;
 
-    queryClient.setQueryData<typeof listQuery.data>(
-      listKey,
-      (current) => {
-        if (!current) return current;
-
-        if (!following) {
-          return {
-            ...current,
-            items: current.items.filter(
-              (item) =>
-                !(
-                  item.entityType === target.entityType &&
-                  item.entityId === target.entityId
-                ),
-            ),
-            meta: {
-              ...current.meta,
-              total: Math.max(0, current.meta.total - 1),
-            },
-          };
-        }
-
-        // The follow was just created, so the list has no entry for it yet.
-        // A placeholder keeps the button's state correct until the next
-        // refetch replaces it with the server's own row.
-        const alreadyListed = current.items.some(
-          (item) =>
-            item.entityType === target.entityType &&
-            item.entityId === target.entityId,
-        );
-        if (alreadyListed) return current;
-
-        return {
-          ...current,
-          items: [
-            ...current.items,
-            {
-              entityType: target.entityType,
-              entityId: target.entityId,
-              followedAt: new Date().toISOString(),
-              displayName: '',
-              state: '',
-            },
-          ],
-          meta: { ...current.meta, total: current.meta.total + 1 },
-        };
-      },
-    );
+    applyFollowToCache(queryClient, viewerId, target, following);
   };
 
   const mutation = isFollowing ? removeMutation : createMutation;

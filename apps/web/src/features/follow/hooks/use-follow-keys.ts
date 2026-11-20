@@ -11,9 +11,10 @@ import { followListKey, followListParams } from './follow-query-keys';
  * following list — needs to ask "do I follow this one?" for each row. A
  * key makes that a set lookup instead of a scan.
  */
-export function followKey(
-  target: { entityType: string; entityId: string },
-): string;
+export function followKey(target: {
+  entityType: string;
+  entityId: string;
+}): string;
 export function followKey(entityType: string, entityId: string): string;
 export function followKey(
   targetOrType: { entityType: string; entityId: string } | string,
@@ -32,18 +33,23 @@ export function followKey(
  * know what the caller follows — the follow button, the following list,
  * the search results — reads this one cached request, so the three agree
  * and a change in one is visible in the others.
+ *
+ * @param viewerId The signed-in researcher's id. A surface that already
+ *   knows the viewer — the search page, which receives the viewer from the
+ *   server — passes it in, so the hook does not have to wait for the
+ *   session to resolve. When it is omitted, the session is used.
  */
-export function useFollowKeys() {
-  const viewer = useCurrentUser();
-  const viewerId = viewer?.id ?? null;
+export function useFollowKeys(viewerId?: string) {
+  const session = useCurrentUser();
+  const id = viewerId ?? session?.id ?? null;
 
   const query = useFollowControllerFindAll(followListParams, {
     query: {
       // The key is scoped by the viewer and matches the key the follow
       // mutation writes to, so the search results and the detail views
       // always read the same state.
-      queryKey: viewerId ? followListKey(viewerId) : undefined,
-      enabled: Boolean(viewerId),
+      queryKey: id ? followListKey(id) : undefined,
+      enabled: Boolean(id),
       staleTime: 30_000,
     },
   });
@@ -60,7 +66,7 @@ export function useFollowKeys() {
     /** Whether the follow state is known yet. */
     isReady: Boolean(query.data),
     /** Whether the caller may follow at all. */
-    canFollow: Boolean(viewer?.roles?.includes('RESEARCHER')),
+    canFollow: Boolean(session?.roles?.includes('RESEARCHER')),
     /** The failed request, if any. */
     error: query.error,
     /** Refetches the caller's follow list. */

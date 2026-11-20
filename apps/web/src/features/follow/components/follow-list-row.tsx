@@ -16,11 +16,7 @@ import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { useFollow } from '../hooks/use-follow';
-import type {
-  Follow,
-  FollowableEntityType,
-  FollowEntityType,
-} from '../types';
+import type { Follow, FollowableEntityType, FollowEntityType } from '../types';
 
 /**
  * The route of a followed entity.

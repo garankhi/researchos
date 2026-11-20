@@ -85,7 +85,11 @@ export function FollowButton({
       </Button>
       {follow.error ? (
         <Text textStyle="xs" color="fg.error" role="alert">
-          {resolveErrorCode(tError, apiErrorCode(follow.error), t('actionFailed'))}
+          {resolveErrorCode(
+            tError,
+            apiErrorCode(follow.error),
+            t('actionFailed'),
+          )}
         </Text>
       ) : null}
     </Flex>

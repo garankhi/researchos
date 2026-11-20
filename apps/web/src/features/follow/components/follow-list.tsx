@@ -20,7 +20,10 @@ export function FollowList() {
   if (!isLoaded && isFailed) {
     return (
       <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '6' }}>
-        <ErrorState title={t('list.loadError')} onRetry={() => void refetch()} />
+        <ErrorState
+          title={t('list.loadError')}
+          onRetry={() => void refetch()}
+        />
       </Box>
     );
   }
