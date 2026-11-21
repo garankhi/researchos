@@ -57,6 +57,15 @@ Nếu cổng web/API đang có ứng dụng khác dùng, cần chọn cổng tr�
 Worker chạy BullMQ bằng application context, không mở HTTP port. Chạy
 `pnpm dev:worker` ở terminal khác; xem [queue và kiểm thử](./docs/queues.md).
 
+### Bật GROBID cho gợi ý metadata Article
+
+Chạy `docker compose --profile grobid up -d grobid`. Khi
+`http://127.0.0.1:8070/api/isalive` trả `true`, đặt
+`ARTICLE_PDF_GROBID_URL=http://127.0.0.1:8070` trong `apps/worker/.env`
+và khởi động lại worker. Đổi URL tương ứng nếu đặt `GROBID_PORT` khác.
+GROBID chạy trên loopback ở local. Khi triển khai, dùng địa chỉ mạng nội bộ
+của worker. Bỏ biến URL để chỉ dùng parser của ResearchOS.
+
 `pnpm infra:down` dừng Docker và giữ dữ liệu trong volume. Khi deploy, server
 sẽ có Docker, biến môi trường và volume riêng; không dùng lại dữ liệu local.
 Xem [thiết lập database](./docs/database.md) và [GitHub](./docs/github.md).
