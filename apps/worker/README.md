@@ -191,3 +191,42 @@ An explicit `vi` preference selects Vietnamese.
   then correlate `background_jobs` and the DLQ using the job ID and generation.
   A generic retry does not reset the digest's five-attempt limit or reopen a
   permanently rejected delivery.
+## Article Topic suggestions
+
+Apply the database migrations, deploy all workers, then deploy the API. Earlier
+worker versions route unknown jobs to the general queue, so restart those workers
+before the API can submit Topic suggestions.
+
+For a local worker running on the host, start the optional private Ollama service
+and provision Qwen.
+
+```powershell
+docker compose --profile topic-suggestions up -d ollama
+docker compose exec ollama ollama pull qwen3-embedding:0.6b
+(Invoke-RestMethod http://127.0.0.1:11434/api/tags).models |
+  Where-Object name -EQ 'qwen3-embedding:0.6b' |
+  Select-Object name,digest
+```
+
+Set `OLLAMA_EMBEDDING_DIGEST` to the reported digest before starting the worker.
+For containerized deployment, keep Ollama on a private service network and set
+`OLLAMA_BASE_URL` to its internal address. The Compose profile binds Ollama to
+loopback and disables cloud features. The model is stored in a dedicated volume.
+
+The first worker with a new configured digest seeds the queue of active Topics.
+It publishes the index once those rows have been processed. An input that fails
+three times is excluded from ranking until the Topic is edited. Model outages
+leave the affected batch queued for retry. Topic writes enqueue
+only the affected IDs through the database trigger. Older versions are retained
+for rollback. When retiring an index version, remove its row from
+`topic_embedding_indexes` to cascade its derived embeddings. Coordinate a model
+upgrade by stopping the current embedding worker before replacing the Ollama tag,
+then restart with the newly provisioned model digest.
+
+The authenticated suggestion route returns a request ID. Poll the status route
+until it reports `ready` or `unavailable`. Workers with a configured Ollama
+model consume the suggestion queue. The worker clears the draft text on
+completion. The API sweeps expired draft text even during a worker outage and
+clears result records after ten minutes. Before production, measure end-to-end
+p95 from submit to result and Hit@5 on reviewed Vietnamese and English abstracts
+with internal Topic IDs. Record cold and warm runs separately on the intended server.
