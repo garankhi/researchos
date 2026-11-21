@@ -29,10 +29,9 @@ import { useHubCollection } from '../hooks/use-group-hub';
 import type { OutputLink } from '../types';
 import {
   HubAction,
-  HubForm,
+  HubEditor,
   HubList,
   HubMenu,
-  HubModal,
   HubSection,
 } from './hub-controls';
 
@@ -185,21 +184,6 @@ function GroupOutputCard({
 
 function LinkOutput({ groupId }: { groupId: string }) {
   const t = useTranslations('groups');
-  return (
-    <HubModal label={t('linkOutput')} title={t('linkOutput')}>
-      {(close) => <LinkOutputForm groupId={groupId} onSaved={close} />}
-    </HubModal>
-  );
-}
-
-function LinkOutputForm({
-  groupId,
-  onSaved,
-}: {
-  groupId: string;
-  onSaved: () => void;
-}) {
-  const t = useTranslations('groups');
   const user = useCurrentUser();
   const selection = useForm({ defaultValues: { outputId: '' } });
   const outputId = useWatch({ control: selection.control, name: 'outputId' });
@@ -217,85 +201,83 @@ function LinkOutputForm({
       (output) =>
         output.sharingStatus === 'SHARED' && output.currentRevision?.releasedAt,
     ) ?? [];
-  if (outputs.isPending) return <GroupLineSkeleton />;
-  if (outputs.isError)
-    return (
-      <ErrorState
-        title={t('loadError')}
-        onRetry={() => void outputs.refetch()}
-      />
-    );
+
+  // The revisions are the submitted fields, and they only exist once an
+  // output is chosen. Until then the editor has nothing to submit.
+  const revisionFields = revisions.data
+    ? [
+        {
+          name: 'revisionId',
+          label: t('chooseRevision'),
+          required: true,
+          options: [
+            { value: '', label: t('chooseRevision') },
+            ...revisions.data
+              .filter((revision) => revision.releasedAt)
+              .map((revision) => ({
+                value: revision.id,
+                label:
+                  t('revision', { number: revision.revisionNo }) +
+                  ': ' +
+                  revision.title,
+              })),
+          ],
+        },
+        {
+          name: 'decisionNote',
+          label: t('note'),
+          type: 'textarea' as const,
+          max: 2000,
+        },
+      ]
+    : [];
+
   return (
-    <Stack gap="3">
-      <FormSelect
-        name="outputId"
-        control={selection.control}
-        label={t('output')}
-      >
-        <option value="">{t('chooseOutput')}</option>
-        {available.map((output) => (
-          <option key={output.id} value={output.id}>
-            {output.currentRevision?.title ?? output.id}
-          </option>
-        ))}
-      </FormSelect>
-      {outputs.hasNextPage ? (
-        <Button
-          variant="outline"
-          loading={outputs.isFetchingNextPage}
-          onClick={() => void outputs.fetchNextPage()}
+    <HubEditor
+      groupId={groupId}
+      label={t('linkOutput')}
+      title={t('linkOutput')}
+      fields={revisionFields}
+      resetKey={outputId}
+      submit={(values) =>
+        groupOutputLinksControllerRequest(groupId, {
+          outputId,
+          revisionId: values.revisionId,
+          decisionNote: values.decisionNote || null,
+        })
+      }
+    >
+      <Stack gap="3">
+        <FormSelect
+          name="outputId"
+          control={selection.control}
+          label={t('output')}
         >
-          {t('loadMore')}
-        </Button>
-      ) : null}
-      {outputId && revisions.isPending ? <GroupLineSkeleton /> : null}
-      {outputId && revisions.isError ? (
-        <ErrorState
-          title={t('loadError')}
-          onRetry={() => void revisions.refetch()}
-        />
-      ) : null}
-      {outputId && revisions.data ? (
-        <HubForm
-          key={outputId}
-          groupId={groupId}
-          onSaved={onSaved}
-          title={t('linkOutput')}
-          fields={[
-            {
-              name: 'revisionId',
-              label: t('chooseRevision'),
-              required: true,
-              options: [
-                { value: '', label: t('chooseRevision') },
-                ...revisions.data
-                  .filter((revision) => revision.releasedAt)
-                  .map((revision) => ({
-                    value: revision.id,
-                    label:
-                      t('revision', { number: revision.revisionNo }) +
-                      ': ' +
-                      revision.title,
-                  })),
-              ],
-            },
-            {
-              name: 'decisionNote',
-              label: t('note'),
-              type: 'textarea',
-              max: 2000,
-            },
-          ]}
-          submit={(values) => {
-            return groupOutputLinksControllerRequest(groupId, {
-              outputId,
-              revisionId: values.revisionId,
-              decisionNote: values.decisionNote || null,
-            });
-          }}
-        />
-      ) : null}
-    </Stack>
+          <option value="">{t('chooseOutput')}</option>
+          {available.map((output) => (
+            <option key={output.id} value={output.id}>
+              {output.currentRevision?.title ?? output.id}
+            </option>
+          ))}
+        </FormSelect>
+        {outputs.hasNextPage ? (
+          <Button
+            variant="outline"
+            loading={outputs.isFetchingNextPage}
+            onClick={() => void outputs.fetchNextPage()}
+          >
+            {t('loadMore')}
+          </Button>
+        ) : null}
+        {outputId && revisions.isPending ? <GroupLineSkeleton /> : null}
+        {outputId && revisions.isError ? (
+          <ErrorState
+            title={t('loadError')}
+            onRetry={() => void revisions.refetch()}
+          />
+        ) : null}
+      </Stack>
+    </HubEditor>
   );
 }
 

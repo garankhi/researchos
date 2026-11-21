@@ -25,6 +25,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CreateResearchGroupDto } from './dto/create-research-group.dto.js';
 import { ListResearchGroupsQueryDto } from './dto/list-research-groups.query.dto.js';
 import { PaginatedResearchGroupsResponseDto } from './dto/paginated-research-groups-response.dto.js';
+import { GroupPreviewResponseDto } from './dto/group-preview-response.dto.js';
 import { ResearchGroupResponseDto } from './dto/research-group-response.dto.js';
 import { UpdateResearchGroupDto } from './dto/update-research-group.dto.js';
 import { GroupsService } from './groups.service.js';
@@ -121,6 +122,37 @@ export class GroupsController {
     @CurrentUserId() callerId: string,
   ): Promise<ResearchGroupResponseDto> {
     return this.groupsService.findOne(groupId, callerId);
+  }
+
+  @ApiOperation({
+    summary: 'Get the quick information a hover card shows about a group',
+    description:
+      "Returns the group's name, its description and its published research directions. The card is a summary — the full group record is served by the group detail endpoint.",
+  })
+  @ApiParam({
+    name: 'groupId',
+    description: 'Unique identifier of the research group (UUID).',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Research group preview retrieved successfully.',
+    type: GroupPreviewResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'The provided groupId is not a valid UUID.',
+  })
+  @ApiForbiddenResponse({
+    description: 'Caller is not allowed to view this research group.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested research group was not found.',
+  })
+  @Get(':groupId/preview')
+  async preview(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<GroupPreviewResponseDto> {
+    return this.groupsService.preview(groupId, callerId);
   }
 
   @ApiOperation({

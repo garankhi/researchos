@@ -9,7 +9,6 @@ import {
   Flex,
   HStack,
   IconButton,
-  Link,
   Stack,
   Text,
 } from '@chakra-ui/react';
@@ -26,7 +25,6 @@ import {
 } from 'react';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
-import NextLink from '@/components/ui/link';
 import { getPathname } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { apiErrorCode } from '@/lib/api-error';
@@ -54,6 +52,7 @@ import {
   type ImagePreviewTarget,
 } from './image-preview-modal';
 import { NewConversationDialog } from './new-conversation-dialog';
+import { EntityLink } from '@/features/discovery';
 
 type RoomEventBridge = {
   onMessageCreated?: ReturnType<typeof useChatRoom>['handleLiveMessageCreated'];
@@ -303,18 +302,13 @@ function ActiveConversationPane({
 
             <Box minW="0">
               {directPartner ? (
-                <Link
-                  asChild
-                  fontWeight="semibold"
-                  textStyle="sm"
-                  layerStyle="researchTextLink"
-                  display="block"
-                  truncate
+                <EntityLink
+                  entityType="RESEARCHER"
+                  entityId={directPartner.userId}
+                  href={`/profile/${directPartner.userId}`}
                 >
-                  <NextLink href={`/profile/${directPartner.userId}`}>
-                    {activeTitle || '—'}
-                  </NextLink>
-                </Link>
+                  {activeTitle || '—'}
+                </EntityLink>
               ) : (
                 <Text fontWeight="semibold" textStyle="sm" truncate>
                   {activeTitle || '—'}

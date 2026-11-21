@@ -7,7 +7,7 @@
  */
 
 /**
- * Formatted author names, researcher full name, group leader name, or opportunity creator name.
+ * Formatted author names, researcher full name, group leader name, or publishing group name.
  * @nullable
  */
 export type SearchResultItemDtoAuthorsText = { [key: string]: unknown } | null;

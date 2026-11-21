@@ -38,6 +38,7 @@ import { resolveErrorCode } from '@/utils/error-messages';
 import type { ChatParticipantPayload, ChatUiMessage } from '../types';
 import { resolveAuthorizedAttachmentUrl } from '../utils/attachment-upload';
 import { initialsForChatName } from '../utils/message-state';
+import { EntityLink } from '@/features/discovery';
 
 function formatByteSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -385,16 +386,13 @@ export function MessageItem({
       {/* Sender name for group chats on first message */}
       {!isOwn && isGroup && isFirstInGroup && (
         <HStack gap="2" textStyle="xs" color="fg.muted" pl="38px" mb="1">
-          <Link
-            asChild
-            fontWeight="semibold"
-            color="fg"
-            layerStyle="researchTextLink"
+          <EntityLink
+            entityType="RESEARCHER"
+            entityId={message.senderId}
+            href={`/profile/${message.senderId}`}
           >
-            <NextLink href={`/profile/${message.senderId}`}>
-              {senderName}
-            </NextLink>
-          </Link>
+            {senderName}
+          </EntityLink>
           <Text>
             {format.dateTime(new Date(message.createdAt), {
               hour: '2-digit',

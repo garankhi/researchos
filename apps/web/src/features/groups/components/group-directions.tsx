@@ -18,10 +18,9 @@ import { ErrorState } from '@/components/ui/feedback';
 import type { Direction } from '../types';
 import {
   HubAction,
-  HubForm,
+  HubEditor,
   HubList,
   HubMenu,
-  HubModal,
   HubSection,
 } from './hub-controls';
 
@@ -31,32 +30,6 @@ function DirectionEditor({
 }: {
   groupId: string;
   direction?: Direction;
-}) {
-  const t = useTranslations('groups');
-  return (
-    <HubModal
-      label={direction ? t('edit') : t('publishDirection')}
-      title={direction ? t('editDirection') : t('publishDirection')}
-    >
-      {(close) => (
-        <DirectionForm
-          groupId={groupId}
-          direction={direction}
-          onSaved={close}
-        />
-      )}
-    </HubModal>
-  );
-}
-
-function DirectionForm({
-  groupId,
-  direction,
-  onSaved,
-}: {
-  groupId: string;
-  direction?: Direction;
-  onSaved: () => void;
 }) {
   const t = useTranslations('groups');
   const [topicId, setTopicId] = useState<string | null>(
@@ -75,10 +48,11 @@ function DirectionForm({
   const selectedTopic = useTaxonomyControllerFindOneTopic(topicId ?? '', {
     query: { enabled: Boolean(topicId && !topicLabel) },
   });
+
   return (
-    <HubForm
+    <HubEditor
       groupId={groupId}
-      onSaved={onSaved}
+      label={direction ? t('edit') : t('publishDirection')}
       title={direction ? t('editDirection') : t('publishDirection')}
       fields={[
         {
@@ -153,7 +127,7 @@ function DirectionForm({
           ))}
         </Stack>
       )}
-    </HubForm>
+    </HubEditor>
   );
 }
 

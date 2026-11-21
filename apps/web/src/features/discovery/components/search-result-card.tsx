@@ -1,22 +1,14 @@
 'use client';
 
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  Link,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Button, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { FieldError } from '@/components/ui/feedback';
-import NextLink from '@/components/ui/link';
 import type { FollowTargetDto, SearchResultItemDto } from '@/lib/api/models';
 import { followKey } from '@/features/follow';
 import { entityHref } from '../entity-href';
+import { EntityLink } from './entity-link';
 import { useChangeSearchFollow } from '../hooks/use-search-follows';
 
 function FollowButton({
@@ -82,6 +74,7 @@ export function SearchResultCard({
   followsReady: boolean;
 }) {
   const format = useFormatter();
+  const t = useTranslations('search');
   const { entityType, entityId } = item;
   const isResearcher = entityType === 'RESEARCHER';
   /**
@@ -89,6 +82,26 @@ export function SearchResultCard({
    * to it. A result the reader cannot open is a dead end.
    */
   const href = entityHref(entityType, entityId);
+  /**
+   * The subtitle names an entity too — a group's leader, or the group
+   * that published an opportunity — so it links to that entity as well.
+   *
+   * The generated id type is a nullable uuid, which arrives as a plain
+   * string on the wire; the same guard the output screens use keeps it
+   * one. Both the type and the id are needed for the link, so they are
+   * resolved together.
+   */
+  const subtitleEntityType = item.subtitleEntityType;
+  const subtitleEntityId =
+    typeof item.subtitleEntityId === 'string' ? item.subtitleEntityId : null;
+  const subtitle =
+    subtitleEntityType && subtitleEntityId
+      ? {
+          entityType: subtitleEntityType,
+          entityId: subtitleEntityId,
+          href: entityHref(subtitleEntityType, subtitleEntityId),
+        }
+      : null;
   const target: FollowTargetDto | undefined =
     canFollow &&
     (entityType === 'GROUP' || (isResearcher && entityId !== userId))
@@ -105,9 +118,13 @@ export function SearchResultCard({
             overflowWrap="anywhere"
           >
             {href ? (
-              <Link asChild color="fg">
-                <NextLink href={href}>{item.title}</NextLink>
-              </Link>
+              <EntityLink
+                entityType={entityType}
+                entityId={entityId}
+                href={href}
+              >
+                {item.title}
+              </EntityLink>
             ) : (
               item.title
             )}
@@ -116,7 +133,23 @@ export function SearchResultCard({
             item.authorsText &&
             item.authorsText !== item.title && (
               <Text textStyle="sm" color="fg.muted" overflowWrap="anywhere">
-                {item.authorsText}
+                {/*
+                 * A group's subtitle names its leader and an
+                 * opportunity's names the group that published it. Both
+                 * are entities with a screen, so both link to it.
+                 */}
+                {entityType === 'GROUP' ? `${t('groupLeaderLabel')} ` : null}
+                {subtitle?.href ? (
+                  <EntityLink
+                    entityType={subtitle.entityType}
+                    entityId={subtitle.entityId}
+                    href={subtitle.href}
+                  >
+                    {item.authorsText}
+                  </EntityLink>
+                ) : (
+                  item.authorsText
+                )}
               </Text>
             )}
           {typeof item.body === 'string' && item.body && (

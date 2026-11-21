@@ -11,6 +11,11 @@ function item(
   entityType: SearchResultItemDto['entityType'],
   entityId: string,
   title: string,
+  subtitle?: {
+    authorsText: string;
+    subtitleEntityType: SearchResultItemDto['subtitleEntityType'];
+    subtitleEntityId: string;
+  },
 ): SearchResultItemDto {
   return {
     entityType,
@@ -23,10 +28,13 @@ function item(
     // The generated type is wider than the wire: the API sends a string
     // here, and the card narrows it at runtime.
     body: 'A short description of the entity.' as unknown as SearchResultItemDto['body'],
-    authorsText:
-      'Minh Nguyen, Linh Tran' as unknown as SearchResultItemDto['authorsText'],
+    authorsText: (subtitle?.authorsText ??
+      'Minh Nguyen, Linh Tran') as unknown as SearchResultItemDto['authorsText'],
     rank: 1,
     updatedAt: '2026-02-01T12:00:00.000Z',
+    subtitleEntityType: subtitle?.subtitleEntityType ?? null,
+    subtitleEntityId: (subtitle?.subtitleEntityId ??
+      null) as unknown as SearchResultItemDto['subtitleEntityId'],
   };
 }
 
@@ -117,5 +125,59 @@ export const EveryResultLinksToItsScreen: Story = {
     await expect(
       canvas.getByRole('link', { name: 'An opportunity' }),
     ).toHaveAttribute('href', '/en/opportunities/opportunity-1');
+  },
+};
+
+/**
+ * The subtitle of a result names an entity too: a group's names its
+ * leader, an opportunity's names the group that published it. Both link
+ * to the screen of the entity they name.
+ */
+export const SubtitleLinksToItsEntity: Story = {
+  args: {
+    item: item('GROUP', 'group-1', 'Robotics Lab', {
+      authorsText: 'Dr. Lead',
+      subtitleEntityType: 'RESEARCHER',
+      subtitleEntityId: 'researcher-9',
+    }),
+  },
+  render: () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <SearchResultCard
+        item={item('GROUP', 'group-1', 'Robotics Lab', {
+          authorsText: 'Dr. Lead',
+          subtitleEntityType: 'RESEARCHER',
+          subtitleEntityId: 'researcher-9',
+        })}
+        userId={userId}
+        canFollow={false}
+        follows={new Set<string>()}
+        followsReady
+      />
+      <SearchResultCard
+        item={item('OPPORTUNITY', 'opportunity-1', 'RA Position in Vision', {
+          authorsText: 'AI & Robotics Lab',
+          subtitleEntityType: 'GROUP',
+          subtitleEntityId: 'group-2',
+        })}
+        userId={userId}
+        canFollow={false}
+        follows={new Set<string>()}
+        followsReady
+      />
+    </div>
+  ),
+  globals: { locale: 'en' },
+  play: async ({ canvas }) => {
+    // A group's leader is labelled, and the name links to their profile.
+    await expect(canvas.getByText('Leader:')).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: 'Dr. Lead' }),
+    ).toHaveAttribute('href', '/en/profile/researcher-9');
+
+    // An opportunity names the group that published it, without a label.
+    await expect(
+      canvas.getByRole('link', { name: 'AI & Robotics Lab' }),
+    ).toHaveAttribute('href', '/en/groups/group-2');
   },
 };

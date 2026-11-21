@@ -1,8 +1,6 @@
 'use client';
 
 import {
-  Button,
-  Dialog,
   IconButton,
   Menu,
   Portal,
@@ -14,6 +12,7 @@ import { Ellipsis, Eye } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
@@ -131,97 +130,64 @@ export function OutputDetailActionsMenu({
         </Portal>
       </Menu.Root>
 
-      <Dialog.Root
+      <ConfirmationModal
         open={dialogOpen}
-        onOpenChange={(details) => {
-          if (!details.open) setDialogOpen(false);
-        }}
-        placement="center"
-        motionPreset="scale"
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content boxShadow="overlayPanel">
-              <Dialog.Header
-                flexDirection="column"
-                alignItems="flex-start"
-                gap="1"
-              >
-                <Dialog.Title>{t('detail.visibilityDialogTitle')}</Dialog.Title>
-                <Dialog.Description textStyle="sm" color="fg.muted">
-                  {t('detail.visibilityDialogDesc')}
-                </Dialog.Description>
-              </Dialog.Header>
+        onClose={() => setDialogOpen(false)}
+        title={t('detail.visibilityDialogTitle')}
+        description={t('detail.visibilityDialogDesc')}
+        body={
+          <>
+            {inlineError ? (
+              <ErrorState
+                title={t('detail.visibilityUpdateError')}
+                message={inlineError}
+              />
+            ) : null}
 
-              <Dialog.Body>
-                <Stack gap="4">
-                  {inlineError ? (
-                    <ErrorState
-                      title={t('detail.visibilityUpdateError')}
-                      message={inlineError}
-                    />
-                  ) : null}
+            <RadioGroup.Root
+              value={selection}
+              onValueChange={(details) =>
+                setSelection(details.value as VisibilityChoice)
+              }
+            >
+              <Stack gap="3">
+                <RadioGroup.Item value="FPTU_COMMUNITY">
+                  <RadioGroup.ItemHiddenInput />
+                  <RadioGroup.ItemIndicator />
+                  <Stack gap="0">
+                    <RadioGroup.ItemText>
+                      {t('detail.visibilityPublicOption')}
+                    </RadioGroup.ItemText>
+                    <Text textStyle="sm" color="fg.muted">
+                      {t('detail.visibilityPublicDesc')}
+                    </Text>
+                  </Stack>
+                </RadioGroup.Item>
 
-                  <RadioGroup.Root
-                    value={selection}
-                    onValueChange={(details) =>
-                      setSelection(details.value as VisibilityChoice)
-                    }
-                  >
-                    <Stack gap="3">
-                      <RadioGroup.Item value="FPTU_COMMUNITY">
-                        <RadioGroup.ItemHiddenInput />
-                        <RadioGroup.ItemIndicator />
-                        <Stack gap="0">
-                          <RadioGroup.ItemText>
-                            {t('detail.visibilityPublicOption')}
-                          </RadioGroup.ItemText>
-                          <Text textStyle="sm" color="fg.muted">
-                            {t('detail.visibilityPublicDesc')}
-                          </Text>
-                        </Stack>
-                      </RadioGroup.Item>
-
-                      <RadioGroup.Item
-                        value="RESEARCH_GROUP"
-                        disabled={!hasGroup}
-                      >
-                        <RadioGroup.ItemHiddenInput />
-                        <RadioGroup.ItemIndicator />
-                        <Stack gap="0">
-                          <RadioGroup.ItemText>
-                            {t('detail.visibilityGroupOption')}
-                          </RadioGroup.ItemText>
-                          <Text textStyle="sm" color="fg.muted">
-                            {hasGroup
-                              ? t('detail.visibilityGroupDesc')
-                              : t('detail.visibilityNoGroupHint')}
-                          </Text>
-                        </Stack>
-                      </RadioGroup.Item>
-                    </Stack>
-                  </RadioGroup.Root>
-                </Stack>
-              </Dialog.Body>
-
-              <Dialog.Footer>
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={isPending}
-                >
-                  {tCommon('cancel')}
-                </Button>
-                <Button onClick={() => void handleSave()} loading={isPending}>
-                  {tCommon('save')}
-                </Button>
-              </Dialog.Footer>
-              <Dialog.CloseTrigger />
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+                <RadioGroup.Item value="RESEARCH_GROUP" disabled={!hasGroup}>
+                  <RadioGroup.ItemHiddenInput />
+                  <RadioGroup.ItemIndicator />
+                  <Stack gap="0">
+                    <RadioGroup.ItemText>
+                      {t('detail.visibilityGroupOption')}
+                    </RadioGroup.ItemText>
+                    <Text textStyle="sm" color="fg.muted">
+                      {hasGroup
+                        ? t('detail.visibilityGroupDesc')
+                        : t('detail.visibilityNoGroupHint')}
+                    </Text>
+                  </Stack>
+                </RadioGroup.Item>
+              </Stack>
+            </RadioGroup.Root>
+          </>
+        }
+        confirmLabel={tCommon('save')}
+        colorPalette="blue"
+        isConfirming={isPending}
+        isConfirmDisabled={selection === output.visibility}
+        onConfirm={() => void handleSave()}
+      />
     </>
   );
 }
