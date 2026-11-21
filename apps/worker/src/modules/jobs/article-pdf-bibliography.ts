@@ -1,98 +1,216 @@
 import { normalizeArticleDoi } from '@researchos/publication-metadata';
+import { comparableArticleText } from './article-pdf-identity.js';
 import {
   abstractHeading,
   endsArticleHeader,
   type PdfHeaderLine,
 } from './article-pdf-layout.js';
 
-const doiLine =
-  /^(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)$/iu;
+const doiLabel = /^(?:doi\s*:\s*|digital object identifier\s*:?\s*)/iu;
+const doiUrl = /^https?:\/\/(?:dx\.)?doi\.org\//iu;
 const citationDoi =
-  /(?:^|\s)(?:doi[ \t]*:[ \t]*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)/giu;
-const citationHeading = /^(?:citation|cite this article)(?:\s*:|$)/iu;
+  /(?:^|\s)(?:doi\s*:\s*|(?=https?:\/\/(?:dx\.)?doi\.org\/))(\S+)/giu;
+const citationHeading = /^(?:citation|cite this article|trích dẫn)(?:\s*:|$)/iu;
 const citationEnd =
-  /^(?:editor|received|accepted|published|copyright|funding|competing interests|data availability(?: statement)?)\s*:/iu;
+  /^(?:editors?|academic editors?|received|accepted|published|copyright|funding|competing interests|data availability(?: statement)?)\s*:/iu;
 const manuscriptHistory =
-  /^(?:received|revised|accepted|ngày nhận|ngày duyệt)(?=\s|:|$)/iu;
+  /^(?:received|revised|accepted|submitted|ngày nhận|ngày duyệt)(?=\s|:|$)/iu;
 const referencesHeading =
   /^(?:(?:\d+|[ivxlcdm]+)[.)]?\s+)?(?:references|bibliography|literature cited|tài liệu tham khảo)\s*[:.]?$/iu;
+const runningImprint =
+  /^\p{L}[\p{L}\p{M}. -]*\s+(?:19|20)\d{2}\s*,\s*\d+\s*,\s*[\p{L}\d.-]+$/u;
+const inlineImprint = /^(.+?)\s+(https?:\/\/(?:dx\.)?doi\.org\/\S+)$/iu;
+const paginatedDoi =
+  /^\p{L}[^|]{0,90}\|\s*doi:\s*(\S+)\s+\p{L}+\s+\d{1,2},\s+\d{4}\s+\d+\s*\/\s*\d+$/iu;
+const keywords = /^(?:keywords?|index terms|từ khóa)(?=$|[\s:])/iu;
 
-function linkedDoi(text: string) {
-  return normalizeArticleDoi(doiLine.exec(text)?.[1]);
+interface BibliographyContext {
+  pageHeight?: number;
+  embeddedDoi?: string | null;
+  teiDoi?: string;
+  title?: string;
+}
+
+function sameMargin(first: PdfHeaderLine, second: PdfHeaderLine) {
+  return Math.abs(first.left - second.left) <= first.height * 1.4;
+}
+
+function continuation(
+  page: readonly PdfHeaderLine[],
+  line: PdfHeaderLine,
+  maxGap = 2.2,
+) {
+  return page.find(
+    (next) =>
+      next.y > line.y &&
+      next.y - line.y <= line.height * maxGap &&
+      sameMargin(line, next),
+  );
+}
+
+function linkedDoi(text: string, next?: string) {
+  if (!doiLabel.test(text) && !doiUrl.test(text)) return undefined;
+  const value = text.replace(doiLabel, '').trim();
+  const doi = normalizeArticleDoi(value);
+  if (doi && !value.endsWith('/')) return doi;
+
+  if (
+    (!value || value.endsWith('/')) &&
+    next &&
+    /^[\p{L}\d][\p{L}\d._;()/+%-]*\.?$/u.test(next)
+  ) {
+    return normalizeArticleDoi(value + next.replace(/\.$/u, ''));
+  }
+  return undefined;
+}
+
+function readSelfCitations(
+  page: readonly PdfHeaderLine[],
+  title: string | undefined,
+) {
+  const normalizedTitle =
+    title && comparableArticleText(title).replace(/\s/gu, '');
+  const dois: string[] = [];
+  const citationLines = new Set<PdfHeaderLine>();
+  for (const line of page) {
+    if (!citationHeading.test(line.text)) continue;
+    const block = [line];
+    let previous = line;
+    for (let count = 0; count < 12; count++) {
+      const next = continuation(page, previous);
+      if (
+        !next ||
+        citationEnd.test(next.text) ||
+        endsArticleHeader(next.text) ||
+        abstractHeading.test(next.text) ||
+        keywords.test(next.text)
+      )
+        break;
+      block.push(next);
+      previous = next;
+    }
+    for (const part of block) citationLines.add(part);
+    const citation = block.map((part) => part.text).join(' ');
+    if (
+      !normalizedTitle ||
+      !comparableArticleText(citation)
+        .replace(/\s/gu, '')
+        .includes(normalizedTitle)
+    )
+      continue;
+    for (const [, source] of citation.matchAll(citationDoi)) {
+      if (source.endsWith('/')) continue;
+      const doi = normalizeArticleDoi(source.replace(/\.$/u, ''));
+      if (doi) dois.push(doi);
+    }
+    for (const [index, part] of block.entries()) {
+      const doi = linkedDoi(part.text, block[index + 1]?.text);
+      if (doi) dois.push(doi);
+    }
+  }
+  return { dois, citationLines };
 }
 
 export function readArticleBibliography(
-  page: readonly PdfHeaderLine[],
-  pageHeight?: number,
-  embeddedDoi?: string | null,
-  teiDoi?: string,
+  firstPage: readonly PdfHeaderLine[],
+  { pageHeight, embeddedDoi, teiDoi, title }: BibliographyContext,
 ): { doi?: string; dateLines: string[] } {
-  const candidates = new Set<string>();
-  const dateLines: string[] = [];
-  let citationLine: PdfHeaderLine | undefined;
-  let inAbstract = false;
-  for (const line of page) {
-    if (endsArticleHeader(line.text)) break;
-    dateLines.push(line.text);
-    if (citationHeading.test(line.text)) {
-      citationLine = line;
-    } else if (
-      citationLine &&
-      Math.abs(line.left - citationLine.left) <= citationLine.height
-    ) {
-      const gap = line.y - citationLine.y;
-      citationLine =
-        gap > 0 &&
-        gap <= citationLine.height * 2 &&
-        !citationEnd.test(line.text) &&
-        !abstractHeading.test(line.text)
-          ? line
-          : undefined;
-    }
-    inAbstract ||= abstractHeading.test(line.text);
-    const standalone = linkedDoi(line.text);
+  const page = [...firstPage].sort((a, b) => a.y - b.y || a.left - b.left);
+  const boundary = page.find(({ text }) => endsArticleHeader(text));
+  const references = page.find(({ text }) => referencesHeading.test(text));
+  const header = boundary ? page.filter(({ y }) => y < boundary.y) : page;
+  const { dois, citationLines } = readSelfCitations(header, title);
+  const candidates = new Set(dois);
+  const dates = new Set<PdfHeaderLine>();
+  let inAbstract: PdfHeaderLine | undefined;
+
+  for (const line of header) {
+    if (abstractHeading.test(line.text)) inAbstract = line;
+    else if (
+      keywords.test(line.text) &&
+      inAbstract &&
+      sameMargin(inAbstract, line)
+    )
+      inAbstract = undefined;
+
+    if (citationLines.has(line) || (inAbstract && sameMargin(inAbstract, line)))
+      continue;
+    dates.add(line);
+    const standalone = linkedDoi(line.text, continuation(header, line)?.text);
     if (standalone) candidates.add(standalone);
-    else if (line === citationLine) {
-      for (const [, source] of line.text.matchAll(citationDoi)) {
-        const doi = normalizeArticleDoi(source.replace(/\.$/u, ''));
-        if (doi) candidates.add(doi);
-      }
-    } else if (
-      !inAbstract &&
-      teiDoi &&
-      normalizeArticleDoi(line.text) === teiDoi
-    ) {
+    else if (!inAbstract && teiDoi && normalizeArticleDoi(line.text) === teiDoi)
       candidates.add(teiDoi);
-    }
   }
 
-  if (pageHeight) {
-    // A publisher can put its article-specific publication block below the
-    // body columns. Require the same margin and a local bibliographic anchor.
+  if (pageHeight && !references) {
     const footer = page.filter(({ y }) => y >= pageHeight * 0.72);
-    const hasReferences = page.some(({ text }) => referencesHeading.test(text));
-    for (const anchor of hasReferences ? [] : footer) {
-      const doi = linkedDoi(anchor.text);
-      if (!doi || (embeddedDoi && embeddedDoi !== doi && !candidates.has(doi)))
-        continue;
+    for (const anchor of footer) {
+      const [, imprint, inlineLink] = inlineImprint.exec(anchor.text) ?? [];
+      const inlineRunningDoi =
+        title && anchor.y >= pageHeight * 0.91
+          ? normalizeArticleDoi(
+              (imprint && runningImprint.test(imprint)
+                ? inlineLink
+                : undefined) ?? paginatedDoi.exec(anchor.text)?.[1],
+            )
+          : undefined;
+      const doi =
+        inlineRunningDoi ??
+        linkedDoi(anchor.text, continuation(footer, anchor)?.text);
+      if (!doi) continue;
       const nearby = footer.filter(
         (line) =>
           Math.abs(line.y - anchor.y) <= anchor.height * 5 &&
-          Math.abs(line.left - anchor.left) <= anchor.height * 1.5,
+          sameMargin(anchor, line),
       );
-      if (!nearby.some(({ text }) => manuscriptHistory.test(text))) continue;
+      const lifecycleFooter = nearby.some(({ text }) =>
+        manuscriptHistory.test(text),
+      );
+      const runningFooter =
+        inlineRunningDoi ||
+        Boolean(
+          title &&
+          anchor.y >= pageHeight * 0.91 &&
+          footer.some(
+            (line) =>
+              Math.abs(line.y - anchor.y) <= anchor.height * 0.5 &&
+              line.right < anchor.left &&
+              runningImprint.test(line.text),
+          ),
+        );
+      if (!lifecycleFooter && !runningFooter) continue;
       candidates.add(doi);
-      dateLines.push(...nearby.map(({ text }) => text));
+      for (const line of nearby) dates.add(line);
+      if (runningFooter) {
+        // Publication details can finish in a separate margin below the main
+        // article heading. Require a nearby manuscript event in that margin.
+        for (const line of footer.filter(({ text }) =>
+          manuscriptHistory.test(text),
+        )) {
+          for (const sibling of footer) {
+            if (
+              Math.abs(sibling.y - line.y) <= line.height * 7 &&
+              sameMargin(line, sibling)
+            )
+              dates.add(sibling);
+          }
+        }
+      }
     }
   }
 
-  const visibleDoi =
-    candidates.size === 1 ? candidates.values().next().value : undefined;
   return {
     doi:
       candidates.size > 1
         ? undefined
-        : (visibleDoi ?? embeddedDoi ?? undefined),
-    dateLines,
+        : (candidates.values().next().value ?? embeddedDoi ?? undefined),
+    dateLines: [...dates]
+      .sort((a, b) => a.y - b.y || a.left - b.left)
+      .map((line) => {
+        const next = continuation(page, line);
+        return next && /[:—–-]\s*$/u.test(line.text)
+          ? line.text + ' ' + next.text
+          : line.text;
+      }),
   };
 }

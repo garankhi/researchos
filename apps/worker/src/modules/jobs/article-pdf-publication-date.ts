@@ -4,17 +4,23 @@ type PublicationEvent = 'online' | 'print' | 'published';
 const publicationLabels: ReadonlyArray<[PublicationEvent, RegExp]> = [
   [
     'online',
-    /^(?:first published online|published online|online publication date|available online|e-?pub|xuất bản trực tuyến)\b/iu,
+    /^(?:first published online|published online|online publication date|available online|e-?pub|xuất bản trực tuyến)(?=$|[\s:–—])/iu,
   ],
   [
     'print',
-    /^(?:published in print|print publication date|xuất bản bản in)\b/iu,
+    /^(?:published in print|print publication date|xuất bản bản in)(?=$|[\s:–—])/iu,
   ],
   [
     'published',
     /^(?:first published|date of publication|publication date|published|ngày xuất bản)(?=\s|:|$)/iu,
   ],
 ];
+const lifecycleLabel =
+  /^(?:date of current version|(?:date of )?(?:receipt|acceptance|submission|revision)|received|submitted|accepted|revised|ngày nhận|ngày duyệt|ngày chấp nhận)(?=$|[\s:–—])/iu;
+// Match separators only before event labels. The comma in "May 16, 2025"
+// and the slashes in numeric dates are part of the value.
+const eventSeparator =
+  /(?:\s*[;,]\s*|\s+\/\s+|(?<=\d{4})\s+)(?=(?:first published|published|(?:date of |online |print )?publication(?: date)?|available online|received|accepted|revised|submitted|date of current version|ngày nhận|ngày duyệt|ngày chấp nhận|ngày xuất bản|xuất bản trực tuyến|xuất bản bản in|e-?pub)(?=$|[\s:–—]))/iu;
 const months = [
   'january',
   'february',
@@ -91,7 +97,13 @@ function readCalendarDate(text: string, vietnamese: boolean) {
 function readPublicationEvents(lines: readonly string[]) {
   const events = new Map<PublicationEvent, Set<string>>();
   for (const line of lines) {
-    for (const part of line.normalize('NFC').split(';')) {
+    const parts = line.normalize('NFC').split(eventSeparator);
+    const first = parts[0].trim();
+    const bibliographyLine =
+      lifecycleLabel.test(first) ||
+      publicationLabels.some(([, label]) => label.test(first));
+    if (!bibliographyLine) continue;
+    for (const part of parts) {
       const text = part.trim();
       for (const [event, label] of publicationLabels) {
         const match = label.exec(text);

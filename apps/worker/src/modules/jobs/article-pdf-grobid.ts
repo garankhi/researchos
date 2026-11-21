@@ -6,6 +6,7 @@ import {
 import type { ArticlePdfMetadata } from '@researchos/queue';
 import { readArticleBibliography } from './article-pdf-bibliography.js';
 import {
+  comparableAbstractText,
   comparableArticleText as comparable,
   generatedTitle,
   selectArticleIdentity,
@@ -14,8 +15,9 @@ import { selectPublicationDate } from './article-pdf-publication-date.js';
 import { SaxesParser, type SaxesAttributeNS } from 'saxes';
 import {
   endsArticleHeader,
+  composeNameDiacritics,
+  matchesArticleHeading,
   personName,
-  publicationMasthead,
   readLabeledAuthors,
   type PdfHeaderLine,
 } from './article-pdf-layout.js';
@@ -339,17 +341,6 @@ function incompleteAbstract(abstract: string | undefined): boolean {
   );
 }
 
-function matchesAbstractText(first: string, second: string): boolean {
-  return unwrapAbstract(first) === unwrapAbstract(second);
-}
-
-function unwrapAbstract(value: string): string {
-  return value
-    .normalize('NFKC')
-    .replace(/-\s+(?=\p{Ll})/gu, '')
-    .replace(/\s+/gu, '');
-}
-
 function suspectByline(
   metadata: ArticlePdfMetadata,
   page: readonly PdfHeaderLine[],
@@ -391,56 +382,52 @@ export function mergeGrobidMetadata(
   const firstPageText = [...evidence.firstPage]
     .sort((a, b) => a.y - b.y || a.left - b.left)
     .map(({ text }) => text)
+    .map(composeNameDiacritics)
     .join('\n');
   const candidate = readGrobidHeader(xml, firstPageText, evidence.firstPage);
-  const visibleBylineText = headerLines(evidence.firstPage)
-    .map(({ text }) => text)
-    .join('\n');
   const suspectAuthors = suspectByline(metadata, evidence.firstPage);
+  const visible = evidence.visibleIdentity ?? {};
+  const printedNames =
+    visible.authorNames ??
+    candidateAuthorNames(candidate.authorNames, visible.undelimitedByline);
   const { title, authorNames } = selectArticleIdentity(
     [
       {
+        origin: 'tei',
+        title: candidate.title,
+        headingMatched:
+          !!candidate.title &&
+          matchesArticleHeading(
+            candidate.title,
+            headerLines(evidence.firstPage),
+          ),
+        authorNames: printedNames ? candidate.authorNames : undefined,
+      },
+      {
+        origin: 'verified',
         title: metadata.title,
         authorNames: suspectAuthors ? undefined : metadata.authorNames,
       },
-      {
-        title:
-          candidate.title && !publicationMasthead.test(candidate.title)
-            ? candidate.title
-            : undefined,
-        authorNames:
-          !suspectAuthors ||
-          candidate.authorNames?.every((name) =>
-            nameOnPage(name, visibleBylineText),
-          )
-            ? candidate.authorNames
-            : undefined,
-      },
     ],
-    evidence.visibleIdentity ?? {},
+    { ...visible, authorNames: printedNames },
   );
-  const visible = evidence.visibleAbstract;
+  const visibleAbstract = evidence.visibleAbstract;
   const tei = candidate.abstract;
-  const recoveredAbstract =
-    visible &&
-    tei &&
-    unwrapAbstract(tei).includes(unwrapAbstract(visible)) &&
-    unwrapAbstract(firstPageText).includes(unwrapAbstract(tei))
-      ? tei
-      : (visible ?? tei);
   const abstract =
-    recoveredAbstract &&
-    (!metadata.abstract ||
-      incompleteAbstract(metadata.abstract) ||
-      matchesAbstractText(metadata.abstract, recoveredAbstract))
-      ? recoveredAbstract
-      : metadata.abstract;
-  const { doi, dateLines } = readArticleBibliography(
-    evidence.firstPage,
-    evidence.firstPageHeight,
-    metadata.doi,
-    candidate.doi,
-  );
+    tei &&
+    visibleAbstract &&
+    comparableAbstractText(tei) === comparableAbstractText(visibleAbstract)
+      ? tei
+      : (visibleAbstract ??
+        (incompleteAbstract(metadata.abstract)
+          ? undefined
+          : metadata.abstract));
+  const { doi, dateLines } = readArticleBibliography(evidence.firstPage, {
+    pageHeight: evidence.firstPageHeight,
+    embeddedDoi: metadata.doi,
+    teiDoi: candidate.doi,
+    title,
+  });
   const publicationDate = selectPublicationDate(
     dateLines,
     metadata.publicationDate,
@@ -452,6 +439,18 @@ export function mergeGrobidMetadata(
     ...(publicationDate && { publicationDate }),
     ...(doi && { doi }),
   };
+}
+
+function candidateAuthorNames(
+  names: string[] | undefined,
+  visibleByline: string | undefined,
+): string[] | undefined {
+  if (!names?.length || !visibleByline) return undefined;
+  // TEI can establish name boundaries in a printed row without separators
+  // only when every character of the row is accounted for in printed order.
+  return comparable(names.join(' ')) === comparable(visibleByline)
+    ? names
+    : undefined;
 }
 
 export type GrobidHeaderInput = {

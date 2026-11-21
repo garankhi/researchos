@@ -8,6 +8,14 @@ export function comparableArticleText(value: string) {
     .trim();
 }
 
+export function comparableAbstractText(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(/[-‐]\s+(?=\p{Ll})/gu, '')
+    .replace(/[‐‑‒–—]/gu, '-')
+    .replace(/\s+/gu, '');
+}
+
 export function generatedTitle(title?: string) {
   return Boolean(
     title &&
@@ -17,11 +25,18 @@ export function generatedTitle(title?: string) {
   );
 }
 
-function matchesTitle(candidate: string, visibleTitle: string) {
-  const embedded = comparableArticleText(candidate);
-  const visible = comparableArticleText(visibleTitle);
-  // One source can wrap the subtitle or only include the main title.
-  return embedded === visible || embedded.startsWith(visible + ' ');
+export const articleTypeLabel =
+  /^(?:(?:original|research|review|full length|invited|regular|special issue|technical) (?:article|paper|report)|short communication|case report|editorial|article)\s*[.:]?$/iu;
+
+export const publicationMasthead =
+  /^(?:(?:the\s+)?(?:[\p{L}-]+\s+){0,3}journal\s+of\b|(?:(?:e-?)?issn|vol(?:ume)?)[\s.:])/iu;
+
+export function articleTitle(value: string): boolean {
+  return (
+    !generatedTitle(value) &&
+    !articleTypeLabel.test(value) &&
+    !publicationMasthead.test(value)
+  );
 }
 
 function nameWords(value: string) {
@@ -64,39 +79,50 @@ function matchesName(candidate: string, visible: string) {
   );
 }
 
+type IdentityCandidate = Pick<ArticlePdfMetadata, 'title' | 'authorNames'> & {
+  origin: 'xmp' | 'pdf-info' | 'tei' | 'verified';
+  headingMatched?: boolean;
+};
+
 export function selectArticleIdentity(
-  sources: readonly Pick<ArticlePdfMetadata, 'title' | 'authorNames'>[],
+  sources: readonly IdentityCandidate[],
   visible: {
     title?: string;
     authorNames?: string[];
     firstByline?: string[];
+    bylineUnresolved?: boolean;
   },
 ): Pick<ArticlePdfMetadata, 'title' | 'authorNames'> {
+  const printedTitle =
+    visible.title && articleTitle(visible.title) ? visible.title : undefined;
   const title =
     sources.find(
-      ({ title }) =>
+      ({ title, origin, headingMatched }) =>
         title &&
-        !generatedTitle(title) &&
-        (!visible.title || matchesTitle(title, visible.title)),
-    )?.title ?? visible.title;
+        articleTitle(title) &&
+        (printedTitle
+          ? comparableArticleText(title) === comparableArticleText(printedTitle)
+          : headingMatched || origin === 'xmp' || origin === 'verified'),
+    )?.title ?? printedTitle;
   const byline = visible.authorNames ?? visible.firstByline;
   const authorNames =
-    sources.find(
-      ({ authorNames }) =>
-        authorNames &&
-        (!byline ||
-          ((visible.authorNames
-            ? authorNames.length === byline.length
-            : authorNames.length >= byline.length) &&
-            byline.every((name, index) =>
-              matchesName(authorNames[index], name),
-            ))),
-    )?.authorNames ?? visible.authorNames;
+    (visible.bylineUnresolved && !visible.authorNames
+      ? undefined
+      : sources.find(
+          ({ authorNames, origin }) =>
+            authorNames &&
+            (byline
+              ? authorNames.length === byline.length &&
+                byline.every((name, index) =>
+                  matchesName(authorNames[index], name),
+                )
+              : origin === 'xmp' || origin === 'verified'),
+        )?.authorNames) ?? visible.authorNames;
   const displayNames = visible.authorNames
     ? authorNames?.map((name, index) => {
         const printed = visible.authorNames![index];
         return nameWords(name).join(' ') === nameWords(printed).join(' ') &&
-          !/\p{M}/u.test(name.normalize('NFD')) &&
+          comparableArticleText(name) !== comparableArticleText(printed) &&
           /\p{M}/u.test(printed.normalize('NFD'))
           ? printed
           : name;

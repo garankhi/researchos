@@ -189,6 +189,48 @@ describe('readGrobidHeader', () => {
   });
 });
 
+describe('article heading corroboration', () => {
+  it('uses article-level TEI in place of an ungrounded title when the full heading is on the page', () => {
+    const firstPage = page(
+      'Review Article',
+      'Measuring the seasonal',
+      'quality of river water',
+      'Mai Nguyen',
+      'Abstract: We study river water.',
+    ).map((line, index) => ({ ...line, height: index < 3 ? 18 : 10 }));
+    const result = mergeGrobidMetadata(
+      { title: 'PROD8826' },
+      { firstPage, hasText: true },
+      tei(
+        '<title level="a">Measuring the seasonal quality of river water</title>',
+      ),
+    );
+    expect(result).toEqual({
+      title: 'Measuring the seasonal quality of river water',
+    });
+  });
+
+  it.each(['Review Article', 'Mai Nguyen', 'Unrelated result'])(
+    'does not accept TEI title %s without article heading evidence',
+    (title) => {
+      expect(
+        mergeGrobidMetadata(
+          {},
+          {
+            firstPage: page(
+              'Review Article',
+              'Mai Nguyen',
+              'Abstract: Unrelated result',
+            ),
+            hasText: true,
+          },
+          tei(`<title level="a">${title}</title>`),
+        ),
+      ).toEqual({});
+    },
+  );
+});
+
 describe('enrichArticlePdfMetadata', () => {
   const settings = {
     endpoint: new URL('http://127.0.0.1:8070/api/processHeaderDocument'),
@@ -210,21 +252,31 @@ describe('enrichArticlePdfMetadata', () => {
       async () =>
         new Response(
           tei(
-            '<title>Different title</title><author><persName><forename>Mai</forename><surname>Nguyen</surname></persName></author>',
+            '<title>Different title</title>' +
+              author('Mai', 'Nguyen') +
+              author('Bao', 'Tran'),
           ),
         ),
     );
     vi.stubGlobal('fetch', fetch);
     const result = await enrichArticlePdfMetadata(
       { title: 'Water clarity', publicationDate: '2025' },
-      evidence,
+      {
+        ...evidence,
+        firstPage: page('Water clarity', 'Mai Nguyen Bao Tran'),
+        visibleIdentity: {
+          title: 'Water clarity',
+          undelimitedByline: 'Mai Nguyen Bao Tran',
+          bylineUnresolved: true,
+        },
+      },
       pdf,
       settings,
       new AbortController().signal,
     );
     expect(result).toEqual({
       title: 'Water clarity',
-      authorNames: ['Mai Nguyen'],
+      authorNames: ['Mai Nguyen', 'Bao Tran'],
       publicationDate: '2025',
     });
     expect(fetch).toHaveBeenCalledExactlyOnceWith(
@@ -399,7 +451,14 @@ describe('enrichArticlePdfMetadata', () => {
       await expect(
         enrichArticlePdfMetadata(
           metadata,
-          { hasText: true, firstPage },
+          {
+            hasText: true,
+            firstPage,
+            visibleIdentity: {
+              title: 'Water clarity',
+              authorNames: ['Mai Nguyen'],
+            },
+          },
           pdf,
           settings,
           new AbortController().signal,
@@ -410,6 +469,34 @@ describe('enrichArticlePdfMetadata', () => {
       });
     },
   );
+
+  it('omits an unresolved byline without losing grounded fields', () => {
+    const firstByline = ['Mai Nguyen', 'Bao Tran', 'An Le'];
+    const result = mergeGrobidMetadata(
+      { title: 'Water clarity', doi: '10.1234/water' },
+      {
+        hasText: true,
+        firstPage: page(
+          'Water clarity',
+          firstByline.join(', ') + ',',
+          'DOI: 10.1234/water',
+        ),
+        visibleIdentity: {
+          title: 'Water clarity',
+          firstByline,
+          bylineUnresolved: true,
+        },
+      },
+      tei(
+        author('Mai', 'Nguyen') +
+          author('Bao', 'Tran') +
+          author('An', 'Le') +
+          author('Thanh', 'Pham') +
+          author('Minh', 'Ho'),
+      ),
+    );
+    expect(result).toEqual({ title: 'Water clarity', doi: '10.1234/water' });
+  });
 
   it('discards a result received after the deadline during header mapping', async () => {
     vi.stubGlobal(
@@ -506,7 +593,10 @@ describe('enrichArticlePdfMetadata', () => {
           abstract:
             'Our measurements arXiv:2005.11401v4 [cs.CL] showed a clear result.',
         },
-        evidence,
+        {
+          ...evidence,
+          visibleAbstract: 'Our measurements showed a clear result.',
+        },
         pdf,
         settings,
         new AbortController().signal,
@@ -514,5 +604,25 @@ describe('enrichArticlePdfMetadata', () => {
     ).resolves.toMatchObject({
       abstract: 'Our measurements showed a clear result.',
     });
+  });
+
+  it('rejects a TEI abstract without a complete matching abstract region', () => {
+    const result = mergeGrobidMetadata(
+      { title: 'Water clarity' },
+      {
+        ...evidence,
+        firstPage: page(
+          'Water clarity',
+          '1. Introduction',
+          'Our measurements showed a clear result.',
+        ),
+      },
+      tei(
+        '',
+        '',
+        '<abstract>Our measurements showed a clear result.</abstract>',
+      ),
+    );
+    expect(result).toEqual({ title: 'Water clarity' });
   });
 });

@@ -49,7 +49,13 @@ const pdf = Buffer.from(
 const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
 
 function pdfWithMetadata(lines = ['Published: 2024-05']): Buffer<ArrayBuffer> {
-  const text = lines.map((line) => `(${line}) Tj`).join(' T* ');
+  const text = [
+    'Title: Water quality',
+    'Authors: Mai Nguyen; Bao Tran',
+    ...lines,
+  ]
+    .map((line) => `(${line}) Tj`)
+    .join(' T* ');
   const pageText = `BT /F1 12 Tf 14 TL 72 720 Td ${text} ET`;
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -808,6 +814,7 @@ describe('Article creation', () => {
           .writeHead(200, { 'content-type': 'application/xml' })
           .end(
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader>' +
+              '<fileDesc><sourceDesc><biblStruct><analytic><idno type="DOI">10.1234/clarity</idno></analytic></biblStruct></sourceDesc></fileDesc>' +
               '<profileDesc><abstract><p>Samples showed improved water clarity.</p></abstract></profileDesc>' +
               '</teiHeader></TEI>',
           );
@@ -827,6 +834,7 @@ describe('Article creation', () => {
               pdfWithMetadata([
                 `${kind} example with enough readable text.`,
                 'Published: 2024-05',
+                ...(kind === 'Success' ? ['10.1234/clarity'] : []),
               ]),
             ),
           ),
@@ -846,7 +854,7 @@ describe('Article creation', () => {
             authorNames: ['Mai Nguyen', 'Bao Tran'],
             publicationDate: '2024-05',
             ...(index === 0 && {
-              abstract: 'Samples showed improved water clarity.',
+              doi: '10.1234/clarity',
             }),
           });
           await request('researcher').get(path).expect(404);

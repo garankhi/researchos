@@ -5,14 +5,14 @@ import type { ArticlePdfMetadata } from '@researchos/queue';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {
   abstractHeading,
-  endsArticleHeader,
+  matchesArticleHeading,
   readAbstract,
+  readArticleHeader,
   readAuthorNames,
   readFrontMatter,
+  readHeadinglessAbstract,
   readLabeledAuthors,
   readPdfLines,
-  readSpacedAbstract,
-  readVisibleAbstract,
   type FrontMatter,
   type PdfHeaderLine,
   type PdfLine,
@@ -20,7 +20,7 @@ import {
 } from './article-pdf-layout.js';
 import { readArticleBibliography } from './article-pdf-bibliography.js';
 import {
-  generatedTitle,
+  comparableAbstractText,
   selectArticleIdentity,
 } from './article-pdf-identity.js';
 import {
@@ -84,13 +84,15 @@ export async function inspectArticlePdf(
       if (pageNo === 1) firstPageHeight = viewport.height;
       const runs: PdfTextRun[] = [];
       const reader = page.streamTextContent().getReader();
+      let separated = false;
       try {
         while (characters < maxTextLength) {
           const chunk = await reader.read();
           if (chunk.done) break;
           for (const item of chunk.value.items) {
             if (!('str' in item)) continue;
-            const value = item.str.slice(0, maxTextLength - characters).trim();
+            const raw = item.str.slice(0, maxTextLength - characters);
+            const value = raw.trim();
             characters += value.length + 1;
             if (value) {
               const [x, y] = viewport.convertToViewportPoint(
@@ -103,8 +105,10 @@ export async function inspectArticlePdf(
                 y,
                 width: item.width,
                 height: item.height,
+                spaceBefore: separated || /^\s/u.test(raw),
               });
             }
+            separated = !item.hasEOL && /\s$/u.test(raw);
             if (characters >= maxTextLength) break;
           }
         }
@@ -119,19 +123,15 @@ export async function inspectArticlePdf(
     const body = lines.map(({ text }) => text).join('\n');
     const firstPage = pages[0] ?? [];
     const frontMatter = readFrontMatter(firstPage);
-    const boundary = firstPage.findIndex(
-      ({ text }) =>
-        /^(?:abstract|tóm tắt)(?:$|[:.—–-]|\s*[:.—–-])/iu.test(text) ||
-        endsArticleHeader(text),
-    );
-    const header = firstPage
-      .slice(0, boundary < 0 ? firstPage.length : boundary)
-      .map(({ text }) => text)
-      .join('\n');
+    const headerLines = readArticleHeader(firstPage);
+    const header = headerLines.map(({ text }) => text).join('\n');
     const visibleIdentity = {
       ...frontMatter,
       title:
-        text(frontMatter.title, 500) ??
+        text(
+          frontMatter.title?.replace(/^(?:title|tiêu đề)\s*:\s*/iu, ''),
+          500,
+        ) ??
         text(/^(?:title|tiêu đề)[ \t]*:[ \t]*(.+)$/imu.exec(header)?.[1], 500),
       authorNames:
         frontMatter.authorNames ??
@@ -142,45 +142,61 @@ export async function inspectArticlePdf(
     const hasVisibleByline = Boolean(
       visibleIdentity.authorNames ?? visibleIdentity.firstByline,
     );
-    const sources = [
-      [metadata?.get('dc:title'), metadata?.get('dc:creator')],
-      [infoFields.Title, infoFields.Author],
-    ] as const;
+    const infoTitle = text(infoFields.Title, 500);
+    const creators = metadata?.get('dc:creator');
     const { title, authorNames } = selectArticleIdentity(
-      sources.map(([value, authors]) => {
-        const title = text(value, 500);
-        // Document-editor metadata can contain the machine account as Author.
-        return {
-          title,
-          authorNames:
-            !generatedTitle(title) || hasVisibleByline
-              ? readAuthorNames(authors)
-              : undefined,
-        };
-      }),
+      [
+        {
+          origin: 'xmp',
+          title: text(metadata?.get('dc:title'), 500),
+          authorNames: Array.isArray(creators)
+            ? readAuthorNames(creators)
+            : undefined,
+        },
+        {
+          origin: 'pdf-info',
+          title: infoTitle,
+          headingMatched:
+            !!infoTitle &&
+            !visibleIdentity.title &&
+            matchesArticleHeading(infoTitle, headerLines),
+          authorNames: hasVisibleByline
+            ? readAuthorNames(infoFields.Author)
+            : undefined,
+        },
+      ],
       visibleIdentity,
     );
     const printedAbstract = text(
-      readSpacedAbstract(firstPage) ?? readAbstract(pages),
+      readAbstract(pages) ??
+        (hasVisibleByline ? readHeadinglessAbstract(firstPage) : undefined),
       20_000,
     );
-    const abstract =
-      printedAbstract ??
-      text(metadata?.get('dcterms:abstract'), 20_000) ??
+    const labeledAbstract = text(metadata?.get('dcterms:abstract'), 20_000);
+    const embeddedAbstract =
+      text(infoFields.Subject, 20_000) ??
       text(
         abstractHeading.exec(
           text(metadata?.get('dc:description'), 20_000) ?? '',
         )?.[1],
         20_000,
       );
+    const corroboratedAbstract = [labeledAbstract, embeddedAbstract].find(
+      (source) =>
+        source &&
+        printedAbstract &&
+        comparableAbstractText(source) ===
+          comparableAbstractText(printedAbstract),
+    );
+    const abstract = corroboratedAbstract ?? printedAbstract;
     const embeddedDoi =
       normalizeArticleDoi(metadata?.get('prism:doi')) ??
       normalizeArticleDoi(metadata?.get('dc:identifier'));
-    const { doi: articleDoi, dateLines } = readArticleBibliography(
-      firstPage,
-      firstPageHeight,
+    const { doi: articleDoi, dateLines } = readArticleBibliography(firstPage, {
+      pageHeight: firstPageHeight,
       embeddedDoi,
-    );
+      title,
+    });
     const published = selectPublicationDate(
       dateLines,
       readEmbeddedPublicationDate(metadata?.get('prism:publicationdate')),
@@ -197,22 +213,20 @@ export async function inspectArticlePdf(
     };
     if (collectEvidence) {
       result.evidence = {
-        firstPage: firstPage.map(({ text, y, height, left, right }) => ({
-          text,
-          y,
-          height,
-          left,
-          right,
-        })),
+        firstPage: firstPage.map(
+          ({ text, y, height, left, right, column }) => ({
+            text,
+            y,
+            height,
+            left,
+            right,
+            column,
+          }),
+        ),
         firstPageHeight,
         visibleIdentity,
         hasText: (body.match(/\p{L}[\p{L}\p{M}]+/gu)?.length ?? 0) >= 5,
-        visibleAbstract: !abstract
-          ? text(
-              readVisibleAbstract(firstPage, Boolean(frontMatter.firstByline)),
-              20_000,
-            )
-          : undefined,
+        visibleAbstract: printedAbstract,
       };
     }
     return result;
