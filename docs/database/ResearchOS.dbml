@@ -7,6 +7,31 @@ Project researchos {
   Note: '''Fresh database design. MVP uses provisioned email/password accounts; OIDC is a future alternative on the same user. Active faculty are researchers; students/staff need a RESEARCHER grant. ADMIN is independent and does not bypass resource ownership/visibility. Personal output releases require output ownership, not group approval. Group leaders accept a pinned released revision for their group only. Other creates LOCAL topics immediately. Taxonomy: OpenAlex Field -> Subfield -> Topic, without Domain. SQL adds constraints, triggers and query helpers; backend authenticates the actor and applies authorization.'''
 }
 
+Enum SourceKind {
+  SELF_DECLARED
+  IMPORTED
+  AI_INFERRED
+  SYSTEM
+}
+Enum VerificationStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+Enum Visibility {
+  PRIVATE
+  GROUP
+  INSTITUTION
+  PUBLIC
+}
+Enum PublicationStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
 Enum user_type { 
   FACULTY
   STUDENT

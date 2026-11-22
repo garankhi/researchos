@@ -34,13 +34,6 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceRoot = resolve(packageRoot, '..', '..');
 
 const SQL_SOURCE = resolve(workspaceRoot, 'docs', 'database', 'ResearchOS.sql');
-const INIT_MIGRATION = resolve(
-  packageRoot,
-  'prisma',
-  'migrations',
-  '20261031000000_init',
-  'migration.sql',
-);
 const SCHEMA = resolve(packageRoot, 'prisma', 'schema.prisma');
 
 /**
@@ -271,12 +264,6 @@ async function main() {
   await recreateScratchDatabase(admin);
 
   try {
-    // The init migration holds `audit_logs` and the four enums that predate
-    // the domain schema. They are not in `ResearchOS.sql`, so the scratch
-    // database is built from both, in migration order.
-    log('Applying the init migration (audit_logs, base enums) ...');
-    await applySql(scratch, INIT_MIGRATION);
-
     log('Applying the schema source (ResearchOS.sql) ...');
     await applySql(scratch, SQL_SOURCE);
 
