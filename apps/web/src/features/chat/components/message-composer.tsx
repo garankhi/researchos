@@ -3,7 +3,6 @@
 import {
   Badge,
   Box,
-  Button,
   Flex,
   HStack,
   IconButton,
@@ -25,16 +24,6 @@ import { useMemo, useRef, useState } from 'react';
 import { FieldError } from '@/components/ui/feedback';
 import { resolveErrorCode } from '@/utils/error-messages';
 import type { ChatParticipantPayload, PendingAttachmentItem } from '../types';
-
-/**
- * The height the composer row shares.
- *
- * The attachment button, the text field and the send button are all given
- * this height, so the row reads as one control instead of three mismatched
- * ones. It is the height of the text field: a two-line field with the
- * default padding and border (1px + 8px + 2 lines of 20px + 8px + 1px).
- */
-const CONTROL_HEIGHT = '58px';
 
 interface ActiveMentionQuery {
   triggerIndex: number;
@@ -201,7 +190,8 @@ export function MessageComposer({
       borderTopWidth="1px"
       borderColor="border.emphasized"
       bg="bg.panel"
-      p="3"
+      px="3"
+      py="2"
       position="relative"
     >
       {/* Mention Autocomplete Popup */}
@@ -339,7 +329,7 @@ export function MessageComposer({
           </FieldError>
         )}
 
-        <Flex gap="2" align="end" w="full" minW="0">
+        <Flex gap="1.5" align="end" w="full" minW="0">
           <Input
             ref={fileInputRef}
             type="file"
@@ -357,17 +347,15 @@ export function MessageComposer({
           />
           <IconButton
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            h={CONTROL_HEIGHT}
-            w={CONTROL_HEIGHT}
             flexShrink={0}
             disabled={attachDisabled}
             aria-label={t('attachFiles')}
             title={t('attachFiles')}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Paperclip size={16} />
+            <Paperclip size={18} />
           </IconButton>
 
           <Textarea
@@ -395,27 +383,40 @@ export function MessageComposer({
               }
             }}
             placeholder={t('composerPlaceholder')}
+            aria-label={t('composerPlaceholder')}
             maxLength={MAX_CHAT_MESSAGE_BODY_LENGTH}
-            rows={2}
+            rows={1}
             resize="none"
             disabled={disabled}
             flex="1"
             minW="0"
-            h={CONTROL_HEIGHT}
+            minH="36px"
+            maxH="116px"
+            overflowY="auto"
+            px="3.5"
+            py="7px"
+            lineHeight="20px"
+            fontSize={{ base: 'md', md: 'sm' }}
+            bg="bg.muted"
+            borderColor="transparent"
+            borderRadius="18px"
+            css={{ fieldSizing: 'content' }}
           />
 
-          <Button
+          <IconButton
             type="button"
             size="sm"
+            variant="ghost"
+            colorPalette="blue"
             flexShrink={0}
-            h={CONTROL_HEIGHT}
+            aria-label={t('send')}
+            title={t('send')}
             onClick={() => void handleSubmit()}
             disabled={!canSend}
             loading={isSending}
           >
-            <Send size={15} />
-            {t('send')}
-          </Button>
+            <Send size={18} />
+          </IconButton>
         </Flex>
       </Stack>
     </Box>

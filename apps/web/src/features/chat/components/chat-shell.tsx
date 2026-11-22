@@ -11,10 +11,12 @@ import {
   IconButton,
   Stack,
   Text,
+  chakra,
 } from '@chakra-ui/react';
-import { ArrowLeft, Info, MessageSquare, Users } from 'lucide-react';
+import { ChatConversationTypeEnum } from '@researchos/chat';
+import { ArrowDown, ArrowLeft, Info, MessageSquare, Users } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import {
   useCallback,
   useEffect,
@@ -122,11 +124,14 @@ function ActiveConversationPane({
   const t = useTranslations('chat');
   const tDetails = useTranslations('chat.details');
   const tTyping = useTranslations('chat.typing');
+  const format = useFormatter();
   const tErrors = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const initialAnchoredRef = useRef(false);
   const prevLastMsgIdRef = useRef<string | undefined>(undefined);
+  const nearLatestRef = useRef(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [expandMembersKey, setExpandMembersKey] = useState(0);
@@ -171,6 +176,14 @@ function ActiveConversationPane({
   );
 
   const lastMsgId = visibleMessages[visibleMessages.length - 1]?.id;
+  const lastSenderId = visibleMessages[visibleMessages.length - 1]?.senderId;
+
+  function jumpToLatest() {
+    const element = scrollContainerRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+    nearLatestRef.current = true;
+    setHasNewMessages(false);
+  }
 
   // Anchor scroll position synchronously BEFORE browser paint so entering a
   // conversation starts immediately at the latest message with zero visible animation.
@@ -187,9 +200,13 @@ function ActiveConversationPane({
 
     if (lastMsgId && lastMsgId !== prevLastMsgIdRef.current) {
       prevLastMsgIdRef.current = lastMsgId;
-      el.scrollTop = el.scrollHeight;
+      if (nearLatestRef.current || lastSenderId === currentUser.id) {
+        el.scrollTop = el.scrollHeight;
+      } else {
+        setHasNewMessages(true);
+      }
     }
-  }, [lastMsgId, visibleMessages.length]);
+  }, [currentUser.id, lastMsgId, lastSenderId, visibleMessages.length]);
 
   if (room.isConversationFailed) {
     return (
@@ -366,6 +383,13 @@ function ActiveConversationPane({
 
         <Box
           ref={scrollContainerRef}
+          onScroll={(event) => {
+            const { scrollTop, scrollHeight, clientHeight } =
+              event.currentTarget;
+            nearLatestRef.current =
+              scrollHeight - scrollTop - clientHeight <= 80;
+            if (nearLatestRef.current) setHasNewMessages(false);
+          }}
           flex="1"
           overflowY="auto"
           px="4"
@@ -390,7 +414,7 @@ function ActiveConversationPane({
               message={t('messagesEmptyMessage')}
             />
           ) : (
-            <Stack gap="3.5">
+            <Stack gap="0">
               {room.hasOlderMessages && (
                 <Flex justify="center" py="1">
                   <Button
@@ -408,9 +432,15 @@ function ActiveConversationPane({
               {visibleMessages.map((msg, index) => {
                 const prev = visibleMessages[index - 1];
                 const next = visibleMessages[index + 1];
+                const date = new Date(msg.createdAt);
+                const startsDay =
+                  !prev ||
+                  new Date(prev.createdAt).toDateString() !==
+                    date.toDateString();
 
                 const isSameSenderAsPrev = Boolean(
                   prev &&
+                  !startsDay &&
                   prev.senderId === msg.senderId &&
                   !prev.deletedAt &&
                   !msg.deletedAt &&
@@ -421,6 +451,8 @@ function ActiveConversationPane({
 
                 const isSameSenderAsNext = Boolean(
                   next &&
+                  new Date(next.createdAt).toDateString() ===
+                    date.toDateString() &&
                   next.senderId === msg.senderId &&
                   !next.deletedAt &&
                   !msg.deletedAt &&
@@ -433,61 +465,97 @@ function ActiveConversationPane({
                 const isLastInGroup = !isSameSenderAsNext;
 
                 return (
-                  <MessageItem
-                    key={msg.id}
-                    message={msg}
-                    currentUserId={currentUser.id}
-                    canModerate={isGroup && isOwner}
-                    isGroup={isGroup}
-                    participants={activeParticipants}
-                    isFirstInGroup={isFirstInGroup}
-                    isLastInGroup={isLastInGroup}
-                    onPreviewImage={(url, fileName) =>
-                      setPreviewImageTarget({ url, fileName })
-                    }
-                    onToggleReaction={(messageId, emoji) => {
-                      void room
-                        .toggleReactionOptimistic(messageId, emoji)
-                        .then((errCode) => {
-                          if (errCode) {
-                            showSnackbar({
-                              severity: 'error',
-                              message: resolveErrorCode(
-                                tErrors,
-                                errCode,
-                                t('errors.reactionFailed'),
-                              ),
-                            });
-                          }
-                        });
-                    }}
-                    onEditMessage={room.editExistingMessage}
-                    onDeleteMessage={(messageId) => {
-                      void room
-                        .deleteExistingMessage(messageId)
-                        .then((errCode) => {
-                          if (errCode) {
-                            showSnackbar({
-                              severity: 'error',
-                              message: resolveErrorCode(
-                                tErrors,
-                                errCode,
-                                tErrors('unknown'),
-                              ),
-                            });
-                          }
-                        });
-                    }}
-                    onHideMessageForMe={onHideMessageForMe}
-                    onRetrySend={(failed) => {
-                      void room.retryFailedMessage(failed);
-                    }}
-                  />
+                  <Box key={msg.id}>
+                    {startsDay && (
+                      <Flex align="center" gap="3" mt={prev ? '5' : '0'} mb="2">
+                        <Box
+                          flex="1"
+                          borderTopWidth="1px"
+                          borderColor="border.subtle"
+                        />
+                        <chakra.time
+                          dateTime={msg.createdAt}
+                          textStyle="xs"
+                          color="fg.muted"
+                        >
+                          {format.dateTime(date, { dateStyle: 'medium' })}
+                        </chakra.time>
+                        <Box
+                          flex="1"
+                          borderTopWidth="1px"
+                          borderColor="border.subtle"
+                        />
+                      </Flex>
+                    )}
+                    <MessageItem
+                      message={msg}
+                      currentUserId={currentUser.id}
+                      canModerate={isGroup && isOwner}
+                      isGroup={isGroup}
+                      participants={activeParticipants}
+                      isFirstInGroup={isFirstInGroup}
+                      isLastInGroup={isLastInGroup}
+                      onPreviewImage={(url, fileName) =>
+                        setPreviewImageTarget({ url, fileName })
+                      }
+                      onToggleReaction={(messageId, emoji) => {
+                        void room
+                          .toggleReactionOptimistic(messageId, emoji)
+                          .then((errCode) => {
+                            if (errCode) {
+                              showSnackbar({
+                                severity: 'error',
+                                message: resolveErrorCode(
+                                  tErrors,
+                                  errCode,
+                                  t('errors.reactionFailed'),
+                                ),
+                              });
+                            }
+                          });
+                      }}
+                      onEditMessage={room.editExistingMessage}
+                      onDeleteMessage={(messageId) => {
+                        void room
+                          .deleteExistingMessage(messageId)
+                          .then((errCode) => {
+                            if (errCode) {
+                              showSnackbar({
+                                severity: 'error',
+                                message: resolveErrorCode(
+                                  tErrors,
+                                  errCode,
+                                  tErrors('unknown'),
+                                ),
+                              });
+                            }
+                          });
+                      }}
+                      onHideMessageForMe={onHideMessageForMe}
+                      onRetrySend={(failed) => {
+                        void room.retryFailedMessage(failed);
+                      }}
+                    />
+                  </Box>
                 );
               })}
             </Stack>
           )}
         </Box>
+
+        {hasNewMessages && (
+          <Flex justify="center" py="1" bg="bg">
+            <Button
+              type="button"
+              variant="subtle"
+              size="xs"
+              onClick={jumpToLatest}
+            >
+              <ArrowDown size={14} />
+              {t('jumpToLatest')}
+            </Button>
+          </Flex>
+        )}
 
         {typingText && (
           <Box
@@ -554,6 +622,7 @@ export function ChatShell({
 }) {
   const t = useTranslations('chat');
   const tRemove = useTranslations('chat.removeMenu');
+  const tErrors = useTranslations('errors');
   const locale = useLocale() as Locale;
   const params = useParams<{ conversationId?: string }>();
   const { showSnackbar } = useSnackbar();
@@ -569,6 +638,8 @@ export function ChatShell({
     selectedId: string | null;
   } | null>(null);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [openingPersonId, setOpeningPersonId] = useState<string | null>(null);
+  const openingPersonRef = useRef(false);
 
   const [hiddenByUser, setHiddenByUser] = useState<{
     userId: string;
@@ -600,6 +671,7 @@ export function ChatShell({
     isFailed: isConversationsFailed,
     error: conversationsError,
     refetch: refetchConversations,
+    createConversation,
     upsertLiveConversation,
   } = useChatConversations();
 
@@ -681,6 +753,47 @@ export function ChatShell({
     }
   }, [locale, routeConversationId]);
 
+  async function handleSelectPerson(userId: string): Promise<boolean> {
+    if (openingPersonRef.current) return false;
+    const existing = conversations.find(
+      (conversation) =>
+        conversation.type === 'DIRECT' &&
+        conversation.participants.some(
+          (participant) => participant.userId === userId,
+        ),
+    );
+    if (existing) {
+      handleSelectConversation(existing.id);
+      return true;
+    }
+
+    openingPersonRef.current = true;
+    setOpeningPersonId(userId);
+    try {
+      const conversation = await createConversation.mutateAsync({
+        data: {
+          type: ChatConversationTypeEnum.DIRECT,
+          participantIds: [userId],
+        },
+      });
+      handleSelectConversation(conversation.id);
+      return true;
+    } catch (error) {
+      showSnackbar({
+        severity: 'error',
+        message: resolveErrorCode(
+          tErrors,
+          apiErrorCode(error) ?? 'server_error',
+          t('sidebarSearch.openFailed'),
+        ),
+      });
+      return false;
+    } finally {
+      openingPersonRef.current = false;
+      setOpeningPersonId(null);
+    }
+  }
+
   const socket = useChatSocket({
     enabled: Boolean(normalizedMe),
     handlers: {
@@ -753,6 +866,8 @@ export function ChatShell({
             onRetry={() => void refetchConversations()}
             onSelectConversation={handleSelectConversation}
             onOpenNewDialog={() => setNewDialogOpen(true)}
+            onSelectPerson={handleSelectPerson}
+            openingPersonId={openingPersonId}
           />
         </Box>
 

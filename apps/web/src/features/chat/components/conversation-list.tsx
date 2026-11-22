@@ -7,10 +7,14 @@ import {
   Button,
   Flex,
   HStack,
+  IconButton,
+  Input,
+  InputGroup,
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { MessageSquarePlus } from 'lucide-react';
+import { MessageSquarePlus, Search, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { stripMentionIdsForPreview } from '@researchos/chat';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
@@ -18,6 +22,7 @@ import { apiErrorCode } from '@/lib/api-error';
 import type { ChatConversationResponseDto } from '@/lib/api/models';
 import { resolveErrorCode } from '@/utils/error-messages';
 import type { ChatConnectionStatus } from '../types';
+import { useSearchChatPeople } from '../hooks/use-chat-conversations';
 import { initialsForChatName } from '../utils/message-state';
 import { ConversationListSkeleton } from './chat-skeletons';
 
@@ -48,6 +53,8 @@ export function ConversationList({
   onRetry,
   onSelectConversation,
   onOpenNewDialog,
+  onSelectPerson,
+  openingPersonId,
 }: {
   conversations: ChatConversationResponseDto[];
   selectedId: string | null;
@@ -59,11 +66,50 @@ export function ConversationList({
   onRetry: () => void;
   onSelectConversation: (conversationId: string) => void;
   onOpenNewDialog: () => void;
+  onSelectPerson: (userId: string) => Promise<boolean>;
+  openingPersonId: string | null;
 }) {
   const t = useTranslations('chat');
   const tConn = useTranslations('chat.connection');
   const tErrors = useTranslations('errors');
   const format = useFormatter();
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const term = search.trim();
+  const isSearching = term.length > 0;
+  const canSearchPeople = term.length >= 2;
+  const searchReady = canSearchPeople && term === debouncedSearch;
+  const people = useSearchChatPeople(debouncedSearch, searchReady);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(term), 250);
+    return () => clearTimeout(timer);
+  }, [term]);
+
+  const query = term.toLocaleLowerCase();
+  const matchingConversations = isSearching
+    ? conversations.filter((conversation) =>
+        [
+          conversation.title,
+          ...conversation.participants
+            .filter((participant) => participant.userId !== currentUserId)
+            .flatMap(({ user }) => [user.fullName, user.email]),
+        ].some((value) => value?.toLocaleLowerCase().includes(query)),
+      )
+    : conversations;
+  const existingDirectUsers = new Set(
+    matchingConversations
+      .filter((conversation) => conversation.type === 'DIRECT')
+      .flatMap((conversation) =>
+        conversation.participants.map(({ userId }) => userId),
+      ),
+  );
+  const matchingPeople = searchReady
+    ? people.users.filter(
+        (person) =>
+          person.id !== currentUserId && !existingDirectUsers.has(person.id),
+      )
+    : [];
 
   const statusColorPalette =
     connectionStatus === 'connected'
@@ -112,7 +158,107 @@ export function ConversationList({
         </Button>
       </Flex>
 
-      <Box flex="1" overflowY="auto">
+      <Box px="3" py="3" borderBottomWidth="1px" borderColor="border.subtle">
+        <InputGroup
+          startElement={<Search size={16} aria-hidden />}
+          endElement={
+            search && (
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                aria-label={t('sidebarSearch.clear')}
+                onClick={() => setSearch('')}
+              >
+                <X size={14} />
+              </IconButton>
+            )
+          }
+        >
+          <Input
+            type="text"
+            size="sm"
+            maxLength={100}
+            value={search}
+            aria-label={t('sidebarSearch.label')}
+            placeholder={t('sidebarSearch.label')}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setSearch('');
+            }}
+          />
+        </InputGroup>
+      </Box>
+
+      <Box flex="1" minH="0" overflowY="auto">
+        {isSearching && (
+          <>
+            {canSearchPeople && (!searchReady || people.isFetching) && (
+              <Text role="status" px="4" py="2" textStyle="xs" color="fg.muted">
+                {t('sidebarSearch.loading')}
+              </Text>
+            )}
+            {searchReady && people.isFailed && (
+              <Text role="alert" px="4" py="2" textStyle="xs" color="fg.error">
+                {t('sidebarSearch.failed')}
+              </Text>
+            )}
+            {matchingPeople.length > 0 && (
+              <Stack gap="0">
+                <Text
+                  as="h2"
+                  px="4"
+                  pt="3"
+                  pb="1"
+                  textStyle="xs"
+                  fontWeight="semibold"
+                  color="fg.muted"
+                >
+                  {t('sidebarSearch.people')}
+                </Text>
+                {matchingPeople.map((person) => (
+                  <Button
+                    key={person.id}
+                    type="button"
+                    variant="plain"
+                    layerStyle="interactiveRow"
+                    justifyContent="start"
+                    px="3.5"
+                    py="2"
+                    h="auto"
+                    w="full"
+                    minW="0"
+                    disabled={
+                      openingPersonId !== null && openingPersonId !== person.id
+                    }
+                    loading={openingPersonId === person.id}
+                    onClick={() => {
+                      void onSelectPerson(person.id).then((opened) => {
+                        if (opened)
+                          setSearch((current) =>
+                            current === search ? '' : current,
+                          );
+                      });
+                    }}
+                  >
+                    <Avatar.Root size="sm" flexShrink={0}>
+                      <Avatar.Fallback name={person.fullName}>
+                        {initialsForChatName(person.fullName)}
+                      </Avatar.Fallback>
+                    </Avatar.Root>
+                    <Box textAlign="start" minW="0">
+                      <Text textStyle="sm" truncate>
+                        {person.fullName}
+                      </Text>
+                      <Text textStyle="xs" color="fg.muted" truncate>
+                        {person.departmentUnit || person.email}
+                      </Text>
+                    </Box>
+                  </Button>
+                ))}
+              </Stack>
+            )}
+          </>
+        )}
         {isInitialLoading ? (
           <ConversationListSkeleton />
         ) : isFailed ? (
@@ -127,7 +273,19 @@ export function ConversationList({
               onRetry={onRetry}
             />
           </Box>
-        ) : conversations.length === 0 ? (
+        ) : matchingConversations.length === 0 && isSearching ? (
+          matchingPeople.length === 0 &&
+          (!canSearchPeople ||
+            (searchReady && !people.isFetching && !people.isFailed)) && (
+            <Text px="4" py="3" role="status" textStyle="sm" color="fg.muted">
+              {t(
+                canSearchPeople
+                  ? 'sidebarSearch.noResults'
+                  : 'sidebarSearch.minLength',
+              )}
+            </Text>
+          )
+        ) : matchingConversations.length === 0 ? (
           <EmptyState
             title={t('conversationsEmptyTitle')}
             message={t('conversationsEmptyMessage')}
@@ -145,7 +303,20 @@ export function ConversationList({
           />
         ) : (
           <Stack gap="0">
-            {conversations.map((conv) => {
+            {isSearching && (
+              <Text
+                as="h2"
+                px="4"
+                pt="3"
+                pb="1"
+                textStyle="xs"
+                fontWeight="semibold"
+                color="fg.muted"
+              >
+                {t('sidebarSearch.conversations')}
+              </Text>
+            )}
+            {matchingConversations.map((conv) => {
               const title = resolveConversationTitle(
                 conv,
                 currentUserId,
@@ -182,7 +353,11 @@ export function ConversationList({
                 >
                   <button
                     type="button"
-                    onClick={() => onSelectConversation(conv.id)}
+                    aria-current={isSelected ? 'true' : undefined}
+                    onClick={() => {
+                      setSearch('');
+                      onSelectConversation(conv.id);
+                    }}
                   >
                     <Avatar.Root size="sm" flexShrink={0}>
                       <Avatar.Fallback name={title}>
