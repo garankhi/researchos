@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   OpportunityKind,
   OpportunityStatus,
@@ -7,6 +8,7 @@ import {
 import {
   Equals,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsString,
@@ -97,6 +99,16 @@ export class CreateOpportunityDto {
   @ValidateIf((_o, value) => value != null)
   @IsString()
   description?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft.',
+    default: false,
+  })
+  @ValidateIf((_o, value) => value !== undefined)
+  @IsBoolean()
+  @Transform(({ obj, key }) => (obj as Record<string, unknown>)[key])
+  autoFillOnAcceptance?: boolean;
 
   @ApiPropertyOptional({
     description:

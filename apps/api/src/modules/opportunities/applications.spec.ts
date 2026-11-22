@@ -90,8 +90,10 @@ describe('Applications HTTP contract', () => {
   const tx = {
     $queryRaw: vi.fn(),
     research_opportunities: { findUnique: vi.fn() },
+    group_members: { findUnique: vi.fn() },
     opportunity_applications: {
       findFirst: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       create: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
@@ -432,6 +434,62 @@ describe('Applications HTTP contract', () => {
 
   describe('respond', () => {
     const respondUrl = `/applications/${id}/respond`;
+
+    it('returns the accepted application and existing membership on a retry', async () => {
+      const accepted = {
+        ...row,
+        status: 'ACCEPTED',
+        responded_by: actorId,
+        responded_at: now,
+      };
+      const groupId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      tx.$queryRaw
+        .mockResolvedValueOnce([row])
+        .mockResolvedValueOnce([{ allowed: true, group_id: groupId }])
+        .mockResolvedValueOnce([{ now }])
+        .mockResolvedValueOnce([accepted])
+        .mockResolvedValueOnce([{ allowed: true, group_id: groupId }])
+        .mockResolvedValueOnce([{ now }]);
+      tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([
+        accepted,
+      ]);
+      tx.opportunity_applications.findUniqueOrThrow.mockResolvedValue(accepted);
+      tx.group_members.findUnique.mockResolvedValue({
+        group_id: groupId,
+        user_id: row.applicant_id,
+        role: 'GROUP_LEADER',
+      });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await request()
+          .post(respondUrl)
+          .set('Cookie', cookie)
+          .send({ decision: 'ACCEPTED' })
+          .expect(200);
+        expect(response.body).toMatchObject({
+          status: 'ACCEPTED',
+          membership: {
+            groupId,
+            userId: row.applicant_id,
+            role: 'GROUP_LEADER',
+          },
+        });
+      }
+      expect(
+        tx.opportunity_applications.updateManyAndReturn,
+      ).toHaveBeenCalledOnce();
+    });
+
+    it('still authorizes a retry of an accepted application', async () => {
+      tx.$queryRaw
+        .mockResolvedValueOnce([{ ...row, status: 'ACCEPTED' }])
+        .mockResolvedValueOnce([{ allowed: false }]);
+      await request()
+        .post(respondUrl)
+        .set('Cookie', cookie)
+        .send({ decision: 'ACCEPTED' })
+        .expect(403);
+      expect(tx.group_members.findUnique).not.toHaveBeenCalled();
+    });
 
     it('requires authentication and researcher access', async () => {
       await request().post(respondUrl).expect(401);

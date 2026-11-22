@@ -8,7 +8,7 @@
 import type { RespondApplicationDtoDecision } from './respondApplicationDtoDecision';
 
 export interface RespondApplicationDto {
-  /** The owner's answer: invite the applicant to a discussion, or decline. */
+  /** The owner's answer: invite the applicant to a discussion, decline, or accept. */
   decision: RespondApplicationDtoDecision;
   /**
    * Note the owner writes for the applicant, explaining the decision.

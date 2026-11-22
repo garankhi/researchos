@@ -154,7 +154,7 @@ export const useOpportunitiesControllerCreate = <
   );
 };
 /**
- * Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.
+ * Status filtering uses persisted states. A background worker expires overdue open opportunities.
  * @summary Lists published opportunities and opportunities managed by the caller
  */
 export const opportunitiesControllerFindAll = (
@@ -322,7 +322,7 @@ export function useOpportunitiesControllerFindAll<
 }
 
 /**
- * An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.
+ * The status reflects the last committed change. Scheduled expiry updates an overdue open opportunity.
  * @summary Returns a visible research opportunity
  */
 export const opportunitiesControllerFindOne = (
@@ -496,7 +496,7 @@ export function useOpportunitiesControllerFindOne<
 }
 
 /**
- * Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.
+ * A scheduled worker expires overdue opportunities. An extension made before the sweep can prevent expiry. Extending an expired opportunity keeps it expired.
  * @summary Updates a research opportunity managed by the caller
  */
 export const opportunitiesControllerUpdate = (

@@ -6,7 +6,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { OpportunityStatus, Prisma, PrismaService } from '@researchos/database';
-import type { ResearchOpportunity } from '@researchos/database';
+import type {
+  OpportunityApplicationStatus,
+  ResearchOpportunity,
+} from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
   buildPaginationMeta,
@@ -192,6 +195,7 @@ export class OpportunitiesService {
       required_expertise_tags: dto.requiredExpertiseTags,
       description: dto.description,
       response_sla_days: dto.responseSlaDays,
+      auto_fill_on_acceptance: dto.autoFillOnAcceptance,
       application_deadline:
         applicationDeadline === undefined
           ? undefined
@@ -220,6 +224,7 @@ export class OpportunitiesService {
       requiredExpertiseTags: row.required_expertise_tags ?? [],
       description: row.description,
       responseSlaDays: row.response_sla_days,
+      autoFillOnAcceptance: row.auto_fill_on_acceptance ?? false,
       status: row.status,
       applicationDeadline: row.application_deadline?.toISOString() ?? null,
       publishedAt: row.published_at?.toISOString() ?? null,
@@ -233,7 +238,9 @@ export class OpportunitiesService {
     } catch (error) {
       // PostgreSQL trigger/check failures can surface through the driver adapter
       // rather than Prisma's legacy P2004 code (including a deadline race).
-      if (readDatabaseFailure(error)?.sqlState === '23514')
+      const sqlState = readDatabaseFailure(error)?.sqlState;
+      if (sqlState === 'P0156') throw new ConflictException();
+      if (sqlState === '23514')
         throw new BadRequestException('validation_failed');
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003' || error.code === 'P2004')
@@ -243,47 +250,6 @@ export class OpportunitiesService {
       }
       throw error;
     }
-  }
-
-  private async expireOverdueInTransaction(
-    tx: Prisma.TransactionClient,
-    id?: string,
-  ) {
-    const expired = await tx.research_opportunities.updateManyAndReturn({
-      where: {
-        ...(id ? { id } : {}),
-        status: OpportunityStatus.OPEN,
-        application_deadline: { lte: new Date() },
-      },
-      data: { status: OpportunityStatus.EXPIRED },
-      select: { id: true },
-    });
-    if (expired.length) {
-      await tx.auditLog.createMany({
-        data: expired.map((record) => ({
-          actorId: null,
-          action: 'OPPORTUNITY_STATUS_CHANGED',
-          entity: 'research_opportunities',
-          entityId: record.id,
-          payload: {
-            fromStatus: OpportunityStatus.OPEN,
-            toStatus: OpportunityStatus.EXPIRED,
-            reason: 'APPLICATION_DEADLINE_REACHED',
-          },
-        })),
-      });
-    }
-    return expired;
-  }
-
-  private async expireOverdue(id?: string): Promise<void> {
-    // Persist expiry before the read transaction so filters, counts and payloads
-    // agree. Conditional updates serialize with fill/close and audit only winners.
-    await this.write(() =>
-      this.prisma.$transaction(async (tx) => {
-        await this.expireOverdueInTransaction(tx, id);
-      }),
-    );
   }
 
   async create(
@@ -339,7 +305,10 @@ export class OpportunitiesService {
                 domainErrorCodes.opportunities.idempotencyKeyConflict,
                 HttpStatus.CONFLICT,
               );
-            return previous.create_response as unknown as OpportunityResponseDto;
+            const response =
+              previous.create_response as unknown as OpportunityResponseDto;
+            response.autoFillOnAcceptance ??= false;
+            return response;
           }
         }
         await this.checkScope(tx, actorId, dto);
@@ -375,8 +344,6 @@ export class OpportunitiesService {
     actorId: string,
     query: ListOpportunitiesQueryDto,
   ): Promise<OpportunityPageDto> {
-    await this.expireOverdue();
-
     const orderBy = parseSortParam<OpportunitySortColumn>(
       query.sort,
       OPPORTUNITY_SORT_FIELDS,
@@ -434,7 +401,6 @@ export class OpportunitiesService {
   }
 
   async findOne(actorId: string, id: string): Promise<OpportunityResponseDto> {
-    await this.expireOverdue(id);
     return this.prisma.$transaction(
       async (tx) => {
         const row = await tx.research_opportunities.findUnique({
@@ -446,9 +412,18 @@ export class OpportunitiesService {
             HttpStatus.NOT_FOUND,
           );
         const [visible] = await tx.$queryRaw<
-          { id: string; can_manage: boolean }[]
+          {
+            id: string;
+            can_manage: boolean;
+            my_application_status: OpportunityApplicationStatus | null;
+          }[]
         >`
-        SELECT o.id, ${this.management(actorId)} AS can_manage FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
+        SELECT o.id, ${this.management(actorId)} AS can_manage, (
+          SELECT a.status FROM opportunity_applications a
+          WHERE a.opportunity_id = o.id AND a.applicant_id = ${actorId}::uuid
+          ORDER BY a.applied_at DESC, a.id DESC LIMIT 1
+        ) AS my_application_status
+        FROM research_opportunities o WHERE o.id = ${id}::uuid AND ${this.visibility(actorId)}
       `;
         if (!visible)
           throw new CodedHttpException(
@@ -457,6 +432,7 @@ export class OpportunitiesService {
           );
         const item = this.response(row);
         item.canManage = visible.can_manage === true;
+        item.myApplicationStatus = visible.my_application_status ?? null;
         return item;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
@@ -468,7 +444,6 @@ export class OpportunitiesService {
     id: string,
     dto: UpdateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
-    await this.expireOverdue(id);
     return this.write(() =>
       this.prisma.$transaction(async (tx) => {
         await this.requireResearcher(tx, actorId);
@@ -499,14 +474,7 @@ export class OpportunitiesService {
           where: { id },
           data,
         });
-        // PATCH can move an OPEN record's deadline into the past. Apply expiry
-        // in the same transaction instead of returning a stale OPEN response.
-        const expired = await this.expireOverdueInTransaction(tx, id);
-        return this.response(
-          expired.length
-            ? { ...updated, status: OpportunityStatus.EXPIRED }
-            : updated,
-        );
+        return this.response(updated);
       }),
     );
   }
@@ -517,7 +485,7 @@ export class OpportunitiesService {
     action: keyof typeof STATUS_ACTIONS,
   ): Promise<OpportunityResponseDto> {
     const transition = STATUS_ACTIONS[action];
-    const result = await this.write(() =>
+    return this.write(() =>
       this.prisma.$transaction(async (tx) => {
         await this.requireResearcher(tx, actorId);
         // Serialize status actions with PATCH and other status actions. A retry
@@ -540,25 +508,24 @@ export class OpportunitiesService {
         const current = await tx.research_opportunities.findUniqueOrThrow({
           where: { id },
         });
-        if (
-          current.status === OpportunityStatus.OPEN &&
-          current.application_deadline &&
-          current.application_deadline.getTime() <= Date.now()
-        ) {
-          await this.expireOverdueInTransaction(tx, id);
-          // Commit automatic expiry before reporting that the requested manual
-          // action conflicts. Throwing inside this transaction would undo it.
-          return null;
-        }
         if (current.status !== transition.from || current.archived_at !== null)
           throw new ConflictException();
 
+        if (action === 'open' || action === 'fill') {
+          const [eligibility] = await tx.$queryRaw<[{ current: boolean }]>`
+            SELECT application_deadline > clock_timestamp() AS current
+            FROM research_opportunities WHERE id = ${id}::uuid
+          `;
+          if (!eligibility?.current) {
+            if (action === 'fill') throw new ConflictException();
+            throw new BadRequestException('validation_failed');
+          }
+        }
         if (action === 'open') {
           if (
             !current.title.trim() ||
             !current.description?.trim() ||
-            !current.application_deadline ||
-            current.application_deadline.getTime() <= Date.now()
+            !current.application_deadline
           )
             throw new BadRequestException('validation_failed');
         }
@@ -584,7 +551,5 @@ export class OpportunitiesService {
         return this.response(updated);
       }),
     );
-    if (result === null) throw new ConflictException();
-    return result;
   }
 }
