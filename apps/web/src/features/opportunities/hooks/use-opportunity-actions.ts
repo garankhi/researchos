@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   applicationsControllerApply,
@@ -20,19 +19,22 @@ import { apiStatusCode } from '@/lib/api-error';
  */
 export function useOpportunityActions({
   opportunityId,
+  groupId,
 }: {
   opportunityId?: string;
+  groupId?: string | null;
 }) {
   const queryClient = useQueryClient();
-
-  /** The note the applicant writes when applying. */
-  const [note, setNote] = useState('');
-  /** Whether the apply form is open. */
-  const [isApplying, setIsApplying] = useState(false);
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({
       predicate: (query) => {
+        if (
+          groupId &&
+          query.queryKey[0] === 'group-hub' &&
+          query.queryKey[2] === groupId
+        )
+          return true;
         const key = query.queryKey[0];
         return (
           typeof key === 'string' &&
@@ -47,11 +49,7 @@ export function useOpportunityActions({
   const applyMutation = useMutation({
     mutationFn: (applicantNote: string) =>
       applicationsControllerApply(opportunityId!, { applicantNote }),
-    onSuccess: async () => {
-      setNote('');
-      setIsApplying(false);
-      await invalidate();
-    },
+    onSuccess: invalidate,
   });
 
   const openMutation = useMutation({
@@ -77,24 +75,7 @@ export function useOpportunityActions({
     onSuccess: invalidate,
   });
 
-  /**
-   * The application the caller already sent to this opportunity, if any.
-   *
-   * The API answers a duplicate application with a conflict, so the button
-   * has to know the state before it is pressed.
-   */
-  const [alreadyApplied, setAlreadyApplied] = useState(false);
-
   return {
-    /** The note the applicant is writing. */
-    note,
-    setNote,
-    /** Whether the apply form is open. */
-    isApplying,
-    setIsApplying,
-    /** Whether the caller already applied to this opportunity. */
-    alreadyApplied,
-    setAlreadyApplied,
     /** Applies to the opportunity. */
     apply: applyMutation.mutateAsync,
     /** Whether the apply request is in flight. */

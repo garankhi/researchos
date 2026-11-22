@@ -157,6 +157,7 @@ export function useHubMutation<T>(
               typeof url === 'string' &&
               (url.startsWith('/research-groups') ||
                 url === '/opportunities' ||
+                url.startsWith('/opportunities/') ||
                 url === '/my/applications')
             );
           },
