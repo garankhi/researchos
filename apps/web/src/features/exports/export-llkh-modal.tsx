@@ -109,9 +109,7 @@ export function ExportLlkhModal() {
             </Dialog.Header>
             <Dialog.Body>
               <Dialog.Description mb="4">{t('description')}</Dialog.Description>
-              <chakra.label htmlFor="llkh-format">
-                {t('format')}
-              </chakra.label>
+              <chakra.label htmlFor="llkh-format">{t('format')}</chakra.label>
               <NativeSelect.Root disabled={!!stage}>
                 <NativeSelect.Field
                   id="llkh-format"
