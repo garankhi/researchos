@@ -176,6 +176,21 @@
     "welcome": "Chào mừng, {name}."
   },
   "profile": {
+    "llkh": {
+      "title": "Xuất Lý lịch khoa học",
+      "description": "Hệ thống tự động định dạng tài liệu và phân loại công trình dựa trên thông tin hiện có.",
+      "format": "Định dạng",
+      "word": "Word (.docx)",
+      "excel": "Excel (.xlsx)",
+      "connecting": "Đang kết nối…",
+      "processing": "Đang tổng hợp, phân loại và tạo tài liệu…",
+      "preparing": "Đang chuẩn bị tải xuống…",
+      "failed": "Chưa thể tải tài liệu. Vui lòng thử lại.",
+      "formatted": "Bản định dạng tự động",
+      "fallback": "Bản tổng hợp tiêu chuẩn (dự phòng)",
+      "download": "Tải xuống",
+      "start": "Bắt đầu xuất"
+    },
     "title": "Hồ sơ Nhà nghiên cứu",
     "myProfile": "Hồ sơ của tôi",
     "editProfile": "Chỉnh sửa hồ sơ",

@@ -176,6 +176,21 @@
     "welcome": "Welcome, {name}."
   },
   "profile": {
+    "llkh": {
+      "title": "Export scientific CV",
+      "description": "ResearchOS formats the document and classifies publications using the available information.",
+      "format": "Format",
+      "word": "Word (.docx)",
+      "excel": "Excel (.xlsx)",
+      "connecting": "Connecting…",
+      "processing": "Gathering publications and generating the document…",
+      "preparing": "Preparing the download…",
+      "failed": "The document could not be downloaded. Please try again.",
+      "formatted": "Automatically formatted",
+      "fallback": "Standard summary (fallback)",
+      "download": "Download",
+      "start": "Start export"
+    },
     "title": "Researcher Profile",
     "myProfile": "My Profile",
     "editProfile": "Edit profile",
