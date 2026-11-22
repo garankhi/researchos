@@ -10,6 +10,7 @@ export { PrismaService } from './prisma.service.js';
 export { OutputType } from './output-type.js';
 export {
   BackgroundJobsService,
+  OPPORTUNITY_EXPIRY_JOB,
   RESEARCH_UPDATE_JOB,
 } from './background-jobs.service.js';
 

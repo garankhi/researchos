@@ -9,13 +9,14 @@ import { Prisma } from './generated/prisma/client.js';
 import { PrismaService } from './prisma.service.js';
 
 export const RESEARCH_UPDATE_JOB = 'research-update';
+export const OPPORTUNITY_EXPIRY_JOB = 'opportunity-expiry';
 
-// Admins can operate research updates because these jobs represent shared
-// publication history. Other job kinds remain private to their owners.
+// Admins can operate system jobs and shared publication updates.
 function jobAccess(callerId: string) {
   return Prisma.sql`(
     owner_id = ${callerId}::uuid OR (
-      kind = ${RESEARCH_UPDATE_JOB} AND is_admin(${callerId}::uuid)
+      (kind = ${RESEARCH_UPDATE_JOB} OR owner_id IS NULL)
+      AND is_admin(${callerId}::uuid)
     )
   )`;
 }

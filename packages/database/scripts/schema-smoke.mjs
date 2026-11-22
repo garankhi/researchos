@@ -229,17 +229,8 @@ function migrationFiles() {
     .map((entry) => resolve(MIGRATIONS_DIR, entry, 'migration.sql'));
 }
 
-/**
- * Builds the schema from the schema source.
- *
- * The init migration comes first: it holds `audit_logs` and the enums
- * that predate the domain schema, and they are not in `ResearchOS.sql`.
- */
+/** Builds the schema from the standalone SQL snapshot. */
 async function buildFromSchemaSource(client) {
-  await applySql(
-    client,
-    resolve(MIGRATIONS_DIR, '20261031000000_init', 'migration.sql'),
-  );
   await applySql(client, resolve(DATABASE_DIR, 'ResearchOS.sql'));
 }
 

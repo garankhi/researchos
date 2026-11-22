@@ -33,7 +33,7 @@ export class JobStatusService {
 
   private async toDto(job: {
     id: string;
-    owner_id: string;
+    owner_id: string | null;
     kind: string;
     payload: unknown;
     status: string;
@@ -41,12 +41,13 @@ export class JobStatusService {
   }): Promise<JobDto> {
     const deliveryId =
       job.kind === DIGEST_SEND_JOB ? digestDeliveryId(job.payload) : undefined;
-    const delivery = deliveryId
-      ? await this.prisma.digest_deliveries.findFirst({
-          where: { id: deliveryId, user_id: job.owner_id },
-          select: { attempts: true },
-        })
-      : null;
+    const delivery =
+      deliveryId && job.owner_id
+        ? await this.prisma.digest_deliveries.findFirst({
+            where: { id: deliveryId, user_id: job.owner_id },
+            select: { attempts: true },
+          })
+        : null;
     return {
       id: job.id,
       status: job.status,

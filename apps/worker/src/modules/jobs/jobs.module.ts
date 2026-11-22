@@ -18,6 +18,11 @@ import {
 import { OutboxService } from './outbox.service.js';
 import { ArticlePdfMetadataService } from './article-pdf-metadata.service.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { OpportunityExpiryProcessor } from '../../processors/opportunity-expiry.processor.js';
+import {
+  OPPORTUNITY_EXPIRY_QUEUE,
+  OpportunityExpiryService,
+} from './opportunity-expiry.service.js';
 
 @Module({
   imports: [
@@ -35,6 +40,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
     BullModule.registerQueue({ name: RESEARCH_UPDATES_QUEUE }),
     BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
+    BullModule.registerQueue({ name: OPPORTUNITY_EXPIRY_QUEUE }),
   ],
   providers: [
     ProbeProcessor,
@@ -44,6 +50,8 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     BackgroundJobProcessor,
     ResearchUpdateProcessor,
     OutboxService,
+    OpportunityExpiryService,
+    OpportunityExpiryProcessor,
   ],
 })
 export class JobsModule {}
