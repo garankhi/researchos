@@ -42,6 +42,7 @@ export interface StorageAdapter {
     key: string,
     body: Uint8Array,
     contentType: string,
+    options?: { overwrite?: boolean },
   ): Promise<ObjectMetadata>;
 }
 
@@ -57,7 +58,7 @@ const checksumHeader = 'x-amz-checksum-sha256';
 
 export function createS3Storage(
   env: NodeJS.ProcessEnv = process.env,
-): StorageAdapter {
+): S3Storage {
   const bucket = env.S3_BUCKET?.trim();
   const region = env.S3_REGION?.trim();
   if (!bucket || !region) {
@@ -110,6 +111,18 @@ class S3Storage implements StorageAdapter {
     private readonly client: S3Client,
     private readonly bucket: string,
   ) {}
+
+  createDownloadUrl(key: string, fileName: string): Promise<string> {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ResponseContentDisposition: `attachment; filename="${fileName}"`,
+      }),
+      { expiresIn: 900 },
+    );
+  }
 
   async createUploadUrl({
     key,
@@ -220,6 +233,7 @@ class S3Storage implements StorageAdapter {
     key: string,
     body: Uint8Array,
     contentType: string,
+    { overwrite = false } = {},
   ): Promise<ObjectMetadata> {
     const checksum = createHash('sha256').update(body).digest();
     await this.client.send(
@@ -229,7 +243,7 @@ class S3Storage implements StorageAdapter {
         Body: body,
         ContentType: contentType,
         ChecksumSHA256: checksum.toString('base64'),
-        IfNoneMatch: '*',
+        IfNoneMatch: overwrite ? undefined : '*',
       }),
     );
     return {

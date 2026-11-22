@@ -10,6 +10,13 @@ export const RESEARCH_UPDATES_QUEUE = 'research-updates';
 export const ARTICLE_PDF_METADATA_QUEUE = 'article-pdf-metadata';
 export const DEAD_LETTER_QUEUE = 'dead-letter-jobs';
 export const DURABLE_PROBE_JOB = 'diagnostic-probe';
+export const LLKH_EXPORT_JOB = 'llkh-export';
+export const LLKH_FORMATS = ['docx', 'xlsx'] as const;
+export type LlkhFormat = (typeof LLKH_FORMATS)[number];
+export const LLKH_CONTENT_TYPES: Record<LlkhFormat, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
 export const ARTICLE_PDF_METADATA_JOB = 'article-pdf-metadata';
 export const MAX_ARTICLE_PDF_BYTES = 50 * 1024 * 1024;
 export const DIGEST_SEND_JOB = 'digest-send';
