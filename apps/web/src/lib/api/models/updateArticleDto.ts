@@ -60,7 +60,11 @@ export interface UpdateArticleDto {
   peerReviewed?: boolean | null;
   /** Active ResearchOS Topic IDs confirmed by the submitter. */
   topicIds?: string[];
+  /** Current release ID observed by the editor. */
   expectedRevisionId: string;
-  /** @minItems 1 */
+  /**
+   * The complete byline in publication order. Omit to keep the current byline.
+   * @minItems 1
+   */
   authors?: UpdateArticleAuthorDto[];
 }

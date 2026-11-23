@@ -12,7 +12,12 @@ export class UpdateArticleAbstractDto {
   @IsUUID(undefined, { message: 'id_uuid' })
   expectedRevisionId!: string;
 
-  @ApiProperty({ type: String, maxLength: 20_000, minLength: 1 })
+  @ApiProperty({
+    type: String,
+    maxLength: 20_000,
+    minLength: 1,
+    description: 'The non-empty abstract to save on the Article.',
+  })
   @Transform(trimText)
   @IsString({ message: 'abstract_invalid' })
   @IsNotEmpty({ message: 'abstract_invalid' })

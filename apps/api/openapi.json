@@ -12947,10 +12947,12 @@
           },
           "expectedRevisionId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Current release ID observed by the editor."
           },
           "authors": {
             "minItems": 1,
+            "description": "The complete byline in publication order. Omit to keep the current byline.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UpdateArticleAuthorDto"
@@ -12972,7 +12974,8 @@
           "abstract": {
             "type": "string",
             "maxLength": 20000,
-            "minLength": 1
+            "minLength": 1,
+            "description": "The non-empty abstract to save on the Article."
           }
         },
         "required": [

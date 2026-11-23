@@ -10,6 +10,7 @@ export interface UpdateArticleAbstractDto {
   /** Current release ID observed by the editor. */
   expectedRevisionId: string;
   /**
+   * The non-empty abstract to save on the Article.
    * @minLength 1
    * @maxLength 20000
    */

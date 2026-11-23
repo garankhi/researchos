@@ -44,11 +44,20 @@ export class UpdateArticleDto extends PartialType(
   ]),
   { skipNullProperties: false },
 ) {
-  @ApiProperty({ type: String, format: 'uuid' })
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    description: 'Current release ID observed by the editor.',
+  })
   @IsUUID(undefined, { message: 'id_uuid' })
   expectedRevisionId!: string;
 
-  @ApiPropertyOptional({ type: [UpdateArticleAuthorDto], minItems: 1 })
+  @ApiPropertyOptional({
+    type: [UpdateArticleAuthorDto],
+    minItems: 1,
+    description:
+      'The complete byline in publication order. Omit to keep the current byline.',
+  })
   @ValidateIf((_object, value) => value !== undefined)
   @IsArray({ message: 'article_authors_invalid' })
   @ArrayNotEmpty({ message: 'article_authors_invalid' })
