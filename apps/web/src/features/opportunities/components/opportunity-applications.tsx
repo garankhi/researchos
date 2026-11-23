@@ -22,8 +22,10 @@ function statusPalette(status: Application['status']) {
   switch (status) {
     case 'PENDING':
       return 'orange' as const;
-    case 'INVITED_TO_DISCUSS':
+    case 'ACCEPTED':
       return 'green' as const;
+    case 'INVITED_TO_DISCUSS':
+      return 'blue' as const;
     case 'DECLINED':
       return 'red' as const;
     default:

@@ -20,6 +20,7 @@ const opportunity: Opportunity = {
   description:
     'Our group is looking for a researcher to join an ongoing experimental programme on coupled optical resonators.',
   responseSlaDays: 14,
+  autoFillOnAcceptance: false,
   applicationDeadline: '2026-12-31T23:59:00.000Z',
   status: 'OPEN',
   publishedAt: '2026-11-01T09:00:00.000Z',

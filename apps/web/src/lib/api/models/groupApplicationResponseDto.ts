@@ -5,9 +5,15 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { AcceptedGroupMembershipDto } from './acceptedGroupMembershipDto';
 import type { GroupApplicationResponseDtoStatus } from './groupApplicationResponseDtoStatus';
 
 export interface GroupApplicationResponseDto {
+  /**
+   * Current active membership returned when accepting a group application. Personal applications have no group membership.
+   * @nullable
+   */
+  membership?: AcceptedGroupMembershipDto | null;
   /** Application identifier. */
   id: string;
   /** Opportunity receiving the application. */

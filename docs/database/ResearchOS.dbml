@@ -7,6 +7,31 @@ Project researchos {
   Note: '''Fresh database design. MVP uses provisioned email/password accounts; OIDC is a future alternative on the same user. Active faculty are researchers; students/staff need a RESEARCHER grant. ADMIN is independent and does not bypass resource ownership/visibility. Personal output releases require output ownership, not group approval. Group leaders accept a pinned released revision for their group only. Other creates LOCAL topics immediately. Taxonomy: OpenAlex Field -> Subfield -> Topic, without Domain. SQL adds constraints, triggers and query helpers; backend authenticates the actor and applies authorization.'''
 }
 
+Enum SourceKind {
+  SELF_DECLARED
+  IMPORTED
+  AI_INFERRED
+  SYSTEM
+}
+Enum VerificationStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+Enum Visibility {
+  PRIVATE
+  GROUP
+  INSTITUTION
+  PUBLIC
+}
+Enum PublicationStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
 Enum user_type { 
   FACULTY
   STUDENT
@@ -99,6 +124,7 @@ Enum opportunity_application_status {
   INVITED_TO_DISCUSS
   DECLINED
   WITHDRAWN
+  ACCEPTED
 }
 Enum expected_role_type {
   CO_PI
@@ -226,10 +252,26 @@ Enum delivery_status {
 
 // Durable infrastructure jobs. Owning features insert the job and outbox in
 // the same transaction as their business write. Redis is transport only.
+Table audit_logs {
+  id text [pk]
+  actor_id text
+  action varchar(64) [not null]
+  entity varchar(64) [not null]
+  entity_id text [not null]
+  payload jsonb
+  created_at timestamptz(3) [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (entity, entity_id) [name: 'audit_logs_entity_entity_id_idx']
+    actor_id [name: 'audit_logs_actor_id_idx']
+    created_at [name: 'audit_logs_created_at_idx']
+  }
+}
+
 Table background_jobs {
   id uuid [pk, default: `gen_random_uuid()`]
   queue_prefix varchar(128) [not null, default: 'researchos']
-  owner_id uuid [not null]
+  owner_id uuid
   kind varchar(64) [not null]
   idempotency_key varchar(128) [not null]
   payload jsonb [not null]
@@ -264,7 +306,7 @@ Table outbox {
     `destination IN ('WORK','DLQ') AND generation >= 0` [name: 'ck_outbox_destination']
   }
 }
-Ref: background_jobs.owner_id > users.id [delete: cascade, update: no action]
+Ref: background_jobs.owner_id >? users.id [delete: cascade, update: no action]
 Ref: outbox.job_id > background_jobs.id [delete: cascade, update: no action]
 
 Table users {
@@ -821,6 +863,7 @@ Table research_opportunities {
   required_expertise_tags text[]
   description text
   response_sla_days int [not null, default: 5]
+  auto_fill_on_acceptance boolean [not null, default: false]
   application_deadline timestamptz
   status opportunity_status [not null, default: 'DRAFT']
   published_at timestamptz
@@ -855,7 +898,7 @@ Table opportunity_applications {
   withdrawn_at timestamptz
   checks {
     `response_due_at >= applied_at` [name: 'ck_response_deadline']
-    `(status IN ('PENDING', 'WITHDRAWN') AND responded_by IS NULL AND responded_at IS NULL) OR (status IN ('INVITED_TO_DISCUSS', 'DECLINED') AND responded_by IS NOT NULL AND responded_at IS NOT NULL AND responded_at >= applied_at)` [name: 'ck_application_response']
+    `(status IN ('PENDING', 'WITHDRAWN') AND responded_by IS NULL AND responded_at IS NULL) OR (status::text IN ('INVITED_TO_DISCUSS', 'DECLINED', 'ACCEPTED') AND responded_by IS NOT NULL AND responded_at IS NOT NULL AND responded_at >= applied_at)` [name: 'ck_application_response']
     `(status = 'WITHDRAWN' AND withdrawn_at IS NOT NULL AND withdrawn_at >= applied_at) OR (status <> 'WITHDRAWN' AND withdrawn_at IS NULL)` [name: 'ck_application_withdrawal']
   }
   indexes {

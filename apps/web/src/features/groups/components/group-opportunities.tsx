@@ -85,6 +85,19 @@ function OpportunityEditor({
           label: t('expertiseTags'),
           initial: opportunity?.requiredExpertiseTags.join(', '),
         },
+        ...(!opportunity || opportunity.status === 'DRAFT'
+          ? [
+              {
+                name: 'autoFillOnAcceptance',
+                label: t('fillPolicy'),
+                initial: String(opportunity?.autoFillOnAcceptance ?? false),
+                options: [
+                  { value: 'false', label: t('manualFill') },
+                  { value: 'true', label: t('singleApplicant') },
+                ],
+              },
+            ]
+          : []),
         {
           name: 'responseSlaDays',
           label: t('slaDays'),
@@ -113,6 +126,10 @@ function OpportunityEditor({
             .map((tag) => tag.trim())
             .filter(Boolean),
           responseSlaDays: Number(values.responseSlaDays),
+          autoFillOnAcceptance:
+            values.autoFillOnAcceptance === undefined
+              ? undefined
+              : values.autoFillOnAcceptance === 'true',
           applicationDeadline: values.applicationDeadline
             ? new Date(values.applicationDeadline).toISOString()
             : null,

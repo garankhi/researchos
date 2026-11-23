@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import {
   PrismaService,
+  OPPORTUNITY_EXPIRY_JOB,
   RESEARCH_UPDATE_JOB,
   type Prisma,
 } from '@researchos/database';
@@ -16,6 +17,7 @@ import {
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
+import { expireOpportunityBatch } from '../modules/jobs/opportunity-expiry.service.js';
 import { researchUpdateScope } from '../modules/jobs/research-update-scope.js';
 
 type BackgroundJobOutcome =
@@ -33,6 +35,7 @@ type BackgroundJobHandler = (
 
 const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
   [DURABLE_PROBE_JOB, runDiagnosticProbe],
+  [OPPORTUNITY_EXPIRY_JOB, runOpportunityExpiry],
   [RESEARCH_UPDATE_JOB, publishResearchUpdate],
 ]);
 
@@ -103,15 +106,42 @@ async function publishResearchUpdate({
   return { result: { eventKey: payload.eventKey } };
 }
 
+async function runOpportunityExpiry({
+  job,
+  tx,
+}: BackgroundJobContext): Promise<BackgroundJobOutcome> {
+  const batchSize = (job.payload as { batchSize?: number } | null)?.batchSize;
+  if (
+    job.owner_id !== null ||
+    typeof batchSize !== 'number' ||
+    !Number.isInteger(batchSize) ||
+    batchSize < 1 ||
+    batchSize > 1_000
+  ) {
+    return unsupportedJob();
+  }
+  await tx.$executeRaw`SAVEPOINT opportunity_expiry`;
+  try {
+    const result = await expireOpportunityBatch(tx, batchSize);
+    await tx.$executeRaw`RELEASE SAVEPOINT opportunity_expiry`;
+    return { result };
+  } catch {
+    await tx.$executeRaw`ROLLBACK TO SAVEPOINT opportunity_expiry`;
+    return { error: new Error('Opportunity expiry batch failed') };
+  }
+}
+
 @Injectable()
 export class BackgroundJobRunner {
+  private readonly logger = new Logger(BackgroundJobRunner.name);
+
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async process(job: Job<BackgroundJobPayload>, scope: string): Promise<void> {
     if (!isBackgroundJobPayload(job.data)) {
       throw new UnrecoverableError('Invalid background job reference');
     }
-    const failure = await this.prisma.$transaction(async (tx) => {
+    const completed = await this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM background_jobs WHERE id = ${job.data.jobId}::uuid FOR UPDATE
       `;
@@ -162,10 +192,25 @@ export class BackgroundJobRunner {
             : {}),
         },
       });
-      return error;
+      return { error, outcome, attempts, terminal, kind: stored.kind };
     });
+    if (completed?.kind === OPPORTUNITY_EXPIRY_JOB) {
+      if ('result' in completed.outcome) {
+        this.logger.log({
+          event: 'opportunity_expiry_completed',
+          metrics: completed.outcome.result,
+        });
+      } else {
+        this.logger.warn({
+          event: 'opportunity_expiry_failed',
+          jobId: job.data.jobId,
+          attempt: completed.attempts,
+          terminal: completed.terminal,
+        });
+      }
+    }
     // Throw only after persisting the failed attempt/DLQ transaction.
-    if (failure) throw failure;
+    if (completed?.error) throw completed.error;
   }
 }
 

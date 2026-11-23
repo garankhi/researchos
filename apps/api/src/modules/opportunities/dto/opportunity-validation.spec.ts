@@ -59,6 +59,8 @@ describe('Opportunity request validation', () => {
     ).resolves.toMatchObject(valid);
   });
   it.each([
+    { autoFillOnAcceptance: 'false' },
+    { autoFillOnAcceptance: null },
     { responseSlaDays: 0 },
     { responseSlaDays: -1 },
     { responseSlaDays: 1.5 },

@@ -24,8 +24,10 @@ function statusPalette(status: Application['status']) {
   switch (status) {
     case 'PENDING':
       return 'orange' as const;
-    case 'INVITED_TO_DISCUSS':
+    case 'ACCEPTED':
       return 'green' as const;
+    case 'INVITED_TO_DISCUSS':
+      return 'blue' as const;
     case 'DECLINED':
       return 'red' as const;
     default:
@@ -216,6 +218,28 @@ export function GroupApplications({
                             })
                           }
                         />
+                        <HubEditor
+                          groupId={groupId}
+                          label={t('acceptApplication')}
+                          title={t('acceptApplication')}
+                          submitLabel={t('acceptApplication')}
+                          fields={[
+                            {
+                              name: 'responseNote',
+                              label: t('responseNote'),
+                              type: 'textarea',
+                              max: 10000,
+                            },
+                          ]}
+                          submit={(values) =>
+                            applicationsControllerRespond(application.id, {
+                              decision: 'ACCEPTED',
+                              responseNote: values.responseNote || null,
+                            })
+                          }
+                        >
+                          <Text>{t('acceptMembershipConfirmation')}</Text>
+                        </HubEditor>
                       </HubMenu>
                     </Flex>
                   ) : null}

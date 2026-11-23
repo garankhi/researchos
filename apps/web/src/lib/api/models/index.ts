@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 
+export * from './acceptedGroupMembershipDto';
+export * from './acceptedGroupMembershipDtoRole';
 export * from './addChatParticipantDto';
 export * from './addGroupMemberDto';
 export * from './addGroupMemberDtoRole';
@@ -169,6 +171,7 @@ export * from './opportunityPageDto';
 export * from './opportunityPageDtoEnvelope';
 export * from './opportunityResponseDto';
 export * from './opportunityResponseDtoEnvelope';
+export * from './opportunityResponseDtoMyApplicationStatus';
 export * from './opportunityResponseDtoOpportunityKind';
 export * from './opportunityResponseDtoStatus';
 export * from './opportunityResponseDtoTargetAudience';

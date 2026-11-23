@@ -250,6 +250,7 @@
     },
     "applicationStatus": {
       "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
       "INVITED_TO_DISCUSS": "Invited to discuss",
       "DECLINED": "Declined",
       "WITHDRAWN": "Withdrawn"
@@ -578,6 +579,9 @@
         "application_access_denied": "You do not have permission to act on this application.",
         "application_already_answered": "This application has already been answered.",
         "application_already_withdrawn": "This application has already been withdrawn.",
+        "application_note_required": "Enter an application note.",
+        "application_note_too_long": "Use 10,000 characters or fewer.",
+        "application_capacity_reached": "This opportunity already has an accepted applicant.",
         "application_invalid_state": "The application is not in a state that allows this action.",
         "field_not_found": "The requested research field was not found.",
         "topic_not_found": "The requested research topic was not found.",
@@ -818,6 +822,11 @@
     }
   },
   "groups": {
+    "acceptApplication": "Accept application",
+    "acceptMembershipConfirmation": "Accepting adds the applicant to the group as a Member. Current members keep their existing role.",
+    "fillPolicy": "Fill policy",
+    "manualFill": "Fill manually",
+    "singleApplicant": "Fill after one acceptance",
     "actions": "Group actions",
     "managementView": "Management view",
     "readonlyView": "Read-only view",
@@ -959,6 +968,7 @@
     }
   },
   "opportunities": {
+    "applicationStatus": "Your application: {status}",
     "loadError": "Could not load this opportunity",
     "accessDeniedTitle": "You cannot view this opportunity",
     "accessDeniedMessage": "You do not have access to this opportunity.",
@@ -1025,6 +1035,7 @@
       "ANY_RESEARCHER": "Any researcher"
     },
     "applicationStatuses": {
+      "ACCEPTED": "Accepted",
       "PENDING": "Pending",
       "INVITED_TO_DISCUSS": "Invited to discuss",
       "DECLINED": "Declined",

@@ -20,13 +20,16 @@ import { useMyApplications } from '../../hooks/use-my-applications';
 import type { ApplicationResponseDto } from '../../types';
 import { ProfileTabSkeleton } from '../profile-skeletons';
 
-function getStatusPalette(status: string): 'blue' | 'green' | 'red' | 'gray' {
+function getStatusPalette(
+  status: string,
+): 'blue' | 'green' | 'orange' | 'red' | 'gray' {
   switch (status) {
     case 'PENDING':
-      return 'blue';
+      return 'orange';
     case 'ACCEPTED':
-    case 'INVITED_TO_DISCUSS':
       return 'green';
+    case 'INVITED_TO_DISCUSS':
+      return 'blue';
     case 'DECLINED':
     case 'REJECTED':
       return 'red';

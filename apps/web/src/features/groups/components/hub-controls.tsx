@@ -252,6 +252,7 @@ export function HubEditor({
   title,
   fields,
   submit,
+  submitLabel,
   children,
   onSaved,
   resetKey,
@@ -262,6 +263,7 @@ export function HubEditor({
   fields: HubField[];
   submit: (values: Record<string, string>) => Promise<unknown>;
   children?: ReactNode;
+  submitLabel?: string;
   onSaved?: () => void;
   /**
    * When this changes, the form is reset to the current field values.
@@ -307,7 +309,7 @@ export function HubEditor({
         open={open}
         onClose={() => setOpen(false)}
         title={title}
-        submitLabel={t('save')}
+        submitLabel={submitLabel ?? t('save')}
         cancelLabel={t('cancel')}
         resolver={zodResolver(schema)}
         defaultValues={defaultValues}

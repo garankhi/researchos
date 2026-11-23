@@ -1,12 +1,23 @@
 'use client';
 
-import { Button, Text, Textarea } from '@chakra-ui/react';
-import { useState } from 'react';
+import { Button, Text } from '@chakra-ui/react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRef, useState } from 'react';
+import { z } from 'zod';
 import { useTranslations } from 'next-intl';
 import { ErrorState } from '@/components/ui/feedback';
 import { FormModal } from '@/components/ui/form-modal';
+import { FormTextarea } from '@/components/ui/form';
 import { apiErrorCode } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
+
+const noteSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(1, 'application_note_required')
+    .max(10000, 'application_note_too_long'),
+});
 
 /**
  * The action that applies to an opportunity.
@@ -28,31 +39,42 @@ export function OpportunityApplyButton({
   const tErrors = useTranslations('errors');
 
   const [open, setOpen] = useState(false);
-  const [note, setNote] = useState('');
   const [error, setError] = useState<unknown>(null);
+  const submitting = useRef(false);
 
-  async function handleApply() {
+  async function handleApply({ note }: z.infer<typeof noteSchema>) {
+    if (submitting.current) return;
+    submitting.current = true;
     setError(null);
     try {
       await onApply(note);
-      setNote('');
       setOpen(false);
     } catch (failure) {
       setError(failure);
+    } finally {
+      submitting.current = false;
     }
   }
 
   return (
-    <FormModal
+    <FormModal<z.infer<typeof noteSchema>>
       open={open}
       onClose={() => setOpen(false)}
       title={t('applyTitle')}
       submitLabel={t('applySubmit')}
       isSubmitting={isBusy}
-      isSubmitDisabled={note.trim().length === 0}
+      resolver={zodResolver(noteSchema)}
+      defaultValues={{ note: '' }}
       onSubmit={handleApply}
       trigger={
-        <Button size="sm" disabled={!canApply}>
+        <Button
+          size="sm"
+          disabled={!canApply}
+          onClick={() => {
+            setError(null);
+            setOpen(true);
+          }}
+        >
           {t('apply')}
         </Button>
       }
@@ -61,14 +83,14 @@ export function OpportunityApplyButton({
         {t('applyDescription')}
       </Text>
 
-      <Textarea
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
+      <FormTextarea
+        name="note"
+        label={t('applyNoteLabel')}
         placeholder={t('applyNotePlaceholder')}
-        aria-label={t('applyNoteLabel')}
         maxLength={10000}
         rows={6}
         disabled={isBusy}
+        required
       />
 
       {error ? (

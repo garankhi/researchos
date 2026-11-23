@@ -17,4 +17,5 @@ export const GroupApplicationResponseDtoStatus = {
   INVITED_TO_DISCUSS: 'INVITED_TO_DISCUSS',
   DECLINED: 'DECLINED',
   WITHDRAWN: 'WITHDRAWN',
+  ACCEPTED: 'ACCEPTED',
 } as const;

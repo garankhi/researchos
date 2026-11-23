@@ -42,6 +42,8 @@ export interface CreateOpportunityDto {
    * @nullable
    */
   description?: string | null;
+  /** Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft. */
+  autoFillOnAcceptance?: boolean;
   /**
    * Response SLA in calendar days, including weekends and holidays.
    * @minimum 1

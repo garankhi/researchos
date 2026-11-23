@@ -3,8 +3,9 @@
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { setTimeout as wait } from 'node:timers/promises';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -55,24 +56,20 @@ try {
   console.log(
     `Testing ${(await db.query('SELECT version()')).rows[0].version} in ${name}`,
   );
-  await db.query(await sql('ResearchOS.sql'));
-  const tablesBefore = (
-    await db.query(
-      "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
-    )
-  ).rows;
-  const migration = await sql('migrations/RES-121-opportunity-idempotency.sql');
-  await check('migration applies twice without adding tables', async () => {
-    await db.query(migration);
-    await db.query(migration);
-    assert.deepEqual(
-      (
-        await db.query(
-          "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
-        )
-      ).rows,
-      tablesBefore,
+  await check('applies the complete Prisma migration chain', async () => {
+    const migrations = new URL(
+      '../../../packages/database/prisma/migrations/',
+      import.meta.url,
     );
+    const entries = await readdir(migrations, { withFileTypes: true });
+    const names = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    for (const migration of names) {
+      const file = new URL(`${migration}/migration.sql`, migrations);
+      await db.query(await readFile(file, 'utf8'));
+    }
   });
   for (const file of [
     'schema-smoke.sql',
@@ -99,6 +96,9 @@ try {
       'guest',
       'admin',
       'inactive',
+      'expiredSession',
+      'revokedSession',
+      'freshApplicant',
     ].map((role) => [role, randomUUID()]),
   );
   const tokens = {};
@@ -257,7 +257,7 @@ try {
     },
   );
   await check(
-    'migration policy agrees with API for creator, lead, core and denied actors',
+    'group opportunity management follows current group leadership',
     async () => {
       const scoped = randomUUID();
       // The creator is deliberately neither group lead nor member: verify the
@@ -276,7 +276,7 @@ try {
         'admin',
         'inactive',
       ]) {
-        const allowed = ['creator', 'lead', 'core'].includes(role);
+        const allowed = ['lead', 'core'].includes(role);
         assert.equal(
           (
             await db.query('SELECT can_manage_opportunity($1,$2) AS allowed', [
@@ -305,8 +305,8 @@ try {
       await http
         .patch(`/opportunities/${scoped}`)
         .set(as('creator'))
-        .send({ title: 'Still creator' })
-        .expect(200);
+        .send({ title: 'Inactive group creator' })
+        .expect(403);
       await db.query('UPDATE research_groups SET is_active=true WHERE id=$1', [
         groupId,
       ]);
@@ -317,16 +317,21 @@ try {
       );
       for (const role of ['creator', 'lead', 'core', 'collaborator']) {
         const application = randomUUID();
+        const applicant = randomUUID();
+        await db.query(
+          "INSERT INTO users(id,user_type,email,full_name,department_unit) VALUES($1,'FACULTY',$2,'Test applicant','Integration')",
+          [applicant, `${applicant}@res121.test.invalid`],
+        );
         await db.query(
           "INSERT INTO opportunity_applications(id,opportunity_id,applicant_id,applicant_note) VALUES($1,$2,$3,'Interested')",
-          [application, scoped, ids.applicant],
+          [application, scoped, applicant],
         );
         const response = () =>
           db.query(
             "UPDATE opportunity_applications SET status='DECLINED',responded_by=$1 WHERE id=$2",
             [ids[role], application],
           );
-        if (role === 'collaborator') {
+        if (role === 'collaborator' || role === 'creator') {
           await assert.rejects(response(), { code: '23514' });
           await db.query(
             "UPDATE opportunity_applications SET status='WITHDRAWN' WHERE id=$1",
@@ -343,13 +348,6 @@ try {
             ).rows[0].stamped,
             true,
           );
-          // A different applicant keeps each answered row and its history.
-          const nextApplicant = randomUUID();
-          await db.query(
-            "INSERT INTO users(id,user_type,email,full_name,department_unit) VALUES($1,'FACULTY',$2,'Next applicant','Integration')",
-            [nextApplicant, `${nextApplicant}@res121.test.invalid`],
-          );
-          ids.applicant = nextApplicant;
         }
       }
     },
@@ -380,14 +378,14 @@ try {
       await http.get('/opportunities').set(as('guest')).expect(403);
       await db.query(
         "UPDATE user_sessions SET expires_at=created_at+interval '1 microsecond',idle_expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",
-        [ids.outsider],
+        [ids.expiredSession],
       );
-      await http.get('/opportunities').set(as('outsider')).expect(401);
+      await http.get('/opportunities').set(as('expiredSession')).expect(401);
       await db.query(
         "UPDATE user_sessions SET revoked_at=clock_timestamp(),revocation_reason='TEST' WHERE user_id=$1",
-        [ids.collaborator],
+        [ids.revokedSession],
       );
-      await http.get('/opportunities').set(as('collaborator')).expect(401);
+      await http.get('/opportunities').set(as('revokedSession')).expect(401);
     },
   );
   await check(
@@ -455,9 +453,9 @@ try {
       await http
         .get(`/opportunities/${personal.id}`)
         .set(as('lead'))
-        .expect(404);
+        .expect(403);
       const list = await http
-        .get('/opportunities?page=1&pageSize=2')
+        .get('/opportunities?page=1&limit=2')
         .set(as('creator'))
         .expect(200);
       assert.ok(list.body.data.items.length <= 2);
@@ -476,6 +474,224 @@ try {
         .expect(400);
     },
   );
+  async function publication(singleApplicant) {
+    const {
+      rows: [opportunity],
+    } = await db.query(
+      "INSERT INTO research_opportunities (group_id,creator_id,title,description,opportunity_kind,application_deadline,auto_fill_on_acceptance) VALUES ($1,$2,'Acceptance integration','Details','RESEARCH_COLLABORATION',clock_timestamp()+interval '1 day',$3) RETURNING id",
+      [groupId, ids.lead, singleApplicant],
+    );
+    await db.query(
+      "UPDATE research_opportunities SET status='OPEN' WHERE id=$1",
+      [opportunity.id],
+    );
+    return opportunity.id;
+  }
+
+  async function applyTo(opportunityId, actor) {
+    const response = await http
+      .post(`/opportunities/${opportunityId}/applications`)
+      .set(as(actor))
+      .send({ applicantNote: 'Interested' })
+      .expect(201);
+    return response.body.data.id;
+  }
+
+  function accept(applicationId, role = 'lead') {
+    return http
+      .post(`/applications/${applicationId}/respond`)
+      .set(as(role))
+      .send({ decision: 'ACCEPTED', responseNote: 'Welcome' });
+  }
+
+  await check(
+    'opportunity detail returns only the signed-in applicant status',
+    async () => {
+      const opportunityId = await publication(false);
+      await applyTo(opportunityId, 'freshApplicant');
+      const path = `/opportunities/${opportunityId}`;
+      const mine = await http.get(path).set(as('freshApplicant')).expect(200);
+      assert.equal(mine.body.data.myApplicationStatus, 'PENDING');
+      const other = await http.get(path).set(as('lead')).expect(200);
+      assert.equal(other.body.data.myApplicationStatus, null);
+    },
+  );
+
+  for (const change of ['revoke role', 'archive group']) {
+    await check(
+      `acceptance rechecks authorization after concurrent ${change}`,
+      async () => {
+        const opportunityId = await publication(false);
+        const applicationId = await applyTo(opportunityId, 'freshApplicant');
+        const editor = new Client({ connectionString: testUrl.href });
+        await editor.connect();
+        let acceptance;
+        try {
+          const {
+            rows: [{ pid }],
+          } = await editor.query('SELECT pg_backend_pid() AS pid');
+          await editor.query('BEGIN');
+          await editor.query(
+            'SELECT id FROM research_groups WHERE id=$1 FOR UPDATE',
+            [groupId],
+          );
+          if (change === 'archive group') {
+            await editor.query(
+              'UPDATE research_groups SET is_active=false WHERE id=$1',
+              [groupId],
+            );
+          } else {
+            await editor.query(
+              "UPDATE group_members SET role='MEMBER' WHERE group_id=$1 AND user_id=$2",
+              [groupId, ids.core],
+            );
+          }
+          acceptance = accept(applicationId, 'core').then(
+            (response) => response,
+          );
+          const timeout = Date.now() + 3_000;
+          let blocked = false;
+          while (!blocked && Date.now() < timeout) {
+            const {
+              rows: [state],
+            } = await db.query(
+              'SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1::int = ANY(pg_blocking_pids(pid))) AS blocked',
+              [pid],
+            );
+            blocked = state.blocked;
+            if (!blocked) await wait(25);
+          }
+          assert.equal(
+            blocked,
+            true,
+            'acceptance should wait for the group lock',
+          );
+          await editor.query('COMMIT');
+          assert.equal((await acceptance).status, 403);
+          const {
+            rows: [outcome],
+          } = await db.query(
+            'SELECT status, EXISTS (SELECT 1 FROM group_members WHERE group_id=$2 AND user_id=applicant_id) AS added FROM opportunity_applications WHERE id=$1',
+            [applicationId, groupId],
+          );
+          assert.deepEqual(outcome, { status: 'PENDING', added: false });
+        } finally {
+          await editor.end();
+          await acceptance;
+          await db.query(
+            'UPDATE research_groups SET is_active=true WHERE id=$1',
+            [groupId],
+          );
+          await db.query(
+            "UPDATE group_members SET role='GROUP_LEADER' WHERE group_id=$1 AND user_id=$2",
+            [groupId, ids.core],
+          );
+        }
+      },
+    );
+  }
+
+  await check(
+    'concurrent single-applicant decisions commit one acceptance and fill audit',
+    async () => {
+      const opportunityId = await publication(true);
+      const applications = await Promise.all([
+        applyTo(opportunityId, 'applicant'),
+        applyTo(opportunityId, 'outsider'),
+      ]);
+      const results = await Promise.all(
+        applications.map((applicationId) => accept(applicationId)),
+      );
+      assert.deepEqual(results.map(({ status }) => status).sort(), [200, 409]);
+      const [winner] = results.filter(({ status }) => status === 200);
+      assert.equal(winner.body.data.membership.role, 'MEMBER');
+      const once = await accept(winner.body.data.id).expect(200);
+      assert.equal(once.body.data.respondedAt, winner.body.data.respondedAt);
+      const audits = await db.query(
+        "SELECT payload FROM audit_logs WHERE entity_id=$1 AND payload->>'reason'='APPLICATION_ACCEPTED'",
+        [opportunityId],
+      );
+      assert.equal(audits.rowCount, 1);
+      assert.equal(
+        (
+          await db.query(
+            'SELECT status FROM research_opportunities WHERE id=$1',
+            [opportunityId],
+          )
+        ).rows[0].status,
+        'FILLED',
+      );
+      await http
+        .post(`/opportunities/${opportunityId}/applications`)
+        .set(as('collaborator'))
+        .send({ applicantNote: 'Too late' })
+        .expect(409);
+    },
+  );
+
+  await check(
+    'delegated response preserves an existing role and manual-fill status',
+    async () => {
+      const opportunityId = await publication(false);
+      const applicationId = await applyTo(opportunityId, 'core');
+      await accept(applicationId, 'outsider').expect(403);
+      const result = await accept(applicationId, 'core').expect(200);
+      assert.equal(result.body.data.membership.role, 'GROUP_LEADER');
+      assert.equal(
+        (
+          await db.query(
+            'SELECT status FROM research_opportunities WHERE id=$1',
+            [opportunityId],
+          )
+        ).rows[0].status,
+        'OPEN',
+      );
+    },
+  );
+
+  await check(
+    'post-cutoff acceptance enrolls the applicant and leaves expiry to the worker',
+    async () => {
+      const opportunityId = await publication(true);
+      const applicationId = await applyTo(opportunityId, 'collaborator');
+      await db.query(
+        'UPDATE research_opportunities SET application_deadline=clock_timestamp() WHERE id=$1',
+        [opportunityId],
+      );
+      const result = await accept(applicationId).expect(200);
+      assert.equal(result.body.data.membership.role, 'MEMBER');
+      assert.equal(
+        (
+          await db.query(
+            'SELECT status FROM research_opportunities WHERE id=$1',
+            [opportunityId],
+          )
+        ).rows[0].status,
+        'OPEN',
+      );
+      await db.query(
+        "UPDATE research_opportunities SET status='EXPIRED' WHERE id=$1",
+        [opportunityId],
+      );
+      await accept(applicationId).expect(200);
+    },
+  );
+
+  if (process.env.RES156_TEST_REDIS_URL) {
+    const { verifyScheduledExpiry } =
+      await import('./verify-scheduled-expiry.mjs');
+    await check(
+      'standalone workers expire opportunities without API reads and recover after failure',
+      () =>
+        verifyScheduledExpiry({
+          db,
+          databaseUrl: testUrl.href,
+          redisUrl: process.env.RES156_TEST_REDIS_URL,
+          ownerId: ids.creator,
+        }),
+    );
+  }
+
   console.log(`${checks} live PostgreSQL checks passed.`);
 } finally {
   if (app) await app.close();
