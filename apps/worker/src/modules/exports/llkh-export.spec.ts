@@ -42,7 +42,7 @@ describe('LLKH export', () => {
       rows.push(row);
     });
     const title = rows.find(
-      (row) => row.getCell(1).text === data.outputs[0].title,
+      (row) => row.getCell(1).text === `1. ${data.outputs[0].title}`,
     )!;
     const authors = rows.find((row) =>
       row.getCell(1).text.includes('Trần Thị Bích'),
@@ -52,6 +52,40 @@ describe('LLKH export', () => {
     expect(authors.alignment.wrapText).toBe(true);
     expect(doi.getCell(1).hyperlink).toBe('https://doi.org/10.1234/example');
   });
+
+  it.each([true, false])(
+    'numbers works in display order (formatted: %s)',
+    async (formatted) => {
+      const journal = {
+        ...data.outputs[0],
+        sources: ['SCOPUS'],
+        title: 'Bài tạp chí',
+      };
+      const conference = {
+        ...data.outputs[0],
+        type: 'CONFERENCE_PAPER',
+        title: 'Bài hội nghị',
+      };
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(
+        await renderLlkh(
+          { ...data, outputs: [conference, journal] },
+          'xlsx',
+          formatted,
+        ),
+      );
+      const titles: string[] = [];
+      workbook.getWorksheet('LLKH')!.eachRow((row) => {
+        if (/^\d+\. /.test(row.getCell(1).text))
+          titles.push(row.getCell(1).text);
+      });
+      expect(titles).toEqual(
+        formatted
+          ? ['1. Bài tạp chí', '2. Bài hội nghị']
+          : ['1. Bài hội nghị', '2. Bài tạp chí'],
+      );
+    },
+  );
 
   it.each([
     [{ sources: ['SCOPUS'] }, 'indexed'],

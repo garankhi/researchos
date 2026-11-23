@@ -51,14 +51,14 @@ function webUrl(value: string | null): string | undefined {
     : undefined;
 }
 
-function publicationBlock(output: Publication): Line[] {
+function publicationBlock(output: Publication, number: number): Line[] {
   const doi = normalizeArticleDoi(output.doi);
   const metadata = [
     output.date,
     outputTypes[output.type] ?? output.type,
     output.status === 'DRAFT' ? 'Bản nháp' : 'Đã chia sẻ',
   ].filter(Boolean);
-  const lines: Line[] = [{ kind: 'work', text: output.title }];
+  const lines: Line[] = [{ kind: 'work', text: `${number}. ${output.title}` }];
   const venue = output.venue || output.publisher;
   if (venue) lines.push({ kind: 'body', text: venue });
   lines.push({ kind: 'body', text: metadata.join('  |  ') });
@@ -109,7 +109,9 @@ function buildBlocks(data: LlkhData, formatted: boolean): Line[][] {
     return [
       ...blocks,
       ...(data.outputs.length
-        ? data.outputs.map(publicationBlock)
+        ? data.outputs.map((output, index) =>
+            publicationBlock(output, index + 1),
+          )
         : [[{ kind: 'body' as const, text: 'Chưa có công trình khoa học.' }]]),
     ];
   }
@@ -121,6 +123,7 @@ function buildBlocks(data: LlkhData, formatted: boolean): Line[][] {
     if (publications) publications.push(output);
     else groups.set(group, [output]);
   }
+  let nextNumber = 1;
   for (const group of Object.keys(
     publicationGroups,
   ) as (keyof typeof publicationGroups)[]) {
@@ -128,8 +131,11 @@ function buildBlocks(data: LlkhData, formatted: boolean): Line[][] {
     if (!publications?.length) continue;
     blocks.push(
       [{ kind: 'section', text: publicationGroups[group] }],
-      ...publications.map(publicationBlock),
+      ...publications.map((output, index) =>
+        publicationBlock(output, nextNumber + index),
+      ),
     );
+    nextNumber += publications.length;
   }
   return blocks;
 }
