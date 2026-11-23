@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { Prisma, PrismaService } from '@researchos/database';
 import {
   buildPaginationMeta,
   PaginationQueryDto,
@@ -17,6 +17,7 @@ import type {
   UpdateGroupDirectionDto,
   GroupDirectionResponseDto,
 } from './dto/group-direction.dto.js';
+import { hasGroupManagementAuthority } from './group-management.js';
 
 const include = {
   research_topics: {
@@ -43,18 +44,16 @@ export class GroupDirectionsService {
       where: { id: groupId },
     });
     if (!group) throw new NotFoundException('Group not found');
-    const lead = group.lead_id === actorId.toLowerCase();
     const active = group.is_active && group.archived_at === null;
-    if (action === 'read' && active) return;
-    const member = await tx.group_members.findUnique({
-      where: { group_id_user_id: { group_id: groupId, user_id: actorId } },
-    });
-    const activeMember = member && !member.archived_at ? member : null;
     if (action === 'read') {
-      if (!lead && !activeMember) throw new ForbiddenException();
+      if (active || group.lead_id === actorId.toLowerCase()) return;
+      const member = await tx.group_members.findUnique({
+        where: { group_id_user_id: { group_id: groupId, user_id: actorId } },
+      });
+      if (!member || member.archived_at) throw new ForbiddenException();
       return;
     }
-    if (!lead && activeMember?.role !== GroupMemberRole.GROUP_LEADER)
+    if (!(await hasGroupManagementAuthority(tx, groupId, actorId)))
       throw new ForbiddenException();
     if (!active)
       throw new ConflictException(

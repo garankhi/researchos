@@ -1,5 +1,5 @@
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -8,6 +8,7 @@ import {
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
+import { hasGroupManagementAuthority } from './group-management.js';
 import type {
   AddGroupMemberDto,
   GroupMemberPageDto,
@@ -191,20 +192,23 @@ export class GroupMembersService {
         domainErrorCodes.groups.groupNotFound,
         HttpStatus.NOT_FOUND,
       );
-    if (group.lead_id === callerId.toLowerCase()) return group;
+    if (write) {
+      if (!(await hasGroupManagementAuthority(tx, groupId, callerId)))
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      return group;
+    }
     // The roster of an active group is public to any signed-in researcher, so
     // the group hub is not empty for an outsider. An archived or inactive
     // group keeps its private roster: only the lead and its members read it.
     const active = group.is_active && group.archived_at === null;
-    if (!write && active) return group;
+    if (active || group.lead_id === callerId.toLowerCase()) return group;
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (
-      !member ||
-      member.archived_at ||
-      (write && member.role !== GroupMemberRole.GROUP_LEADER)
-    )
+    if (!member || member.archived_at)
       throw new CodedHttpException(
         domainErrorCodes.groups.accessDenied,
         HttpStatus.FORBIDDEN,

@@ -111,6 +111,22 @@ try {
       'utf8',
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        '20261123120000_group_management_authority/migration.sql',
+        migrations,
+      ),
+      'utf8',
+    ),
+  );
+  const groupAuthority = async (actor) =>
+    (
+      await db.query(
+        'SELECT has_group_management_authority($1,$2) AS allowed',
+        [actor, ids.group],
+      )
+    ).rows[0].allowed;
   const policy = async (actor, opportunity) =>
     (
       await db.query('SELECT can_manage_opportunity($1,$2) AS allowed', [
@@ -149,6 +165,8 @@ try {
     },
   );
   await check('group scope grants only its active managers', async () => {
+    assert.equal(await groupAuthority(ids.lead), true);
+    assert.equal(await groupAuthority(ids.delegated), true);
     assert.equal(await policy(ids.lead, ids.groupOpportunity), true);
     assert.equal(await policy(ids.delegated, ids.groupOpportunity), true);
     assert.equal(await policy(ids.creator, ids.groupOpportunity), false);
@@ -170,6 +188,7 @@ try {
         false,
       );
       assert.equal(await policy(ids.delegated, ids.groupOpportunity), false);
+      assert.equal(await groupAuthority(ids.delegated), false);
       assert.equal(
         (
           await db.query('SELECT can_manage_group($1,$2) AS allowed', [
@@ -189,6 +208,29 @@ try {
         [ids.group, ids.delegated],
       );
       assert.equal(await policy(ids.delegated, ids.groupOpportunity), true);
+    },
+  );
+  await check(
+    'an archived membership leaves the designated lead in charge',
+    async () => {
+      await db.query(
+        `INSERT INTO group_members (group_id,user_id,role,archived_at)
+       VALUES ($1,$2,'GROUP_LEADER',clock_timestamp())`,
+        [ids.group, ids.lead],
+      );
+      assert.equal(await groupAuthority(ids.lead), true);
+      assert.equal(await policy(ids.lead, ids.groupOpportunity), true);
+    },
+  );
+  await check(
+    'an active ordinary member has no management authority',
+    async () => {
+      await db.query(
+        `INSERT INTO group_members (group_id,user_id,role) VALUES ($1,$2,'MEMBER')`,
+        [ids.group, ids.creator],
+      );
+      assert.equal(await groupAuthority(ids.creator), false);
+      assert.equal(await policy(ids.creator, ids.groupOpportunity), false);
     },
   );
   await check(

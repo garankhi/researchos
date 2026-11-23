@@ -102,7 +102,7 @@ describe('Group directions HTTP contract', () => {
       isResearcher: true,
       isAdmin: false,
     });
-    tx.$queryRaw.mockResolvedValue([]);
+    tx.$queryRaw.mockResolvedValue([{ allowed: true }]);
     tx.research_groups.findUnique.mockResolvedValue(group);
     tx.group_members.findUnique.mockResolvedValue(null);
     tx.research_topics.findUnique.mockResolvedValue({ is_active: true });
@@ -179,6 +179,7 @@ describe('Group directions HTTP contract', () => {
   });
 
   it('forbids publishing by plain members, outsiders and unrelated admins', async () => {
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
     tx.research_groups.findUnique.mockResolvedValue({
       ...group,
       lead_id: otherId,

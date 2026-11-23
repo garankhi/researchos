@@ -40,22 +40,29 @@ describe('GroupsController', () => {
     updated_at: new Date('2026-11-07T08:00:00.000Z'),
   };
 
-  const createPrismaMock = () => ({
-    users: {
-      findUnique: vi.fn(),
-    },
-    research_groups: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    },
-    group_members: {
-      findUnique: vi.fn(),
-    },
-  });
+  const createPrismaMock = () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ allowed: false }]),
+      users: {
+        findUnique: vi.fn(),
+      },
+      research_groups: {
+        findFirst: vi.fn(),
+        findUnique: vi.fn(),
+        findMany: vi.fn(),
+        count: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      group_members: {
+        findUnique: vi.fn(),
+      },
+    };
+    return {
+      ...tx,
+      $transaction: vi.fn((run: (client: typeof tx) => unknown) => run(tx)),
+    };
+  };
 
   const createAccessServiceMock = () => ({
     effectiveRoles: vi.fn().mockResolvedValue({
@@ -271,6 +278,20 @@ describe('GroupsController', () => {
   });
 
   describe('findOne', () => {
+    it('omits the caller role when a delegated leader has been archived', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
+      prismaMock.group_members.findUnique.mockResolvedValue({
+        role: 'GROUP_LEADER',
+        archived_at: new Date(),
+      });
+
+      const controller = await setupController(prismaMock);
+      expect(await controller.findOne(groupId, memberId)).not.toHaveProperty(
+        'callerMembershipRole',
+      );
+    });
+
     it('does not treat an archived membership as access to an archived group', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.research_groups.findUnique.mockResolvedValue({
@@ -348,6 +369,7 @@ describe('GroupsController', () => {
   describe('update', () => {
     it('archives a group by setting is_active=false and archived_at', async () => {
       const prismaMock = createPrismaMock();
+      prismaMock.$queryRaw.mockResolvedValue([{ allowed: true }]);
       prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
       const archivedAt = new Date('2026-11-07T15:00:00.000Z');
       prismaMock.research_groups.update.mockResolvedValue({
@@ -391,10 +413,7 @@ describe('GroupsController', () => {
     it('allows an active GROUP_LEADER to edit and archive the group', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
-      prismaMock.group_members.findUnique.mockResolvedValue({
-        role: 'GROUP_LEADER',
-        archived_at: null,
-      });
+      prismaMock.$queryRaw.mockResolvedValue([{ allowed: true }]);
       prismaMock.research_groups.update.mockResolvedValue({
         ...mockGroup,
         is_active: false,

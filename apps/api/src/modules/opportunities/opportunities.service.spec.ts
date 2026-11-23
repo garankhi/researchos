@@ -150,6 +150,24 @@ describe('OpportunitiesService', () => {
     });
   });
 
+  it('denies replay of a group opportunity create after management is revoked', async () => {
+    const groupDraft = { ...draft, groupId: id };
+    await service.create(actor, groupDraft, 'group-retry');
+    tx.research_opportunities.findUnique.mockResolvedValue(
+      tx.research_opportunities.update.mock.calls[0][0].data,
+    );
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ allowed: false }]);
+
+    await expect(service.create(actor, groupDraft, 'group-retry')).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.opportunities.accessDenied,
+    });
+    expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a project scoped to a different group', async () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ allowed: true }])

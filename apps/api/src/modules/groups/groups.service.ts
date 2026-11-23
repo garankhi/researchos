@@ -17,6 +17,7 @@ import type { PaginatedResearchGroupsResponseDto } from './dto/paginated-researc
 import type { GroupPreviewResponseDto } from './dto/group-preview-response.dto.js';
 import type { ResearchGroupResponseDto } from './dto/research-group-response.dto.js';
 import type { UpdateResearchGroupDto } from './dto/update-research-group.dto.js';
+import { hasGroupManagementAuthority } from './group-management.js';
 
 type ResearchGroupRow = Prisma.research_groupsGetPayload<Record<string, never>>;
 
@@ -303,7 +304,20 @@ export class GroupsService {
     dto: UpdateResearchGroupDto,
     callerId: string,
   ): Promise<ResearchGroupResponseDto> {
-    const existing = await this.prisma.research_groups.findUnique({
+    return this.prisma.$transaction((tx) =>
+      this.updateGroup(tx, groupId, dto, callerId),
+    );
+  }
+
+  private async updateGroup(
+    tx: Prisma.TransactionClient,
+    groupId: string,
+    dto: UpdateResearchGroupDto,
+    callerId: string,
+  ): Promise<ResearchGroupResponseDto> {
+    // Serialize changes to the designated lead with membership writes.
+    await tx.$queryRaw`SELECT id FROM research_groups WHERE id = ${groupId}::uuid FOR UPDATE`;
+    const existing = await tx.research_groups.findUnique({
       where: { id: groupId },
     });
 
@@ -314,16 +328,7 @@ export class GroupsService {
       );
     }
 
-    const callerAccess = await this.accessService.effectiveRoles(callerId);
-    const membership = await this.prisma.group_members.findUnique({
-      where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
-    });
-    const canManage =
-      callerAccess.isResearcher &&
-      (existing.lead_id === callerId.toLowerCase() ||
-        (membership?.role === 'GROUP_LEADER' && !membership.archived_at));
-
-    if (!canManage) {
+    if (!(await hasGroupManagementAuthority(tx, groupId, callerId))) {
       throw new CodedHttpException(
         domainErrorCodes.groups.accessDenied,
         HttpStatus.FORBIDDEN,
@@ -334,7 +339,7 @@ export class GroupsService {
 
     if (dto.code !== undefined) {
       const trimmedCode = dto.code.trim();
-      const codeConflict = await this.prisma.research_groups.findFirst({
+      const codeConflict = await tx.research_groups.findFirst({
         where: {
           id: { not: groupId },
           code: { equals: trimmedCode, mode: 'insensitive' },
@@ -375,7 +380,7 @@ export class GroupsService {
     }
 
     try {
-      const updated = await this.prisma.research_groups.update({
+      const updated = await tx.research_groups.update({
         where: { id: groupId },
         data,
       });

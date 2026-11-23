@@ -132,11 +132,7 @@ export class OpportunitiesService {
   ) {
     if (dto.groupId) {
       const [group] = await tx.$queryRaw<{ allowed: boolean }[]>`
-        SELECT (g.lead_id = ${actorId}::uuid OR EXISTS (
-          SELECT 1 FROM group_members m WHERE m.group_id = g.id
-          AND m.user_id = ${actorId}::uuid AND m.role = 'GROUP_LEADER' AND m.archived_at IS NULL
-        )) AS allowed FROM research_groups g
-        WHERE g.id = ${dto.groupId}::uuid AND g.is_active AND g.archived_at IS NULL
+        SELECT can_manage_group(${actorId}::uuid, ${dto.groupId}::uuid) AS allowed
       `;
       if (!group?.allowed)
         throw new CodedHttpException(
@@ -300,6 +296,7 @@ export class OpportunitiesService {
                 domainErrorCodes.opportunities.idempotencyKeyConflict,
                 HttpStatus.CONFLICT,
               );
+            if (dto.groupId) await this.checkScope(tx, actorId, dto);
             if (!previous.create_response)
               throw new CodedHttpException(
                 domainErrorCodes.opportunities.idempotencyKeyConflict,
