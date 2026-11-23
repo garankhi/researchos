@@ -1193,3 +1193,18 @@ CREATE INDEX group_directions_active_group_idx ON group_directions (group_id, cr
 
 CREATE UNIQUE INDEX uq_system_background_job_request
   ON background_jobs (queue_prefix, kind, idempotency_key) WHERE owner_id IS NULL;
+
+-- Notification inbox lookups, delivery claims and durable event scans.
+CREATE INDEX idx_notification_events_pending ON notification_events (created_at, id) WHERE processed_at IS NULL;
+CREATE INDEX idx_notifications_inbox ON notifications (recipient_id, created_at DESC, id DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_notifications_unread ON notifications (recipient_id) WHERE archived_at IS NULL AND read_at IS NULL;
+CREATE UNIQUE INDEX uq_notification_delivery_without_device ON notification_deliveries (notification_id, channel) WHERE device_id IS NULL;
+CREATE INDEX idx_notification_deliveries_ready ON notification_deliveries (next_attempt_at, id) WHERE status = 'PENDING';
+CREATE INDEX idx_notification_deliveries_lease ON notification_deliveries (locked_until) WHERE status = 'PROCESSING';
+
+ALTER TABLE notification_deliveries
+  ADD CONSTRAINT ck_notification_delivery_attempts CHECK (attempts >= 0),
+  ADD CONSTRAINT ck_notification_delivery_target CHECK ((channel = 'FCM') = (device_id IS NOT NULL));
+
+ALTER TABLE push_devices
+  ADD CONSTRAINT ck_push_devices_revoked_inactive CHECK (revoked_at IS NULL OR NOT is_active);
