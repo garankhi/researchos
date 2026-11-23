@@ -10,16 +10,16 @@ import {
   Menu,
   Portal,
 } from '@chakra-ui/react';
-import { Bell, ChevronDown, ListChecks, Mail } from 'lucide-react';
+import { ChevronDown, ListChecks, Mail } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
+import { NotificationBell } from '@/features/notifications';
 import { BrandLink } from './brand-link';
 import NextLink from './link';
 
 const morePages = ['opportunities', 'groups'] as const;
 
 const activityActions = [
-  { label: 'updates', icon: Bell, href: undefined },
   { label: 'messages', icon: Mail, href: '/chat' },
   { label: 'requests', icon: ListChecks, href: undefined },
 ] as const;
@@ -149,6 +149,7 @@ function HeaderActions({
       justify="end"
     >
       {mobileSearch}
+      <NotificationBell />
       {activityActions.map(({ label, icon: Icon, href }) => {
         const actionLabel = t(label);
 

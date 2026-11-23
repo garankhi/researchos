@@ -2489,6 +2489,337 @@
         ]
       }
     },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification inbox page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists the signed-in user’s inbox",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Unread notification count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationCountDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Counts unread notifications for the signed-in user",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/read-all": {
+      "patch": {
+        "operationId": "NotificationsController_readAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Number of newly read notifications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationCountDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Marks all visible notifications as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "operationId": "NotificationsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the notification.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The notification is read."
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The notification is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Marks one notification as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/archive": {
+      "patch": {
+        "operationId": "NotificationsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the notification.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The notification is archived."
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The notification is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Archives one notification",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/preferences": {
+      "get": {
+        "operationId": "NotificationsController_preferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Notification preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Reads the signed-in user’s notification preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "patch": {
+        "operationId": "NotificationsController_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated notification preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Updates the signed-in user’s notification preferences",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/notifications/devices": {
       "put": {
         "operationId": "NotificationDevicesController_register",
@@ -10168,6 +10499,163 @@
           "metadataErrorCode"
         ]
       },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique notification ID.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title in the recipient’s preferred language."
+          },
+          "body": {
+            "type": "string",
+            "description": "Notification detail or actor name."
+          },
+          "link": {
+            "type": "string",
+            "description": "Relative path to the notification target."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the notification was created.",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "description": "When the notification was read, if read.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "link",
+          "createdAt",
+          "readAt"
+        ]
+      },
+      "NotificationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Notifications in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "NotificationCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of notifications counted or updated.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "NotificationType": {
+        "type": "string",
+        "enum": [
+          "OUTPUT_SHARED",
+          "REVISION_RELEASED",
+          "OUTPUT_LINKED",
+          "OPPORTUNITY_OPENED",
+          "SEMINAR_PUBLISHED",
+          "CHAT_MENTION",
+          "DIRECT_MESSAGE",
+          "GROUP_MEMBER_ADDED",
+          "GROUP_MEMBER_REMOVED",
+          "GROUP_OUTPUT_REQUESTED",
+          "GROUP_OUTPUT_ACCEPTED",
+          "GROUP_OUTPUT_REJECTED",
+          "APPLICATION_RECEIVED",
+          "APPLICATION_ACCEPTED",
+          "APPLICATION_DECLINED",
+          "APPLICATION_WITHDRAWN",
+          "OPPORTUNITY_EXPIRED",
+          "FOLLOW",
+          "CONVERSATION_PARTICIPANT_ADDED"
+        ],
+        "description": "Event types excluded from notification delivery."
+      },
+      "NotificationPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "websocketEnabled": {
+            "type": "boolean",
+            "description": "Whether live WebSocket delivery is enabled."
+          },
+          "pushEnabled": {
+            "type": "boolean",
+            "description": "Whether device push delivery is enabled."
+          },
+          "mutedTypes": {
+            "type": "array",
+            "description": "Event types excluded from notification delivery.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone for the recipient."
+          }
+        },
+        "required": [
+          "websocketEnabled",
+          "pushEnabled",
+          "mutedTypes",
+          "timezone"
+        ]
+      },
+      "UpdateNotificationPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "websocketEnabled": {
+            "type": "boolean",
+            "description": "Whether live WebSocket delivery is enabled."
+          },
+          "pushEnabled": {
+            "type": "boolean",
+            "description": "Whether device push delivery is enabled."
+          },
+          "mutedTypes": {
+            "type": "array",
+            "description": "Event types excluded from notification delivery.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone for the recipient."
+          }
+        }
+      },
       "PushPlatform": {
         "type": "string",
         "enum": [
@@ -14419,6 +14907,78 @@
           },
           "data": {
             "$ref": "#/components/schemas/ArticlePdfUploadStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationCountDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationCountDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationPreferencesDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationPreferencesDto"
           },
           "message": {
             "type": "string",
