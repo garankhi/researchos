@@ -367,6 +367,37 @@ CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_fields FOR
 CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_subfields FOR EACH ROW EXECUTE FUNCTION normalize_taxonomy();
 CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_topics FOR EACH ROW EXECUTE FUNCTION normalize_taxonomy();
 
+CREATE INDEX idx_topic_embeddings_pending
+  ON topic_embeddings (index_version, next_attempt_at, topic_id) WHERE pending_token IS NOT NULL;
+CREATE INDEX idx_topic_suggestions_pending_deadline
+  ON topic_suggestion_requests (deadline_at) WHERE status = 'pending';
+
+CREATE FUNCTION queue_topic_embedding_refresh() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF (NEW.name, NEW.description, NEW.is_active)
+       IS NOT DISTINCT FROM (OLD.name, OLD.description, OLD.is_active) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  IF NEW.is_active THEN
+    INSERT INTO topic_embeddings (index_version, topic_id)
+    SELECT version, NEW.id FROM topic_embedding_indexes
+    ON CONFLICT (index_version, topic_id) DO UPDATE
+      SET pending_token = gen_random_uuid(), vector = NULL, failed_attempts = 0,
+          next_attempt_at = CURRENT_TIMESTAMP;
+  ELSE
+    DELETE FROM topic_embeddings WHERE topic_id = NEW.id;
+  END IF;
+
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER queue_topic_embedding_refresh
+AFTER INSERT OR UPDATE OF name, description, is_active ON research_topics
+FOR EACH ROW EXECUTE FUNCTION queue_topic_embedding_refresh();
+
 CREATE FUNCTION guard_revision() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF TG_OP<>'INSERT' THEN

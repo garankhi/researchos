@@ -19,6 +19,7 @@ import {
   DEAD_LETTER_QUEUE,
   RESEARCH_UPDATES_QUEUE,
   SYSTEM_QUEUE,
+  TOPIC_SUGGESTION_QUEUE,
   articlePdfMetadataScope,
   backgroundTransportId,
   createQueueOptions,
@@ -406,6 +407,7 @@ describe('Article creation', () => {
     // The worker has already exited. Delete only queues in this run's UUID prefix.
     for (const name of [
       ARTICLE_PDF_METADATA_QUEUE,
+      TOPIC_SUGGESTION_QUEUE,
       BACKGROUND_QUEUE,
       DEAD_LETTER_QUEUE,
       RESEARCH_UPDATES_QUEUE,
