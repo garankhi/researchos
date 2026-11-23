@@ -93,7 +93,6 @@ async function fetchData(
       ['Scopus Author ID', user.researcher_profiles?.scopus_author_id ?? ''],
     ],
     academic: [
-      ['Đơn vị công tác', user.department_unit],
       [
         'Hướng nghiên cứu',
         user.research_interests
@@ -118,20 +117,19 @@ async function fetchData(
           sources: output.output_external_ids.map(({ source }) => source),
           peerReviewed: revision.peer_reviewed,
           doi: output.doi,
-          cells: [
-            revision.title,
+          title: revision.title,
+          authors:
             byline ||
-              (draft
-                ? output.output_authors
-                    .map((author) => author.author_name_string)
-                    .join(', ')
-                : ''),
-            revision.publication_year ?? '',
-            revision.venue ?? revision.publisher ?? '',
-            revision.output_type,
-            output.sharing_status,
-            [output.doi, revision.external_url].filter(Boolean).join(' · '),
-          ],
+            (draft
+              ? output.output_authors
+                  .map((author) => author.author_name_string)
+                  .join(', ')
+              : ''),
+          date:
+            revision.publication_date ||
+            String(revision.publication_year ?? ''),
+          status: output.sharing_status,
+          url: revision.external_url,
         },
       ];
     }),

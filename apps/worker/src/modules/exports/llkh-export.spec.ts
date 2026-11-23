@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import ExcelJS from 'exceljs';
 import {
   classifyOutput,
   type PublicationEvidence,
@@ -21,20 +22,37 @@ const data: LlkhData = {
   outputs: [
     {
       ...article,
-      cells: [
-        'Test article',
-        'Nguyễn Văn An',
-        2026,
-        'Journal',
-        'ARTICLE',
-        'DRAFT',
-        '',
-      ],
+      title: 'Tổng hợp phương pháp nhận diện cảm xúc từ dữ liệu đa phương thức',
+      authors: 'Nguyễn Văn An, Trần Thị Bích',
+      date: '2026-01',
+      status: 'DRAFT',
+      doi: '10.1234/example',
+      url: null,
     },
   ],
 };
 
 describe('LLKH export', () => {
+  it('keeps publication metadata readable and the DOI clickable in Excel', async () => {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await renderLlkh(data, 'xlsx', true));
+    const sheet = workbook.getWorksheet('LLKH')!;
+    const rows: ExcelJS.Row[] = [];
+    sheet.eachRow((row) => {
+      rows.push(row);
+    });
+    const title = rows.find(
+      (row) => row.getCell(1).text === data.outputs[0].title,
+    )!;
+    const authors = rows.find((row) =>
+      row.getCell(1).text.includes('Trần Thị Bích'),
+    )!;
+    const doi = rows.find((row) => row.getCell(1).text.startsWith('DOI:'))!;
+    expect(title.font).toMatchObject({ name: 'Arial', bold: true });
+    expect(authors.alignment.wrapText).toBe(true);
+    expect(doi.getCell(1).hyperlink).toBe('https://doi.org/10.1234/example');
+  });
+
   it.each([
     [{ sources: ['SCOPUS'] }, 'indexed'],
     [{ sources: ['WOS'] }, 'indexed'],
