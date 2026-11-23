@@ -13,10 +13,10 @@ import {
 } from '@chakra-ui/react';
 import { ExternalLink, Users } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
+import { FollowButton } from '@/features/follow';
 import type { OutputDetail } from '../types';
-import { OutputFollowButton } from './output-actions';
 import { formatPublishedDate } from './output-header';
+import { EntityLink } from '@/features/discovery';
 
 export function OutputSidebar({
   output,
@@ -168,20 +168,18 @@ export function OutputSidebar({
                 <Icon as={Users} boxSize="4" color="fg.muted" aria-hidden />
               </Flex>
               <Box minW="0" flex="1">
-                <Link
-                  asChild
-                  textStyle="sm"
-                  fontWeight="semibold"
-                  layerStyle="researchTextLink"
-                  display="block"
+                <EntityLink
+                  entityType="GROUP"
+                  entityId={groupId}
+                  href={`/groups/${groupId}`}
                 >
-                  <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
-                </Link>
+                  {groupLabel}
+                </EntityLink>
               </Box>
             </Flex>
 
             <Box alignSelf="flex-start">
-              <OutputFollowButton output={output} />
+              <FollowButton entityType="GROUP" entityId={groupId} />
             </Box>
           </Stack>
         </Box>

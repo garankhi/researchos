@@ -72,7 +72,14 @@
     "followed": "Đã theo dõi {title}",
     "unfollowed": "Đã bỏ theo dõi {title}",
     "followError": "Không cập nhật được lượt theo dõi.",
-    "followingLoadError": "Không tải được danh sách đang theo dõi."
+    "followingLoadError": "Không tải được danh sách đang theo dõi.",
+    "groupLeaderLabel": "Chủ nhóm:"
+  },
+  "entityPreview": {
+    "unavailable": "Không có thông tin xem trước.",
+    "directionCount": "{count, plural, other {# hướng nghiên cứu}}",
+    "groupPreviewTitle": "Xem trước nhóm nghiên cứu",
+    "researcherPreviewTitle": "Xem trước nhà nghiên cứu"
   },
   "addResearch": {
     "trigger": "Thêm mới",
@@ -203,6 +210,7 @@
       "outputs": "Nghiên cứu",
       "groups": "Nhóm nghiên cứu",
       "interests": "Lĩnh vực",
+      "following": "Đang theo dõi",
       "applications": "Ứng tuyển",
       "openalex": "OpenAlex"
     },
@@ -606,6 +614,11 @@
         "article_pdf_upload_expired": "Lượt tải PDF này đã hết hạn. Vui lòng tải PDF lên lại.",
         "article_pdf_upload_not_verified": "Hãy xác nhận PDF đã tải lên trước khi đính kèm.",
         "article_pdf_upload_consumed": "PDF từ lượt tải này đã được đính kèm. Vui lòng tải tệp lên lại.",
+        "article_pdf_metadata_unsupported": "Định dạng hoặc dung lượng tệp vượt giới hạn đọc thông tin.",
+        "article_pdf_metadata_corrupt": "Không đọc được PDF. Bạn có thể tự nhập thông tin bài báo.",
+        "article_pdf_metadata_encrypted": "Không đọc được thông tin từ PDF đã mã hóa.",
+        "article_pdf_metadata_timeout": "Thời gian đọc PDF đã hết. Bạn có thể tự nhập thông tin bài báo.",
+        "article_pdf_metadata_unavailable": "Tạm thời chưa có gợi ý từ PDF. Bạn có thể tự nhập thông tin bài báo.",
         "group_not_found": "Không tìm thấy nhóm nghiên cứu yêu cầu.",
         "group_code_already_exists": "Mã nhóm nghiên cứu này đã tồn tại.",
         "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động.",
@@ -852,6 +865,7 @@
     "archiveOpportunity": "Lưu trữ cơ hội",
     "untitledOpportunity": "Cơ hội nghiên cứu",
     "viewApplicant": "Xem hồ sơ ứng viên",
+    "unknownApplicant": "Ứng tuyển viên không xác định",
     "respond": "Phản hồi đơn ứng tuyển",
     "decision": "Quyết định",
     "responseNote": "Nội dung phản hồi",
@@ -905,5 +919,105 @@
     },
     "loadMore": "Tải thêm",
     "chooseRevision": "Chọn phiên bản đã phát hành"
+  },
+  "follow": {
+    "follow": "Theo dõi",
+    "following": "Đang theo dõi",
+    "unfollowActionShort": "Bỏ theo dõi",
+    "unfollowAction": "Bỏ theo dõi {name}",
+    "updating": "Đang cập nhật…",
+    "followedToast": "Bạn đang theo dõi mục tiêu này.",
+    "unfollowedToast": "Bạn đã bỏ theo dõi mục tiêu này.",
+    "actionFailed": "Không thể cập nhật theo dõi. Vui lòng thử lại.",
+    "entityTypes": {
+      "RESEARCHER": "Nhà nghiên cứu",
+      "GROUP": "Nhóm",
+      "TOPIC": "Chủ đề",
+      "PROJECT": "Dự án",
+      "OUTPUT": "Công trình"
+    },
+    "list": {
+      "title": "Đang theo dõi",
+      "loadError": "Không thể tải danh sách theo dõi.",
+      "emptyTitle": "Chưa theo dõi mục tiêu nào",
+      "emptyMessage": "Hãy theo dõi một nhà nghiên cứu, một nhóm hoặc một chủ đề để xem tại đây.",
+      "loading": "Đang tải danh sách theo dõi…",
+      "pageInfo": "Trang {page} / {totalPages}",
+      "previous": "Trước",
+      "next": "Sau"
+    }
+  },
+  "opportunities": {
+    "loadError": "Không tải được cơ hội này",
+    "accessDeniedTitle": "Bạn không thể xem cơ hội này",
+    "accessDeniedMessage": "Bạn không có quyền truy cập cơ hội này.",
+    "notFoundTitle": "Không tìm thấy cơ hội",
+    "notFoundMessage": "Cơ hội này không tồn tại hoặc đã bị gỡ bỏ.",
+    "tabsOverview": "Tổng quan",
+    "tabsApplications": "Hồ sơ ứng tuyển",
+    "aboutTitle": "Về cơ hội này",
+    "noDescription": "Nhóm chưa thêm mô tả.",
+    "roleTitle": "Vai trò mong đợi",
+    "expertiseTitle": "Chuyên môn cần tìm",
+    "detailsTitle": "Chi tiết",
+    "kind": "Loại",
+    "audience": "Đối tượng",
+    "deadlineLabel": "Hạn nộp hồ sơ",
+    "noDeadline": "Không có hạn",
+    "slaDays": "Thời gian phản hồi",
+    "slaDaysValue": "{days, plural, =1 {1 ngày} other {# ngày}}",
+    "groupTitle": "Đăng bởi",
+    "viewGroup": "Xem nhóm",
+    "archived": "Đã lưu trữ",
+    "deadline": "Hạn ứng tuyển: {date}",
+    "apply": "Ứng tuyển",
+    "applyTitle": "Ứng tuyển cơ hội này",
+    "applyDescription": "Hãy cho nhóm biết lý do bạn phù hợp. Lời nhắn của bạn được gửi tới nhóm đã đăng cơ hội.",
+    "applyNoteLabel": "Lời nhắn của bạn",
+    "applyNotePlaceholder": "Mô tả nền tảng và lý do bạn quan tâm.",
+    "applySubmit": "Gửi hồ sơ",
+    "applyError": "Không gửi được hồ sơ ứng tuyển",
+    "applySuccess": "Hồ sơ ứng tuyển của bạn đã được gửi.",
+    "cancel": "Hủy",
+    "openForApplications": "Mở để nhận hồ sơ",
+    "markFilled": "Đánh dấu đã đủ người",
+    "close": "Đóng",
+    "archive": "Lưu trữ",
+    "openedToast": "Cơ hội đã mở để nhận hồ sơ.",
+    "filledToast": "Cơ hội đã được đánh dấu là đã đủ người.",
+    "closedToast": "Cơ hội đã được đóng.",
+    "archivedToast": "Cơ hội đã được lưu trữ.",
+    "applicationsTitle": "Hồ sơ đã nhận",
+    "applicationsLoadError": "Không tải được danh sách hồ sơ",
+    "applicationsEmptyTitle": "Chưa có hồ sơ nào",
+    "applicationsEmptyMessage": "Chưa có ai ứng tuyển cơ hội này.",
+    "viewApplicant": "Xem người ứng tuyển",
+    "unknownApplicant": "Ứng tuyển viên không xác định",
+    "responseNoteLabel": "Phản hồi",
+    "overdue": "Đã quá hạn phản hồi",
+    "statuses": {
+      "DRAFT": "Bản nháp",
+      "OPEN": "Đang mở",
+      "FILLED": "Đã đủ người",
+      "CLOSED": "Đã đóng",
+      "EXPIRED": "Đã hết hạn"
+    },
+    "kinds": {
+      "RESEARCH_COLLABORATION": "Hợp tác nghiên cứu",
+      "PROJECT_FORMATION": "Hình thành nhóm dự án",
+      "DATA_METHOD_EXCHANGE": "Trao đổi dữ liệu và phương pháp",
+      "FUNDING_CALL": "Kêu gọi tài trợ"
+    },
+    "audiences": {
+      "FACULTY": "Giảng viên",
+      "STUDENT": "Sinh viên",
+      "ANY_RESEARCHER": "Mọi nhà nghiên cứu"
+    },
+    "applicationStatuses": {
+      "PENDING": "Đang chờ",
+      "INVITED_TO_DISCUSS": "Đã mời trao đổi",
+      "DECLINED": "Đã từ chối",
+      "WITHDRAWN": "Đã rút"
+    }
   }
 }

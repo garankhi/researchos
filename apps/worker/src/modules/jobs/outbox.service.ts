@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@researchos/database';
 import {
+  ARTICLE_PDF_METADATA_QUEUE,
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
   DIGEST_QUEUE,
@@ -15,6 +16,7 @@ import {
   RESEARCH_UPDATES_QUEUE,
   TOPIC_SUGGESTION_JOB,
   TOPIC_SUGGESTION_QUEUE,
+  articlePdfMetadataScope,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
@@ -35,10 +37,12 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly work: Queue;
   private readonly researchUpdates: Queue;
   private readonly topicSuggestions: Queue;
+  private readonly articlePdfMetadata: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
   private readonly digestWork?: Queue;
   private readonly researchScope: string;
+  private readonly articlePdfScope: string;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -52,11 +56,16 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     );
     this.prefix = options.prefix!;
     this.researchScope = researchUpdateScope(this.prefix);
+    this.articlePdfScope = articlePdfMetadataScope(this.prefix);
     this.connection = new Redis(options.connection);
     const queueOptions = { ...options, connection: this.connection };
     this.work = new Queue(BACKGROUND_QUEUE, queueOptions);
     this.researchUpdates = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
     this.topicSuggestions = new Queue(TOPIC_SUGGESTION_QUEUE, queueOptions);
+    this.articlePdfMetadata = new Queue(
+      ARTICLE_PDF_METADATA_QUEUE,
+      queueOptions,
+    );
     this.deadLetters = new Queue(DEAD_LETTER_QUEUE, queueOptions);
     if (config.get<string>('DIGEST_SMTP_ENABLED') === 'true') {
       this.digestWork = new Queue(DIGEST_QUEUE, queueOptions);
@@ -65,6 +74,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       this.work,
       this.researchUpdates,
       this.topicSuggestions,
+      this.articlePdfMetadata,
       this.deadLetters,
       this.digestWork,
     ]) {
@@ -100,6 +110,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
           this.work.waitUntilReady(),
           this.researchUpdates.waitUntilReady(),
           this.topicModel?.version && this.topicSuggestions.waitUntilReady(),
+          this.articlePdfMetadata.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
           this.digestWork?.waitUntilReady(),
         ]),
@@ -136,7 +147,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
           WHEN j.kind = ${DIGEST_SEND_JOB} AND j.payload->>'deliveryId' ~*
             '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
           THEN (j.payload->>'deliveryId')::uuid END AND d.user_id = j.owner_id
-        WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope})
+        WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope}, ${this.articlePdfScope})
           AND o.available_at <= now() AND (
           o.dispatched_at IS NULL OR (
             o.destination = 'WORK' AND j.status = 'PENDING'
@@ -162,9 +173,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         for (const row of rows) {
           const digest = row.kind === DIGEST_SEND_JOB;
           const work =
-            row.queue_prefix === this.researchScope
-              ? this.researchUpdates
-              : this.work;
+            row.queue_prefix === this.articlePdfScope
+              ? this.articlePdfMetadata
+              : row.queue_prefix === this.researchScope
+                ? this.researchUpdates
+                : this.work;
           const queue =
             row.destination === 'DLQ'
               ? this.deadLetters
@@ -247,6 +260,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
       this.work.close(),
       this.researchUpdates.close(),
       this.topicSuggestions.close(),
+      this.articlePdfMetadata.close(),
       this.deadLetters.close(),
       this.digestWork?.close(),
     ]);

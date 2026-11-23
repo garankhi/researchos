@@ -15,6 +15,7 @@ import {
 import { BookOpen, ExternalLink, UserRound } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
+import { EntityLink } from '@/features/discovery';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { doiUrl } from '@/lib/doi-url';
 
@@ -322,11 +323,13 @@ export function OutputCard({
                   aria-hidden
                 />
                 {author.userId ? (
-                  <Link asChild layerStyle="researchTextLink">
-                    <NextLink href={`/profile/${author.userId}`}>
-                      {author.name}
-                    </NextLink>
-                  </Link>
+                  <EntityLink
+                    entityType="RESEARCHER"
+                    entityId={author.userId}
+                    href={`/profile/${author.userId}`}
+                  >
+                    {author.name}
+                  </EntityLink>
                 ) : (
                   <Text as="span">{author.name}</Text>
                 )}

@@ -7,7 +7,9 @@ import {
   BACKGROUND_QUEUE,
   RESEARCH_UPDATES_QUEUE,
   TOPIC_SUGGESTION_QUEUE,
+  ARTICLE_PDF_METADATA_QUEUE,
 } from '@researchos/queue';
+import { ArticlePdfMetadataProcessor } from '../../processors/article-pdf-metadata.processor.js';
 import { ProbeProcessor } from '../../processors/probe.processor.js';
 import {
   BackgroundJobProcessor,
@@ -15,6 +17,7 @@ import {
   ResearchUpdateProcessor,
 } from '../../processors/background-job.processor.js';
 import { OutboxService } from './outbox.service.js';
+import { ArticlePdfMetadataService } from './article-pdf-metadata.service.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { TopicSuggestionProcessor } from '../../processors/topic-suggestion.processor.js';
 import { TopicEmbeddingIndexService } from './topic-embedding-index.service.js';
@@ -36,10 +39,13 @@ import { TopicEmbeddingModel } from './topic-embedding-model.js';
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
     BullModule.registerQueue({ name: RESEARCH_UPDATES_QUEUE }),
     BullModule.registerQueue({ name: TOPIC_SUGGESTION_QUEUE }),
+    BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
   ],
   providers: [
     ProbeProcessor,
     BackgroundJobRunner,
+    ArticlePdfMetadataService,
+    ArticlePdfMetadataProcessor,
     BackgroundJobProcessor,
     ResearchUpdateProcessor,
     OutboxService,

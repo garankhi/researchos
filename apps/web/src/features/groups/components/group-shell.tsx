@@ -12,6 +12,7 @@ import {
 } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { groupsControllerUpdate } from '@/lib/api';
+import { FollowButton } from '@/features/follow';
 import { useGroupHub } from '../hooks/use-group-hub';
 import type { GroupTab } from '../types';
 import { GroupApplications } from './group-applications';
@@ -80,53 +81,57 @@ export function GroupShell({
                 active={active}
               />
 
-              {permissions.editInfo ? (
-                <HubMenu>
-                  <HubEditor
-                    groupId={groupId}
-                    label={t('editGroup')}
-                    title={t('editGroup')}
-                    fields={[
-                      {
-                        name: 'name',
-                        label: t('name'),
-                        initial: group.name,
-                        required: true,
-                        max: 255,
-                      },
-                      {
-                        name: 'code',
-                        label: t('code'),
-                        initial: group.code,
-                        required: true,
-                        max: 50,
-                      },
-                      {
-                        name: 'description',
-                        label: t('description'),
-                        initial: group.description ?? '',
-                        type: 'textarea',
-                      },
-                    ]}
-                    submit={(values) =>
-                      groupsControllerUpdate(groupId, {
-                        name: values.name,
-                        code: values.code,
-                        description: values.description || null,
-                      })
-                    }
-                  />
-                  <HubAction
-                    groupId={groupId}
-                    label={t(active ? 'archiveGroup' : 'restoreGroup')}
-                    confirm
-                    danger={active}
-                    action={() =>
-                      groupsControllerUpdate(groupId, { isActive: !active })
-                    }
-                  />
-                </HubMenu>
-              ) : null}
+              <Flex gap="2" align="flex-start" flexShrink={0}>
+                <FollowButton entityType="GROUP" entityId={groupId} />
+
+                {permissions.editInfo ? (
+                  <HubMenu>
+                    <HubEditor
+                      groupId={groupId}
+                      label={t('editGroup')}
+                      title={t('editGroup')}
+                      fields={[
+                        {
+                          name: 'name',
+                          label: t('name'),
+                          initial: group.name,
+                          required: true,
+                          max: 255,
+                        },
+                        {
+                          name: 'code',
+                          label: t('code'),
+                          initial: group.code,
+                          required: true,
+                          max: 50,
+                        },
+                        {
+                          name: 'description',
+                          label: t('description'),
+                          initial: group.description ?? '',
+                          type: 'textarea',
+                        },
+                      ]}
+                      submit={(values) =>
+                        groupsControllerUpdate(groupId, {
+                          name: values.name,
+                          code: values.code,
+                          description: values.description || null,
+                        })
+                      }
+                    />
+                    <HubAction
+                      groupId={groupId}
+                      label={t(active ? 'archiveGroup' : 'restoreGroup')}
+                      confirm
+                      danger={active}
+                      action={() =>
+                        groupsControllerUpdate(groupId, { isActive: !active })
+                      }
+                    />
+                  </HubMenu>
+                ) : null}
+              </Flex>
             </Flex>
 
             <Tabs.List

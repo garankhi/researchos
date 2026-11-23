@@ -49,6 +49,40 @@ const row = {
   withdrawn_at: null,
 };
 
+/**
+ * The applicant join every application read carries.
+ *
+ * The join is what puts the applicant's name, email, department and avatar
+ * on the application, so a list renders without an N+1 walk over the
+ * profile endpoints.
+ */
+const applicantInclude = {
+  users_opportunity_applications_applicant_idTousers: {
+    include: { researcher_profiles: true },
+  },
+};
+
+/** A joined applicant, so a mocked row carries the display fields. */
+function withApplicant(
+  application: Record<string, unknown>,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    ...application,
+    users_opportunity_applications_applicant_idTousers: {
+      id: actorId,
+      full_name: 'Nguyễn Văn A',
+      email: 'nguyenvana@fpt.edu.vn',
+      department_unit: 'Software Engineering',
+      academic_title: 'PGS',
+      academic_degree: 'TS',
+      user_type: 'FACULTY',
+      researcher_profiles: { avatar_storage_key: 'avatars/abc.png' },
+      ...overrides,
+    },
+  };
+}
+
 describe('Applications HTTP contract', () => {
   let app: INestApplication;
   const client = createHttpTestClient();
@@ -114,8 +148,10 @@ describe('Applications HTTP contract', () => {
     });
     tx.research_opportunities.findUnique.mockResolvedValue(opportunity);
     tx.opportunity_applications.findFirst.mockResolvedValue(null);
-    tx.opportunity_applications.create.mockResolvedValue(row);
-    tx.opportunity_applications.findMany.mockResolvedValue([row]);
+    tx.opportunity_applications.create.mockResolvedValue(withApplicant(row));
+    tx.opportunity_applications.findMany.mockResolvedValue([
+      withApplicant({ ...row, research_opportunities: { title: 'A call' } }),
+    ]);
     tx.opportunity_applications.count.mockResolvedValue(1);
     tx.opportunity_applications.updateManyAndReturn.mockResolvedValue([row]);
   });
@@ -160,6 +196,7 @@ describe('Applications HTTP contract', () => {
         applicant_note: 'Research interest',
         response_due_at: row.response_due_at,
       },
+      include: applicantInclude,
     });
   });
 
@@ -270,12 +307,53 @@ describe('Applications HTTP contract', () => {
       where: { opportunity_id: opportunityId },
       include: {
         research_opportunities: { select: { title: true } },
+        ...applicantInclude,
       },
       orderBy: [{ response_due_at: 'asc' }, { id: 'asc' }],
       skip: 1,
       take: 1,
     });
     expect(response.body.meta).toMatchObject({ page: 2, limit: 1, total: 1 });
+  });
+
+  it('returns the applicant display fields the opportunity screen renders', async () => {
+    tx.opportunity_applications.findMany.mockResolvedValue([
+      withApplicant({ ...row, research_opportunities: { title: 'A call' } }),
+    ]);
+
+    const response = await request()
+      .get(base)
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(response.body.items[0]).toMatchObject({
+      applicantId: actorId,
+      applicantFullName: 'Nguyễn Văn A',
+      applicantEmail: 'nguyenvana@fpt.edu.vn',
+      applicantDepartmentUnit: 'Software Engineering',
+      applicantAvatarStorageKey: 'avatars/abc.png',
+    });
+  });
+
+  it('lists an applicant without a profile row instead of failing', async () => {
+    tx.opportunity_applications.findMany.mockResolvedValue([
+      withApplicant(
+        { ...row, research_opportunities: { title: 'A call' } },
+        { researcher_profiles: null },
+      ),
+    ]);
+
+    const response = await request()
+      .get(base)
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(response.body.items[0]).toMatchObject({
+      applicantFullName: 'Nguyễn Văn A',
+      applicantEmail: 'nguyenvana@fpt.edu.vn',
+      applicantDepartmentUnit: 'Software Engineering',
+      applicantAvatarStorageKey: null,
+    });
   });
 
   it('scopes my applications to the caller and computes one countdown time for the page', async () => {
@@ -401,6 +479,7 @@ describe('Applications HTTP contract', () => {
           response_note: 'Let us meet next week.',
           responded_by: actorId,
         },
+        include: applicantInclude,
       });
     });
 
@@ -427,6 +506,7 @@ describe('Applications HTTP contract', () => {
           response_note: null,
           responded_by: actorId,
         },
+        include: applicantInclude,
       });
     });
 
@@ -453,6 +533,7 @@ describe('Applications HTTP contract', () => {
           response_note: null,
           responded_by: actorId,
         },
+        include: applicantInclude,
       });
     });
 
@@ -610,6 +691,7 @@ describe('Applications HTTP contract', () => {
       ).toHaveBeenCalledWith({
         where: { id, status: 'PENDING' },
         data: { status: 'WITHDRAWN' },
+        include: applicantInclude,
       });
     });
 

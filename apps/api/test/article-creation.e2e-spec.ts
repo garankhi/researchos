@@ -1,7 +1,12 @@
 import 'reflect-metadata';
+import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { readdir, readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
+import { Socket } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -9,10 +14,23 @@ import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@researchos/database';
 import {
+  ARTICLE_PDF_METADATA_JOB,
+  ARTICLE_PDF_METADATA_QUEUE,
+  BACKGROUND_QUEUE,
+  DEAD_LETTER_QUEUE,
+  RESEARCH_UPDATES_QUEUE,
+  SYSTEM_QUEUE,
+  articlePdfMetadataScope,
+  backgroundTransportId,
+  createQueueOptions,
+} from '@researchos/queue';
+import { Ajv } from 'ajv';
+import {
   createS3Storage,
   StorageObjectNotFoundError,
   type StorageAdapter,
 } from '@researchos/storage';
+import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createHttpTestClient } from './http-test-client.js';
@@ -29,6 +47,35 @@ const pdf = Buffer.from(
   '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n',
 );
 const pdfSha256 = createHash('sha256').update(pdf).digest('hex');
+
+function pdfWithMetadata(lines = ['Published: 2024-05']): Buffer<ArrayBuffer> {
+  const text = [
+    'Title: Water quality',
+    'Authors: Mai Nguyen; Bao Tran',
+    ...lines,
+  ]
+    .map((line) => `(${line}) Tj`)
+    .join(' T* ');
+  const pageText = `BT /F1 12 Tf 14 TL 72 720 Td ${text} ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${pageText.length} >>\nstream\n${pageText}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    '<< /Title (Water quality) /Author (Mai Nguyen; Bao Tran) /CreationDate (D:20251101) >>',
+  ];
+  let source = '%PDF-1.4\n';
+  const offsets = ['0000000000 65535 f \n'];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(String(source.length).padStart(10, '0') + ' 00000 n \n');
+    source += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = source.length;
+  source += `xref\n0 ${offsets.length}\n${offsets.join('')}trailer\n`;
+  source += `<< /Root 1 0 R /Info 6 0 R /Size ${offsets.length} >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(source);
+}
 
 function createTestStorage(): StorageAdapter {
   const objects = new Map<string, { bytes: Buffer; contentType: string }>();
@@ -87,17 +134,23 @@ describe('Article creation', () => {
   };
   const http = createHttpTestClient();
   const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalQueuePrefix = process.env.QUEUE_PREFIX;
   const databaseName = `article_creation_${randomUUID().replaceAll('-', '')}`;
   let admin: InstanceType<typeof Client>;
   let db: InstanceType<typeof Client>;
+  const adminSocket = new Socket();
+  const dbSocket = new Socket();
   let databaseCreated = false;
   let app: INestApplication;
   let originalRevision: Record<string, unknown>;
   let originalSearchTimestamp: string;
   let storage: StorageAdapter;
   let sweepExpiredUploads: () => Promise<void>;
+  let workerStarted = false;
   const objectKeys = new Set<string>();
-  const useLocalS3 = process.env.ARTICLE_UPLOAD_E2E_STORAGE === 'seaweedfs';
+  const useLocalS3 =
+    process.env.CI === 'true' ||
+    process.env.ARTICLE_UPLOAD_E2E_STORAGE === 'seaweedfs';
 
   async function readLegacyRevision() {
     const result = await db.query(
@@ -198,6 +251,7 @@ describe('Article creation', () => {
   }
 
   beforeAll(async () => {
+    process.env.QUEUE_PREFIX = databaseName;
     if (!originalDatabaseUrl) {
       throw new Error('DATABASE_URL is required for the Article API tests');
     }
@@ -207,8 +261,8 @@ describe('Article creation', () => {
     const databaseUrl = new URL(source);
     databaseUrl.pathname = `/${databaseName}`;
 
-    admin = new Client({ connectionString: source.href });
-    db = new Client({ connectionString: databaseUrl.href });
+    admin = new Client({ connectionString: source.href, stream: adminSocket });
+    db = new Client({ connectionString: databaseUrl.href, stream: dbSocket });
     await admin.connect();
     await admin.query(`CREATE DATABASE "${databaseName}"`);
     databaseCreated = true;
@@ -265,8 +319,13 @@ describe('Article creation', () => {
     const { ApiResponseInterceptor } =
       await import('../dist/common/interceptors/api-response.interceptor.js');
     if (useLocalS3) {
-      const endpoint = new URL(process.env.S3_ENDPOINT ?? '');
-      if (!['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)) {
+      const endpoint = process.env.S3_ENDPOINT
+        ? new URL(process.env.S3_ENDPOINT)
+        : null;
+      if (
+        !endpoint ||
+        !['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)
+      ) {
         throw new Error(
           'SeaweedFS integration tests need a loopback S3 endpoint',
         );
@@ -312,25 +371,61 @@ describe('Article creation', () => {
   afterAll(async () => {
     http.close();
     try {
-      await app?.close();
-      if (useLocalS3) {
-        await Promise.all(
-          [...objectKeys].map((key) => storage.deleteObject(key)),
-        );
+      const appCleanup = await Promise.allSettled([app?.close()]);
+      const fixtureCleanup = await Promise.allSettled([
+        dropTestDatabase(),
+        ...[...objectKeys].map((key) => storage.deleteObject(key)),
+        ...(workerStarted ? [clearWorkerQueues()] : []),
+      ]);
+      const errors = [...appCleanup, ...fixtureCleanup].flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : [],
+      );
+      if (errors.length) {
+        throw new AggregateError(errors, 'Article fixture cleanup failed');
       }
     } finally {
-      await db?.end();
-      try {
-        if (databaseCreated) {
-          await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
-        }
-      } finally {
-        await admin?.end();
-        if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
-        else process.env.DATABASE_URL = originalDatabaseUrl;
-      }
+      if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = originalDatabaseUrl;
+      if (originalQueuePrefix === undefined) delete process.env.QUEUE_PREFIX;
+      else process.env.QUEUE_PREFIX = originalQueuePrefix;
     }
   });
+
+  async function dropTestDatabase(): Promise<void> {
+    try {
+      const closed = db?.end();
+      // No queries remain. Close the fixture-owned TCP socket locally so the
+      // database drop does not wait for the peer to close the connection.
+      dbSocket.destroy();
+      await closed;
+      if (databaseCreated) {
+        await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+      }
+    } finally {
+      const closed = admin?.end();
+      adminSocket.destroy();
+      await closed;
+    }
+  }
+
+  async function clearWorkerQueues(): Promise<void> {
+    const options = createQueueOptions(process.env.REDIS_URL!, databaseName);
+    // The worker has already exited. Delete only queues in this run's UUID prefix.
+    for (const name of [
+      ARTICLE_PDF_METADATA_QUEUE,
+      BACKGROUND_QUEUE,
+      DEAD_LETTER_QUEUE,
+      RESEARCH_UPDATES_QUEUE,
+      SYSTEM_QUEUE,
+    ]) {
+      const queue = new Queue(name, options);
+      try {
+        await queue.obliterate({ force: true });
+      } finally {
+        await queue.close();
+      }
+    }
+  }
 
   function submit(
     body: object,
@@ -393,7 +488,10 @@ describe('Article creation', () => {
     return { uploadId, uploadUrl, headers, key };
   }
 
-  async function putPdf(upload: Awaited<ReturnType<typeof preparePdf>>) {
+  async function putPdf(
+    upload: Awaited<ReturnType<typeof preparePdf>>,
+    bytes = pdf,
+  ) {
     if (useLocalS3) {
       const origin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
       const preflight = await fetch(upload.uploadUrl, {
@@ -429,24 +527,417 @@ describe('Article creation', () => {
       const response = await fetch(upload.uploadUrl, {
         method: 'PUT',
         headers: upload.headers,
-        body: pdf,
+        body: bytes,
       });
       if (!response.ok) {
         throw new Error(`SeaweedFS presigned PUT failed (${response.status})`);
       }
       return;
     }
-    await storage.putObject(upload.key, pdf, pdfInput.mimeType);
+    await storage.putObject(upload.key, bytes, pdfInput.mimeType);
   }
 
-  async function verifiedPdf() {
-    const upload = await preparePdf();
-    await putPdf(upload);
+  async function verifiedPdf(bytes = pdf, confirmWithUppercaseId = false) {
+    const upload = await preparePdf({
+      ...pdfInput,
+      sizeBytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    await putPdf(upload, bytes);
+    const confirmId = confirmWithUppercaseId
+      ? upload.uploadId.toUpperCase()
+      : upload.uploadId;
     await request('owner')
-      .post(`${uploadEndpoint}/${upload.uploadId}/confirm`)
+      .post(`${uploadEndpoint}/${confirmId}/confirm`)
       .expect(200);
     return upload;
   }
+
+  function startArticleWorker(overrides: NodeJS.ProcessEnv = {}) {
+    const worker = spawn(
+      process.execPath,
+      [fileURLToPath(new URL('../../worker/dist/main.js', import.meta.url))],
+      {
+        env: {
+          ...process.env,
+          DIGEST_SMTP_ENABLED: 'false',
+          ARTICLE_PDF_GROBID_URL: '',
+          ...overrides,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    workerStarted ||= Boolean(worker.pid);
+    let logs = '';
+    worker.stdout.on('data', (chunk: Buffer) => {
+      logs += chunk.toString();
+    });
+    worker.stderr.on('data', (chunk: Buffer) => {
+      logs += chunk.toString();
+    });
+    return {
+      get logs() {
+        return logs;
+      },
+      async stop() {
+        if (worker.exitCode === null && worker.signalCode === null) {
+          const exited = once(worker, 'exit');
+          worker.kill();
+          await exited;
+        }
+      },
+    };
+  }
+
+  it.runIf(useLocalS3)(
+    'extracts PDF suggestions and reports document or storage failures through the owner status API',
+    async () => {
+      const spec: { components: object } = JSON.parse(
+        await readFile(new URL('../openapi.json', import.meta.url), 'utf8'),
+      );
+      const validateStatus = new Ajv({
+        strict: false,
+        validateFormats: false,
+      }).compile({
+        components: spec.components,
+        $ref: '#/components/schemas/ArticlePdfUploadStatusDto',
+      });
+      const upload = await verifiedPdf(pdfWithMetadata(), true);
+      const path = `${uploadEndpoint}/${upload.uploadId}`;
+      const queued = await request('owner').get(path).expect(200);
+      expect(queued.body.data.metadataStatus).toBe('QUEUED');
+      const replay = await request('owner').post(`${path}/confirm`).expect(200);
+      expect(replay.body.data).toEqual(queued.body.data);
+      expect(
+        validateStatus(replay.body.data),
+        JSON.stringify(validateStatus.errors),
+      ).toBe(true);
+      const jobs = await db.query(
+        'SELECT id, idempotency_key, payload, queue_prefix FROM background_jobs WHERE owner_id = $1 AND kind = $2',
+        [actors.owner, ARTICLE_PDF_METADATA_JOB],
+      );
+      expect(jobs.rows).toEqual([
+        {
+          id: expect.any(String),
+          idempotency_key: upload.uploadId,
+          payload: { uploadId: upload.uploadId },
+          queue_prefix: articlePdfMetadataScope(databaseName),
+        },
+      ]);
+      const legacyScope = `@research-updates:${createHash('sha256').update(databaseName).digest('hex')}`;
+      const legacyRows = await db.query(
+        `SELECT o.id FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+         WHERE o.job_id = $1 AND j.queue_prefix IN ($2, $3)`,
+        [jobs.rows[0].id, databaseName, legacyScope],
+      );
+      expect(legacyRows.rowCount).toBe(0);
+      const full = await verifiedPdf(
+        pdfWithMetadata([
+          'Abstract: A study of river samples.',
+          'Keywords: water',
+          'Published: 2024-05-17',
+          'DOI: https://doi.org/10.1234/water.2024%28supplement%29',
+        ]),
+      );
+      const invalid = await verifiedPdf();
+      const unsupportedBytes = Buffer.from('This is not a PDF.');
+      const unsupported = await preparePdf({
+        ...pdfInput,
+        sizeBytes: unsupportedBytes.length,
+        sha256: createHash('sha256').update(unsupportedBytes).digest('hex'),
+      });
+      await putPdf(unsupported, unsupportedBytes);
+      await request('owner')
+        .post(`${uploadEndpoint}/${unsupported.uploadId}/confirm`)
+        .expect(409);
+      // A blank PDF protected with a non-empty user password.
+      const encryptedBytes = Buffer.from(
+        await readFile(
+          new URL('./fixtures/encrypted-article.pdf.base64', import.meta.url),
+          'utf8',
+        ),
+        'base64',
+      );
+      const encrypted = await verifiedPdf(encryptedBytes);
+      const missingObject = await verifiedPdf();
+      await storage.deleteObject(missingObject.key);
+      const expired = await verifiedPdf();
+      await db.query(
+        `
+        UPDATE article_creation_uploads SET created_at = now() - interval '2 hours',
+          expires_at = now() - interval '1 hour' WHERE id = $1
+      `,
+        [expired.uploadId],
+      );
+      const consumed = await verifiedPdf();
+      await submit({
+        ...input,
+        uploadId: consumed.uploadId,
+        fileVisibility: 'PRIVATE',
+      }).expect(201);
+
+      const worker = startArticleWorker();
+      try {
+        await expect
+          .poll(
+            async () => {
+              const response = await request('owner').get(path).expect(200);
+              return response.body.data;
+            },
+            { timeout: 20_000, interval: 200 },
+          )
+          .toMatchObject({
+            status: 'VERIFIED',
+            metadataStatus: 'READY',
+            metadataErrorCode: null,
+            metadata: {
+              title: 'Water quality',
+              authorNames: ['Mai Nguyen', 'Bao Tran'],
+              publicationDate: '2024-05',
+            },
+          });
+        const options = createQueueOptions(
+          process.env.REDIS_URL!,
+          databaseName,
+        );
+        const articleQueue = new Queue(ARTICLE_PDF_METADATA_QUEUE, options);
+        const legacyQueue = new Queue(BACKGROUND_QUEUE, options);
+        try {
+          const transportId = backgroundTransportId(jobs.rows[0].id, 0);
+          expect(await articleQueue.getJob(transportId)).toBeDefined();
+          expect(await legacyQueue.getJob(transportId)).toBeUndefined();
+        } finally {
+          await Promise.all([articleQueue.close(), legacyQueue.close()]);
+        }
+        await request('researcher').get(path).expect(404);
+        const status = async (id: string) => {
+          const response = await request('owner')
+            .get(`${uploadEndpoint}/${id}`)
+            .expect(200);
+          expect(
+            validateStatus(response.body.data),
+            JSON.stringify(validateStatus.errors),
+          ).toBe(true);
+          return response.body.data;
+        };
+        const pollStatus = (id: string) =>
+          expect.poll(() => status(id), { timeout: 10_000, interval: 200 });
+        await pollStatus(full.uploadId).toMatchObject({
+          metadataStatus: 'READY',
+          metadata: {
+            abstract: 'A study of river samples.',
+            publicationDate: '2024-05-17',
+            doi: '10.1234/water.2024(supplement)',
+          },
+        });
+        const fullStatus = await status(full.uploadId);
+        const published = await submit({
+          ...input,
+          doi: fullStatus.metadata.doi,
+          uploadId: full.uploadId,
+          fileVisibility: 'PRIVATE',
+        }).expect(201);
+        expect(
+          (await detail(published.body.data.outputId).expect(200)).body.data
+            .doi,
+        ).toBe('10.1234/water.2024(supplement)');
+        const failures = [
+          [invalid, 'article_pdf_metadata_corrupt'],
+          [encrypted, 'article_pdf_metadata_encrypted'],
+          [missingObject, 'article_pdf_metadata_unavailable'],
+        ] as const;
+        for (const [failed, code] of failures) {
+          await pollStatus(failed.uploadId).toMatchObject({
+            status: 'VERIFIED',
+            metadataStatus: 'FAILED',
+            metadataErrorCode: code,
+            metadata: null,
+          });
+        }
+        const attempts = await db.query(
+          "SELECT attempts FROM background_jobs WHERE idempotency_key = $1 AND kind = 'article-pdf-metadata'",
+          [missingObject.uploadId],
+        );
+        expect(attempts.rows[0].attempts).toBe(3);
+        expect(await status(expired.uploadId)).toMatchObject({
+          status: 'EXPIRED',
+          metadata: null,
+        });
+        await expect
+          .poll(async () => {
+            const job = await db.query(
+              'SELECT status, result FROM background_jobs WHERE idempotency_key = $1 AND kind = $2',
+              [consumed.uploadId, ARTICLE_PDF_METADATA_JOB],
+            );
+            return job.rows[0];
+          })
+          .toEqual({ status: 'COMPLETED', result: null });
+        expect(await status(consumed.uploadId)).toMatchObject({
+          status: 'CONSUMED',
+          metadataStatus: 'NOT_STARTED',
+          metadata: null,
+        });
+        await submit({
+          ...input,
+          uploadId: invalid.uploadId,
+          fileVisibility: 'PRIVATE',
+        }).expect(201);
+      } catch (error) {
+        throw new Error(
+          `PDF metadata test failed. Worker output:\n${worker.logs}`,
+          {
+            cause: error,
+          },
+        );
+      } finally {
+        await worker.stop();
+      }
+    },
+    45_000,
+  );
+
+  it.runIf(useLocalS3)(
+    'enriches verified text PDFs and keeps partial metadata available through GROBID failure and timeout',
+    async () => {
+      const requests: Array<{ path?: string; body: string }> = [];
+      const server = createServer(async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const body = Buffer.concat(chunks).toString();
+        requests.push({ path: req.url, body });
+        if (body.includes('Timeout example')) return;
+        if (body.includes('Unavailable example')) {
+          res.writeHead(503).end();
+          return;
+        }
+        res
+          .writeHead(200, { 'content-type': 'application/xml' })
+          .end(
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader>' +
+              '<fileDesc><sourceDesc><biblStruct><analytic><idno type="DOI">10.1234/clarity</idno></analytic></biblStruct></sourceDesc></fileDesc>' +
+              '<profileDesc><abstract><p>Samples showed improved water clarity.</p></abstract></profileDesc>' +
+              '</teiHeader></TEI>',
+          );
+      });
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      const port = (server.address() as { port: number }).port;
+      const worker = startArticleWorker({
+        ARTICLE_PDF_GROBID_URL: `http://127.0.0.1:${port}`,
+        ARTICLE_PDF_GROBID_TIMEOUT_MS: '1000',
+      });
+
+      try {
+        const created = await Promise.all(
+          ['Success', 'Unavailable', 'Timeout'].map((kind) =>
+            verifiedPdf(
+              pdfWithMetadata([
+                `${kind} example with enough readable text.`,
+                'Published: 2024-05',
+                ...(kind === 'Success' ? ['10.1234/clarity'] : []),
+              ]),
+            ),
+          ),
+        );
+        for (const [index, upload] of created.entries()) {
+          const path = `${uploadEndpoint}/${upload.uploadId}`;
+          await expect
+            .poll(
+              async () =>
+                (await request('owner').get(path).expect(200)).body.data,
+              { timeout: 12_000, interval: 200 },
+            )
+            .toMatchObject({ status: 'VERIFIED', metadataStatus: 'READY' });
+          const { data } = (await request('owner').get(path).expect(200)).body;
+          expect(data.metadata).toEqual({
+            title: 'Water quality',
+            authorNames: ['Mai Nguyen', 'Bao Tran'],
+            publicationDate: '2024-05',
+            ...(index === 0 && {
+              doi: '10.1234/clarity',
+            }),
+          });
+          await request('researcher').get(path).expect(404);
+        }
+        expect(requests).toHaveLength(3);
+        for (const sent of requests) {
+          expect(sent.path).toBe('/api/processHeaderDocument');
+          expect(sent.body).toContain('%PDF-1.4');
+          expect(sent.body).toContain('name="consolidateHeader"\r\n\r\n0');
+        }
+        await submit({
+          ...input,
+          uploadId: created[1].uploadId,
+          fileVisibility: 'PRIVATE',
+        }).expect(201);
+        await request('owner')
+          .get(`${uploadEndpoint}/${created[1].uploadId}`)
+          .expect(200)
+          .expect(({ body }) => expect(body.data.status).toBe('CONSUMED'));
+      } catch (error) {
+        throw new Error(`GROBID test failed. Worker output:\n${worker.logs}`, {
+          cause: error,
+        });
+      } finally {
+        await worker.stop();
+        const closed = once(server, 'close');
+        server.close();
+        server.closeAllConnections();
+        await closed;
+      }
+    },
+    30_000,
+  );
+
+  it('distinguishes a completed job without a result from an empty extraction', async () => {
+    const upload = await verifiedPdf();
+    const path = `${uploadEndpoint}/${upload.uploadId}`;
+    await db.query(
+      "UPDATE background_jobs SET status = 'COMPLETED' WHERE idempotency_key = $1 AND kind = $2",
+      [upload.uploadId, ARTICLE_PDF_METADATA_JOB],
+    );
+    expect(
+      (await request('owner').get(path).expect(200)).body.data,
+    ).toMatchObject({
+      status: 'VERIFIED',
+      metadataStatus: 'NOT_STARTED',
+      metadata: null,
+    });
+    await db.query(
+      "UPDATE background_jobs SET result = '{}'::jsonb WHERE idempotency_key = $1 AND kind = $2",
+      [upload.uploadId, ARTICLE_PDF_METADATA_JOB],
+    );
+    expect(
+      (await request('owner').get(path).expect(200)).body.data,
+    ).toMatchObject({
+      status: 'VERIFIED',
+      metadataStatus: 'READY',
+      metadata: {},
+    });
+  });
+
+  it('enqueues metadata on reconfirm of a previously verified upload', async () => {
+    const upload = await preparePdf();
+    await putPdf(upload);
+    await db.query(
+      'UPDATE article_creation_uploads SET verified_at = now() WHERE id = $1',
+      [upload.uploadId],
+    );
+    const path = `${uploadEndpoint}/${upload.uploadId}`;
+    const initial = await request('owner').get(path).expect(200);
+    expect(initial.body.data).toMatchObject({
+      status: 'VERIFIED',
+      metadataStatus: 'NOT_STARTED',
+    });
+
+    const confirmed = await request('owner')
+      .post(`${path}/confirm`)
+      .expect(200);
+    expect(confirmed.body.data).toMatchObject({
+      status: 'VERIFIED',
+      metadataStatus: 'QUEUED',
+    });
+  });
 
   it('rejects invalid PDF upload JSON with a translatable code for each field', async () => {
     const response = await request('owner')
@@ -520,6 +1011,12 @@ describe('Article creation', () => {
     ]);
     expect(confirms[0].body.data).toEqual(confirms[1].body.data);
     expect(confirms[0].body.data.status).toBe('VERIFIED');
+    expect(confirms[0].body.data.metadataStatus).toBe('QUEUED');
+    const jobs = await db.query(
+      "SELECT id FROM background_jobs WHERE kind = 'article-pdf-metadata' AND idempotency_key = $1",
+      [upload.uploadId],
+    );
+    expect(jobs.rowCount).toBe(1);
 
     const key = randomUUID();
     const [original, replay] = await Promise.all([

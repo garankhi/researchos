@@ -1,18 +1,9 @@
 'use client';
 
-import {
-  Badge,
-  Box,
-  Flex,
-  Heading,
-  Icon,
-  Link,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Icon, Stack, Text } from '@chakra-ui/react';
 import { Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
+import { EntityLink } from '@/features/discovery';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useProfileGroups } from '../../hooks/use-profile-groups';
 import type { ResearchGroupResponseDto } from '../../types';
@@ -93,9 +84,13 @@ export function ProfileGroupsTab({
 
           <Stack gap="1" minW="0" flex="1">
             <Heading as="h3" size="sm" fontWeight="bold" lineHeight="1.35">
-              <Link asChild layerStyle="researchTextLink">
-                <NextLink href={`/groups/${group.id}`}>{group.name}</NextLink>
-              </Link>
+              <EntityLink
+                entityType="GROUP"
+                entityId={group.id}
+                href={`/groups/${group.id}`}
+              >
+                {group.name}
+              </EntityLink>
             </Heading>
 
             <Text textStyle="xs" color="fg.muted">

@@ -6,12 +6,11 @@ import {
   Box,
   Flex,
   Heading,
-  Link,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
+import { EntityLink } from '@/features/discovery';
 import {
   groupMembersControllerAdd,
   groupMembersControllerRemove,
@@ -97,11 +96,13 @@ export function GroupMembers({
                 </Avatar.Root>
                 <Stack flex="1" minW="0" gap="2">
                   <Heading as="h3" size="sm" pe={canManage ? '8' : '0'}>
-                    <Link asChild layerStyle="researchTextLink">
-                      <NextLink href={`/profile/${member.userId}`}>
-                        {member.fullName}
-                      </NextLink>
-                    </Link>
+                    <EntityLink
+                      entityType="RESEARCHER"
+                      entityId={member.userId}
+                      href={`/profile/${member.userId}`}
+                    >
+                      {member.fullName}
+                    </EntityLink>
                   </Heading>
                   <Text textStyle="sm" color="fg.muted" overflowWrap="anywhere">
                     {member.email}

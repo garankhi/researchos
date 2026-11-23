@@ -31,6 +31,59 @@ type ApplicationRow = Prisma.opportunity_applicationsGetPayload<
 >;
 
 /**
+ * The applicant, read from the joined account row.
+ *
+ * `researcher_profiles` is optional, so the profile-backed field is
+ * nullable: an applicant without a profile row still appears in the list.
+ */
+interface ApplicantDisplay {
+  fullName: string;
+  email: string;
+  departmentUnit: string;
+  avatarStorageKey: string | null;
+}
+
+/**
+ * An application row with the applicant joined in.
+ *
+ * The join is one query for the whole page, so a list of applications does
+ * not walk the profile endpoints once per row.
+ *
+ * The opportunity title is joined separately, because only the two list
+ * queries read it — a single application is answered without it.
+ */
+type ApplicationRowWithApplicant = Prisma.opportunity_applicationsGetPayload<{
+  include: {
+    users_opportunity_applications_applicant_idTousers: {
+      include: { researcher_profiles: true };
+    };
+  };
+}>;
+
+/**
+ * An application row with the applicant and the opportunity joined in.
+ *
+ * The two list queries read the opportunity's title alongside the
+ * application, so they join both in one query.
+ */
+type ApplicationRowWithOpportunity = ApplicationRowWithApplicant & {
+  research_opportunities: { title: string };
+};
+
+/**
+ * The applicant join every application read carries.
+ *
+ * Declared once so the create, the update and the two list queries all
+ * join the same shape — and so the display fields are never missing on
+ * one path and present on another.
+ */
+const applicantInclude = {
+  users_opportunity_applications_applicant_idTousers: {
+    include: { researcher_profiles: true },
+  },
+} as const;
+
+/**
  * The sort keys the group application list accepts.
  *
  * They mirror the per-opportunity list, so the two tabs sort the same way.
@@ -140,6 +193,7 @@ export class ApplicationsService {
             now.getTime() + opportunity.response_sla_days * 86400000,
           ),
         },
+        include: applicantInclude,
       });
       return this.response(application, await this.now(tx));
     });
@@ -218,6 +272,7 @@ export class ApplicationsService {
           response_note: dto.responseNote?.trim() ? dto.responseNote : null,
           responded_by: actorId,
         },
+        include: applicantInclude,
       });
       // The conditional update matched no row when another transaction
       // answered the application between the lock and the write.
@@ -269,6 +324,7 @@ export class ApplicationsService {
           status: OpportunityApplicationStatus.PENDING,
         },
         data: { status: OpportunityApplicationStatus.WITHDRAWN },
+        include: applicantInclude,
       });
       if (!withdrawn.length)
         throw new CodedHttpException(
@@ -381,6 +437,9 @@ export class ApplicationsService {
         where,
         include: {
           research_opportunities: { select: { title: true } },
+          users_opportunity_applications_applicant_idTousers: {
+            include: { researcher_profiles: true },
+          },
         },
         orderBy: [orderBy, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
@@ -414,6 +473,9 @@ export class ApplicationsService {
       where,
       include: {
         research_opportunities: { select: { title: true } },
+        users_opportunity_applications_applicant_idTousers: {
+          include: { researcher_profiles: true },
+        },
       },
       orderBy: [orderBy, { id: 'asc' }],
       skip: (query.page - 1) * query.limit,
@@ -430,13 +492,40 @@ export class ApplicationsService {
     };
   }
 
-  private response(row: ApplicationRow, now: Date): ApplicationResponseDto {
+  /**
+   * Reads the applicant's display fields from the joined account row.
+   *
+   * The join is optional on purpose: a missing join must not break the
+   * list, so the display fields fall back to empty strings rather than
+   * throwing.
+   */
+  private applicantDisplay(row: ApplicationRowWithApplicant): ApplicantDisplay {
+    const user = row.users_opportunity_applications_applicant_idTousers;
+    const profile = user?.researcher_profiles ?? null;
+
+    return {
+      fullName: user?.full_name ?? '',
+      email: user?.email ?? '',
+      departmentUnit: user?.department_unit ?? '',
+      avatarStorageKey: profile?.avatar_storage_key ?? null,
+    };
+  }
+
+  private response(
+    row: ApplicationRowWithApplicant,
+    now: Date,
+  ): ApplicationResponseDto {
     const pending = row.status === 'PENDING';
     const remaining = row.response_due_at.getTime() - now.getTime();
+    const applicant = this.applicantDisplay(row);
     return {
       id: row.id,
       opportunityId: row.opportunity_id,
       applicantId: row.applicant_id,
+      applicantFullName: applicant.fullName,
+      applicantEmail: applicant.email,
+      applicantDepartmentUnit: applicant.departmentUnit,
+      applicantAvatarStorageKey: applicant.avatarStorageKey,
       applicantNote: row.applicant_note,
       status: row.status,
       responseNote: row.response_note,

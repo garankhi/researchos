@@ -1,53 +1,21 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  followControllerCreate,
-  followControllerFindAll,
-  followControllerRemove,
-} from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { followControllerCreate, followControllerRemove } from '@/lib/api';
 import { apiStatusCode } from '@/lib/api-error';
 import type { FollowTargetDto } from '@/lib/api/models';
-import { MAX_PAGE_SIZE } from '@/utils/pagination';
+import { applyFollowToCache } from '@/features/follow';
 
-export function followKey(target: FollowTargetDto) {
-  return `${target.entityType}:${target.entityId}`;
-}
-
-export function useSearchFollows(userId: string, enabled: boolean) {
-  const queryKey = ['search-follows', userId];
-
-  const query = useQuery({
-    queryKey,
-    enabled,
-    staleTime: 30_000,
-    queryFn: async ({ signal }) => {
-      const targets: string[] = [];
-      let page = 1;
-
-      for (;;) {
-        const response = await followControllerFindAll(
-          { page, limit: MAX_PAGE_SIZE },
-          undefined,
-          signal,
-        );
-        targets.push(...response.items.map(followKey));
-        if (!response.meta.hasNextPage) return targets;
-        page += 1;
-      }
-    },
-  });
-
-  return {
-    targets: query.data,
-    isFailed: enabled && query.isError && !query.data,
-    retry: query.refetch,
-  };
-}
-
+/**
+ * Changes one follow on behalf of the search results.
+ *
+ * The state itself is read through the `follow` feature, which owns the
+ * single cached follow list every surface shares. This hook only performs
+ * the write, so the search results, the follow button and the following
+ * list can never disagree.
+ */
 export function useChangeSearchFollow(userId: string) {
   const queryClient = useQueryClient();
-  const queryKey = ['search-follows', userId];
 
   const mutation = useMutation({
     mutationFn: async ({
@@ -72,12 +40,10 @@ export function useChangeSearchFollow(userId: string) {
       }
     },
     onSuccess: async (_, { target, follow }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const key = followKey(target);
-      queryClient.setQueryData<string[]>(queryKey, (current) => {
-        const remainder = (current ?? []).filter((item) => item !== key);
-        return follow ? [...remainder, key] : remainder;
-      });
+      // The cached list is the shared source of truth, so the change is
+      // written to it directly: every surface reading it re-renders at
+      // once, without waiting for a refetch.
+      applyFollowToCache(queryClient, userId, target, follow);
     },
   });
 

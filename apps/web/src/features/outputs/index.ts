@@ -24,7 +24,6 @@ export {
 export {
   OutputDownloadPrimaryButton,
   OutputFiles,
-  OutputFollowButton,
   OutputShareButton,
 } from './components/output-actions';
 export { OutputDetailSkeleton } from './components/output-skeletons';

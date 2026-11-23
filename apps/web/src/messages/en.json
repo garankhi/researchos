@@ -72,7 +72,14 @@
     "followed": "Now following {title}",
     "unfollowed": "Unfollowed {title}",
     "followError": "Could not update this follow.",
-    "followingLoadError": "Could not load followed accounts and groups."
+    "followingLoadError": "Could not load followed accounts and groups.",
+    "groupLeaderLabel": "Leader:"
+  },
+  "entityPreview": {
+    "unavailable": "No preview available.",
+    "directionCount": "{count, plural, one {# research direction} other {# research directions}}",
+    "groupPreviewTitle": "Group preview",
+    "researcherPreviewTitle": "Researcher preview"
   },
   "addResearch": {
     "trigger": "Add new",
@@ -93,8 +100,14 @@
       "label": "Presentation",
       "description": "Add a presentation"
     },
-    "poster": { "label": "Poster", "description": "Add a conference poster" },
-    "data": { "label": "Data", "description": "Table, image, sequence, etc." },
+    "poster": {
+      "label": "Poster",
+      "description": "Add a conference poster"
+    },
+    "data": {
+      "label": "Data",
+      "description": "Table, image, sequence, etc."
+    },
     "other": {
       "label": "Other",
       "description": "Methods, proposal, code, etc."
@@ -197,6 +210,7 @@
       "outputs": "Research",
       "groups": "Groups",
       "interests": "Disciplines",
+      "following": "Following",
       "applications": "Applications",
       "openalex": "OpenAlex"
     },
@@ -600,6 +614,11 @@
         "article_pdf_upload_expired": "This PDF upload has expired. Please upload the PDF again.",
         "article_pdf_upload_not_verified": "Confirm the PDF upload before attaching it.",
         "article_pdf_upload_consumed": "This PDF upload is already attached. Please start a new upload.",
+        "article_pdf_metadata_unsupported": "This file format or size is unsupported for metadata extraction.",
+        "article_pdf_metadata_corrupt": "The PDF could not be read. You can enter the details manually.",
+        "article_pdf_metadata_encrypted": "Metadata could not be read from this encrypted PDF.",
+        "article_pdf_metadata_timeout": "Reading the PDF took too long. You can enter the details manually.",
+        "article_pdf_metadata_unavailable": "PDF suggestions are temporarily unavailable. You can enter the details manually.",
         "group_not_found": "The requested research group was not found.",
         "group_code_already_exists": "A research group with this code already exists.",
         "group_leader_ineligible": "The designated group leader must be an active researcher.",
@@ -846,6 +865,7 @@
     "archiveOpportunity": "Archive opportunity",
     "untitledOpportunity": "Research opportunity",
     "viewApplicant": "View applicant profile",
+    "unknownApplicant": "Unknown applicant",
     "respond": "Respond to application",
     "decision": "Decision",
     "responseNote": "Response note",
@@ -899,5 +919,105 @@
     },
     "loadMore": "Load more",
     "chooseRevision": "Choose a released revision"
+  },
+  "follow": {
+    "follow": "Follow",
+    "following": "Following",
+    "unfollowActionShort": "Unfollow",
+    "unfollowAction": "Stop following {name}",
+    "updating": "Updating…",
+    "followedToast": "You are now following this target.",
+    "unfollowedToast": "You stopped following this target.",
+    "actionFailed": "Could not update the follow. Please try again.",
+    "entityTypes": {
+      "RESEARCHER": "Researcher",
+      "GROUP": "Group",
+      "TOPIC": "Topic",
+      "PROJECT": "Project",
+      "OUTPUT": "Output"
+    },
+    "list": {
+      "title": "Following",
+      "loadError": "Could not load the following list.",
+      "emptyTitle": "Not following anything yet",
+      "emptyMessage": "Follow a researcher, a group or a topic to see it here.",
+      "loading": "Loading the following list…",
+      "pageInfo": "Page {page} of {totalPages}",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "opportunities": {
+    "loadError": "Could not load this opportunity",
+    "accessDeniedTitle": "You cannot view this opportunity",
+    "accessDeniedMessage": "You do not have access to this opportunity.",
+    "notFoundTitle": "Opportunity not found",
+    "notFoundMessage": "This opportunity does not exist, or it has been removed.",
+    "tabsOverview": "Overview",
+    "tabsApplications": "Applications",
+    "aboutTitle": "About this opportunity",
+    "noDescription": "The group did not add a description.",
+    "roleTitle": "Expected role",
+    "expertiseTitle": "Expertise sought",
+    "detailsTitle": "Details",
+    "kind": "Kind",
+    "audience": "Audience",
+    "deadlineLabel": "Application deadline",
+    "noDeadline": "No deadline",
+    "slaDays": "Response time",
+    "slaDaysValue": "{days, plural, =1 {1 calendar day} other {# calendar days}}",
+    "groupTitle": "Posted by",
+    "viewGroup": "View the group",
+    "archived": "Archived",
+    "deadline": "Applications close: {date}",
+    "apply": "Apply",
+    "applyTitle": "Apply to this opportunity",
+    "applyDescription": "Tell the group why you are a fit. Your note goes to the group that posted the call.",
+    "applyNoteLabel": "Your note",
+    "applyNotePlaceholder": "Describe your background and why you are interested.",
+    "applySubmit": "Send application",
+    "applyError": "Could not send your application",
+    "applySuccess": "Your application was sent.",
+    "cancel": "Cancel",
+    "openForApplications": "Open for applications",
+    "markFilled": "Mark as filled",
+    "close": "Close",
+    "archive": "Archive",
+    "openedToast": "The opportunity is open for applications.",
+    "filledToast": "The opportunity was marked as filled.",
+    "closedToast": "The opportunity was closed.",
+    "archivedToast": "The opportunity was archived.",
+    "applicationsTitle": "Applications received",
+    "applicationsLoadError": "Could not load the applications",
+    "applicationsEmptyTitle": "No applications yet",
+    "applicationsEmptyMessage": "Nobody has applied to this opportunity so far.",
+    "viewApplicant": "View the applicant",
+    "unknownApplicant": "Unknown applicant",
+    "responseNoteLabel": "Response",
+    "overdue": "Past its response deadline",
+    "statuses": {
+      "DRAFT": "Draft",
+      "OPEN": "Open",
+      "FILLED": "Filled",
+      "CLOSED": "Closed",
+      "EXPIRED": "Expired"
+    },
+    "kinds": {
+      "RESEARCH_COLLABORATION": "Research collaboration",
+      "PROJECT_FORMATION": "Project formation",
+      "DATA_METHOD_EXCHANGE": "Data and method exchange",
+      "FUNDING_CALL": "Funding call"
+    },
+    "audiences": {
+      "FACULTY": "Faculty",
+      "STUDENT": "Students",
+      "ANY_RESEARCHER": "Any researcher"
+    },
+    "applicationStatuses": {
+      "PENDING": "Pending",
+      "INVITED_TO_DISCUSS": "Invited to discuss",
+      "DECLINED": "Declined",
+      "WITHDRAWN": "Withdrawn"
+    }
   }
 }

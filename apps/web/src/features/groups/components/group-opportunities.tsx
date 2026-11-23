@@ -1,7 +1,8 @@
 'use client';
 
-import { Badge, Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Link, Stack, Text } from '@chakra-ui/react';
 import { useLocale, useTranslations } from 'next-intl';
+import NextLink from '@/components/ui/link';
 import {
   opportunitiesControllerCreate,
   opportunitiesControllerUpdate,
@@ -152,7 +153,11 @@ export function GroupOpportunities({
             >
               <Stack gap="3">
                 <Heading as="h3" size="md" pe={canManage ? '8' : '0'}>
-                  {opportunity.title}
+                  <Link asChild color="fg">
+                    <NextLink href={`/opportunities/${opportunity.id}`}>
+                      {opportunity.title}
+                    </NextLink>
+                  </Link>
                 </Heading>
                 <Flex gap="2" align="center" flexWrap="wrap">
                   <Badge
