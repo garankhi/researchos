@@ -1,11 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getOutputsControllerFindAllQueryKey,
-  getOutputsControllerFindHomeFeedQueryKey,
   getOutputsControllerFindOneQueryKey,
   useOutputsControllerUpdateArticle,
 } from '@/lib/api';
 import type { OutputResponseDto } from '@/lib/api/models/outputResponseDto';
+import { homeResearchFeedKey } from '../home-research-feed-key';
 
 export function useUpdateArticle() {
   const queryClient = useQueryClient();
@@ -28,7 +28,7 @@ export function useUpdateArticle() {
           queryKey: getOutputsControllerFindAllQueryKey(),
         });
         void queryClient.invalidateQueries({
-          queryKey: getOutputsControllerFindHomeFeedQueryKey(),
+          queryKey: homeResearchFeedKey,
         });
       },
     },

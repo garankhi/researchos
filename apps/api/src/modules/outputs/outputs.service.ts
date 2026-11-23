@@ -23,7 +23,11 @@ import {
 } from '../../common/dto/pagination.dto.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
 import { ArticleCreationUploadService } from '../storage/article-creation-upload.service.js';
-import { completeArticleByline, readArticleByline } from './article-byline.js';
+import {
+  completeArticleByline,
+  readArticleByline,
+  snapshotAuthors,
+} from './article-byline.js';
 import {
   normalizeArticleMetadata,
   normalizePublicationDate,
@@ -918,6 +922,15 @@ export class OutputsService {
     const byOrder = new Map(
       existing.map((author) => [author.author_order, author]),
     );
+    const sourceByRowId = new Map(
+      snapshotAuthors(release.authors_snapshot).flatMap((entry) => {
+        if (typeof entry.id === 'string') return [[entry.id, entry] as const];
+        const row = byOrder.get(entry.order);
+        return row?.author_name_string === entry.name
+          ? [[row.id, entry] as const]
+          : [];
+      }),
+    );
     for (const author of readArticleByline(release)) {
       const row = byOrder.get(author.authorOrder);
       if (
@@ -946,7 +959,12 @@ export class OutputsService {
       }
       if (row) retained.add(row.id);
       if (account) accounts.add(account);
+      const source = row ? sourceByRowId.get(row.id) : undefined;
       return {
+        ...(typeof source?.openAlexAuthorId === 'string' && {
+          openAlexAuthorId: source.openAlexAuthorId,
+        }),
+        ...(typeof source?.orcid === 'string' && { orcid: source.orcid }),
         id: row?.id ?? randomUUID(),
         name: displayName,
         userId: account,

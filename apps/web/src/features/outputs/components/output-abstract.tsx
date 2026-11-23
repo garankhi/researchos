@@ -62,17 +62,19 @@ export function OutputAbstract({
           <Text textStyle="sm" lineHeight="1.75" whiteSpace="pre-line">
             {abstract}
           </Text>
-        ) : onSaveAbstract ? (
+        ) : !onSaveAbstract ? (
+          <EmptyState
+            title={t('detail.noAbstractTitle')}
+            message={t('detail.noAbstractMessage')}
+          />
+        ) : null}
+        {onSaveAbstract && (
           <AddAbstractDialog
+            showTrigger={!abstract}
             onSave={async (value) => {
               await onSaveAbstract(value);
               requestAnimationFrame(() => heading.current?.focus());
             }}
-          />
-        ) : (
-          <EmptyState
-            title={t('detail.noAbstractTitle')}
-            message={t('detail.noAbstractMessage')}
           />
         )}
       </Box>
@@ -80,10 +82,17 @@ export function OutputAbstract({
   );
 }
 
-function AddAbstractDialog({ onSave }: { onSave: SaveAbstract }) {
+function AddAbstractDialog({
+  onSave,
+  showTrigger,
+}: {
+  onSave: SaveAbstract;
+  showTrigger: boolean;
+}) {
   const t = useTranslations('articleEdit');
   const common = useTranslations('common');
   const fields = useRef<HTMLDivElement>(null);
+  const saveOnOpen = useRef<SaveAbstract>(onSave);
   const [saving, setSaving] = useState(false);
 
   return (
@@ -93,36 +102,41 @@ function AddAbstractDialog({ onSave }: { onSave: SaveAbstract }) {
       scrollBehavior="inside"
       closeOnEscape={!saving}
       closeOnInteractOutside={!saving}
+      onOpenChange={({ open }) => {
+        if (open) saveOnOpen.current = onSave;
+      }}
       initialFocusEl={() => fields.current?.querySelector('textarea') ?? null}
       lazyMount
       unmountOnExit
     >
-      <Dialog.Trigger asChild>
-        <chakra.button
-          type="button"
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          gap="3"
-          w="full"
-          p={{ base: '4', md: '6' }}
-          textAlign="center"
-          borderWidth="1px"
-          borderStyle="dashed"
-          borderColor="border.emphasized"
-          cursor="button"
-          focusVisibleRing="outside"
-          _hover={{ bg: 'bg.subtle' }}
-        >
-          <ArticleIllustration kind="add-abstract" />
-          <Text as="span" fontWeight="semibold">
-            {t('addAbstract')}
-          </Text>
-          <Text as="span" textStyle="sm" color="fg.muted">
-            {t('abstractHint')}
-          </Text>
-        </chakra.button>
-      </Dialog.Trigger>
+      {showTrigger && (
+        <Dialog.Trigger asChild>
+          <chakra.button
+            type="button"
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            gap="3"
+            w="full"
+            p={{ base: '4', md: '6' }}
+            textAlign="center"
+            borderWidth="1px"
+            borderStyle="dashed"
+            borderColor="border.emphasized"
+            cursor="button"
+            focusVisibleRing="outside"
+            _hover={{ bg: 'bg.subtle' }}
+          >
+            <ArticleIllustration kind="add-abstract" />
+            <Text as="span" fontWeight="semibold">
+              {t('addAbstract')}
+            </Text>
+            <Text as="span" textStyle="sm" color="fg.muted">
+              {t('abstractHint')}
+            </Text>
+          </chakra.button>
+        </Dialog.Trigger>
+      )}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -135,7 +149,7 @@ function AddAbstractDialog({ onSave }: { onSave: SaveAbstract }) {
               onSave={async (value) => {
                 setSaving(true);
                 try {
-                  await onSave(value);
+                  await saveOnOpen.current(value);
                 } finally {
                   setSaving(false);
                 }

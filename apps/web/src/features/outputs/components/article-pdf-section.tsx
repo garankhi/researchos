@@ -26,6 +26,15 @@ import { OutputDownloadPrimaryButton, OutputFiles } from './output-actions';
 
 type PdfDestination = Omit<AttachArticlePdfDto, 'uploadId'>;
 
+function currentArticlePdf(files: OutputFile[]) {
+  return files.find(
+    (file) =>
+      file.isCurrentReleaseAttachment &&
+      file.mimeType.toLowerCase() === 'application/pdf' &&
+      file.visibility,
+  );
+}
+
 export function ArticlePdfSection({
   outputId,
   revisionId,
@@ -52,13 +61,12 @@ export function ArticlePdfSection({
   const [progress, setProgress] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string>();
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [replacementNotice, setReplacementNotice] = useState<{
+    fileName?: string;
+  }>();
   const api = useManageArticlePdf(outputId);
-  const current = files.find(
-    (file) =>
-      file.isCurrentReleaseAttachment &&
-      file.mimeType.toLowerCase() === 'application/pdf' &&
-      file.visibility,
-  );
+  const current = currentArticlePdf(files);
   const otherFiles = files.filter((file) => file.id !== current?.id);
 
   useEffect(() => () => request.current?.abort(), []);
@@ -71,6 +79,27 @@ export function ArticlePdfSection({
     setBusy(true);
     setFailure(undefined);
     try {
+      let target = pending.destination;
+      if (needsRefresh) {
+        const latest = await api.reloadDestination(signal);
+        signal.throwIfAborted();
+        if (!latest.revisionId) {
+          setFailure(edit('pdfDestinationUnavailable'));
+          return;
+        }
+        const latestFile = currentArticlePdf(latest.files);
+        target = {
+          ...target,
+          expectedRevisionId: latest.revisionId,
+          replaceFileId: latestFile?.id,
+        };
+        setNeedsRefresh(false);
+        setPending({ ...pending, destination: target });
+        if (target.replaceFileId !== pending.destination.replaceFileId) {
+          setReplacementNotice({ fileName: latestFile?.fileName });
+          return;
+        }
+      }
       if (!verifiedId.current) {
         setProgress(0);
         verifiedId.current = await articlePdfReader.verify(
@@ -82,7 +111,7 @@ export function ArticlePdfSection({
       signal.throwIfAborted();
       setProgress(undefined);
       await api.attach({
-        ...pending.destination,
+        ...target,
         uploadId: verifiedId.current,
       });
       setPending(undefined);
@@ -96,8 +125,11 @@ export function ArticlePdfSection({
       ) {
         verifiedId.current = undefined;
       }
+      const destinationConflict =
+        code === 'output_revision_locked' || code === 'output_file_conflict';
+      if (destinationConflict) setNeedsRefresh(true);
       setFailure(
-        code === 'output_revision_locked'
+        destinationConflict
           ? edit('pdfRevisionChanged')
           : resolveErrorCode(errors, code, basics('failed')),
       );
@@ -173,6 +205,8 @@ export function ArticlePdfSection({
           verifiedId.current = undefined;
           setRights(false);
           setFailure(undefined);
+          setNeedsRefresh(false);
+          setReplacementNotice(undefined);
           setProgress(undefined);
           setPending({ file, destination: target });
         }}
@@ -189,7 +223,13 @@ export function ArticlePdfSection({
         isConfirming={busy}
         isConfirmDisabled={!rights}
         colorPalette="blue"
-        confirmLabel={failure ? basics('retry') : basics('upload')}
+        confirmLabel={
+          failure
+            ? basics('retry')
+            : replacementNotice && pending?.destination.replaceFileId
+              ? basics('replace')
+              : basics('upload')
+        }
         body={
           pending ? (
             <>
@@ -201,6 +241,15 @@ export function ArticlePdfSection({
               {pending.destination.replaceFileId && (
                 <Text textStyle="sm" color="fg.muted">
                   {edit('replacePdfHint')}
+                </Text>
+              )}
+              {replacementNotice && (
+                <Text role="status" textStyle="sm" color="fg.muted">
+                  {replacementNotice.fileName
+                    ? edit('pdfReplacementChanged', {
+                        fileName: replacementNotice.fileName,
+                      })
+                    : edit('pdfReplacementRemoved')}
                 </Text>
               )}
               <Checkbox.Root

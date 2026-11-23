@@ -66,7 +66,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
     return <OutputDetailSkeleton />;
   }
 
-  if (isFailed) {
+  if (isFailed && !output) {
     return (
       <Box flex="1" bg="home.background">
         <Container
@@ -252,10 +252,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                   />
                 </Box>
 
-                {canManageArticle &&
-                revision &&
-                files &&
-                !filesQuery.isFailed ? (
+                {canManageArticle && revision && files ? (
                   <ArticlePdfSection
                     key={output.id}
                     outputId={output.id}

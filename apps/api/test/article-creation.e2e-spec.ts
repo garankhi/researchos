@@ -1902,8 +1902,11 @@ describe('Article creation', () => {
     ).toBe('output_doi_conflict');
   });
 
-  it('freezes the verified author link when an OpenAlex Article is accepted and published', async () => {
+  it('freezes the published byline and relinks the correct OpenAlex author after reordering', async () => {
+    const { OpenAlexIngestService } =
+      await import('../dist/modules/openalex/openalex-ingest.service.js');
     const outputId = randomUUID();
+    const workId = 'https://openalex.org/W101175';
     await db.query(
       "INSERT INTO research_outputs (id, created_by, import_state) VALUES ($1, $2, 'CANDIDATE')",
       [outputId, actors.researcher],
@@ -1922,13 +1925,18 @@ describe('Article creation', () => {
             orcid: importedOrcid,
             isCorresponding: true,
           },
+          { name: 'Other author', order: 2 },
         ]),
       ],
     );
     await db.query(
       `INSERT INTO output_authors (output_id, author_name_string, author_order, is_corresponding_author)
-       VALUES ($1, 'Imported author', 1, true)`,
+       VALUES ($1, 'Imported author', 1, true), ($1, 'Other author', 2, false)`,
       [outputId],
+    );
+    await db.query(
+      "INSERT INTO output_external_ids (output_id, source, external_id) VALUES ($1, 'OPENALEX', $2)",
+      [outputId, workId],
     );
     const server = app.getHttpServer();
     const cookie = cookies.get('researcher')!;
@@ -1951,6 +1959,7 @@ describe('Article creation', () => {
         userId: actors.researcher,
         isCorrespondingAuthor: true,
       },
+      { authorNameString: 'Other author', userId: null },
     ]);
     await db.query(
       'UPDATE output_authors SET user_id = NULL WHERE output_id = $1',
@@ -1959,6 +1968,56 @@ describe('Article creation', () => {
     expect((await detail(outputId).expect(200)).body.data.authors).toEqual(
       article.authors,
     );
+
+    await request('researcher')
+      .patch(`/outputs/${outputId}/article`)
+      .send({
+        expectedRevisionId: article.currentReleaseId,
+        authors: [...article.authors].reverse().map((author) => ({
+          authorId: author.id,
+          displayName: author.authorNameString,
+        })),
+      })
+      .expect(200);
+    const ingest = await app
+      .get(OpenAlexIngestService)
+      .upsertWork(actors.researcher, {
+        id: workId,
+        shortId: 'W101175',
+        doi: null,
+        title: 'Imported Article',
+        abstract: null,
+        venue: null,
+        publicationYear: null,
+        rawType: 'article',
+        outputType: 'ARTICLE',
+        url: null,
+        authors: [
+          {
+            order: 1,
+            name: 'Imported author',
+            isCorresponding: true,
+            authorId: 'https://openalex.org/A101',
+            orcid: importedOrcid,
+          },
+          {
+            order: 2,
+            name: 'Other author',
+            isCorresponding: false,
+            authorId: 'https://openalex.org/A102',
+            orcid: null,
+          },
+        ],
+      });
+    expect(ingest.authorOrder).toBe(2);
+    const byline = await db.query(
+      'SELECT author_name_string, user_id FROM output_authors WHERE output_id = $1 ORDER BY author_order',
+      [outputId],
+    );
+    expect(byline.rows).toEqual([
+      { author_name_string: 'Other author', user_id: null },
+      { author_name_string: 'Imported author', user_id: actors.researcher },
+    ]);
   });
 
   it('rolls back the Article and retry record when pinning the released revision fails', async () => {

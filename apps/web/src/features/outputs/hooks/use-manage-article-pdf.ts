@@ -1,21 +1,24 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getOutputsControllerFindFilesQueryKey,
-  getOutputsControllerFindHomeFeedQueryKey,
   getOutputsControllerFindOneQueryKey,
   outputsControllerAttachArticlePdf,
+  outputsControllerFindFiles,
+  outputsControllerFindOne,
   outputsControllerRemoveArticlePdf,
   outputsControllerUpdateArticlePdfVisibility,
 } from '@/lib/api';
 import type { AttachArticlePdfDto } from '@/lib/api/models/attachArticlePdfDto';
 import type { UpdateArticlePdfVisibilityDtoFileVisibility } from '@/lib/api/models/updateArticlePdfVisibilityDtoFileVisibility';
+import { homeResearchFeedKey } from '../home-research-feed-key';
+import { mapOutputFile } from '../types';
 
 export function useManageArticlePdf(outputId: string) {
   const queryClient = useQueryClient();
 
   async function refreshArticleFiles() {
     void queryClient.invalidateQueries({
-      queryKey: getOutputsControllerFindHomeFeedQueryKey(),
+      queryKey: homeResearchFeedKey,
     });
     await Promise.all([
       queryClient.invalidateQueries({
@@ -30,6 +33,16 @@ export function useManageArticlePdf(outputId: string) {
   }
 
   return {
+    async reloadDestination(signal: AbortSignal) {
+      const [article, files] = await Promise.all([
+        outputsControllerFindOne(outputId, undefined, signal),
+        outputsControllerFindFiles(outputId, undefined, signal),
+      ]);
+      return {
+        revisionId: article.currentReleaseId,
+        files: files.map(mapOutputFile),
+      };
+    },
     async attach(data: AttachArticlePdfDto) {
       await outputsControllerAttachArticlePdf(outputId, data);
       await refreshArticleFiles();

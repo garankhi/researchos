@@ -284,6 +284,50 @@ export const AddAbstractPopup: Story = {
   },
 };
 
+function AbstractRefetchPreview() {
+  const [abstract, setAbstract] = useState<string | null>(null);
+  return (
+    <Stack maxW="3xl" p="4">
+      <Button onClick={() => setAbstract('Abstract saved in another tab')}>
+        Simulate article refresh
+      </Button>
+      <OutputAbstract
+        abstract={abstract}
+        onSaveAbstract={
+          abstract
+            ? setAbstract
+            : () => {
+                throw new Error(
+                  'The draft was opened on the previous revision',
+                );
+              }
+        }
+      />
+    </Stack>
+  );
+}
+
+export const AbstractDraftSurvivesRefetch: Story = {
+  args: AddAbstract.args,
+  render: () => <AbstractRefetchPreview />,
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', abstractCard));
+    const page = within(canvasElement.ownerDocument.body);
+    const dialog = within(await page.findByRole('dialog', addAbstractAction));
+    const field = dialog.getByRole('textbox', abstractField);
+    await userEvent.type(field, 'Local draft');
+    // The update comes from outside the active dialog, like a query refetch.
+    canvas.getByText('Simulate article refresh').click();
+    await expect(
+      await canvas.findByText('Abstract saved in another tab'),
+    ).toBeInTheDocument();
+    await expect(field).toHaveValue('Local draft');
+    await userEvent.click(dialog.getByRole('button', { name: /^(Save|Lưu)$/ }));
+    await expect(await dialog.findByRole('alert')).toBeVisible();
+    await expect(field).toHaveValue('Local draft');
+  },
+};
+
 export const AddPdf: Story = {
   args: { pdf: undefined },
   globals: { viewport: { value: 'mobile1' } },

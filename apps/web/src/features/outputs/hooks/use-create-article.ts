@@ -2,10 +2,10 @@ import { useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getOutputsControllerFindAllQueryKey,
-  getOutputsControllerFindHomeFeedQueryKey,
   useOutputsControllerCreateArticle,
 } from '@/lib/api';
 import type { CreateArticleDto } from '@/lib/api/models/createArticleDto';
+import { homeResearchFeedKey } from '../home-research-feed-key';
 
 export function useCreateArticle() {
   const queryClient = useQueryClient();
@@ -25,7 +25,7 @@ export function useCreateArticle() {
         headers: { 'idempotency-key': key },
       });
       void queryClient.invalidateQueries({
-        queryKey: getOutputsControllerFindHomeFeedQueryKey(),
+        queryKey: homeResearchFeedKey,
       });
       void queryClient.invalidateQueries({
         queryKey: getOutputsControllerFindAllQueryKey(),
