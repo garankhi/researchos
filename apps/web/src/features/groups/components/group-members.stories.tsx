@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import en from '@/messages/en.json';
@@ -117,9 +117,11 @@ export const ArchivedRoster: Story = {
     const confirmation = await body.findByRole('alertdialog', {
       name: t.restoreMember,
     });
-    await expect(
-      within(confirmation).getByText(t.restoreMemberNotice),
-    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(confirmation).getByText(t.restoreMemberNotice),
+      ).toBeVisible(),
+    );
   },
 };
 
