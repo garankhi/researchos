@@ -164,7 +164,14 @@
     "followed": "Now following {title}",
     "unfollowed": "Unfollowed {title}",
     "followError": "Could not update this follow.",
-    "followingLoadError": "Could not load followed accounts and groups."
+    "followingLoadError": "Could not load followed accounts and groups.",
+    "groupLeaderLabel": "Leader:"
+  },
+  "entityPreview": {
+    "unavailable": "No preview available.",
+    "directionCount": "{count, plural, one {# research direction} other {# research directions}}",
+    "groupPreviewTitle": "Group preview",
+    "researcherPreviewTitle": "Researcher preview"
   },
   "addResearch": {
     "trigger": "Add new",

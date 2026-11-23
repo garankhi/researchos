@@ -17,9 +17,9 @@ import {
 import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import { doiUrl } from '@/lib/doi-url';
 import type { OutputDetail } from '../types';
+import { EntityLink } from '@/features/discovery';
 
 const VISIBLE_AUTHORS = 6;
 
@@ -130,15 +130,13 @@ export function OutputHeader({
           >
             {hasGroupLabel ? (
               <Box minW="0">
-                <Link
-                  asChild
-                  fontWeight="semibold"
-                  textStyle="sm"
-                  truncate
-                  display="block"
+                <EntityLink
+                  entityType="GROUP"
+                  entityId={groupId}
+                  href={`/groups/${groupId}`}
                 >
-                  <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
-                </Link>
+                  {groupLabel}
+                </EntityLink>
               </Box>
             ) : null}
             {followSlot}
@@ -229,9 +227,13 @@ export function OutputHeader({
               {t('detail.groupRowLabel')}
             </Text>
             <Box minW="0">
-              <Link asChild textStyle="sm">
-                <NextLink href={`/groups/${groupId}`}>{groupLabel}</NextLink>
-              </Link>
+              <EntityLink
+                entityType="GROUP"
+                entityId={groupId}
+                href={`/groups/${groupId}`}
+              >
+                {groupLabel}
+              </EntityLink>
             </Box>
           </Flex>
         ) : null}
@@ -252,16 +254,13 @@ export function OutputHeader({
                 </Box>
                 <Box minW="0">
                   {author.userId ? (
-                    <Link
-                      asChild
-                      textStyle="sm"
-                      fontWeight="medium"
-                      layerStyle="researchTextLink"
+                    <EntityLink
+                      entityType="RESEARCHER"
+                      entityId={author.userId}
+                      href={`/profile/${author.userId}`}
                     >
-                      <NextLink href={`/profile/${author.userId}`}>
-                        {author.authorNameString}
-                      </NextLink>
-                    </Link>
+                      {author.authorNameString}
+                    </EntityLink>
                   ) : (
                     <Text as="span" textStyle="sm" fontWeight="medium">
                       {author.authorNameString}

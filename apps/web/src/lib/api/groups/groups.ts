@@ -28,6 +28,7 @@ import type {
   GroupMemberPageDtoEnvelope,
   GroupMemberResponseDtoEnvelope,
   GroupMembersControllerFindAllParams,
+  GroupPreviewResponseDtoEnvelope,
   GroupsControllerFindAllParams,
   PaginatedResearchGroupsResponseDtoEnvelope,
   ResearchGroupResponseDtoEnvelope,
@@ -588,6 +589,173 @@ export const useGroupsControllerUpdate = <
     queryClient,
   );
 };
+/**
+ * Returns the group's name, its description and its published research directions. The card is a summary — the full group record is served by the group detail endpoint.
+ * @summary Get the quick information a hover card shows about a group
+ */
+export const groupsControllerPreview = (
+  groupId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupPreviewResponseDtoEnvelope>(
+    { url: `/research-groups/${groupId}/preview`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getGroupsControllerPreviewQueryKey = (groupId: string) => {
+  return [`/research-groups/${groupId}/preview`] as const;
+};
+
+export const getGroupsControllerPreviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof groupsControllerPreview>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupsControllerPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGroupsControllerPreviewQueryKey(groupId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof groupsControllerPreview>>
+  > = ({ signal }) => groupsControllerPreview(groupId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: groupId !== null && groupId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof groupsControllerPreview>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type GroupsControllerPreviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof groupsControllerPreview>>
+>;
+export type GroupsControllerPreviewQueryError = ApiErrorResponseDto;
+
+export function useGroupsControllerPreview<
+  TData = Awaited<ReturnType<typeof groupsControllerPreview>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupsControllerPreview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof groupsControllerPreview>>,
+          TError,
+          Awaited<ReturnType<typeof groupsControllerPreview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGroupsControllerPreview<
+  TData = Awaited<ReturnType<typeof groupsControllerPreview>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupsControllerPreview>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof groupsControllerPreview>>,
+          TError,
+          Awaited<ReturnType<typeof groupsControllerPreview>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useGroupsControllerPreview<
+  TData = Awaited<ReturnType<typeof groupsControllerPreview>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupsControllerPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the quick information a hover card shows about a group
+ */
+
+export function useGroupsControllerPreview<
+  TData = Awaited<ReturnType<typeof groupsControllerPreview>>,
+  TError = ApiErrorResponseDto,
+>(
+  groupId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof groupsControllerPreview>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGroupsControllerPreviewQueryOptions(groupId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 /**
  * The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.
  * @summary List group members

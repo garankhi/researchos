@@ -4,13 +4,12 @@ import { GroupListSkeleton } from './group-skeletons';
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Box,
   Button,
-  Dialog,
   Flex,
   Heading,
   IconButton,
@@ -21,12 +20,9 @@ import {
 } from '@chakra-ui/react';
 import { Ellipsis } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import {
-  FormSelect,
-  FormSubmitButton,
-  FormTextarea,
-  FormTextField,
-} from '@/components/ui/form';
+import { FormSelect, FormTextarea, FormTextField } from '@/components/ui/form';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
+import { FormModal } from '@/components/ui/form-modal';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
@@ -145,69 +141,14 @@ function HubTrigger({
   );
 }
 
-export function HubModal({
-  label,
-  title,
-  children,
-}: {
-  label: string;
-  title: string;
-  children: (close: () => void) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const t = useTranslations('groups');
-  return (
-    <>
-      <HubTrigger label={label} onClick={() => setOpen(true)} />
-      <Dialog.Root
-        open={open}
-        onOpenChange={(details) => setOpen(details.open)}
-        placement="center"
-        size="lg"
-        scrollBehavior="inside"
-        lazyMount
-        unmountOnExit
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content borderRadius="0" shadow="overlayPanel" mx="4">
-              <Dialog.Header>
-                <Dialog.Title>{title}</Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>{children(() => setOpen(false))}</Dialog.Body>
-              <Dialog.Footer>
-                <Button variant="outline" onClick={() => setOpen(false)}>
-                  {t('cancel')}
-                </Button>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-    </>
-  );
-}
-
-export function HubForm({
-  groupId,
-  title,
-  fields,
-  submit,
-  children,
-  onSaved,
-}: {
-  groupId: string;
-  title: string;
-  fields: HubField[];
-  submit: (values: Record<string, string>) => Promise<unknown>;
-  children?: ReactNode;
-  onSaved?: () => void;
-}) {
-  const t = useTranslations('groups');
-  const errors = useTranslations('errors');
-  const mutation = useHubMutation(groupId, submit);
-  const schema = z.object(
+/**
+ * The schema for a set of hub fields.
+ *
+ * Each field carries its own constraints, so the schema is built from the
+ * field list rather than written out by hand.
+ */
+function hubFieldSchema(fields: HubField[]) {
+  return z.object(
     Object.fromEntries(
       fields.map((field) => {
         let value = z.string().trim();
@@ -230,87 +171,166 @@ export function HubForm({
       }),
     ),
   );
-  const methods = useForm<Record<string, string>>({
-    resolver: zodResolver(schema),
-    defaultValues: Object.fromEntries(
-      fields.map((field) => [field.name, field.initial ?? '']),
-    ),
-  });
-  const onSubmit = methods.handleSubmit(async (values) => {
-    try {
-      await mutation.mutateAsync(values);
-      onSaved?.();
-    } catch (error) {
-      const codes = apiFieldErrorCodes(error);
-      for (const [name, messages] of Object.entries(codes ?? {})) {
-        if (fields.some((field) => field.name === name))
-          methods.setError(name, { message: messages[0] });
-      }
-    }
-  });
+}
+
+/**
+ * The fields of a hub form.
+ *
+ * The fields bind to the form the surrounding `FormModal` provides, so a
+ * field never names a control of its own. The extra content a feature
+ * adds — a search field, a topic picker — goes after the fields.
+ */
+export function HubFields({
+  fields,
+  disabled,
+  children,
+}: {
+  fields: HubField[];
+  disabled?: boolean;
+  children?: ReactNode;
+}) {
+  const { control } = useFormContext<Record<string, string>>();
+
   return (
-    <Box aria-label={title}>
-      <FormProvider {...methods}>
-        <form onSubmit={onSubmit} noValidate>
-          <Stack gap="4">
-            {fields.map((field) =>
-              field.options ? (
-                <FormSelect
-                  key={field.name}
-                  name={field.name}
-                  label={field.label}
-                  required={field.required}
-                  disabled={mutation.isPending}
-                >
-                  {field.options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </FormSelect>
-              ) : field.type === 'textarea' ? (
-                <FormTextarea
-                  key={field.name}
-                  name={field.name}
-                  label={field.label}
-                  required={field.required}
-                  disabled={mutation.isPending}
-                />
-              ) : (
-                <FormTextField
-                  key={field.name}
-                  name={field.name}
-                  label={field.label}
-                  required={field.required}
-                  disabled={mutation.isPending}
-                  type={
-                    field.type === 'number' || field.type === 'datetime-local'
-                      ? field.type
-                      : 'text'
-                  }
-                />
-              ),
+    <Stack gap="4">
+      {fields.map((field) =>
+        field.options ? (
+          <FormSelect
+            key={field.name}
+            name={field.name}
+            label={field.label}
+            required={field.required}
+            disabled={disabled}
+            control={control}
+          >
+            {field.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </FormSelect>
+        ) : field.type === 'textarea' ? (
+          <FormTextarea
+            key={field.name}
+            name={field.name}
+            label={field.label}
+            required={field.required}
+            disabled={disabled}
+            control={control}
+          />
+        ) : (
+          <FormTextField
+            key={field.name}
+            name={field.name}
+            label={field.label}
+            required={field.required}
+            disabled={disabled}
+            control={control}
+            type={
+              field.type === 'number' || field.type === 'datetime-local'
+                ? field.type
+                : 'text'
+            }
+          />
+        ),
+      )}
+      {children}
+    </Stack>
+  );
+}
+
+/**
+ * The editor a group's rows open.
+ *
+ * The modal owns the layout and the form; the fields, the schema and the
+ * mutation belong to the feature. The submit closes the modal and calls
+ * `onSaved`.
+ */
+export function HubEditor({
+  groupId,
+  label,
+  title,
+  fields,
+  submit,
+  children,
+  onSaved,
+  resetKey,
+}: {
+  groupId: string;
+  label: string;
+  title: string;
+  fields: HubField[];
+  submit: (values: Record<string, string>) => Promise<unknown>;
+  children?: ReactNode;
+  onSaved?: () => void;
+  /**
+   * When this changes, the form is reset to the current field values.
+   *
+   * A form whose fields arrive asynchronously needs it: the fields are
+   * empty until the data lands, and the form has to pick them up.
+   */
+  resetKey?: string;
+}) {
+  const t = useTranslations('groups');
+  const errors = useTranslations('errors');
+  const mutation = useHubMutation(groupId, submit);
+  const [open, setOpen] = useState(false);
+
+  const schema = hubFieldSchema(fields);
+  const defaultValues = Object.fromEntries(
+    fields.map((field) => [field.name, field.initial ?? '']),
+  );
+
+  const onSubmit = async (values: Record<string, string>) => {
+    await mutation.mutateAsync(values);
+    setOpen(false);
+    onSaved?.();
+  };
+
+  const onSubmitError = (
+    error: unknown,
+    setFieldError: (name: string, message: string) => void,
+  ) => {
+    // The server named the fields it rejected, so each message goes
+    // back onto the field that caused it.
+    const codes = apiFieldErrorCodes(error);
+    for (const [name, messages] of Object.entries(codes ?? {})) {
+      if (fields.some((field) => field.name === name) && messages[0])
+        setFieldError(name, messages[0]);
+    }
+  };
+
+  return (
+    <>
+      <HubTrigger label={label} onClick={() => setOpen(true)} />
+      <FormModal<Record<string, string>>
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        submitLabel={t('save')}
+        cancelLabel={t('cancel')}
+        resolver={zodResolver(schema)}
+        defaultValues={defaultValues}
+        onSubmit={onSubmit}
+        onSubmitError={onSubmitError}
+        isSubmitting={mutation.isPending}
+        resetKey={resetKey}
+      >
+        <HubFields fields={fields} disabled={mutation.isPending}>
+          {children}
+        </HubFields>
+        {mutation.isError ? (
+          <ErrorState
+            title={t('saveError')}
+            message={resolveErrorCode(
+              errors,
+              apiErrorCode(mutation.error),
+              errors('unknown'),
             )}
-            {children}
-            {mutation.isError ? (
-              <ErrorState
-                title={t('saveError')}
-                message={resolveErrorCode(
-                  errors,
-                  apiErrorCode(mutation.error),
-                  errors('unknown'),
-                )}
-              />
-            ) : null}
-            <FormSubmitButton
-              mutation={mutation}
-              label={t('save')}
-              alignSelf="start"
-            />
-          </Stack>
-        </form>
-      </FormProvider>
-    </Box>
+          />
+        ) : null}
+      </FormModal>
+    </>
   );
 }
 
@@ -343,62 +363,36 @@ export function HubAction({
           confirm ? setConfirming(true) : mutation.mutate(undefined)
         }
       />
-      <Dialog.Root
+      <ConfirmationModal
         open={confirming}
-        onOpenChange={(details) => {
-          if (!mutation.isPending) setConfirming(details.open);
-        }}
+        onClose={() => setConfirming(false)}
+        title={label}
+        body={
+          <>
+            <Text textStyle="sm" color="fg.muted">
+              {t('confirmAction', { action: label })}
+            </Text>
+            {mutation.isError ? (
+              <ErrorState
+                title={t('saveError')}
+                message={resolveErrorCode(
+                  errors,
+                  apiErrorCode(mutation.error),
+                  errors('unknown'),
+                )}
+              />
+            ) : null}
+          </>
+        }
+        confirmLabel={t('confirmAction', { action: label })}
+        cancelLabel={t('cancel')}
+        colorPalette={danger ? 'red' : 'gray'}
         role="alertdialog"
-        placement="center"
-        closeOnEscape={!mutation.isPending}
-        closeOnInteractOutside={!mutation.isPending}
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content borderRadius="0" shadow="overlayPanel" mx="4">
-              <Dialog.Header>
-                <Dialog.Title>{label}</Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Text>{t('confirmAction', { action: label })}</Text>
-                {mutation.isError ? (
-                  <ErrorState
-                    title={t('saveError')}
-                    message={resolveErrorCode(
-                      errors,
-                      apiErrorCode(mutation.error),
-                      errors('unknown'),
-                    )}
-                  />
-                ) : null}
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={mutation.isPending}
-                  onClick={() => setConfirming(false)}
-                >
-                  {t('cancel')}
-                </Button>
-                <Button
-                  size="sm"
-                  colorPalette={danger ? 'red' : undefined}
-                  loading={mutation.isPending}
-                  onClick={() =>
-                    mutation.mutate(undefined, {
-                      onSuccess: () => setConfirming(false),
-                    })
-                  }
-                >
-                  {t('confirmAction', { action: label })}
-                </Button>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+        isConfirming={mutation.isPending}
+        onConfirm={() =>
+          mutation.mutate(undefined, { onSuccess: () => setConfirming(false) })
+        }
+      />
       {mutation.isError && !confirm ? (
         <ErrorState
           title={t('saveError')}
@@ -497,23 +491,5 @@ export function HubSection({
         <Stack gap="4">{children}</Stack>
       </Box>
     </Box>
-  );
-}
-
-export function HubEditor(
-  props: Parameters<typeof HubForm>[0] & { label: string },
-) {
-  return (
-    <HubModal label={props.label} title={props.title}>
-      {(close) => (
-        <HubForm
-          {...props}
-          onSaved={() => {
-            close();
-            props.onSaved?.();
-          }}
-        />
-      )}
-    </HubModal>
   );
 }

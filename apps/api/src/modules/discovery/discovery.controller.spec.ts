@@ -22,6 +22,7 @@ describe('DiscoveryController & DiscoveryService', () => {
   const researcherId = '44444444-4444-4444-8444-444444444444';
   const groupId = '55555555-5555-4555-8555-555555555555';
   const opportunityId = '66666666-6666-4666-8666-666666666666';
+  const leadId = '77777777-7777-4777-8777-777777777777';
 
   const createTxMock = () => ({
     $executeRawUnsafe: vi.fn().mockResolvedValue(0),
@@ -74,6 +75,8 @@ describe('DiscoveryController & DiscoveryService', () => {
             title: 'Private Shared Quantum Paper',
             body: 'Quantum computing abstract',
             authors_text: 'Dr. Owner',
+            subtitle_entity_type: null,
+            subtitle_entity_id: null,
             rank: 0.75,
             updated_at: new Date('2026-11-10T10:00:00.000Z'),
           },
@@ -111,6 +114,8 @@ describe('DiscoveryController & DiscoveryService', () => {
           title: 'Private Shared Quantum Paper',
           body: 'Quantum computing abstract',
           authorsText: 'Dr. Owner',
+          subtitleEntityType: null,
+          subtitleEntityId: null,
           rank: 0.75,
           updatedAt: '2026-11-10T10:00:00.000Z',
         },
@@ -140,6 +145,8 @@ describe('DiscoveryController & DiscoveryService', () => {
             title: 'Dr. Nguyen Van A',
             body: 'Researcher in NLP and speech recognition',
             authors_text: 'Nguyen Van A',
+            subtitle_entity_type: null,
+            subtitle_entity_id: null,
             rank: '0.42',
             updated_at: '2026-11-10T11:00:00.000Z',
           },
@@ -177,6 +184,8 @@ describe('DiscoveryController & DiscoveryService', () => {
             title: 'AI & Robotics Lab',
             body: 'Autonomous systems research group',
             authors_text: 'Dr. Lead',
+            subtitle_entity_type: SearchEntityType.RESEARCHER,
+            subtitle_entity_id: leadId,
             rank: 0.61,
             updated_at: new Date('2026-11-10T12:00:00.000Z'),
           },
@@ -194,6 +203,54 @@ describe('DiscoveryController & DiscoveryService', () => {
       expect(selectSql.values).toContain(SearchEntityType.GROUP);
       expect(result.items[0].entityType).toBe(SearchEntityType.GROUP);
       expect(result.items[0].entityId).toBe(groupId);
+      // The subtitle of a group names its leader, so the client can link
+      // the name to that leader's profile.
+      expect(result.items[0].authorsText).toBe('Dr. Lead');
+      expect(result.items[0].subtitleEntityType).toBe(
+        SearchEntityType.RESEARCHER,
+      );
+      expect(result.items[0].subtitleEntityId).toBe(leadId);
+    });
+
+    it('joins the subtitle before the WHERE clause, so the SQL parses', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([
+          {
+            entity_type: SearchEntityType.GROUP,
+            entity_id: groupId,
+            revision_id: null,
+            owner_id: actorId,
+            visibility: OutputFileVisibility.FPTU_COMMUNITY,
+            access_group_id: null,
+            title: 'AI & Robotics Lab',
+            body: 'Autonomous systems research group',
+            authors_text: 'Dr. Lead',
+            subtitle_entity_type: SearchEntityType.RESEARCHER,
+            subtitle_entity_id: leadId,
+            rank: 0.61,
+            updated_at: new Date('2026-11-10T12:00:00.000Z'),
+          },
+        ]);
+
+      const { controller } = await setupController(prismaMock);
+      await controller.search(actorId, {
+        tab: SearchTab.GROUP,
+        q: 'Robotics',
+        page: 1,
+        limit: 20,
+      });
+
+      // A join written after the WHERE clause is a syntax error, and the
+      // error only shows up against a real database.
+      const selectSql =
+        prismaMock.tx.$queryRaw.mock.calls[1][0].strings.join(' ');
+      const joinAt = selectSql.indexOf('LEFT JOIN LATERAL');
+      const whereAt = selectSql.indexOf('WHERE (v.doc @@ q');
+      expect(joinAt).toBeGreaterThan(-1);
+      expect(whereAt).toBeGreaterThan(-1);
+      expect(joinAt).toBeLessThan(whereAt);
     });
 
     it('queries the OPPORTUNITY slice for tab=opportunity', async () => {
@@ -210,7 +267,9 @@ describe('DiscoveryController & DiscoveryService', () => {
             access_group_id: null,
             title: 'RA Position in Computer Vision',
             body: 'Seeking student researchers',
-            authors_text: 'Dr. Creator',
+            authors_text: 'AI & Robotics Lab',
+            subtitle_entity_type: SearchEntityType.GROUP,
+            subtitle_entity_id: groupId,
             rank: 0.55,
             updated_at: new Date('2026-11-10T12:30:00.000Z'),
           },
@@ -228,6 +287,11 @@ describe('DiscoveryController & DiscoveryService', () => {
       expect(selectSql.values).toContain(SearchEntityType.OPPORTUNITY);
       expect(result.items[0].entityType).toBe(SearchEntityType.OPPORTUNITY);
       expect(result.items[0].entityId).toBe(opportunityId);
+      // The subtitle of an opportunity names the group that published it,
+      // so the client can link the name to that group's screen.
+      expect(result.items[0].authorsText).toBe('AI & Robotics Lab');
+      expect(result.items[0].subtitleEntityType).toBe(SearchEntityType.GROUP);
+      expect(result.items[0].subtitleEntityId).toBe(groupId);
     });
 
     it('returns an empty list with pagination metadata (not 404) when no rows match', async () => {
@@ -271,6 +335,8 @@ describe('DiscoveryController & DiscoveryService', () => {
             title: 'Alpha Paper',
             body: null,
             authors_text: null,
+            subtitle_entity_type: null,
+            subtitle_entity_id: null,
             rank: 0.2,
             updated_at: new Date('2026-11-10T10:00:00.000Z'),
           },

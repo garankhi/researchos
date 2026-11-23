@@ -5,18 +5,17 @@ import {
   Badge,
   Box,
   Button,
-  Dialog,
   Flex,
   Heading,
   IconButton,
   Input,
-  Portal,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { DelayedSkeleton } from '@/components/ui/delayed-skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useTaxonomyControllerFindAllTopics } from '@/lib/api';
@@ -283,106 +282,65 @@ export function ProfileInterestsTab({
         </Box>
       )}
 
-      <Dialog.Root
+      <ConfirmationModal
         open={openAddDialog}
-        onOpenChange={(details) => {
-          if (!details.open) setOpenAddDialog(false);
-        }}
-        size="lg"
-        placement="center"
-        motionPreset="scale"
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content boxShadow="overlayPanel">
-              <Dialog.Header
-                flexDirection="column"
-                alignItems="flex-start"
-                gap="1"
+        onClose={() => setOpenAddDialog(false)}
+        title={t('interestsTab.addInterestDialogTitle')}
+        description={t('interestsTab.addInterestDialogDesc')}
+        body={
+          <>
+            {inlineActionError && openAddDialog ? (
+              <ErrorState
+                title={t('interestsTab.interestAddError')}
+                message={inlineActionError}
+              />
+            ) : null}
+
+            <Input
+              value={topicSearchInput}
+              onChange={(event) => setTopicSearchInput(event.target.value)}
+              placeholder={t('interestsTab.selectTopic')}
+              aria-label={t('interestsTab.selectTopic')}
+            />
+
+            {topicsQuery.isLoading ? (
+              <DelayedSkeleton layout={topicOptions} />
+            ) : searchedTopics.length === 0 ? (
+              <Text textStyle="sm" color="fg.muted">
+                {t('interestsTab.emptyMessage')}
+              </Text>
+            ) : (
+              <Stack
+                gap="0"
+                maxH="60"
+                overflowY="auto"
+                borderWidth="1px"
+                borderColor="border"
               >
-                <Dialog.Title>
-                  {t('interestsTab.addInterestDialogTitle')}
-                </Dialog.Title>
-                <Dialog.Description textStyle="sm" color="fg.muted">
-                  {t('interestsTab.addInterestDialogDesc')}
-                </Dialog.Description>
-              </Dialog.Header>
-
-              <Dialog.Body>
-                <Stack gap="3">
-                  {inlineActionError && openAddDialog ? (
-                    <ErrorState
-                      title={t('interestsTab.interestAddError')}
-                      message={inlineActionError}
-                    />
-                  ) : null}
-
-                  <Input
-                    value={topicSearchInput}
-                    onChange={(event) =>
-                      setTopicSearchInput(event.target.value)
-                    }
-                    placeholder={t('interestsTab.selectTopic')}
-                    aria-label={t('interestsTab.selectTopic')}
-                  />
-
-                  {topicsQuery.isLoading ? (
-                    <DelayedSkeleton layout={topicOptions} />
-                  ) : searchedTopics.length === 0 ? (
-                    <Text textStyle="sm" color="fg.muted">
-                      {t('interestsTab.emptyMessage')}
-                    </Text>
-                  ) : (
-                    <Stack
-                      gap="0"
-                      maxH="60"
-                      overflowY="auto"
-                      borderWidth="1px"
-                      borderColor="border"
+                {searchedTopics.map((topic) => {
+                  const isSelected = selectedTopic?.id === topic.id;
+                  return (
+                    <Button
+                      key={topic.id}
+                      variant={isSelected ? 'solid' : 'ghost'}
+                      layerStyle={isSelected ? undefined : 'interactiveRow'}
+                      justifyContent="flex-start"
+                      onClick={() => setSelectedTopic(topic)}
                     >
-                      {searchedTopics.map((topic) => {
-                        const isSelected = selectedTopic?.id === topic.id;
-                        return (
-                          <Button
-                            key={topic.id}
-                            variant={isSelected ? 'solid' : 'ghost'}
-                            layerStyle={
-                              isSelected ? undefined : 'interactiveRow'
-                            }
-                            justifyContent="flex-start"
-                            onClick={() => setSelectedTopic(topic)}
-                          >
-                            {topic.name}
-                          </Button>
-                        );
-                      })}
-                    </Stack>
-                  )}
-                </Stack>
-              </Dialog.Body>
-
-              <Dialog.Footer>
-                <Button
-                  variant="outline"
-                  onClick={() => setOpenAddDialog(false)}
-                  disabled={isCreating}
-                >
-                  {tCommon('cancel')}
-                </Button>
-                <Button
-                  onClick={() => void handleAddInterest()}
-                  disabled={!selectedTopic}
-                  loading={isCreating}
-                >
-                  {tCommon('add')}
-                </Button>
-              </Dialog.Footer>
-              <Dialog.CloseTrigger />
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+                      {topic.name}
+                    </Button>
+                  );
+                })}
+              </Stack>
+            )}
+          </>
+        }
+        confirmLabel={tCommon('add')}
+        colorPalette="blue"
+        isConfirming={isCreating}
+        isConfirmDisabled={!selectedTopic}
+        onConfirm={() => void handleAddInterest()}
+      />
     </Box>
   );
 }

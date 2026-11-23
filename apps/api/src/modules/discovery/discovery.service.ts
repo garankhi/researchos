@@ -52,6 +52,8 @@ interface RawSearchIndexRow {
   authors_text: string | null;
   rank: number | string;
   updated_at: Date | string;
+  subtitle_entity_type: SearchEntityType | null;
+  subtitle_entity_id: string | null;
 }
 
 /**
@@ -79,7 +81,43 @@ export function escapeLikePattern(term: string): string {
   return term.replace(/[\\%_]/g, '\\$&');
 }
 
-function visibleSearchMatches(actorId: string, query: string): Prisma.Sql {
+/**
+ * The `FROM` clause of a search query: the visible slice of the index and
+ * the parsed query term.
+ *
+ * The `WHERE` clause is built separately so a caller can join another
+ * table between the two. A join written after the `WHERE` is a syntax
+ * error, so the two halves have to be kept apart.
+ */
+function visibleSearchFrom(actorId: string, query: string): Prisma.Sql {
+  const term = searchTerm(query);
+  return Prisma.sql`
+    FROM visible_search_index(${actorId}::uuid) v,
+         websearch_to_tsquery('simple', ${term}) q
+  `;
+}
+
+/**
+ * The `WHERE` clause of a search query: the rows the term matches.
+ *
+ * @param actorId The reader the rows are filtered for.
+ * @param query The term the reader typed.
+ */
+function visibleSearchWhere(actorId: string, query: string): Prisma.Sql {
+  const term = searchTerm(query);
+  const likePattern = `%${escapeLikePattern(term)}%`;
+  return Prisma.sql`
+    WHERE (v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\')
+  `;
+}
+
+/**
+ * The search term, validated.
+ *
+ * Both halves of the query need the same term, and both need it to be
+ * valid, so the check lives here rather than in either half.
+ */
+function searchTerm(query: string): string {
   const term = typeof query === 'string' ? query.trim() : '';
   if (
     !minLength(term, MIN_SEARCH_QUERY_LENGTH) ||
@@ -88,13 +126,7 @@ function visibleSearchMatches(actorId: string, query: string): Prisma.Sql {
   ) {
     throw new BadRequestException('validation_failed');
   }
-
-  const likePattern = `%${escapeLikePattern(term)}%`;
-  return Prisma.sql`
-    FROM visible_search_index(${actorId}::uuid) v,
-         websearch_to_tsquery('simple', ${term}) q
-    WHERE (v.doc @@ q OR v.title ILIKE ${likePattern} ESCAPE '\\')
-  `;
+  return term;
 }
 
 /**
@@ -144,7 +176,8 @@ export class DiscoveryService {
     actorId: string,
     query: SearchCountsQueryDto,
   ): Promise<SearchCountsResponseDto> {
-    const matches = visibleSearchMatches(actorId, query.q);
+    const from = visibleSearchFrom(actorId, query.q);
+    const where = visibleSearchWhere(actorId, query.q);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
@@ -157,7 +190,8 @@ export class DiscoveryService {
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.RESEARCHER}::search_entity_type)::bigint AS people,
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.GROUP}::search_entity_type)::bigint AS group_count,
           COUNT(*) FILTER (WHERE v.entity_type = ${SearchEntityType.OPPORTUNITY}::search_entity_type)::bigint AS opportunity
-        ${matches}
+        ${from}
+        ${where}
       `);
 
       const row = rows[0];
@@ -217,8 +251,14 @@ export class DiscoveryService {
     entityType: SearchEntityType,
     query: SearchQueryDto,
   ): Promise<PaginatedSearchResultsResponseDto> {
-    const matches = Prisma.sql`
-      ${visibleSearchMatches(actorId, query.q)}
+    const from = visibleSearchFrom(actorId, query.q);
+    const where = visibleSearchWhere(actorId, query.q);
+    /**
+     * The slice is part of the match, so it sits next to the term. It is
+     * a `WHERE` condition, which is why the join that resolves the
+     * subtitle has to come before it.
+     */
+    const slice = Prisma.sql`
       AND v.entity_type = ${entityType}::search_entity_type
     `;
 
@@ -248,7 +288,9 @@ export class DiscoveryService {
 
         const countRows = await tx.$queryRaw<{ total: bigint }[]>(Prisma.sql`
           SELECT COUNT(*)::bigint AS total
-          ${matches}
+          ${from}
+          ${where}
+          ${slice}
         `);
 
         const total = toCount(countRows[0]?.total);
@@ -271,10 +313,15 @@ export class DiscoveryService {
             v.access_group_id,
             v.title,
             v.body,
-            v.authors_text,
+            sub.authors_text,
             ts_rank(v.doc, q)::float8 AS rank,
-            v.updated_at
-          ${matches}
+            v.updated_at,
+            sub.entity_type AS subtitle_entity_type,
+            sub.entity_id AS subtitle_entity_id
+          ${from}
+          LEFT JOIN LATERAL ${this.subtitleJoin()} sub ON TRUE
+          ${where}
+          ${slice}
           ORDER BY ${orderBySql}
           LIMIT ${limit}
           OFFSET ${offset}
@@ -289,6 +336,49 @@ export class DiscoveryService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  /**
+   * The entity a result's subtitle names, resolved per entity type.
+   *
+   * A group's subtitle is its leader, and an opportunity's subtitle is
+   * the group that published it — both are entities with a screen of
+   * their own, so the client needs their id to turn the subtitle into a
+   * link. An output's subtitle is a list of author names and names no
+   * entity, so it resolves to nothing.
+   *
+   * The join is lateral and runs once per row, so it costs one lookup
+   * per result rather than a second pass over the whole page.
+   *
+   * The body is wrapped in parentheses because it is a subquery: a
+   * `LEFT JOIN LATERAL` needs them, and the fragment is interpolated
+   * straight into the statement.
+   */
+  private subtitleJoin(): Prisma.Sql {
+    return Prisma.sql`(
+      SELECT
+        CASE
+          WHEN v.entity_type = 'GROUP' THEN g.lead_id
+          WHEN v.entity_type = 'OPPORTUNITY' THEN og.id
+          ELSE NULL
+        END AS entity_id,
+        CASE
+          WHEN v.entity_type = 'GROUP' THEN 'RESEARCHER'::search_entity_type
+          WHEN v.entity_type = 'OPPORTUNITY' THEN 'GROUP'::search_entity_type
+          ELSE NULL
+        END AS entity_type,
+        CASE
+          WHEN v.entity_type = 'OPPORTUNITY' THEN coalesce(og.name, v.authors_text)
+          ELSE v.authors_text
+        END AS authors_text
+      FROM (SELECT 1) AS one
+      LEFT JOIN research_groups g
+        ON v.entity_type = 'GROUP' AND g.id = v.entity_id
+      LEFT JOIN research_opportunities op
+        ON v.entity_type = 'OPPORTUNITY' AND op.id = v.entity_id
+      LEFT JOIN research_groups og
+        ON og.id = op.group_id
+    )`;
   }
 
   private buildOrderByClause(
@@ -324,6 +414,8 @@ export class DiscoveryService {
       title: row.title,
       body: row.body ?? null,
       authorsText: row.authors_text ?? null,
+      subtitleEntityType: row.subtitle_entity_type ?? null,
+      subtitleEntityId: row.subtitle_entity_id ?? null,
       rank: typeof row.rank === 'number' ? row.rank : Number(row.rank),
       updatedAt:
         row.updated_at instanceof Date

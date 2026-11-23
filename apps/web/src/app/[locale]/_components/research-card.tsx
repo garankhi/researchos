@@ -18,6 +18,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import NextLink from '@/components/ui/link';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
+import { EntityLink } from '@/features/discovery';
 import { OutputDownloadPrimaryButton } from '@/features/outputs';
 import type { ResearchCardData, ResearchFigure } from './research-feed-data';
 
@@ -291,11 +292,13 @@ export function ResearchCard({ item }: { item: ResearchCardData }) {
               <Flex as="li" key={author.id} align="center" gap="1.5">
                 <Icon as={UserRound} aria-hidden boxSize="4" color="fg.muted" />
                 {author.userId ? (
-                  <Link asChild>
-                    <NextLink href={`/profile/${author.userId}`}>
-                      {author.name}
-                    </NextLink>
-                  </Link>
+                  <EntityLink
+                    entityType="RESEARCHER"
+                    entityId={author.userId}
+                    href={`/profile/${author.userId}`}
+                  >
+                    {author.name}
+                  </EntityLink>
                 ) : (
                   author.name
                 )}

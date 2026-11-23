@@ -7,15 +7,14 @@ import {
   Flex,
   Heading,
   Icon,
-  Link,
   SimpleGrid,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { Compass, FolderKanban, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import NextLink from '@/components/ui/link';
 import type { Direction, Group, GroupTab, Member, Opportunity } from '../types';
+import { EntityLink } from '@/features/discovery';
 
 /**
  * The group's right column.
@@ -108,18 +107,13 @@ export function GroupSidebar({
               <Icon as={Users} boxSize="4" color="fg.muted" aria-hidden />
             </Flex>
             <Box minW="0" flex="1">
-              <Link
-                asChild
-                textStyle="sm"
-                fontWeight="semibold"
-                layerStyle="researchTextLink"
-                display="block"
-                truncate
+              <EntityLink
+                entityType="RESEARCHER"
+                entityId={lead.userId}
+                href={`/profile/${lead.userId}`}
               >
-                <NextLink href={`/profile/${lead.userId}`}>
-                  {lead.fullName}
-                </NextLink>
-              </Link>
+                {lead.fullName}
+              </EntityLink>
               <Text textStyle="xs" color="fg.muted" truncate>
                 {lead.email}
               </Text>
@@ -218,12 +212,6 @@ export function GroupSidebar({
           </Stack>
         </Box>
       ) : null}
-
-      {isLeader ? null : (
-        <Text textStyle="xs" color="fg.muted">
-          {t('readonlyNotice')}
-        </Text>
-      )}
     </Stack>
   );
 }

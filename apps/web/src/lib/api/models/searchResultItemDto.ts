@@ -11,6 +11,8 @@ import type { SearchResultItemDtoBody } from './searchResultItemDtoBody';
 import type { SearchResultItemDtoEntityType } from './searchResultItemDtoEntityType';
 import type { SearchResultItemDtoOwnerId } from './searchResultItemDtoOwnerId';
 import type { SearchResultItemDtoRevisionId } from './searchResultItemDtoRevisionId';
+import type { SearchResultItemDtoSubtitleEntityId } from './searchResultItemDtoSubtitleEntityId';
+import type { SearchResultItemDtoSubtitleEntityType } from './searchResultItemDtoSubtitleEntityType';
 import type { SearchResultItemDtoVisibility } from './searchResultItemDtoVisibility';
 
 export interface SearchResultItemDto {
@@ -43,10 +45,20 @@ export interface SearchResultItemDto {
    */
   body: SearchResultItemDtoBody;
   /**
-   * Formatted author names, researcher full name, group leader name, or opportunity creator name.
+   * Formatted author names, researcher full name, group leader name, or publishing group name.
    * @nullable
    */
   authorsText: SearchResultItemDtoAuthorsText;
+  /**
+   * Kind of entity the subtitle refers to — `RESEARCHER` for a group leader, `GROUP` for an opportunity publishing group. `null` when the subtitle names no entity, as it does for an output's authors.
+   * @nullable
+   */
+  subtitleEntityType: SearchResultItemDtoSubtitleEntityType;
+  /**
+   * Primary key UUID of the entity the subtitle refers to; `null` when the subtitle names no entity.
+   * @nullable
+   */
+  subtitleEntityId: SearchResultItemDtoSubtitleEntityId;
   /** Text relevance score computed strictly from `ts_rank` on the full-text vector (`BR-11`, `S-33`). */
   rank: number;
   /** Timestamp when the search index entry was last updated. */
