@@ -1,5 +1,10 @@
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import {
+  GroupMemberRole,
+  Prisma,
+  PrismaService,
+  stageNotificationEvent,
+} from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -124,6 +129,14 @@ export class GroupMembersService {
               users: { include: { researcher_profiles: true } },
             },
           });
+      await stageNotificationEvent(tx, {
+        key: `group-member-added:${groupId}:${dto.userId}:${previous?.archived_at?.toISOString() ?? 'initial'}`,
+        type: 'GROUP_MEMBER_ADDED',
+        actorId: callerId,
+        subjectType: 'GROUP',
+        subjectId: groupId,
+        payload: { recipientId: dto.userId, link: `/groups/${groupId}` },
+      });
       return this.toResponse(row);
     });
   }
@@ -162,12 +175,21 @@ export class GroupMembersService {
           domainErrorCodes.groups.leadRemovalDenied,
           HttpStatus.FORBIDDEN,
         );
+      const archivedAt = new Date();
       await tx.group_members.update({
         where: {
           group_id_user_id: { group_id: groupId, user_id: userId },
           archived_at: null,
         },
-        data: { archived_at: new Date() },
+        data: { archived_at: archivedAt },
+      });
+      await stageNotificationEvent(tx, {
+        key: `group-member-removed:${groupId}:${userId}:${archivedAt.toISOString()}`,
+        type: 'GROUP_MEMBER_REMOVED',
+        actorId: callerId,
+        subjectType: 'GROUP',
+        subjectId: groupId,
+        payload: { recipientId: userId, link: `/groups/${groupId}` },
       });
     });
   }

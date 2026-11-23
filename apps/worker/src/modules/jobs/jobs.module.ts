@@ -5,6 +5,7 @@ import {
   createQueueOptions,
   SYSTEM_QUEUE,
   BACKGROUND_QUEUE,
+  NOTIFICATION_QUEUE,
   RESEARCH_UPDATES_QUEUE,
   TOPIC_SUGGESTION_QUEUE,
   ARTICLE_PDF_METADATA_QUEUE,
@@ -14,6 +15,7 @@ import { ProbeProcessor } from '../../processors/probe.processor.js';
 import {
   BackgroundJobProcessor,
   BackgroundJobRunner,
+  NotificationFanoutProcessor,
   ResearchUpdateProcessor,
 } from '../../processors/background-job.processor.js';
 import { OutboxService } from './outbox.service.js';
@@ -42,6 +44,7 @@ import { TopicEmbeddingModel } from './topic-embedding-model.js';
     }),
     BullModule.registerQueue({ name: SYSTEM_QUEUE }),
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
+    BullModule.registerQueue({ name: NOTIFICATION_QUEUE }),
     BullModule.registerQueue({ name: RESEARCH_UPDATES_QUEUE }),
     BullModule.registerQueue({ name: TOPIC_SUGGESTION_QUEUE }),
     BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
@@ -50,6 +53,7 @@ import { TopicEmbeddingModel } from './topic-embedding-model.js';
   providers: [
     ProbeProcessor,
     BackgroundJobRunner,
+    NotificationFanoutProcessor,
     ArticlePdfMetadataService,
     ArticlePdfMetadataProcessor,
     BackgroundJobProcessor,

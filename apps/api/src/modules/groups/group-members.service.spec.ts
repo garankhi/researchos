@@ -61,6 +61,7 @@ function setup() {
   };
   const row = memberRow();
   const tx = {
+    $executeRaw: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([{ id: groupId }]),
     research_groups: { findUnique: vi.fn().mockResolvedValue(group) },
     users: { findUnique: vi.fn().mockResolvedValue({ id: userId }) },

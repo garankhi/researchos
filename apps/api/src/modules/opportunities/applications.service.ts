@@ -10,6 +10,7 @@ import {
   OpportunityApplicationStatus,
   Prisma,
   PrismaService,
+  stageNotificationEvent,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -205,6 +206,12 @@ export class ApplicationsService {
         },
         include: applicantInclude,
       });
+      await this.notifyApplication(
+        tx,
+        application,
+        actorId,
+        'APPLICATION_RECEIVED',
+      );
       return this.response(application, await this.now(tx));
     });
   }
@@ -307,6 +314,12 @@ export class ApplicationsService {
           domainErrorCodes.applications.alreadyAnswered,
           HttpStatus.CONFLICT,
         );
+      await this.notifyApplication(
+        tx,
+        answered[0],
+        actorId,
+        accepting ? 'APPLICATION_ACCEPTED' : 'APPLICATION_DECLINED',
+      );
       return accepting
         ? this.acceptanceResponse(tx, answered[0], opportunity.group_id)
         : this.response(answered[0], await this.now(tx));
@@ -384,6 +397,12 @@ export class ApplicationsService {
           domainErrorCodes.applications.alreadyWithdrawn,
           HttpStatus.CONFLICT,
         );
+      await this.notifyApplication(
+        tx,
+        withdrawn[0],
+        actorId,
+        'APPLICATION_WITHDRAWN',
+      );
       return this.response(withdrawn[0], await this.now(tx));
     });
   }
@@ -396,6 +415,26 @@ export class ApplicationsService {
    * lock is taken before the row is read, so the read returns the state the
    * lock holder sees.
    */
+  private notifyApplication(
+    tx: Prisma.TransactionClient,
+    row: ApplicationRow,
+    actorId: string,
+    type:
+      | 'APPLICATION_RECEIVED'
+      | 'APPLICATION_ACCEPTED'
+      | 'APPLICATION_DECLINED'
+      | 'APPLICATION_WITHDRAWN',
+  ) {
+    return stageNotificationEvent(tx, {
+      key: `${type}:${row.id}`,
+      type,
+      actorId,
+      subjectType: 'APPLICATION',
+      subjectId: row.id,
+      payload: { link: `/opportunities/${row.opportunity_id}` },
+    });
+  }
+
   private async lock(
     tx: Prisma.TransactionClient,
     applicationId: string,
