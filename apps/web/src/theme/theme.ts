@@ -59,6 +59,18 @@ const config = defineConfig({
       },
     },
     layerStyles: {
+      formFields: {
+        value: {
+          '& :where([data-scope="field"][data-part="label"], [data-scope="fieldset"][data-part="legend"], [data-scope="combobox"][data-part="label"])':
+            { fontWeight: 'bold' },
+          '& :where(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"]), textarea, select)':
+            {
+              borderBottomColor: 'fg.muted',
+              _placeholder: { color: 'fg.muted' },
+              _invalid: { borderBottomColor: 'border.error' },
+            },
+        },
+      },
       interactiveRow: {
         value: {
           position: 'relative',
