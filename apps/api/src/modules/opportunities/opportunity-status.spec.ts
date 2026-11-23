@@ -51,7 +51,18 @@ function setup(status: OpportunityStatus = OpportunityStatus.DRAFT) {
     archived_at: null as Date | null,
   };
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([{ allowed: true }]),
+    $queryRaw: vi.fn().mockImplementation(async (sql: TemplateStringsArray) =>
+      sql.join('').includes('AS current')
+        ? [
+            {
+              current: Boolean(
+                row.application_deadline &&
+                row.application_deadline.getTime() > Date.now(),
+              ),
+            },
+          ]
+        : [{ allowed: true }],
+    ),
     research_opportunities: {
       updateManyAndReturn: vi.fn().mockImplementation(async () => {
         if (
@@ -239,7 +250,7 @@ describe('Opportunity status actions', () => {
   });
 });
 
-describe('Deadline-based opportunity expiry', () => {
+describe('Opportunity requests during scheduled expiry', () => {
   const now = new Date('2026-11-10T12:00:00Z');
 
   beforeEach(() => {
@@ -248,137 +259,59 @@ describe('Deadline-based opportunity expiry', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each([-1, 0])(
-    'expires an OPEN record when its deadline is now minus %s milliseconds',
-    async (offset) => {
-      const { service, row, tx } = setup(OpportunityStatus.OPEN);
-      row.application_deadline = new Date(now.getTime() + offset);
-      await expect(service.findOne(actorId, id)).resolves.toMatchObject({
-        status: OpportunityStatus.EXPIRED,
-      });
-      expect(
-        tx.research_opportunities.updateManyAndReturn,
-      ).toHaveBeenCalledWith({
-        where: {
-          id,
-          status: OpportunityStatus.OPEN,
-          application_deadline: { lte: now },
-        },
-        data: { status: OpportunityStatus.EXPIRED },
-        select: { id: true },
-      });
-      expect(tx.auditLog.createMany).toHaveBeenCalledWith({
-        data: [
-          {
-            actorId: null,
-            action: 'OPPORTUNITY_STATUS_CHANGED',
-            entity: 'research_opportunities',
-            entityId: id,
-            payload: {
-              fromStatus: OpportunityStatus.OPEN,
-              toStatus: OpportunityStatus.EXPIRED,
-              reason: 'APPLICATION_DEADLINE_REACHED',
-            },
-          },
-        ],
-      });
-    },
-  );
-
-  it('keeps an opportunity OPEN before its deadline', async () => {
-    const { service, row, tx } = setup(OpportunityStatus.OPEN);
-    row.application_deadline = new Date(now.getTime() + 1);
-    await expect(service.findOne(actorId, id)).resolves.toMatchObject({
-      status: OpportunityStatus.OPEN,
-    });
-    expect(tx.auditLog.createMany).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    OpportunityStatus.DRAFT,
-    OpportunityStatus.FILLED,
-    OpportunityStatus.CLOSED,
-    OpportunityStatus.EXPIRED,
-  ])('does not expire %s even with an old deadline', async (status) => {
-    const { service, row, tx } = setup(status);
-    row.application_deadline = new Date(now.getTime() - 1);
-    await expect(service.findOne(actorId, id)).resolves.toMatchObject({
-      status,
-    });
-    expect(tx.auditLog.createMany).not.toHaveBeenCalled();
-  });
-
-  it('does not duplicate the expiry audit on repeated reads', async () => {
+  it('reads overdue detail and list without writing expiry or audit records', async () => {
     const { service, row, tx } = setup(OpportunityStatus.OPEN);
     row.application_deadline = now;
-    await service.findOne(actorId, id);
-    await service.findOne(actorId, id);
-    expect(tx.auditLog.createMany).toHaveBeenCalledOnce();
-  });
-
-  it('expires records before applying list filters and counting', async () => {
-    const { service, row, tx } = setup(OpportunityStatus.OPEN);
-    row.application_deadline = now;
+    await expect(service.findOne(actorId, id)).resolves.toMatchObject({
+      status: 'OPEN',
+    });
     tx.$queryRaw
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ total: 0n }]);
-    tx.research_opportunities.findMany.mockResolvedValue([]);
+      .mockResolvedValueOnce([{ id }])
+      .mockResolvedValueOnce([{ total: 1n }]);
     const query = Object.assign(new ListOpportunitiesQueryDto(), {
       status: OpportunityStatus.OPEN,
     });
     await expect(service.findAll(actorId, query)).resolves.toMatchObject({
-      items: [],
-      meta: { total: 0 },
+      items: [{ status: 'OPEN' }],
+      meta: { total: 1 },
     });
-    expect(row.status).toBe(OpportunityStatus.EXPIRED);
     expect(
       tx.research_opportunities.updateManyAndReturn,
-    ).toHaveBeenCalledBefore(tx.$queryRaw);
-    expect(
-      tx.research_opportunities.updateManyAndReturn.mock.calls[0][0].where,
-    ).not.toHaveProperty('id');
+    ).not.toHaveBeenCalled();
+    expect(tx.auditLog.createMany).not.toHaveBeenCalled();
   });
 
-  it('commits automatic expiry before rejecting a fill with 409', async () => {
-    const { service, row, tx, prisma } = setup(OpportunityStatus.OPEN);
-    row.application_deadline = now;
+  it.each([-1, 0])(
+    'rejects manual fill at or after the database cutoff (%s ms)',
+    async (offset) => {
+      const { service, row, tx } = setup(OpportunityStatus.OPEN);
+      row.application_deadline = new Date(now.getTime() + offset);
+      await expect(
+        service.transitionStatus(actorId, id, 'fill'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(row.status).toBe('OPEN');
+      expect(tx.auditLog.create).not.toHaveBeenCalled();
+      expect(tx.research_opportunities.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not revive a swept opportunity by extending its deadline', async () => {
+    const { service } = setup(OpportunityStatus.EXPIRED);
     await expect(
-      service.transitionStatus(actorId, id, 'fill'),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(row.status).toBe(OpportunityStatus.EXPIRED);
-    await expect(prisma.$transaction.mock.results[0].value).resolves.toBeNull();
-    expect(tx.auditLog.createMany).toHaveBeenCalledOnce();
-    expect(tx.auditLog.create).not.toHaveBeenCalled();
-    expect(tx.research_opportunities.update).not.toHaveBeenCalled();
+      service.update(actorId, id, {
+        applicationDeadline: '2099-01-01T00:00:00Z',
+      }),
+    ).resolves.toMatchObject({ status: 'EXPIRED' });
   });
 
-  it('fails the expiry transaction if its audit insert fails', async () => {
-    const { service, row, tx } = setup(OpportunityStatus.OPEN);
-    row.application_deadline = now;
-    const failure = new Error('Audit unavailable');
-    tx.auditLog.createMany.mockRejectedValue(failure);
-    await expect(service.findOne(actorId, id)).rejects.toBe(failure);
-    expect(tx.research_opportunities.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('does not revive an expired opportunity by extending the deadline', async () => {
+  it('allows a deadline extension before the worker claims the row', async () => {
     const { service, row } = setup(OpportunityStatus.OPEN);
     row.application_deadline = now;
     await expect(
       service.update(actorId, id, {
         applicationDeadline: '2099-01-01T00:00:00Z',
       }),
-    ).resolves.toMatchObject({ status: OpportunityStatus.EXPIRED });
-  });
-
-  it('expires an OPEN record if PATCH moves its deadline into the past', async () => {
-    const { service, tx } = setup(OpportunityStatus.OPEN);
-    await expect(
-      service.update(actorId, id, {
-        applicationDeadline: '2000-01-01T00:00:00Z',
-      }),
-    ).resolves.toMatchObject({ status: OpportunityStatus.EXPIRED });
-    expect(tx.auditLog.createMany).toHaveBeenCalledOnce();
+    ).resolves.toMatchObject({ status: 'OPEN' });
   });
 });
 

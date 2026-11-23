@@ -14,9 +14,9 @@ import {
   DIGEST_QUEUE,
   DIGEST_SEND_JOB,
   RESEARCH_UPDATES_QUEUE,
-  articlePdfMetadataScope,
   TOPIC_SUGGESTION_JOB,
   TOPIC_SUGGESTION_QUEUE,
+  articlePdfMetadataScope,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
@@ -36,8 +36,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly connection: Redis;
   private readonly work: Queue;
   private readonly researchUpdates: Queue;
-  private readonly articlePdfMetadata: Queue;
   private readonly topicSuggestions: Queue;
+  private readonly articlePdfMetadata: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
   private readonly digestWork?: Queue;
@@ -61,11 +61,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     const queueOptions = { ...options, connection: this.connection };
     this.work = new Queue(BACKGROUND_QUEUE, queueOptions);
     this.researchUpdates = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
+    this.topicSuggestions = new Queue(TOPIC_SUGGESTION_QUEUE, queueOptions);
     this.articlePdfMetadata = new Queue(
       ARTICLE_PDF_METADATA_QUEUE,
       queueOptions,
     );
-    this.topicSuggestions = new Queue(TOPIC_SUGGESTION_QUEUE, queueOptions);
     this.deadLetters = new Queue(DEAD_LETTER_QUEUE, queueOptions);
     if (config.get<string>('DIGEST_SMTP_ENABLED') === 'true') {
       this.digestWork = new Queue(DIGEST_QUEUE, queueOptions);
@@ -73,8 +73,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     for (const queue of [
       this.work,
       this.researchUpdates,
-      this.articlePdfMetadata,
       this.topicSuggestions,
+      this.articlePdfMetadata,
       this.deadLetters,
       this.digestWork,
     ]) {
@@ -109,8 +109,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         Promise.all([
           this.work.waitUntilReady(),
           this.researchUpdates.waitUntilReady(),
-          this.articlePdfMetadata.waitUntilReady(),
           this.topicModel?.version && this.topicSuggestions.waitUntilReady(),
+          this.articlePdfMetadata.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
           this.digestWork?.waitUntilReady(),
         ]),
@@ -259,8 +259,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.work.close(),
       this.researchUpdates.close(),
-      this.articlePdfMetadata.close(),
       this.topicSuggestions.close(),
+      this.articlePdfMetadata.close(),
       this.deadLetters.close(),
       this.digestWork?.close(),
     ]);

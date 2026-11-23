@@ -1,5 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { OpportunityApplicationStatus } from '@researchos/database';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  GroupMemberRole,
+  OpportunityApplicationStatus,
+} from '@researchos/database';
+import { domainErrorCodes } from '@researchos/error-codes';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
@@ -13,11 +17,27 @@ export class CreateApplicationDto {
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(10000)
+  @IsNotEmpty({ message: domainErrorCodes.applications.noteRequired })
+  @MaxLength(10000, { message: domainErrorCodes.applications.noteTooLong })
   applicantNote: string;
 }
 
+export class AcceptedGroupMembershipDto {
+  @ApiProperty({ format: 'uuid', description: 'Group the applicant joined.' })
+  groupId: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Accepted applicant identifier.',
+  })
+  userId: string;
+
+  @ApiProperty({
+    enum: GroupMemberRole,
+    description: 'Current role of the applicant in the group.',
+  })
+  role: GroupMemberRole;
+}
 /**
  * One application, with the display data the screens render.
  *
@@ -32,6 +52,14 @@ export class CreateApplicationDto {
  * not, so the avatar may be absent.
  */
 export class ApplicationResponseDto {
+  @ApiPropertyOptional({
+    type: AcceptedGroupMembershipDto,
+    nullable: true,
+    description:
+      'Current active membership returned when accepting a group application. Personal applications have no group membership.',
+  })
+  membership?: AcceptedGroupMembershipDto | null;
+
   @ApiProperty({ description: 'Application identifier.', format: 'uuid' })
   id: string;
 

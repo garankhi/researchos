@@ -78,7 +78,7 @@ export class DigestSender {
         digestDeliveryId(job.payload) !== deliveryId
       )
         return null;
-      if (!deliveryId || !delivery) {
+      if (!deliveryId || !delivery || !job.owner_id) {
         await this.finishJob(tx, ref, 'invalid_digest_reference');
         return null;
       }

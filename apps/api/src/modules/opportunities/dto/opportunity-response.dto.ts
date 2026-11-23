@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  OpportunityApplicationStatus,
   OpportunityKind,
   OpportunityStatus,
   TargetAudience,
@@ -12,6 +13,13 @@ export class OpportunityResponseDto {
       'Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes.',
   })
   canManage?: boolean;
+  @ApiPropertyOptional({
+    description:
+      "Current caller's most recent application status. Returned by detail reads; null means the caller has never applied.",
+    enum: OpportunityApplicationStatus,
+    nullable: true,
+  })
+  myApplicationStatus?: OpportunityApplicationStatus | null;
   @ApiProperty({ description: 'Opportunity identifier.', format: 'uuid' })
   id: string;
   @ApiProperty({
@@ -65,6 +73,12 @@ export class OpportunityResponseDto {
   description: string | null;
   @ApiProperty({ description: 'Response SLA measured in calendar days.' })
   responseSlaDays: number;
+
+  @ApiProperty({
+    description:
+      'Whether acceptance automatically fills this opportunity before its deadline.',
+  })
+  autoFillOnAcceptance: boolean;
   @ApiProperty({
     description: 'Exact application cutoff timestamp.',
     type: String,

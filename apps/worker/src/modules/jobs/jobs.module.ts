@@ -6,8 +6,8 @@ import {
   SYSTEM_QUEUE,
   BACKGROUND_QUEUE,
   RESEARCH_UPDATES_QUEUE,
-  ARTICLE_PDF_METADATA_QUEUE,
   TOPIC_SUGGESTION_QUEUE,
+  ARTICLE_PDF_METADATA_QUEUE,
 } from '@researchos/queue';
 import { ArticlePdfMetadataProcessor } from '../../processors/article-pdf-metadata.processor.js';
 import { ProbeProcessor } from '../../processors/probe.processor.js';
@@ -19,6 +19,11 @@ import {
 import { OutboxService } from './outbox.service.js';
 import { ArticlePdfMetadataService } from './article-pdf-metadata.service.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { OpportunityExpiryProcessor } from '../../processors/opportunity-expiry.processor.js';
+import {
+  OPPORTUNITY_EXPIRY_QUEUE,
+  OpportunityExpiryService,
+} from './opportunity-expiry.service.js';
 import { TopicSuggestionProcessor } from '../../processors/topic-suggestion.processor.js';
 import { TopicEmbeddingIndexService } from './topic-embedding-index.service.js';
 import { TopicEmbeddingModel } from './topic-embedding-model.js';
@@ -38,8 +43,9 @@ import { TopicEmbeddingModel } from './topic-embedding-model.js';
     BullModule.registerQueue({ name: SYSTEM_QUEUE }),
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
     BullModule.registerQueue({ name: RESEARCH_UPDATES_QUEUE }),
-    BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
     BullModule.registerQueue({ name: TOPIC_SUGGESTION_QUEUE }),
+    BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
+    BullModule.registerQueue({ name: OPPORTUNITY_EXPIRY_QUEUE }),
   ],
   providers: [
     ProbeProcessor,
@@ -49,6 +55,8 @@ import { TopicEmbeddingModel } from './topic-embedding-model.js';
     BackgroundJobProcessor,
     ResearchUpdateProcessor,
     OutboxService,
+    OpportunityExpiryService,
+    OpportunityExpiryProcessor,
     TopicSuggestionProcessor,
     TopicEmbeddingIndexService,
     TopicEmbeddingModel,

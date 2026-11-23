@@ -2,6 +2,10 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 
+const webOrigin = new URL(
+  process.env.RES159_WEB_ORIGIN ?? 'http://localhost:3100',
+).origin;
+
 const id = (n) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const groupId = id(1),
   leadId = id(2),
@@ -100,6 +104,7 @@ try {
       archived = false,
       large = false,
       projectRestricted = false,
+      opportunityPipeline = false,
     } = {},
   ) {
     const context = await browser.newContext({
@@ -148,8 +153,12 @@ try {
       requiredExpertiseTags: ['AI'],
       description: 'Join our research project',
       responseSlaDays: 7,
+      autoFillOnAcceptance: opportunityPipeline,
       applicationDeadline: '2099-12-01T00:00:00Z',
-      status: role === 'outsider' || projectRestricted ? 'OPEN' : 'DRAFT',
+      status:
+        role === 'outsider' || projectRestricted || opportunityPipeline
+          ? 'OPEN'
+          : 'DRAFT',
       publishedAt: null,
       archivedAt: null,
     };
@@ -158,7 +167,7 @@ try {
         id: applicationId,
         opportunityId,
         opportunityTitle: opportunity.title,
-        applicantId: memberId,
+        applicantId: opportunityPipeline ? outsiderId : memberId,
         applicantNote: 'I would like to collaborate',
         status: 'PENDING',
         responseNote: null,
@@ -229,7 +238,7 @@ try {
         path = url.pathname,
         method = request.method();
       const headers = {
-        'access-control-allow-origin': 'http://localhost:3100',
+        'access-control-allow-origin': webOrigin,
         'access-control-allow-credentials': 'true',
         'access-control-allow-headers': 'content-type',
         'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
@@ -355,7 +364,18 @@ try {
         data = links.find((row) => row.outputId === workId);
       } else if (path === '/opportunities')
         data = pageOf(empty ? [] : [opportunity]);
-      else if (path === `/opportunities/${opportunityId}/open`) {
+      else if (path === `/opportunities/${opportunityId}`) data = opportunity;
+      else if (
+        path === `/opportunities/${opportunityId}/applications` &&
+        method === 'POST'
+      ) {
+        data = {
+          ...applications[0],
+          applicantNote: request.postDataJSON().applicantNote,
+        };
+        opportunity = { ...opportunity, myApplicationStatus: 'PENDING' };
+        status = 201;
+      } else if (path === `/opportunities/${opportunityId}/open`) {
         opportunity = { ...opportunity, status: 'OPEN' };
         data = opportunity;
       } else if (path === `/research-groups/${groupId}/applications`)
@@ -367,6 +387,19 @@ try {
           responseNote: request.postDataJSON().responseNote,
         }));
         data = applications[0];
+        if (data.status === 'ACCEPTED') {
+          members.push({
+            ...members[1],
+            userId: outsiderId,
+            fullName: 'Accepted Researcher',
+            role: 'MEMBER',
+          });
+          opportunity = { ...opportunity, status: 'FILLED' };
+          data = {
+            ...data,
+            membership: { groupId, userId: outsiderId, role: 'MEMBER' },
+          };
+        }
       } else if (path === '/outputs')
         data = pageOf([
           work(outputId, revision(newRevision, 'Latest release title', 2)),
@@ -426,9 +459,7 @@ try {
         ),
       });
     });
-    await page.goto(
-      `${process.env.RES159_WEB_ORIGIN ?? 'http://localhost:3100'}/${locale}/groups/${groupId}`,
-    );
+    await page.goto(`${webOrigin}/${locale}/groups/${groupId}`);
     if (slow) {
       await page.getByTestId('loading-skeleton').first().waitFor();
       results.push('loading skeleton');
@@ -446,6 +477,112 @@ try {
         fail = false;
       },
     };
+  }
+
+  for (const mobile of [false, true]) {
+    const applicant = await scenario('outsider', {
+      mobile,
+      opportunityPipeline: true,
+    });
+    await applicant.page.getByRole('tab', { name: /^Opportunities/ }).click();
+    await applicant.page
+      .getByRole('link', { name: 'Research collaboration', exact: true })
+      .click();
+    const apply = applicant.page.getByRole('button', {
+      name: 'Apply',
+      exact: true,
+    });
+    await apply.press('Enter');
+    const submit = applicant.page.getByRole('button', {
+      name: 'Send application',
+      exact: true,
+    });
+    await submit.press('Enter');
+    await applicant.page
+      .getByText('Enter an application note.', { exact: true })
+      .waitFor();
+    const note = applicant.page.getByRole('textbox', {
+      name: 'Your note',
+      exact: true,
+    });
+    await note.fill('I would like to contribute.');
+    await submit.press('Enter');
+    await applicant.page
+      .getByText('Your application was sent.', { exact: true })
+      .first()
+      .waitFor();
+    const applications = applicant.writes.filter(({ path }) =>
+      path.endsWith('/applications'),
+    );
+    assert.equal(applications.length, 1);
+    assert.equal(
+      applications[0].data.applicantNote,
+      'I would like to contribute.',
+    );
+    await applicant.page.reload();
+    await applicant.page
+      .getByText('Your application: Pending', { exact: true })
+      .waitFor();
+    assert.equal(await apply.count(), 0);
+    assert.deepEqual(applicant.errors, []);
+    await applicant.context.close();
+  }
+  results.push(
+    'keyboard application and persisted status after reload at desktop and mobile widths',
+  );
+
+  const manager = await scenario('lead', { opportunityPipeline: true });
+  const roster = () =>
+    manager.requests.filter(({ path }) => path.endsWith('/members')).length;
+  const opportunityLists = () =>
+    manager.requests.filter(({ path }) => path === '/opportunities').length;
+  await manager.page
+    .getByRole('tab', { name: /^Inbound applications/ })
+    .click();
+  await manager.page
+    .getByText('I would like to collaborate', { exact: true })
+    .waitFor();
+  const before = { roster: roster(), opportunities: opportunityLists() };
+  await manager.page
+    .getByRole('button', { name: 'Group actions', exact: true })
+    .last()
+    .click();
+  await manager.page
+    .getByRole('menuitem', { name: 'Accept application', exact: true })
+    .click();
+  const dialog = manager.page.getByRole('dialog', {
+    name: 'Accept application',
+    exact: true,
+  });
+  await dialog
+    .getByText(/adds the applicant to the group as a Member/)
+    .waitFor();
+  await dialog
+    .getByRole('textbox', { name: 'Response note' })
+    .fill('Welcome to the group');
+  await dialog
+    .getByRole('button', { name: 'Accept application', exact: true })
+    .press('Enter');
+  await manager.page
+    .getByText('Welcome to the group', { exact: true })
+    .waitFor();
+  await manager.page.getByRole('tab', { name: /^Members/ }).click();
+  await manager.page
+    .getByText('Accepted Researcher', { exact: true })
+    .waitFor();
+  assert(roster() > before.roster);
+  assert(opportunityLists() > before.opportunities);
+  assert(manager.writes.some(({ data }) => data?.decision === 'ACCEPTED'));
+  assert.deepEqual(manager.errors, []);
+  await manager.context.close();
+  results.push(
+    'acceptance confirmation refreshes the application, opportunity, and member collections',
+  );
+
+  if (process.argv.includes('--opportunity-pipeline')) {
+    console.log(JSON.stringify({ passed: results }, null, 2));
+    await browser.close();
+    process.exit(0);
   }
 
   const readonly = await scenario('outsider');

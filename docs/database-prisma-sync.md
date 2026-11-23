@@ -135,8 +135,8 @@ hiện được lệch khi database đã được dựng từ SQL mới nhất. 
 làm đúng việc đó một cách tự động và lặp lại được:
 
 1. Tạo database tạm `researchos_drift` trên cùng server với database dev.
-2. Áp dụng migration init (chứa `audit_logs` và bốn enum nền) rồi áp dụng
-   `docs/database/ResearchOS.sql`.
+2. Áp dụng `docs/database/ResearchOS.sql` vào database tạm. File này đã chứa
+   `audit_logs` và bốn enum nền.
 3. So sánh database tạm với `schema.prisma` bằng `prisma migrate diff`.
 4. Xoá database tạm.
 

@@ -10,9 +10,10 @@ import {
   Grid,
   Stack,
   Tabs,
+  Text,
 } from '@chakra-ui/react';
 import { LockKeyhole, SearchX } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useNow, useTranslations } from 'next-intl';
 import NextLink from '@/components/ui/link';
 import { ErrorState, RouteFeedback } from '@/components/ui/feedback';
 import { useCurrentUser } from '@/features/identity';
@@ -46,6 +47,8 @@ export function OpportunityDetailShell({
 }) {
   const t = useTranslations('opportunities');
   const common = useTranslations('common');
+  const applicationStatus = useTranslations('profile.applicationStatus');
+  const now = useNow({ updateInterval: 1000 });
   const viewer = useCurrentUser();
   const { showSnackbar } = useSnackbar();
   const [activeTab, setActiveTab] = useState<OpportunityTab>('overview');
@@ -58,7 +61,7 @@ export function OpportunityDetailShell({
     isNotFound,
     isEmpty,
     refetch,
-  } = useOpportunity({ opportunityId });
+  } = useOpportunity({ opportunityId, viewerId: viewer?.id });
 
   const permissions = opportunity
     ? opportunityPermissions(opportunity, viewer)
@@ -71,7 +74,10 @@ export function OpportunityDetailShell({
     enabled: Boolean(permissions?.canSeeApplications),
   });
 
-  const actions = useOpportunityActions({ opportunityId });
+  const actions = useOpportunityActions({
+    opportunityId,
+    groupId: opportunity?.groupId,
+  });
 
   if (isLoading) {
     return <OpportunityDetailSkeleton />;
@@ -170,7 +176,18 @@ export function OpportunityDetailShell({
               />
 
               <Flex gap="2" align="center" flexShrink={0} wrap="wrap">
-                {permissions.canApply ? (
+                {viewer && opportunity.myApplicationStatus && (
+                  <Text role="status">
+                    {t('applicationStatus', {
+                      status: applicationStatus(
+                        opportunity.myApplicationStatus,
+                      ),
+                    })}
+                  </Text>
+                )}
+                {permissions.canApply &&
+                opportunity.applicationDeadline &&
+                new Date(opportunity.applicationDeadline) > now ? (
                   <OpportunityApplyButton
                     canApply={permissions.canApply}
                     onApply={handleApply}

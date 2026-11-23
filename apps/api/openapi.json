@@ -5235,7 +5235,7 @@
         ]
       },
       "get": {
-        "description": "Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.",
+        "description": "Status filtering uses persisted states. A background worker expires overdue open opportunities.",
         "operationId": "OpportunitiesController_findAll",
         "parameters": [
           {
@@ -5345,7 +5345,7 @@
     },
     "/opportunities/{opportunityId}": {
       "get": {
-        "description": "An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.",
+        "description": "The status reflects the last committed change. Scheduled expiry updates an overdue open opportunity.",
         "operationId": "OpportunitiesController_findOne",
         "parameters": [
           {
@@ -5402,7 +5402,7 @@
         ]
       },
       "patch": {
-        "description": "Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.",
+        "description": "A scheduled worker expires overdue opportunities. An extension made before the sweep can prevent expiry. Extending an expired opportunity keeps it expired.",
         "operationId": "OpportunitiesController_update",
         "parameters": [
           {
@@ -5428,7 +5428,7 @@
         },
         "responses": {
           "200": {
-            "description": "Updated opportunity details, including automatic deadline expiry.",
+            "description": "Updated opportunity details and current persisted status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6101,7 +6101,7 @@
     },
     "/applications/{applicationId}/respond": {
       "post": {
-        "description": "Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.",
+        "description": "Only the opportunity creator, the group lead and the group leaders may answer. The database timestamps the response. Acceptance enrolls a group applicant and returns the membership. For single-applicant opportunities, acceptance fills an open opportunity before the deadline.",
         "operationId": "ApplicationsController_respond",
         "parameters": [
           {
@@ -11550,6 +11550,11 @@
             "description": "Opportunity details; required before publication.",
             "nullable": true
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft.",
+            "default": false
+          },
           "responseSlaDays": {
             "type": "number",
             "description": "Response SLA in calendar days, including weekends and holidays.",
@@ -11589,6 +11594,18 @@
           "canManage": {
             "type": "boolean",
             "description": "Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes."
+          },
+          "myApplicationStatus": {
+            "type": "string",
+            "description": "Current caller's most recent application status. Returned by detail reads; null means the caller has never applied.",
+            "enum": [
+              "PENDING",
+              "INVITED_TO_DISCUSS",
+              "DECLINED",
+              "WITHDRAWN",
+              "ACCEPTED"
+            ],
+            "nullable": true
           },
           "id": {
             "type": "string",
@@ -11656,6 +11673,10 @@
             "type": "number",
             "description": "Response SLA measured in calendar days."
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Whether acceptance automatically fills this opportunity before its deadline."
+          },
           "applicationDeadline": {
             "type": "string",
             "description": "Exact application cutoff timestamp.",
@@ -11698,6 +11719,7 @@
           "requiredExpertiseTags",
           "description",
           "responseSlaDays",
+          "autoFillOnAcceptance",
           "applicationDeadline",
           "status",
           "publishedAt",
@@ -11774,6 +11796,11 @@
             "description": "Opportunity details; required before publication.",
             "nullable": true
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft.",
+            "default": false
+          },
           "responseSlaDays": {
             "type": "number",
             "description": "Response SLA in calendar days, including weekends and holidays.",
@@ -11808,9 +11835,47 @@
           "applicantNote"
         ]
       },
+      "AcceptedGroupMembershipDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Group the applicant joined."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Accepted applicant identifier."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "MEMBER",
+              "GROUP_LEADER"
+            ],
+            "description": "Current role of the applicant in the group."
+          }
+        },
+        "required": [
+          "groupId",
+          "userId",
+          "role"
+        ]
+      },
       "ApplicationResponseDto": {
         "type": "object",
         "properties": {
+          "membership": {
+            "nullable": true,
+            "description": "Current active membership returned when accepting a group application. Personal applications have no group membership.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedGroupMembershipDto"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "description": "Application identifier.",
@@ -11863,7 +11928,8 @@
               "PENDING",
               "INVITED_TO_DISCUSS",
               "DECLINED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "ACCEPTED"
             ]
           },
           "responseNote": {
@@ -11962,6 +12028,16 @@
       "GroupApplicationResponseDto": {
         "type": "object",
         "properties": {
+          "membership": {
+            "nullable": true,
+            "description": "Current active membership returned when accepting a group application. Personal applications have no group membership.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedGroupMembershipDto"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "description": "Application identifier.",
@@ -12014,7 +12090,8 @@
               "PENDING",
               "INVITED_TO_DISCUSS",
               "DECLINED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "ACCEPTED"
             ]
           },
           "responseNote": {
@@ -12115,10 +12192,11 @@
         "properties": {
           "decision": {
             "type": "string",
-            "description": "The owner's answer: invite the applicant to a discussion, or decline.",
+            "description": "The owner's answer: invite the applicant to a discussion, decline, or accept.",
             "enum": [
               "INVITED_TO_DISCUSS",
-              "DECLINED"
+              "DECLINED",
+              "ACCEPTED"
             ]
           },
           "responseNote": {

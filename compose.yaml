@@ -83,6 +83,15 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  grobid:
+    image: grobid/grobid:0.9.1-crf
+    profiles: [grobid]
+    init: true
+    ulimits:
+      core: 0
+    ports:
+      - "127.0.0.1:${GROBID_PORT:-8070}:8070"
+
 volumes:
   ollama_models:
   postgres_data:

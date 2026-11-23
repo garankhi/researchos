@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService, type Prisma } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -13,24 +14,34 @@ import {
 } from '@researchos/queue';
 import { createS3Storage, type StorageAdapter } from '@researchos/storage';
 import { UnrecoverableError } from 'bullmq';
+import {
+  enrichArticlePdfMetadata,
+  type GrobidHeaderInput,
+  type GrobidSettings,
+} from './article-pdf-grobid.js';
+import type { PdfEvidence, PdfParserInput } from './article-pdf-parser.js';
 
 const errors = domainErrorCodes.storage;
 const extractionTimeoutMs = 15_000;
+const defaultGrobidTimeoutMs = 4_000;
 type Extraction = { metadata: ArticlePdfMetadata } | { error: string };
+type ParserResult = Extraction & { evidence?: PdfEvidence };
 type VerifiedPdf = { storage_key: string; size_bytes: bigint; sha256: string };
 
-function parsePdf(bytes: Uint8Array, signal: AbortSignal): Promise<Extraction> {
+function runPdfThread<Result>(
+  module: URL,
+  input: PdfParserInput | GrobidHeaderInput,
+  signal: AbortSignal,
+  transferList: ArrayBuffer[] = [],
+): Promise<Result> {
   signal.throwIfAborted();
-  const worker = new Worker(
-    new URL('./article-pdf-parser.js', import.meta.url),
-    {
-      workerData: bytes,
-      transferList: [bytes.buffer as ArrayBuffer],
-      resourceLimits: { maxOldGenerationSizeMb: 192 },
-    },
-  );
+  const worker = new Worker(module, {
+    workerData: input,
+    transferList,
+    resourceLimits: { maxOldGenerationSizeMb: 192 },
+  });
   let abort: () => void;
-  return new Promise<Extraction>((resolve, reject) => {
+  return new Promise<Result>((resolve, reject) => {
     abort = () => reject(signal.reason);
     signal.addEventListener('abort', abort, { once: true });
     worker.once('message', resolve);
@@ -45,8 +56,38 @@ function parsePdf(bytes: Uint8Array, signal: AbortSignal): Promise<Extraction> {
 @Injectable()
 export class ArticlePdfMetadataService {
   private storage?: StorageAdapter;
+  private readonly grobid?: GrobidSettings;
 
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ConfigService) config: ConfigService,
+  ) {
+    const baseUrl = config.get<string>('ARTICLE_PDF_GROBID_URL')?.trim();
+    if (!baseUrl) return;
+    try {
+      const endpoint = new URL('/api/processHeaderDocument', baseUrl);
+      if (
+        !['http:', 'https:'].includes(endpoint.protocol) ||
+        endpoint.username ||
+        endpoint.password
+      )
+        throw new Error('Invalid GROBID URL');
+      const timeout = Number(
+        config.get<string>('ARTICLE_PDF_GROBID_TIMEOUT_MS'),
+      );
+      this.grobid = {
+        endpoint,
+        timeoutMs:
+          Number.isInteger(timeout) && timeout > 0
+            ? Math.min(timeout, extractionTimeoutMs)
+            : defaultGrobidTimeoutMs,
+      };
+    } catch {
+      new Logger(ArticlePdfMetadataService.name).warn(
+        'Invalid ARTICLE_PDF_GROBID_URL; Article PDF enrichment is disabled',
+      );
+    }
+  }
 
   async process(ref: BackgroundJobPayload, scope: string): Promise<void> {
     const identity = {
@@ -185,6 +226,39 @@ export class ArticlePdfMetadataService {
     if (offset !== size || sha256.digest('hex') !== pdf.sha256) {
       return { error: errors.articlePdfMetadataCorrupt };
     }
-    return parsePdf(bytes, signal);
+    // The parser worker takes ownership of the ArrayBuffer. Keep an immutable
+    // copy of the verified bytes only when the fallback is enabled.
+    const file = this.grobid
+      ? new Blob([bytes], { type: 'application/pdf' })
+      : undefined;
+    const parsed = await runPdfThread<ParserResult>(
+      new URL('./article-pdf-parser.js', import.meta.url),
+      { bytes, collectEvidence: Boolean(file) },
+      signal,
+      [bytes.buffer],
+    );
+    if ('error' in parsed) return { error: parsed.error };
+    const { metadata, evidence } = parsed;
+    return {
+      metadata:
+        this.grobid && file && evidence
+          ? await enrichArticlePdfMetadata(
+              metadata,
+              evidence,
+              file,
+              this.grobid,
+              signal,
+              (input, deadline) =>
+                runPdfThread<ArticlePdfMetadata>(
+                  new URL(
+                    './article-pdf-grobid-header.worker.js',
+                    import.meta.url,
+                  ),
+                  input,
+                  deadline,
+                ),
+            )
+          : metadata,
+    };
   }
 }

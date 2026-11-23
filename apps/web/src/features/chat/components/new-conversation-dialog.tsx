@@ -7,14 +7,13 @@ import {
   CloseButton,
   Dialog,
   Flex,
-  HStack,
   Input,
   Portal,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { ChatConversationTypeEnum } from '@researchos/chat';
-import { Check, MessageSquarePlus, Users } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ErrorState } from '@/components/ui/feedback';
@@ -40,7 +39,6 @@ export function NewConversationDialog({
   const tCommon = useTranslations('common');
   const tErrors = useTranslations('errors');
 
-  const [mode, setMode] = useState<'DIRECT' | 'GROUP'>('DIRECT');
   const [groupTitle, setGroupTitle] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<ChatUserSummary[]>([]);
@@ -50,7 +48,6 @@ export function NewConversationDialog({
   const { users, isFetching } = useSearchChatPeople(searchQuery, open);
 
   const resetState = () => {
-    setMode('DIRECT');
     setGroupTitle('');
     setSearchQuery('');
     setSelectedUsers([]);
@@ -66,12 +63,6 @@ export function NewConversationDialog({
 
   const toggleUser = (user: ChatUserSummary) => {
     setSubmitErrorCode(null);
-    if (mode === 'DIRECT') {
-      setSelectedUsers((prev) =>
-        prev.some((u) => u.id === user.id) ? [] : [user],
-      );
-      return;
-    }
     setSelectedUsers((prev) =>
       prev.some((u) => u.id === user.id)
         ? prev.filter((u) => u.id !== user.id)
@@ -80,20 +71,14 @@ export function NewConversationDialog({
   };
 
   const handleCreate = async () => {
-    if (selectedUsers.length === 0) {
-      setSubmitErrorCode('chat_direct_participant_invalid');
-      return;
-    }
+    if (selectedUsers.length === 0 || createConversation.isPending) return;
 
     setSubmitErrorCode(null);
     try {
       const created = await createConversation.mutateAsync({
         data: {
-          type:
-            mode === 'DIRECT'
-              ? ChatConversationTypeEnum.DIRECT
-              : ChatConversationTypeEnum.GROUP,
-          title: mode === 'GROUP' ? groupTitle.trim() || null : null,
+          type: ChatConversationTypeEnum.GROUP,
+          title: groupTitle.trim() || null,
           participantIds: selectedUsers.map((u) => u.id),
         },
       });
@@ -115,7 +100,7 @@ export function NewConversationDialog({
         <Dialog.Positioner>
           <Dialog.Content boxShadow="overlayPanel" maxW="lg" w="full">
             <Dialog.Header>
-              <Dialog.Title>{t('newConversation')}</Dialog.Title>
+              <Dialog.Title>{t('createGroup')}</Dialog.Title>
               <Dialog.CloseTrigger asChild>
                 <CloseButton size="sm" />
               </Dialog.CloseTrigger>
@@ -123,43 +108,17 @@ export function NewConversationDialog({
 
             <Dialog.Body>
               <Stack gap="4">
-                <HStack gap="2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={mode === 'DIRECT' ? 'solid' : 'outline'}
-                    onClick={() => {
-                      setMode('DIRECT');
-                      setSelectedUsers((prev) => prev.slice(0, 1));
-                    }}
-                  >
-                    <MessageSquarePlus size={16} />
-                    {t('directChat')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={mode === 'GROUP' ? 'solid' : 'outline'}
-                    onClick={() => setMode('GROUP')}
-                  >
-                    <Users size={16} />
-                    {t('groupChat')}
-                  </Button>
-                </HStack>
-
-                {mode === 'GROUP' && (
-                  <Stack gap="1">
-                    <Text textStyle="sm" fontWeight="medium">
-                      {t('groupTitleLabel')}
-                    </Text>
-                    <Input
-                      value={groupTitle}
-                      onChange={(e) => setGroupTitle(e.target.value)}
-                      placeholder={t('groupTitlePlaceholder')}
-                      maxLength={120}
-                    />
-                  </Stack>
-                )}
+                <Stack gap="1">
+                  <Text textStyle="sm" fontWeight="medium">
+                    {t('groupTitleLabel')}
+                  </Text>
+                  <Input
+                    value={groupTitle}
+                    onChange={(e) => setGroupTitle(e.target.value)}
+                    placeholder={t('groupTitlePlaceholder')}
+                    maxLength={120}
+                  />
+                </Stack>
 
                 <Stack gap="1">
                   <Text textStyle="sm" fontWeight="medium">
@@ -270,7 +229,7 @@ export function NewConversationDialog({
                 disabled={selectedUsers.length === 0}
                 onClick={() => void handleCreate()}
               >
-                {t('createAction')}
+                {t('createGroup')}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>
