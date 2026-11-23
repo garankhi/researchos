@@ -117,59 +117,20 @@ export function MessageItem({
 
   const segments = tokenizeMessageBody(message.body);
 
-  // Grouped bubble corners matching Facebook Messenger
-  const bubbleRadiusProps = (() => {
-    if (isDeleted || (isFirstInGroup && isLastInGroup)) {
-      return { borderRadius: '2xl' };
-    }
-    if (isOwn) {
-      if (isFirstInGroup) {
-        return {
-          borderTopLeftRadius: '2xl',
-          borderTopRightRadius: '2xl',
-          borderBottomLeftRadius: '2xl',
-          borderBottomRightRadius: 'sm',
-        };
-      }
-      if (isLastInGroup) {
-        return {
-          borderTopLeftRadius: '2xl',
-          borderTopRightRadius: 'sm',
-          borderBottomLeftRadius: '2xl',
-          borderBottomRightRadius: '2xl',
-        };
-      }
-      return {
-        borderTopLeftRadius: '2xl',
-        borderTopRightRadius: 'sm',
-        borderBottomLeftRadius: '2xl',
-        borderBottomRightRadius: 'sm',
-      };
-    } else {
-      if (isFirstInGroup) {
-        return {
-          borderTopLeftRadius: '2xl',
-          borderTopRightRadius: '2xl',
-          borderBottomLeftRadius: 'sm',
-          borderBottomRightRadius: '2xl',
-        };
-      }
-      if (isLastInGroup) {
-        return {
-          borderTopLeftRadius: 'sm',
-          borderTopRightRadius: '2xl',
-          borderBottomLeftRadius: '2xl',
-          borderBottomRightRadius: '2xl',
-        };
-      }
-      return {
-        borderTopLeftRadius: 'sm',
-        borderTopRightRadius: '2xl',
-        borderBottomLeftRadius: 'sm',
-        borderBottomRightRadius: '2xl',
-      };
-    }
-  })();
+  const bubbleRadius = '18px';
+  const joinedRadius = '5px';
+  const bubbleRadiusProps = {
+    borderRadius: bubbleRadius,
+    ...(isOwn
+      ? {
+          borderStartEndRadius: isFirstInGroup ? bubbleRadius : joinedRadius,
+          borderEndEndRadius: isLastInGroup ? bubbleRadius : joinedRadius,
+        }
+      : {
+          borderStartStartRadius: isFirstInGroup ? bubbleRadius : joinedRadius,
+          borderEndStartRadius: isLastInGroup ? bubbleRadius : joinedRadius,
+        }),
+  };
 
   const isToolbarVisible = reactionPickerOpen || actionsMenuOpen;
 
@@ -181,6 +142,7 @@ export function MessageItem({
         gap="0.5"
         opacity={{ base: 1, md: isToolbarVisible ? 1 : 0 }}
         _groupHover={{ opacity: 1 }}
+        _focusWithin={{ opacity: 1 }}
         transition="opacity 0.15s ease-in-out"
         flexShrink={0}
         px="1"
@@ -411,7 +373,7 @@ export function MessageItem({
       >
         {/* If incoming: avatar on last message of group, or empty spacer to keep alignment */}
         {!isOwn && (
-          <Box w="32px" h="32px" flexShrink={0} mb="0.5" me="1.5">
+          <Box w="32px" flexShrink={0} me="1.5">
             {isLastInGroup ? (
               <Link
                 asChild
@@ -731,68 +693,70 @@ export function MessageItem({
       </Flex>
 
       {/* Own-message delivery / read / retry status on last message of cluster */}
-      {isOwn && isLastInGroup && !isDeleted && (
-        <HStack gap="1.5" textStyle="xs" color="fg.muted" mt="0.5">
-          {message.editedAt && (
-            <Text fontStyle="italic">({t('editedBadge')})</Text>
-          )}
-          {message.localState === 'sending' && (
-            <>
-              <Clock size={12} />
-              <Text>{t('delivery.sending')}</Text>
-            </>
-          )}
-          {message.localState === 'failed' && (
-            <HStack gap="2" color="fg.error">
-              <AlertCircle size={12} />
-              <Text>
-                {message.localErrorCode
-                  ? resolveErrorCode(
-                      tErrors,
-                      message.localErrorCode,
-                      t('delivery.failed'),
-                    )
-                  : t('delivery.failed')}
-              </Text>
-              <Button
-                type="button"
-                size="2xs"
-                variant="outline"
-                colorPalette="red"
-                onClick={() => onRetrySend(message)}
-              >
-                <RotateCcw size={12} />
-                {t('retrySend')}
-              </Button>
-            </HStack>
-          )}
-          {!message.localState && otherReads.length > 0 && (
-            <>
-              <CheckCheck size={13} />
-              <Text>
-                {participants.length > 2
-                  ? t('delivery.readByCount', { count: otherReads.length })
-                  : t('delivery.read')}
-              </Text>
-            </>
-          )}
-          {!message.localState && otherReads.length === 0 && hasDelivered && (
-            <>
-              <CheckCheck size={13} />
-              <Text>{t('delivery.delivered')}</Text>
-            </>
-          )}
-          {!message.localState &&
-            otherReads.length === 0 &&
-            !hasDelivered &&
-            hasSent && (
+      {isOwn &&
+        (isLastInGroup || message.localState === 'failed') &&
+        !isDeleted && (
+          <HStack gap="1.5" textStyle="xs" color="fg.muted" mt="0.5">
+            {message.editedAt && (
+              <Text fontStyle="italic">({t('editedBadge')})</Text>
+            )}
+            {message.localState === 'sending' && (
               <>
-                <Check size={13} />
-                <Text>{t('delivery.sent')}</Text>
+                <Clock size={12} />
+                <Text>{t('delivery.sending')}</Text>
               </>
             )}
-        </HStack>
-      )}
+            {message.localState === 'failed' && (
+              <HStack gap="2" color="fg.error">
+                <AlertCircle size={12} />
+                <Text>
+                  {message.localErrorCode
+                    ? resolveErrorCode(
+                        tErrors,
+                        message.localErrorCode,
+                        t('delivery.failed'),
+                      )
+                    : t('delivery.failed')}
+                </Text>
+                <Button
+                  type="button"
+                  size="2xs"
+                  variant="outline"
+                  colorPalette="red"
+                  onClick={() => onRetrySend(message)}
+                >
+                  <RotateCcw size={12} />
+                  {t('retrySend')}
+                </Button>
+              </HStack>
+            )}
+            {!message.localState && otherReads.length > 0 && (
+              <>
+                <CheckCheck size={13} />
+                <Text>
+                  {participants.length > 2
+                    ? t('delivery.readByCount', { count: otherReads.length })
+                    : t('delivery.read')}
+                </Text>
+              </>
+            )}
+            {!message.localState && otherReads.length === 0 && hasDelivered && (
+              <>
+                <CheckCheck size={13} />
+                <Text>{t('delivery.delivered')}</Text>
+              </>
+            )}
+            {!message.localState &&
+              otherReads.length === 0 &&
+              !hasDelivered &&
+              hasSent && (
+                <>
+                  <Check size={13} />
+                  <Text>{t('delivery.sent')}</Text>
+                </>
+              )}
+          </HStack>
+        )}
     </Flex>
   );
 }
