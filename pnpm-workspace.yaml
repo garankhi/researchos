@@ -16,3 +16,6 @@ allowBuilds:
   '@prisma/engines': true
   '@prisma/client': true
   prisma: true
+  # Firebase uses explicit runtime configuration and its distributed JS files.
+  '@firebase/util': false
+  protobufjs: false
