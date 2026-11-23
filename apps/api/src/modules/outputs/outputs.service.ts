@@ -989,23 +989,37 @@ export class OutputsService {
         },
       });
     }
-    if (retained.size > 0) {
+    const changed = byline.flatMap((author) => {
+      const previous = byId.get(author.id);
+      if (!previous) return [];
+      const orderChanged = previous.author_order !== author.order;
+      const nameChanged = previous.author_name_string !== author.name;
+      return orderChanged || nameChanged
+        ? [{ author, orderChanged, nameChanged }]
+        : [];
+    });
+    const movedIds = changed
+      .filter(({ orderChanged }) => orderChanged)
+      .map(({ author }) => author.id);
+    if (movedIds.length > 0) {
       // Disjoint temporary positions avoid collisions with the unique (output, order) index.
       const offset = existing.reduce(
         (max, author) => Math.max(max, author.author_order),
         byline.length,
       );
       await tx.output_authors.updateMany({
-        where: { output_id: outputId },
+        where: { id: { in: movedIds } },
         data: { author_order: { increment: offset } },
       });
-      for (const author of byline) {
-        if (!retained.has(author.id)) continue;
-        await tx.output_authors.update({
-          where: { id: author.id },
-          data: { author_order: author.order, author_name_string: author.name },
-        });
-      }
+    }
+    for (const { author, orderChanged, nameChanged } of changed) {
+      await tx.output_authors.update({
+        where: { id: author.id },
+        data: {
+          ...(orderChanged && { author_order: author.order }),
+          ...(nameChanged && { author_name_string: author.name }),
+        },
+      });
     }
     if (added.length > 0) {
       await tx.output_authors.createMany({

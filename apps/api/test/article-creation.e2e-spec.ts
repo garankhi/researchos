@@ -1186,6 +1186,55 @@ describe('Article creation', () => {
     await submit(submission, key).expect(201);
   });
 
+  it('only rewrites author rows whose name or byline position changed', async () => {
+    const { body } = await submit({
+      ...input,
+      authors: [
+        { displayName: 'An' },
+        { displayName: 'Binh' },
+        { displayName: 'Chi' },
+      ],
+    }).expect(201);
+    const { outputId, revisionId } = body.data;
+    const article = (await detail(outputId).expect(200)).body.data;
+    const readByline = async () =>
+      (
+        await db.query(
+          `SELECT id, author_name_string AS name, ctid::text AS row_version
+           FROM output_authors WHERE output_id = $1 ORDER BY author_order`,
+          [outputId],
+        )
+      ).rows;
+    const before = await readByline();
+    const authors = article.authors.map((author, index) => ({
+      authorId: author.id,
+      displayName: index === 1 ? 'Bình' : author.authorNameString,
+    }));
+    const path = `/outputs/${outputId}/article`;
+    const renamed = await request('owner')
+      .patch(path)
+      .send({ expectedRevisionId: revisionId, authors })
+      .expect(200);
+    const afterRename = await readByline();
+    expect(afterRename[0]).toEqual(before[0]);
+    expect(afterRename[1]).toMatchObject({ id: before[1].id, name: 'Bình' });
+    expect(afterRename[1].row_version).not.toBe(before[1].row_version);
+    expect(afterRename[2]).toEqual(before[2]);
+
+    await request('owner')
+      .patch(path)
+      .send({
+        expectedRevisionId: renamed.body.data.currentReleaseId,
+        authors: [...authors].reverse(),
+      })
+      .expect(200);
+    const afterReorder = await readByline();
+    expect(afterReorder.map(({ id }) => id)).toEqual(
+      [...before].reverse().map(({ id }) => id),
+    );
+    expect(afterReorder[1]).toEqual(afterRename[1]);
+  });
+
   it('edits a released Article while preserving author claims, private files and the previous release', async () => {
     const upload = await verifiedPdf();
     const { body } = await submit({
