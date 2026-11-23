@@ -388,6 +388,65 @@ describe('Group membership policies', () => {
     expect(tx.group_members.findMany).toHaveBeenCalled();
   });
 
+  it.each(['true', 'all'] as const)(
+    'filters and counts the roster with archived=%s',
+    async (archived) => {
+      const { service, tx } = setup();
+      const archivedAt = new Date('2026-11-19T00:00:00Z');
+      tx.group_members.findMany.mockResolvedValue([
+        memberRow({ archived_at: archivedAt }),
+      ]);
+      tx.group_members.count.mockResolvedValue(3);
+      const result = await service.findAll(
+        groupId,
+        { page: 1, limit: 1, archived },
+        leadId,
+      );
+      const where =
+        archived === 'true'
+          ? { group_id: groupId, archived_at: { not: null } }
+          : { group_id: groupId };
+      expect(tx.group_members.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where, take: 1 }),
+      );
+      expect(tx.group_members.count).toHaveBeenCalledWith({ where });
+      expect(result.meta.total).toBe(3);
+      expect(result.items[0].archivedAt).toBe(archivedAt.toISOString());
+    },
+  );
+
+  it('denies archive reads and restores when the caller lacks management permission', async () => {
+    const { service, tx } = setup();
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
+    for (const archived of ['true', 'all'] as const) {
+      await expect(
+        service.findAll(groupId, { page: 1, limit: 20, archived }, callerId),
+      ).rejects.toMatchObject({ status: 403 });
+    }
+    await expect(
+      service.restore(groupId, userId, callerId),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(tx.group_members.findMany).not.toHaveBeenCalled();
+    expect(tx.group_members.update).not.toHaveBeenCalled();
+  });
+
+  it('restores only an archived membership and resets its role', async () => {
+    const { service, tx } = setup();
+    tx.group_members.update.mockResolvedValue(memberRow({ archived_at: null }));
+    const result = await service.restore(groupId, userId, leadId);
+    expect(tx.group_members.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          group_id_user_id: { group_id: groupId, user_id: userId },
+          archived_at: { not: null },
+        },
+        data: { archived_at: null, role: GroupMemberRole.MEMBER },
+      }),
+    );
+    expect(result.role).toBe(GroupMemberRole.MEMBER);
+    expect(result.archivedAt).toBeUndefined();
+  });
+
   it('denies an outsider the roster of an archived group', async () => {
     const { service, tx, group } = setup();
     group.archived_at = new Date('2026-11-09T00:00:00Z');

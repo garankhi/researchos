@@ -266,6 +266,75 @@ describe('Group directions HTTP contract', () => {
       .expect(409);
   });
 
+  it.each(['true', 'all'] as const)(
+    'filters and counts directions with archived=%s',
+    async (archived) => {
+      const archivedAt = new Date('2026-11-19T00:00:00Z');
+      tx.group_directions.findMany.mockResolvedValue([
+        { ...row, archived_at: archivedAt },
+      ]);
+      tx.group_directions.count.mockResolvedValue(4);
+      const result = await request()
+        .get(`${base}?archived=${archived}&limit=1`)
+        .set('Cookie', cookie)
+        .expect(200);
+      const where =
+        archived === 'true'
+          ? { group_id: groupId, archived_at: { not: null } }
+          : { group_id: groupId };
+      expect(tx.group_directions.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where, take: 1 }),
+      );
+      expect(tx.group_directions.count).toHaveBeenCalledWith({ where });
+      expect(result.body.meta.total).toBe(4);
+      expect(result.body.items[0].archivedAt).toBe(archivedAt.toISOString());
+    },
+  );
+
+  it('rejects invalid archive filters and denies archive access to non-managers', async () => {
+    await request()
+      .get(`${base}?archived=invalid`)
+      .set('Cookie', cookie)
+      .expect(400);
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
+    await request()
+      .get(`${base}?archived=true`)
+      .set('Cookie', cookie)
+      .expect(403);
+    await request()
+      .get(`${base}?archived=all`)
+      .set('Cookie', cookie)
+      .expect(403);
+    await request()
+      .patch(`${base}/${directionId}/restore`)
+      .set('Cookie', cookie)
+      .expect(403);
+    expect(tx.group_directions.update).not.toHaveBeenCalled();
+  });
+
+  it('restores a direction in its own group and refuses restoration into an inactive group', async () => {
+    const restore = () =>
+      request().patch(`${base}/${directionId}/restore`).set('Cookie', cookie);
+    await restore().expect(200);
+    expect(tx.group_directions.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id_group_id: { id: directionId, group_id: groupId } },
+        data: { archived_at: null },
+      }),
+    );
+    tx.research_groups.findUnique.mockResolvedValue({
+      ...group,
+      is_active: false,
+    });
+    await restore().expect(409);
+    tx.research_groups.findUnique.mockResolvedValue({
+      ...group,
+      archived_at: new Date(),
+    });
+    await restore().expect(409);
+    expect(tx.group_directions.update).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 404 for a missing group, direction, or taxonomy topic', async () => {
     tx.research_groups.findUnique.mockResolvedValue(null);
     await request().get(base).set('Cookie', cookie).expect(404);

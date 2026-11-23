@@ -65,7 +65,11 @@ export class OpportunitiesController {
     summary:
       'Lists published opportunities and opportunities managed by the caller',
     description:
-      'Status filtering uses persisted states. A background worker expires overdue open opportunities.',
+      'Status filtering uses persisted states. Omitting the archive filter preserves ordinary opportunity visibility. Explicit archive views require a group the caller manages.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Archived list requires management permission for the requested group.',
   })
   @ApiOkResponse({
     description: 'Visible opportunities and pagination information.',

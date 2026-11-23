@@ -8,9 +8,12 @@ import {
 import { Prisma, PrismaService } from '@researchos/database';
 import {
   buildPaginationMeta,
-  PaginationQueryDto,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
+import {
+  archiveFilter,
+  type ArchiveListQueryDto,
+} from '../../common/dto/archive-list.query.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import type {
   CreateGroupDirectionDto,
@@ -36,7 +39,7 @@ export class GroupDirectionsService {
     tx: Prisma.TransactionClient,
     groupId: string,
     actorId: string,
-    action: 'read' | 'publish' | 'edit',
+    action: 'read' | 'readArchive' | 'edit',
   ) {
     // Use the same parent lock as membership and lead changes.
     await tx.$queryRaw`SELECT id FROM research_groups WHERE id = ${groupId}::uuid FOR SHARE`;
@@ -55,10 +58,7 @@ export class GroupDirectionsService {
     }
     if (!(await hasGroupManagementAuthority(tx, groupId, actorId)))
       throw new ForbiddenException();
-    if (!active)
-      throw new ConflictException(
-        'Archived or inactive groups cannot publish or change directions',
-      );
+    if (!active && action === 'edit') throw new ConflictException('conflict');
   }
 
   private async topic(
@@ -93,7 +93,7 @@ export class GroupDirectionsService {
     }
   }
 
-  async list(groupId: string, actorId: string, query: PaginationQueryDto) {
+  async list(groupId: string, actorId: string, query: ArchiveListQueryDto) {
     const orderBy = parseSortParam(
       query.sort,
       { createdAt: 'created_at', title: 'title' },
@@ -102,8 +102,15 @@ export class GroupDirectionsService {
     if (!orderBy)
       throw new BadRequestException('Unsupported direction sort field');
     return this.run(async (tx) => {
-      await this.authorize(tx, groupId, actorId, 'read');
-      const where = { group_id: groupId, archived_at: null };
+      await this.authorize(
+        tx,
+        groupId,
+        actorId,
+        query.archived === 'true' || query.archived === 'all'
+          ? 'readArchive'
+          : 'read',
+      );
+      const where = { group_id: groupId, ...archiveFilter(query.archived) };
       const rows = await tx.group_directions.findMany({
         where,
         include,
@@ -125,7 +132,7 @@ export class GroupDirectionsService {
     dto: CreateGroupDirectionDto,
   ): Promise<GroupDirectionResponseDto> {
     return this.run(async (tx) => {
-      await this.authorize(tx, groupId, actorId, 'publish');
+      await this.authorize(tx, groupId, actorId, 'edit');
       await this.topic(tx, dto.topicId);
       return this.response(
         await tx.group_directions.create({
@@ -192,6 +199,23 @@ export class GroupDirectionsService {
     });
   }
 
+  async restore(
+    groupId: string,
+    directionId: string,
+    actorId: string,
+  ): Promise<GroupDirectionResponseDto> {
+    return this.run(async (tx) => {
+      await this.authorize(tx, groupId, actorId, 'edit');
+      return this.response(
+        await tx.group_directions.update({
+          where: { id_group_id: { id: directionId, group_id: groupId } },
+          data: { archived_at: null },
+          include,
+        }),
+      );
+    });
+  }
+
   private response(row: DirectionRow): GroupDirectionResponseDto {
     const topic = row.research_topics;
     const subfield = topic?.research_subfields;
@@ -203,6 +227,7 @@ export class GroupDirectionsService {
       title: row.title,
       description: row.description,
       createdAt: row.created_at.toISOString(),
+      ...(row.archived_at && { archivedAt: row.archived_at.toISOString() }),
       topicPath:
         topic && subfield && field
           ? {

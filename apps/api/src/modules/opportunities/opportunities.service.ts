@@ -354,7 +354,16 @@ export class OpportunitiesService {
     const sortDir = orderBy[sortColumn] ?? 'desc';
     const orderBySql = opportunityOrderBy(sortColumn, sortDir);
 
+    const includeArchived =
+      query.archived === 'true' || query.archived === 'all';
+    const archiveCondition =
+      query.archived === 'true'
+        ? Prisma.sql`AND o.archived_at IS NOT NULL`
+        : query.archived === 'false'
+          ? Prisma.sql`AND o.archived_at IS NULL`
+          : Prisma.empty;
     const conditions = Prisma.sql`${this.visibility(actorId)}
+      ${archiveCondition}
       ${query.groupId ? Prisma.sql`AND o.group_id = ${query.groupId}::uuid` : Prisma.empty}
       ${query.projectId ? Prisma.sql`AND o.project_id = ${query.projectId}::uuid` : Prisma.empty}
       ${query.status ? Prisma.sql`AND o.status = ${query.status}::opportunity_status` : Prisma.empty}
@@ -365,6 +374,18 @@ export class OpportunitiesService {
 
     return this.prisma.$transaction(
       async (tx) => {
+        if (includeArchived) {
+          const [group] = query.groupId
+            ? await tx.$queryRaw<{ allowed: boolean }[]>`
+                SELECT can_manage_group(${actorId}::uuid, ${query.groupId}::uuid) AS allowed
+              `
+            : [];
+          if (!group?.allowed)
+            throw new CodedHttpException(
+              domainErrorCodes.opportunities.accessDenied,
+              HttpStatus.FORBIDDEN,
+            );
+        }
         const ids = await tx.$queryRaw<{ id: string; can_manage: boolean }[]>`
         SELECT o.id, ${this.management(actorId)} AS can_manage FROM research_opportunities o WHERE ${conditions}
         ORDER BY ${orderBySql} LIMIT ${limit} OFFSET ${(page - 1) * limit}

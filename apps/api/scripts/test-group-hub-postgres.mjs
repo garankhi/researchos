@@ -271,6 +271,51 @@ try {
     );
     assert.equal(await policy(ids.projectLead, ids.projectOpportunity), false);
   });
+  await check(
+    'restored opportunities keep their lifecycle and only OPEN ones return to search',
+    async () => {
+      const opportunity = ids.groupOpportunity;
+      const inSearch = async () =>
+        (
+          await db.query(
+            "SELECT 1 FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=$1",
+            [opportunity],
+          )
+        ).rows.length === 1;
+      const archiveAndRestore = async (status) => {
+        await db.query(
+          'UPDATE research_opportunities SET archived_at=clock_timestamp() WHERE id=$1',
+          [opportunity],
+        );
+        assert.equal(await inSearch(), false);
+        const {
+          rows: [restored],
+        } = await db.query(
+          'UPDATE research_opportunities SET archived_at=NULL WHERE id=$1 RETURNING status, published_at',
+          [opportunity],
+        );
+        assert.equal(restored.status, status);
+        assert.equal(restored.published_at === null, status === 'DRAFT');
+        assert.equal(await inSearch(), status === 'OPEN');
+      };
+      await archiveAndRestore('DRAFT');
+      await db.query(
+        "UPDATE research_opportunities SET status='OPEN', description='Published details', application_deadline=clock_timestamp() + interval '7 days' WHERE id=$1",
+        [opportunity],
+      );
+      assert.equal(await inSearch(), true);
+      await archiveAndRestore('OPEN');
+      await db.query(
+        "UPDATE research_opportunities SET status='FILLED' WHERE id=$1",
+        [opportunity],
+      );
+      await db.query(
+        "UPDATE research_opportunities SET status='CLOSED' WHERE id=$1",
+        [opportunity],
+      );
+      await archiveAndRestore('CLOSED');
+    },
+  );
   console.log(`Passed ${checks} PostgreSQL integration checks.`);
 } finally {
   await db.end().catch(() => {});
