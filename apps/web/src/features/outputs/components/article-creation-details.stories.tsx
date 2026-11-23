@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, waitFor, within } from 'storybook/test';
-import { QueryProvider } from '@/components/providers/query-provider';
 import { AddResearchDrawer } from '@/features/identity';
 import type { ArticlePdfReader } from '../hooks/use-article-pdf-preview';
 import { ArticleCreationBasics } from './article-creation-basics';
@@ -36,13 +35,6 @@ const meta = {
   title: 'Outputs/Article creation/Additional details',
   component: ArticleCreationDetails,
   parameters: { layout: 'fullscreen' },
-  decorators: [
-    (Story) => (
-      <QueryProvider>
-        <Story />
-      </QueryProvider>
-    ),
-  ],
   args: {
     topics: [water, hydrology, climate],
     suggestions: [water, hydrology],

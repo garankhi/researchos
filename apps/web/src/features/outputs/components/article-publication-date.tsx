@@ -11,7 +11,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useController, useFormContext } from 'react-hook-form';
 import type { ArticleBasics } from './article-basics';
 
-export function ArticlePublicationDate({ onEdit }: { onEdit: () => void }) {
+export function ArticlePublicationDate({ onEdit }: { onEdit?: () => void }) {
   const { control } = useFormContext<ArticleBasics>();
   const { field, fieldState } = useController({
     control,
@@ -23,7 +23,7 @@ export function ArticlePublicationDate({ onEdit }: { onEdit: () => void }) {
   const [year = '', month = '', day = ''] = field.value.split('-');
   function change(parts: string[]) {
     // Keep empty leading parts while editing so day and month can be entered first.
-    onEdit();
+    onEdit?.();
     field.onChange(parts.join('-').replace(/-+$/, ''));
   }
   return (

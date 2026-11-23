@@ -13,6 +13,7 @@ import {
   type ResearchOutput,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
+import { normalizeArticleDoi } from '@researchos/publication-metadata';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -49,6 +50,8 @@ import {
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
+import type { UpdateArticleAbstractDto } from './dto/update-article-abstract.dto.js';
+import type { UpdateArticleDto } from './dto/update-article.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
 import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
 import {
@@ -291,7 +294,10 @@ export class OutputsService {
 
   private async validateArticleReferences(
     tx: Prisma.TransactionClient,
-    { authors, topicIds }: ReturnType<typeof normalizeArticleMetadata>,
+    {
+      authors,
+      topicIds,
+    }: { authors: { userId: string | null }[]; topicIds: string[] },
   ): Promise<void> {
     const accountIds = authors.flatMap(({ userId }) =>
       userId ? [userId] : [],
@@ -787,6 +793,254 @@ export class OutputsService {
     };
   }
 
+  async updateArticle(
+    outputId: string,
+    callerId: string,
+    {
+      expectedRevisionId,
+      doi,
+      authors,
+      topicIds,
+      ...metadata
+    }: UpdateArticleDto,
+  ): Promise<OutputResponseDto> {
+    const normalizedDoi = normalizeArticleDoi(doi);
+    if (doi && !normalizedDoi) {
+      throw new BadRequestException({ message: { doi: ['doi_invalid'] } });
+    }
+    const date =
+      metadata.publicationDate === undefined
+        ? undefined
+        : normalizePublicationDate(metadata.publicationDate);
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const release = await this.lockArticleRelease(tx, outputId, callerId);
+        this.assertExpectedArticleRevision(release, expectedRevisionId);
+        if (
+          doi === undefined &&
+          authors === undefined &&
+          topicIds === undefined &&
+          Object.values(metadata).every((value) => value === undefined)
+        ) {
+          return this.loadResponse(tx, outputId);
+        }
+
+        const selectedTopics = topicIds?.map((id) => id.toLowerCase());
+        const uniqueTopics = selectedTopics && [...new Set(selectedTopics)];
+        if (uniqueTopics) {
+          const current = await tx.output_topics.findMany({
+            where: { revision_id: release.id },
+            select: { topic_id: true },
+          });
+          const currentIds = new Set(current.map((topic) => topic.topic_id));
+          await this.validateArticleReferences(tx, {
+            authors: [],
+            topicIds: uniqueTopics.filter((id) => !currentIds.has(id)),
+          });
+        }
+
+        const snapshot =
+          authors === undefined
+            ? undefined
+            : await this.updateArticleByline(tx, release, authors);
+        if (doi !== undefined) {
+          await tx.research_outputs.update({
+            where: { id: outputId },
+            data: { doi: normalizedDoi },
+          });
+        }
+        const revisionId = await this.copyArticleRevision(
+          tx,
+          release,
+          callerId,
+          {
+            topicIds: uniqueTopics,
+            metadata: {
+              ...(metadata.title !== undefined && { title: metadata.title }),
+              ...(metadata.abstract !== undefined && {
+                abstract: metadata.abstract || null,
+              }),
+              ...(metadata.journal !== undefined && {
+                venue: metadata.journal || null,
+              }),
+              ...(metadata.volume !== undefined && {
+                volume: metadata.volume || null,
+              }),
+              ...(metadata.issue !== undefined && {
+                issue: metadata.issue || null,
+              }),
+              ...(metadata.pages !== undefined && {
+                pages: metadata.pages || null,
+              }),
+              ...(metadata.peerReviewed !== undefined && {
+                peer_reviewed: metadata.peerReviewed,
+              }),
+              ...(date !== undefined && {
+                publication_date: date,
+                publication_year: Number(date.slice(0, 4)),
+              }),
+              ...(snapshot !== undefined && { authors_snapshot: snapshot }),
+            },
+          },
+        );
+        await this.releaseRevision(tx, { outputId, revisionId, callerId });
+        return this.loadResponse(tx, outputId);
+      });
+    } catch (error) {
+      if (
+        readDatabaseFailure(error)?.constraintName ===
+        'research_outputs_doi_key'
+      ) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputDoiConflict,
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async updateArticleByline(
+    tx: Prisma.TransactionClient,
+    release: ArticleRelease,
+    authors: NonNullable<UpdateArticleDto['authors']>,
+  ): Promise<Prisma.InputJsonArray> {
+    const outputId = release.output_id;
+    await tx.$queryRaw`
+      SELECT id FROM output_authors WHERE output_id = ${outputId}::uuid FOR UPDATE
+    `;
+    const existing = await tx.output_authors.findMany({
+      where: { output_id: outputId },
+      include: { _count: { select: { publication_claims: true } } },
+    });
+    const byId = new Map(existing.map((author) => [author.id, author]));
+    const byOrder = new Map(
+      existing.map((author) => [author.author_order, author]),
+    );
+    for (const author of readArticleByline(release)) {
+      const row = byOrder.get(author.authorOrder);
+      if (
+        row &&
+        row.author_name_string === author.authorNameString &&
+        !byId.has(author.id)
+      ) {
+        byId.set(author.id, row);
+      }
+    }
+
+    const retained = new Set<string>();
+    const accounts = new Set<string>();
+    const byline = authors.map(({ authorId, displayName, userId }, index) => {
+      const row = authorId ? byId.get(authorId.toLowerCase()) : undefined;
+      const account = row ? row.user_id : (userId?.toLowerCase() ?? null);
+      if (
+        (authorId && !row) ||
+        (row && retained.has(row.id)) ||
+        (account && accounts.has(account))
+      ) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputAuthorInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (row) retained.add(row.id);
+      if (account) accounts.add(account);
+      return {
+        id: row?.id ?? randomUUID(),
+        name: displayName,
+        userId: account,
+        order: index + 1,
+        isCorresponding: row?.is_corresponding_author ?? false,
+      };
+    });
+    const removed = existing.filter((author) => !retained.has(author.id));
+    if (removed.some((author) => author._count.publication_claims > 0)) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputAuthorClaimed,
+        HttpStatus.CONFLICT,
+      );
+    }
+    const added = byline.filter((author) => !retained.has(author.id));
+    await this.validateArticleReferences(tx, { authors: added, topicIds: [] });
+    if (removed.length > 0) {
+      await tx.output_authors.deleteMany({
+        where: {
+          output_id: outputId,
+          id: { in: removed.map((author) => author.id) },
+        },
+      });
+    }
+    if (retained.size > 0) {
+      // Disjoint temporary positions avoid collisions with the unique (output, order) index.
+      const offset = existing.reduce(
+        (max, author) => Math.max(max, author.author_order),
+        byline.length,
+      );
+      await tx.output_authors.updateMany({
+        where: { output_id: outputId },
+        data: { author_order: { increment: offset } },
+      });
+      for (const author of byline) {
+        if (!retained.has(author.id)) continue;
+        await tx.output_authors.update({
+          where: { id: author.id },
+          data: { author_order: author.order, author_name_string: author.name },
+        });
+      }
+    }
+    if (added.length > 0) {
+      await tx.output_authors.createMany({
+        data: added.map(({ id, name, userId, order }) => ({
+          id,
+          output_id: outputId,
+          author_name_string: name,
+          user_id: userId,
+          author_order: order,
+        })),
+      });
+    }
+    return byline;
+  }
+
+  private assertExpectedArticleRevision(
+    release: ArticleRelease,
+    expectedRevisionId: string,
+  ): void {
+    if (release.id !== expectedRevisionId.toLowerCase()) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputRevisionLocked,
+        HttpStatus.CONFLICT,
+      );
+    }
+  }
+
+  async updateArticleAbstract(
+    outputId: string,
+    callerId: string,
+    dto: UpdateArticleAbstractDto,
+  ): Promise<OutputRevisionResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const release = await this.lockArticleRelease(tx, outputId, callerId);
+      this.assertExpectedArticleRevision(release, dto.expectedRevisionId);
+      if (release.abstract === dto.abstract)
+        return this.mapToRevisionResponse(release);
+
+      const revisionId = await this.copyArticleRevision(tx, release, callerId, {
+        metadata: { abstract: dto.abstract },
+      });
+      await this.releaseRevision(tx, {
+        outputId: release.output_id,
+        revisionId,
+        callerId,
+      });
+      const revision = await tx.output_revisions.findUniqueOrThrow({
+        where: { id: revisionId },
+      });
+      return this.mapToRevisionResponse(revision);
+    });
+  }
+
   async attachArticlePdf(
     outputId: string,
     callerId: string,
@@ -794,12 +1048,7 @@ export class OutputsService {
   ): Promise<AttachArticlePdfResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const release = await this.lockArticleRelease(tx, outputId, callerId);
-      if (release.id !== dto.expectedRevisionId.toLowerCase()) {
-        throw new CodedHttpException(
-          domainErrorCodes.outputs.outputRevisionLocked,
-          HttpStatus.CONFLICT,
-        );
-      }
+      this.assertExpectedArticleRevision(release, dto.expectedRevisionId);
 
       const replacedFileId = dto.replaceFileId?.toLowerCase();
       if (replacedFileId) {
@@ -811,12 +1060,9 @@ export class OutputsService {
         );
       }
 
-      const revisionId = await this.copyArticleRevisionForPdfEdit(
-        tx,
-        release,
-        callerId,
-        replacedFileId,
-      );
+      const revisionId = await this.copyArticleRevision(tx, release, callerId, {
+        removedFileId: replacedFileId,
+      });
       const file = await this.articleUploads.consumeVerifiedUpload(
         tx,
         callerId,
@@ -864,12 +1110,9 @@ export class OutputsService {
       const release = await this.lockArticleRelease(tx, outputId, callerId);
       const removedFileId = fileId.toLowerCase();
       this.assertCurrentArticlePdf(release, removedFileId);
-      const revisionId = await this.copyArticleRevisionForPdfEdit(
-        tx,
-        release,
-        callerId,
+      const revisionId = await this.copyArticleRevision(tx, release, callerId, {
         removedFileId,
-      );
+      });
       await this.releaseRevision(tx, {
         outputId: release.output_id,
         revisionId,
@@ -970,11 +1213,33 @@ export class OutputsService {
     }
   }
 
-  private async copyArticleRevisionForPdfEdit(
+  private async copyArticleRevision(
     tx: Prisma.TransactionClient,
     release: ArticleRelease,
     callerId: string,
-    removedFileId?: string,
+    {
+      metadata,
+      removedFileId,
+      topicIds,
+    }: {
+      metadata?: Partial<
+        Pick<
+          Prisma.output_revisionsUncheckedCreateInput,
+          | 'title'
+          | 'abstract'
+          | 'venue'
+          | 'volume'
+          | 'issue'
+          | 'pages'
+          | 'peer_reviewed'
+          | 'publication_date'
+          | 'publication_year'
+          | 'authors_snapshot'
+        >
+      >;
+      removedFileId?: string;
+      topicIds?: string[];
+    },
   ): Promise<string> {
     const outputId = release.output_id;
     const [revisions] = await tx.$queryRaw<
@@ -1009,6 +1274,7 @@ export class OutputsService {
         peer_reviewed: release.peer_reviewed,
         external_url: release.external_url,
         authors_snapshot: release.authors_snapshot ?? Prisma.JsonNull,
+        ...metadata,
       },
       select: { id: true },
     });
@@ -1032,7 +1298,25 @@ export class OutputsService {
       SELECT output_id, ${revision.id}::uuid, topic_id, added_by, created_at
       FROM output_topics
       WHERE revision_id = ${release.id}::uuid
+        ${
+          topicIds === undefined
+            ? Prisma.empty
+            : topicIds.length
+              ? Prisma.sql`AND topic_id IN (${Prisma.join(topicIds.map((id) => Prisma.sql`${id}::uuid`))})`
+              : Prisma.sql`AND FALSE`
+        }
     `;
+    if (topicIds?.length) {
+      await tx.output_topics.createMany({
+        data: topicIds.map((topicId) => ({
+          output_id: outputId,
+          revision_id: revision.id,
+          topic_id: topicId,
+          added_by: callerId,
+        })),
+        skipDuplicates: true,
+      });
+    }
     if (removedFileId) {
       // Old revision links remain intact. The shared download policy checks
       // file availability, including when a group points to an older release.

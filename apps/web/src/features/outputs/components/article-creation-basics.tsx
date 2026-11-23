@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Badge,
   Box,
@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import {
   FormSubmitButton,
   FormTextarea,
@@ -48,6 +48,7 @@ type Props = {
   onSearchAccounts?: (query: string) => void;
   accountsLoading?: boolean;
   accountsFailed?: boolean;
+  onSuggestionTitleChange?: (title: string) => void;
   onSuggestedAbstractChange?: (abstract: string | undefined) => void;
   onContinue: (draft: ArticleDraft) => void;
 };
@@ -58,11 +59,13 @@ export function ArticleCreationBasics({
   onSearchAccounts,
   accountsLoading,
   accountsFailed,
+  onSuggestionTitleChange,
   onSuggestedAbstractChange,
   onContinue,
 }: Props) {
   const t = useTranslations('articleBasics');
   const [step, setStep] = useState<'file' | 'basics'>('file');
+  const [awaitingTitleBlur, setAwaitingTitleBlur] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const edited = useRef(new Set<string>());
   const [suggestedAbstract, setSuggestedAbstract] = useState<string>();
@@ -70,6 +73,12 @@ export function ArticleCreationBasics({
     resolver: zodResolver(articleBasicsSchema),
     defaultValues: emptyBasics,
   });
+  const title = useWatch({ control: form.control, name: 'title' });
+  const suggestionTitle = step === 'basics' && !awaitingTitleBlur ? title : '';
+  useEffect(() => {
+    onSuggestionTitleChange?.(suggestionTitle);
+  }, [onSuggestionTitleChange, suggestionTitle]);
+
   function applyMetadata(data: NonNullable<ArticlePdfUploadStatusDtoMetadata>) {
     for (const key of ['title', 'publicationDate', 'doi'] as const) {
       if (data[key] && !edited.current.has(key)) form.setValue(key, data[key]);
@@ -146,10 +155,20 @@ export function ArticleCreationBasics({
                       target instanceof HTMLInputElement
                     ) {
                       if (target.name) edited.current.add(target.name);
+                      if (target.name === 'title') setAwaitingTitleBlur(true);
+                    }
+                  }}
+                  onBlur={(event) => {
+                    if (
+                      event.target instanceof HTMLTextAreaElement &&
+                      event.target.name === 'title'
+                    ) {
+                      setAwaitingTitleBlur(false);
                     }
                   }}
                   onSubmit={form.handleSubmit((values) => {
                     if (pdf.file && (!pdf.uploadId || !pdf.visibility)) return;
+                    setAwaitingTitleBlur(false);
                     onContinue({
                       ...values,
                       ...(pdf.file && {

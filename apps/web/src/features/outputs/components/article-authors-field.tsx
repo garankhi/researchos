@@ -23,7 +23,7 @@ export function ArticleAuthorsField({
   isFailed,
 }: {
   options: AuthorOption[];
-  onEdit: () => void;
+  onEdit?: () => void;
   onSearch?: (query: string) => void;
   isLoading?: boolean;
   isFailed?: boolean;
@@ -46,7 +46,7 @@ export function ArticleAuthorsField({
       )
     : [];
   function change(rows: ArticleBasics['authors']) {
-    onEdit();
+    onEdit?.();
     field.onChange(rows);
   }
   function add(author: ArticleBasics['authors'][number]) {
@@ -123,7 +123,7 @@ export function ArticleAuthorsField({
             onChange={(e) => {
               setQuery(e.target.value);
               onSearch?.(e.target.value);
-              onEdit();
+              onEdit?.();
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.nativeEvent.isComposing) {

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { CircleCheck, Eye, EyeOff, Info, Trash2, Upload } from 'lucide-react';
 import {
   Box,
@@ -14,10 +14,11 @@ import {
   Text,
   VisuallyHidden,
 } from '@chakra-ui/react';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import type { CreateArticleDtoFileVisibility } from '@/lib/api/models/createArticleDtoFileVisibility';
+import { isValidArticlePdf } from '../hooks/article-pdf-reader';
 import type { useArticlePdfPreview } from '../hooks/use-article-pdf-preview';
-import { ArticleIllustration } from './article-illustration';
+import { ArticlePdfFileCard } from './article-pdf-file-card';
 
 type PdfPreview = ReturnType<typeof useArticlePdfPreview>;
 type PdfSelection = {
@@ -71,10 +72,7 @@ export function ArticlePdfUpload({
             const next = event.target.files?.[0];
             event.target.value = '';
             if (!next || busy) return;
-            const valid =
-              next.name.toLowerCase().endsWith('.pdf') &&
-              next.size > 0 &&
-              next.size <= 50 * 1024 * 1024;
+            const valid = isValidArticlePdf(next);
             setInvalid(!valid);
             if (valid) {
               setPending({ file: next, rights: false });
@@ -85,7 +83,7 @@ export function ArticlePdfUpload({
           }}
         />
         {visibleFile && (
-          <PdfFileCard file={visibleFile}>
+          <ArticlePdfFileCard file={visibleFile}>
             <Button
               type="button"
               variant="ghost"
@@ -101,7 +99,7 @@ export function ArticlePdfUpload({
               <Trash2 aria-hidden />
               {t('remove')}
             </Button>
-          </PdfFileCard>
+          </ArticlePdfFileCard>
         )}
         {pending ? (
           <Stack ref={visibilityFields} gap="5">
@@ -205,28 +203,6 @@ export function ArticlePdfUpload({
         </Flex>
       </Flex>
     </Box>
-  );
-}
-
-function PdfFileCard({ file, children }: { file: File; children?: ReactNode }) {
-  const format = useFormatter();
-  return (
-    <Flex align="center" gap="3" wrap="wrap" borderWidth="1px" p="3">
-      <HStack gap="3" flex="1 1 11rem" minW="0">
-        <Box flexShrink="0">
-          <ArticleIllustration kind="pdf-file" />
-        </Box>
-        <Box minW="0">
-          <Text fontWeight="semibold" overflowWrap="anywhere">
-            {file.name}
-          </Text>
-          <Text fontSize="sm" color="fg.muted">
-            {format.number(file.size / 1024, { maximumFractionDigits: 1 })} KiB
-          </Text>
-        </Box>
-      </HStack>
-      {children}
-    </Flex>
   );
 }
 
@@ -348,14 +324,7 @@ export function ArticlePdfSummary({
       <Text textStyle="sm" fontWeight="bold">
         {t('fileOptional')}
       </Text>
-      <Text
-        borderWidth="1px"
-        p="3"
-        fontWeight="semibold"
-        overflowWrap="anywhere"
-      >
-        {file.name}
-      </Text>
+      <ArticlePdfFileCard file={file} />
       <HStack role="status" gap="2" color="fg.muted" textStyle="sm">
         {hasSuggestions && (
           <Box flexShrink="0">

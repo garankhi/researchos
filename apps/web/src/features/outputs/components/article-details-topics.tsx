@@ -14,6 +14,7 @@ export type ArticleTopic = { id: string; name: string };
 
 export function ArticleDetailsTopics({
   topics,
+  savedTopics = [],
   suggestions,
   suggestionsLoading,
   suggestionsUnavailable,
@@ -24,6 +25,7 @@ export function ArticleDetailsTopics({
   isFailed,
 }: {
   topics: ArticleTopic[];
+  savedTopics?: ArticleTopic[];
   suggestions: ArticleTopic[];
   suggestionsLoading: boolean;
   suggestionsUnavailable: boolean;
@@ -38,7 +40,10 @@ export function ArticleDetailsTopics({
   const [search, setSearch] = useState('');
   const [chosen, setChosen] = useState<ArticleTopic[]>([]);
   const catalog = new Map(
-    [...chosen, ...suggestions, ...topics].map((topic) => [topic.id, topic]),
+    [...savedTopics, ...chosen, ...suggestions, ...topics].map((topic) => [
+      topic.id,
+      topic,
+    ]),
   );
   const query = search.trim().toLocaleLowerCase(locale);
   const matches = topics.filter(

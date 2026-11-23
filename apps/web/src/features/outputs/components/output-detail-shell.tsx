@@ -19,7 +19,9 @@ import { useOutput } from '../hooks/use-output';
 import { useOutputCapability } from '../hooks/use-output-capability';
 import { useOutputFiles } from '../hooks/use-output-files';
 import { useOutputGroup } from '../hooks/use-output-group';
+import { useUpdateArticleAbstract } from '../hooks/use-update-article-abstract';
 import { OutputAbstract } from './output-abstract';
+import { ArticlePdfSection } from './article-pdf-section';
 import {
   OutputDownloadPrimaryButton,
   OutputFiles,
@@ -50,6 +52,7 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
     refetch,
   } = useOutput({ outputId });
   const filesQuery = useOutputFiles({ outputId });
+  const updateAbstract = useUpdateArticleAbstract();
   const groupQuery = useOutputGroup({ groupId: output?.accessGroupId });
   const capability = useOutputCapability({
     ownerId: output?.ownerId,
@@ -112,8 +115,21 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
     );
   }
 
+  const revision = output.revision;
+  const canManageArticle =
+    capability.isOwner &&
+    output.sharingStatus === 'SHARED' &&
+    revision?.outputType === 'ARTICLE' &&
+    Boolean(revision.releasedAt);
   const files = filesQuery.files;
-  const primaryFile = files?.[0];
+  const primaryFile =
+    revision?.outputType === 'ARTICLE'
+      ? (files?.find(
+          (file) =>
+            file.isCurrentReleaseAttachment &&
+            file.mimeType.toLowerCase() === 'application/pdf',
+        ) ?? files?.[0])
+      : files?.[0];
   const sourceUrl = output.doi
     ? `https://doi.org/${output.doi}`
     : (output.revision?.externalUrl ?? null);
@@ -221,31 +237,54 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
               <Stack gap="4">
                 <Box bg="bg.panel" boxShadow="xs">
                   <OutputAbstract
-                    abstract={output.revision?.abstract ?? null}
+                    abstract={revision?.abstract ?? null}
+                    onSaveAbstract={
+                      canManageArticle && revision
+                        ? async (abstract) => {
+                            await updateAbstract(
+                              output.id,
+                              revision.id,
+                              abstract,
+                            );
+                          }
+                        : undefined
+                    }
                   />
                 </Box>
 
-                <Box bg="bg.panel" boxShadow="xs">
-                  <Box
-                    px={{ base: '4', md: '6' }}
-                    py="4"
-                    borderBottomWidth="1px"
-                    borderColor="border"
-                  >
-                    <Heading as="h2" size="md" fontWeight="bold">
-                      {t('detail.filesTitle')}
-                    </Heading>
+                {canManageArticle &&
+                revision &&
+                files &&
+                !filesQuery.isFailed ? (
+                  <ArticlePdfSection
+                    key={output.id}
+                    outputId={output.id}
+                    revisionId={revision.id}
+                    files={files}
+                  />
+                ) : (
+                  <Box bg="bg.panel" boxShadow="xs">
+                    <Box
+                      px={{ base: '4', md: '6' }}
+                      py="4"
+                      borderBottomWidth="1px"
+                      borderColor="border"
+                    >
+                      <Heading as="h2" size="md" fontWeight="bold">
+                        {t('detail.filesTitle')}
+                      </Heading>
+                    </Box>
+                    <Box p={{ base: '4', md: '6' }}>
+                      <OutputFiles
+                        files={files}
+                        hasRestrictedPdf={output.hasRestrictedPdf}
+                        isLoading={filesQuery.isLoading}
+                        isFailed={filesQuery.isFailed}
+                        onRetry={() => void filesQuery.refetch()}
+                      />
+                    </Box>
                   </Box>
-                  <Box p={{ base: '4', md: '6' }}>
-                    <OutputFiles
-                      files={files}
-                      hasRestrictedPdf={output.hasRestrictedPdf}
-                      isLoading={filesQuery.isLoading}
-                      isFailed={filesQuery.isFailed}
-                      onRetry={() => void filesQuery.refetch()}
-                    />
-                  </Box>
-                </Box>
+                )}
               </Stack>
             </Tabs.Content>
 

@@ -89,6 +89,7 @@ export const FromDrawer: Story = {
 };
 export const ManualEntry: Story = {
   render: FromDrawer.render,
+  args: { onSuggestionTitleChange: fn() },
   play: async ({ args, canvas, canvasElement, userEvent }) => {
     await userEvent.click(
       canvas.getByRole('button', { name: /Add new|Thêm mới/i }),
@@ -112,8 +113,14 @@ export const ManualEntry: Story = {
     );
     const title = canvas.getByRole('textbox', { name: /^(Title|Tiêu đề)/ });
     await userEvent.type(title, 'Water quality in the Mekong Delta');
+    await expect(args.onSuggestionTitleChange).not.toHaveBeenCalledWith(
+      'Water quality in the Mekong Delta',
+    );
     const next = canvas.getByRole('button', { name: /^(Continue|Tiếp tục)$/ });
     await userEvent.click(next);
+    await expect(args.onSuggestionTitleChange).toHaveBeenLastCalledWith(
+      'Water quality in the Mekong Delta',
+    );
     await expect(args.onContinue).not.toHaveBeenCalled();
     await expect(
       canvas.getByText(/Confirm at least one author|ít nhất một tác giả/i),
@@ -211,12 +218,23 @@ export const ReadyToContinue: Story = {
   },
 };
 
+export const PdfSummary: Story = {
+  play: async (context) => {
+    const { canvas, userEvent } = context;
+    await uploadPrivatePdf(context);
+    await userEvent.click(await canvas.findByRole('button', continueAction));
+    await expect(canvas.getByText('research-notes.pdf')).toBeVisible();
+    await expect(canvas.getByText(/^4 KiB$/)).toBeVisible();
+  },
+};
+
 export const VerifiedPdf: Story = {
   args: {
     reader: {
       verify: fn(reader.verify),
       readMetadata: fn(reader.readMetadata),
     },
+    onSuggestionTitleChange: fn(),
   },
   play: async (context) => {
     const { args, canvas, userEvent } = context;
@@ -234,16 +252,25 @@ export const VerifiedPdf: Story = {
     result.resolve(suggestions);
 
     const continueWithFile = await canvas.findByRole('button', continueAction);
+    await expect(args.onSuggestionTitleChange).not.toHaveBeenCalledWith(
+      suggestions.title,
+    );
     await expect(
       canvas.queryByRole('textbox', { name: /^(Title|Tiêu đề)/ }),
     ).not.toBeInTheDocument();
     await expect(canvas.getByText('research-notes.pdf')).toBeVisible();
+    const fileSize = canvas.getByText(/^[\d.,]+ KiB$/);
+    await expect(fileSize).toBeVisible();
+    const sizeBeforeContinue = fileSize.textContent;
     await userEvent.click(continueWithFile);
 
     const title = await canvas.findByRole('textbox', {
       name: /^(Title|Tiêu đề)/,
     });
     await expect(title).toHaveValue(suggestions.title);
+    await expect(args.onSuggestionTitleChange).toHaveBeenLastCalledWith(
+      suggestions.title,
+    );
     await expect(canvas.getByText('Minh An')).toBeVisible();
     await expect(
       canvas.getByRole('combobox', { name: /^(Month|Tháng)$/ }),
@@ -255,6 +282,9 @@ export const VerifiedPdf: Story = {
       canvas.getByRole('combobox', { name: /^(Day|Ngày)$/ }),
     ).toHaveValue('');
     await expect(canvas.getByText('research-notes.pdf')).toBeVisible();
+    await expect(canvas.getByText(/^[\d.,]+ KiB$/)).toHaveTextContent(
+      sizeBeforeContinue ?? '',
+    );
     await expect(
       canvas.queryByRole('button', { name: /Replace PDF|Thay tệp PDF/ }),
     ).not.toBeInTheDocument();

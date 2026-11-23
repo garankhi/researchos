@@ -5,6 +5,7 @@ const sizes = {
   discovery: 96,
   published: 104,
   'pdf-file': 48,
+  'add-abstract': 88,
 } as const;
 
 export function ArticleIllustration({ kind }: { kind: keyof typeof sizes }) {

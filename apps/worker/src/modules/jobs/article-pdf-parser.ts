@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { parentPort, workerData } from 'node:worker_threads';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -20,6 +21,13 @@ import {
 const errors = domainErrorCodes.storage;
 const maxPages = 5;
 const maxTextLength = 50_000;
+const standardFontDataUrl =
+  fileURLToPath(
+    new URL(
+      '../../standard_fonts',
+      import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs'),
+    ),
+  ) + '/';
 
 function text(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -138,6 +146,7 @@ export async function extractArticlePdfMetadata(
     data: bytes,
     stopAtErrors: true,
     useSystemFonts: false,
+    standardFontDataUrl,
   });
   try {
     const pdf = await task.promise;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { extractArticlePdfMetadata } from './article-pdf-parser.js';
 
 function pdf(
@@ -48,6 +48,21 @@ function xmpMetadata(fields: string): string {
 }
 
 describe('extractArticlePdfMetadata', () => {
+  it('loads PDF.js standard font data for a PDF with an unembedded Helvetica font', async () => {
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      const result = await extractArticlePdfMetadata(
+        pdf([[12, 720, 'Abstract: Results of a water-quality study.']]),
+      );
+      expect(result.abstract).toBe('Results of a water-quality study.');
+      expect(warning).not.toHaveBeenCalledWith(
+        expect.stringMatching(/standardFontDataUrl|Unable to load font data/),
+      );
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('finds an unlabeled title and byline and ends a multi-paragraph abstract at a numbered heading', async () => {
     const result = await extractArticlePdfMetadata(
       pdf([

@@ -9,6 +9,14 @@ import {
 } from '@/lib/presigned-upload';
 import type { ArticlePdfReader } from './use-article-pdf-preview';
 
+export function isValidArticlePdf(file: File): boolean {
+  return (
+    file.name.toLowerCase().endsWith('.pdf') &&
+    file.size > 0 &&
+    file.size <= 50 * 1024 * 1024
+  );
+}
+
 function waitToPoll(signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     signal.throwIfAborted();

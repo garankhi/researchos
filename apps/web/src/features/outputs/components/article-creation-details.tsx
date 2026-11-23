@@ -4,66 +4,39 @@ import { useEffect, useRef } from 'react';
 import {
   Box,
   Button,
-  Fieldset,
   Flex,
-  Grid,
   Heading,
   HStack,
-  RadioGroup,
   Stack,
   Text,
 } from '@chakra-ui/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import {
-  FormProvider,
-  useController,
-  useForm,
-  useWatch,
-} from 'react-hook-form';
-import { z } from 'zod';
-import {
-  FormSubmitButton,
-  FormTextarea,
-  FormTextField,
-} from '@/components/ui/form';
+import { FormProvider, useController, useForm } from 'react-hook-form';
+import { FormSubmitButton } from '@/components/ui/form';
 import type { CreateArticleDto } from '@/lib/api/models/createArticleDto';
-import { useArticleTopicSuggestions } from '../hooks/use-article-topic-suggestions';
+import {
+  ArticleAbstractField,
+  ArticleJournalFields,
+  ArticlePeerReviewField,
+  articleDetailsSchema,
+  type ArticleDetailsValues,
+} from './article-details-fields';
 import {
   ArticleDetailsTopics,
   type ArticleTopic,
 } from './article-details-topics';
 import { ArticleIllustration } from './article-illustration';
 
-const fields = {
-  abstract: { limit: 20000, error: 'abstract_too_long' },
-  journal: { limit: 255, error: 'venue_too_long' },
-  volume: { limit: 50, error: 'article_volume_invalid' },
-  issue: { limit: 50, error: 'article_issue_invalid' },
-  pages: { limit: 100, error: 'article_pages_invalid' },
-} as const;
-
-const detailsSchema = z.object({
-  abstract: z.string().trim().max(fields.abstract.limit, fields.abstract.error),
-  journal: z.string().trim().max(fields.journal.limit, fields.journal.error),
-  volume: z.string().trim().max(fields.volume.limit, fields.volume.error),
-  issue: z.string().trim().max(fields.issue.limit, fields.issue.error),
-  pages: z.string().trim().max(fields.pages.limit, fields.pages.error),
-  peerReviewed: z.enum(['unspecified', 'yes', 'no']),
-  topicIds: z.array(z.string()),
-});
-
-export type ArticleDetails = Pick<
-  CreateArticleDto,
-  keyof typeof fields | 'peerReviewed' | 'topicIds'
->;
+export type ArticleDetails = Pick<CreateArticleDto, keyof ArticleDetailsValues>;
 
 export function ArticleCreationDetails({
   suggestedAbstract,
-  suggestionContext,
   topics,
-  suggestions,
+  suggestions = [],
+  suggestionsLoading = false,
   suggestionsUnavailable = false,
+  onAbstractChange,
   onSearchTopics,
   topicsLoading,
   topicsFailed,
@@ -73,10 +46,11 @@ export function ArticleCreationDetails({
   onSubmit,
 }: {
   suggestedAbstract?: string;
-  suggestionContext?: { userId: string; title: string };
   topics: ArticleTopic[];
   suggestions?: ArticleTopic[];
+  suggestionsLoading?: boolean;
   suggestionsUnavailable?: boolean;
+  onAbstractChange?: (abstract: string) => void;
   onSearchTopics?: (query: string) => void;
   topicsLoading?: boolean;
   topicsFailed?: boolean;
@@ -88,7 +62,7 @@ export function ArticleCreationDetails({
   const t = useTranslations('articleDetails');
   const abstractEdited = useRef(false);
   const form = useForm({
-    resolver: zodResolver(detailsSchema),
+    resolver: zodResolver(articleDetailsSchema),
     defaultValues: {
       abstract: suggestedAbstract ?? '',
       journal: '',
@@ -99,20 +73,11 @@ export function ArticleCreationDetails({
       topicIds: [],
     },
   });
-  const { field: peerReview } = useController({
-    name: 'peerReviewed',
-    control: form.control,
-  });
   const { field: topicIds } = useController({
     name: 'topicIds',
     control: form.control,
   });
   const { setValue } = form;
-  const abstract = useWatch({ control: form.control, name: 'abstract' });
-  const topicSuggestions = useArticleTopicSuggestions(
-    suggestionContext,
-    abstract,
-  );
   useEffect(() => {
     if (!abstractEdited.current) setValue('abstract', suggestedAbstract ?? '');
   }, [setValue, suggestedAbstract]);
@@ -138,6 +103,7 @@ export function ArticleCreationDetails({
                   event.target.name === 'abstract'
                 ) {
                   abstractEdited.current = true;
+                  onAbstractChange?.(event.target.value);
                 }
               }}
               onSubmit={form.handleSubmit((values) => {
@@ -170,82 +136,15 @@ export function ArticleCreationDetails({
                   </Heading>
                   <Text color="fg.muted">{t('hint')}</Text>
                 </Stack>
-                <FormTextarea
-                  name="abstract"
-                  label={t('abstract')}
-                  placeholder={t('abstractPlaceholder')}
-                  maxLength={fields.abstract.limit}
-                  minH="32"
-                  variant="subtle"
-                />
-                <Fieldset.Root>
-                  <Fieldset.Legend>{t('peerReviewed')}</Fieldset.Legend>
-                  <RadioGroup.Root
-                    colorPalette="blue"
-                    variant="outline"
-                    name={peerReview.name}
-                    value={peerReview.value}
-                    onValueChange={({ value }) => peerReview.onChange(value)}
-                  >
-                    <Stack gap="2">
-                      {(['yes', 'no', 'unspecified'] as const).map((value) => (
-                        <RadioGroup.Item key={value} value={value}>
-                          <RadioGroup.ItemHiddenInput />
-                          <RadioGroup.ItemIndicator
-                            borderRadius="50%"
-                            borderColor="border.emphasized"
-                            _checked={{
-                              color: 'blue.solid',
-                              borderColor: 'blue.solid',
-                            }}
-                            css={{ '& .dot': { borderRadius: '50%' } }}
-                          />
-                          <RadioGroup.ItemText>{t(value)}</RadioGroup.ItemText>
-                        </RadioGroup.Item>
-                      ))}
-                    </Stack>
-                  </RadioGroup.Root>
-                </Fieldset.Root>
-                <FormTextField
-                  name="journal"
-                  label={t('journal')}
-                  maxLength={fields.journal.limit}
-                  variant="subtle"
-                />
-                <Grid
-                  templateColumns={{
-                    base: '1fr',
-                    sm: 'repeat(3,minmax(0,1fr))',
-                  }}
-                  gap="3"
-                >
-                  <FormTextField
-                    name="volume"
-                    label={t('volume')}
-                    maxLength={fields.volume.limit}
-                    variant="subtle"
-                  />
-                  <FormTextField
-                    name="issue"
-                    label={t('issue')}
-                    maxLength={fields.issue.limit}
-                    variant="subtle"
-                  />
-                  <FormTextField
-                    name="pages"
-                    label={t('pages')}
-                    maxLength={fields.pages.limit}
-                    variant="subtle"
-                  />
-                </Grid>
+                <ArticleAbstractField />
+                <ArticlePeerReviewField />
+                <ArticleJournalFields />
                 <Box borderTopWidth="1px" pt="5">
                   <ArticleDetailsTopics
                     topics={topics}
-                    suggestions={suggestions ?? topicSuggestions.items}
-                    suggestionsLoading={topicSuggestions.loading}
-                    suggestionsUnavailable={
-                      suggestionsUnavailable || topicSuggestions.unavailable
-                    }
+                    suggestions={suggestions}
+                    suggestionsLoading={suggestionsLoading}
+                    suggestionsUnavailable={suggestionsUnavailable}
                     selectedIds={topicIds.value}
                     onChange={topicIds.onChange}
                     onSearch={onSearchTopics}

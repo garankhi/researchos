@@ -21,6 +21,7 @@ async function wait(ms: number, signal: AbortSignal) {
 export function useArticleTopicSuggestions(
   context: { userId: string; title: string } | undefined,
   value: string,
+  delayMs: number,
 ) {
   const title = context?.title.trim() ?? '';
   const abstract = value.trim();
@@ -32,7 +33,7 @@ export function useArticleTopicSuggestions(
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     queryFn: async ({ signal }) => {
-      await wait(500, signal);
+      if (delayMs > 0) await wait(delayMs, signal);
       const requestSignal = AbortSignal.any([
         signal,
         AbortSignal.timeout(20_000),

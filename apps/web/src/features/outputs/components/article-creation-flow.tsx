@@ -6,6 +6,7 @@ import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
 import { articlePdfReader } from '../hooks/article-pdf-reader';
 import { useArticleCatalogs } from '../hooks/use-article-catalogs';
+import { useArticleTopicSuggestions } from '../hooks/use-article-topic-suggestions';
 import { useCreateArticle } from '../hooks/use-create-article';
 import {
   ArticleCreationBasics,
@@ -29,6 +30,8 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
   const [step, setStep] = useState<'basics' | 'details' | 'success'>('basics');
   const [draft, setDraft] = useState<Omit<ArticleDraft, 'suggestedAbstract'>>();
   const [abstract, setAbstract] = useState<string>();
+  const [editedAbstract, setEditedAbstract] = useState<string>();
+  const [suggestionTitle, setSuggestionTitle] = useState('');
   const [result, setResult] = useState<Success>();
   const [submitError, setSubmitError] = useState<string>();
   const activeScreen = useRef<HTMLElement>(null);
@@ -38,6 +41,16 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
     userId,
   );
   const { create, isPending } = useCreateArticle();
+  const topicSuggestions = useArticleTopicSuggestions(
+    step === 'success'
+      ? undefined
+      : {
+          userId,
+          title: step === 'details' ? (draft?.title ?? '') : suggestionTitle,
+        },
+    editedAbstract ?? abstract ?? '',
+    step === 'basics' ? 0 : 500,
+  );
 
   useEffect(() => {
     const visibleHeading = [
@@ -83,6 +96,8 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
           onAddMore={() => {
             setDraft(undefined);
             setAbstract(undefined);
+            setEditedAbstract(undefined);
+            setSuggestionTitle('');
             setResult(undefined);
             people.search('');
             topics.search('');
@@ -98,6 +113,7 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
               onSearchAccounts={people.search}
               accountsLoading={people.isLoading}
               accountsFailed={people.isFailed}
+              onSuggestionTitleChange={setSuggestionTitle}
               onSuggestedAbstractChange={setAbstract}
               onContinue={({ suggestedAbstract, ...values }) => {
                 setDraft(values);
@@ -112,11 +128,10 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
               <ArticleCreationDetails
                 suggestedAbstract={abstract}
                 topics={topics.items}
-                suggestionContext={
-                  step === 'details'
-                    ? { userId, title: draft.title }
-                    : undefined
-                }
+                suggestions={topicSuggestions.items}
+                suggestionsLoading={topicSuggestions.loading}
+                suggestionsUnavailable={topicSuggestions.unavailable}
+                onAbstractChange={setEditedAbstract}
                 onSearchTopics={topics.search}
                 topicsLoading={topics.isLoading}
                 topicsFailed={topics.isFailed}
