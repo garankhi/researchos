@@ -2,11 +2,23 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock';
 import { expect, waitFor, within } from 'storybook/test';
 import { Button } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from './app-header';
 
 const meta = {
   title: 'Shared/Header',
   component: AppHeader,
+  decorators: [
+    (Story) => (
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { enabled: false } } })
+        }
+      >
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
     nextjs: { navigation: { pathname: '/en' } },
@@ -70,12 +82,9 @@ export const Desktop: Story = {
     await expect(
       canvas.getByRole('link', { name: 'Messages' }),
     ).toHaveAttribute('href', '/en/chat');
-    for (const name of ['Update notifications', 'Request notifications']) {
-      await expect(canvas.getByRole('button', { name })).toHaveAttribute(
-        'aria-disabled',
-        'true',
-      );
-    }
+    await expect(
+      canvas.queryByRole('link', { name: /notifications/i }),
+    ).toBeNull();
   },
 };
 
