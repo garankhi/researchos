@@ -16,6 +16,8 @@ export interface GroupMemberResponseDto {
   role: GroupMemberResponseDtoRole;
   /** Timestamp when the user joined the group. */
   joinedAt: string;
+  /** Timestamp when the membership was archived. */
+  archivedAt?: string;
   /** Full display name of the member. */
   fullName: string;
   /** Institutional email address of the member. */

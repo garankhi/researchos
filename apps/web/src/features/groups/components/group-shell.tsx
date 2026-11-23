@@ -13,7 +13,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { groupsControllerUpdate } from '@/lib/api';
 import { FollowButton } from '@/features/follow';
-import { useGroupHub } from '../hooks/use-group-hub';
+import { useGroupArchiveViews, useGroupHub } from '../hooks/use-group-hub';
 import type { GroupTab } from '../types';
 import { GroupApplications } from './group-applications';
 import { GroupDirections } from './group-directions';
@@ -47,6 +47,12 @@ export function GroupShell({
   const [activeTab, setActiveTab] = useState<GroupTab>('outputs');
 
   const active = group.isActive && !group.archivedAt;
+  const archives = useGroupArchiveViews(
+    groupId,
+    activeTab,
+    permissions.manageMembers,
+    permissions.manageOpportunities,
+  );
   const isLeader = permissions.editInfo;
   const members = hub.members.data ?? [];
 
@@ -221,6 +227,7 @@ export function GroupShell({
                 active={active}
                 canManage={permissions.manageMembers}
                 query={hub.members}
+                archive={archives.members}
               />
             </Tabs.Content>
 
@@ -230,6 +237,7 @@ export function GroupShell({
                 canPublish={permissions.publishDirections}
                 canEdit={permissions.editDirections}
                 query={hub.directions}
+                archive={archives.directions}
               />
             </Tabs.Content>
 
@@ -238,6 +246,7 @@ export function GroupShell({
                 groupId={groupId}
                 canManage={permissions.manageOpportunities}
                 query={hub.opportunities}
+                archive={archives.opportunities}
               />
             </Tabs.Content>
 

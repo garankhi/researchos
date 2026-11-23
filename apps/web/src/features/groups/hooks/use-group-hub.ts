@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   useInfiniteQuery,
   useMutation,
@@ -16,8 +17,10 @@ import {
   groupOutputLinksControllerList,
   opportunitiesControllerFindAll,
   applicationsControllerForGroup,
+  getDiscoveryControllerSearchQueryKey,
+  getDiscoveryControllerCountsQueryKey,
 } from '@/lib/api';
-import { groupPermissions } from '../types';
+import { groupPermissions, type GroupTab } from '../types';
 
 export function useHubCollection<T>(
   key: readonly unknown[],
@@ -36,6 +39,96 @@ export function useHubCollection<T>(
       page.meta.hasNextPage ? page.meta.page + 1 : undefined,
   });
   return { ...query, data: query.data?.pages.flatMap((page) => page.items) };
+}
+
+export type HubCollection<T> = {
+  data?: T[];
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => unknown;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  fetchNextPage?: () => unknown;
+};
+
+export type HubArchive<T> = {
+  showing: boolean;
+  toggle: () => void;
+  query: HubCollection<T>;
+};
+
+export function useGroupArchiveViews(
+  groupId: string,
+  activeTab: GroupTab,
+  canManageGroup: boolean,
+  canManageOpportunities: boolean,
+) {
+  const user = useCurrentUser();
+  const key = ['group-hub', user?.id, groupId];
+  const [open, setOpen] = useState({
+    members: false,
+    directions: false,
+    opportunities: false,
+  });
+  const members = useHubCollection(
+    [...key, 'members', 'archived'],
+    Boolean(user && canManageGroup && activeTab === 'members' && open.members),
+    (page, signal) =>
+      groupMembersControllerFindAll(
+        groupId,
+        { page, limit: 20, archived: 'true' },
+        undefined,
+        signal,
+      ),
+  );
+  const directions = useHubCollection(
+    [...key, 'directions', 'archived'],
+    Boolean(
+      user && canManageGroup && activeTab === 'directions' && open.directions,
+    ),
+    (page, signal) =>
+      groupDirectionsControllerList(
+        groupId,
+        { page, limit: 20, archived: 'true' },
+        undefined,
+        signal,
+      ),
+  );
+  const opportunities = useHubCollection(
+    [...key, 'opportunities', 'archived'],
+    Boolean(
+      user &&
+      canManageOpportunities &&
+      activeTab === 'opportunities' &&
+      open.opportunities,
+    ),
+    (page, signal) =>
+      opportunitiesControllerFindAll(
+        { groupId, page, limit: 20, archived: 'true' },
+        undefined,
+        signal,
+      ),
+  );
+
+  function view<T>(
+    tab: keyof typeof open,
+    allowed: boolean,
+    query: HubArchive<T>['query'],
+  ): HubArchive<T> | undefined {
+    if (!allowed) return undefined;
+    return {
+      showing: open[tab],
+      toggle: () => setOpen((state) => ({ ...state, [tab]: !state[tab] })),
+      query,
+    };
+  }
+
+  return {
+    members: view('members', canManageGroup, members),
+    directions: view('directions', canManageGroup, directions),
+    opportunities: view('opportunities', canManageOpportunities, opportunities),
+  };
 }
 
 export function useGroupHub(groupId: string) {
@@ -104,6 +197,7 @@ export function useGroupHub(groupId: string) {
           groupId,
           page,
           limit: 20,
+          archived: 'false',
           ...(!manageOpportunities ? { status: 'OPEN' as const } : {}),
         },
         undefined,
@@ -156,7 +250,9 @@ export function useHubMutation<T>(
               (url.startsWith('/research-groups') ||
                 url === '/opportunities' ||
                 url.startsWith('/opportunities/') ||
-                url === '/my/applications')
+                url === '/my/applications' ||
+                url === getDiscoveryControllerSearchQueryKey()[0] ||
+                url === getDiscoveryControllerCountsQueryKey()[0])
             );
           },
         }),

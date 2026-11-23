@@ -53,7 +53,8 @@ const withQueryKey = <T extends object, K>(
 };
 
 /**
- * @summary List published group directions with taxonomy paths
+ * By default, only active directions are listed.
+ * @summary List group directions with taxonomy paths
  */
 export const groupDirectionsControllerList = (
   groupId: string,
@@ -204,7 +205,7 @@ export function useGroupDirectionsControllerList<
   queryKey: DataTag<QueryKey, TData, TError>;
 };
 /**
- * @summary List published group directions with taxonomy paths
+ * @summary List group directions with taxonomy paths
  */
 
 export function useGroupDirectionsControllerList<
@@ -549,6 +550,108 @@ export const useGroupDirectionsControllerRemove = <
 > => {
   return useMutation(
     getGroupDirectionsControllerRemoveMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Restore a group direction
+ */
+export const groupDirectionsControllerRestore = (
+  groupId: string,
+  directionId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupDirectionResponseDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/directions/${directionId}/restore`,
+      method: 'PATCH',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupDirectionsControllerRestoreMutationKey = () =>
+  ['groupDirectionsControllerRestore'] as const;
+
+export const getGroupDirectionsControllerRestoreMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof groupDirectionsControllerRestore>>,
+    TError,
+    GroupDirectionsControllerRestoreMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof groupDirectionsControllerRestore>>,
+  TError,
+  GroupDirectionsControllerRestoreMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGroupDirectionsControllerRestoreMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof groupDirectionsControllerRestore>>,
+    GroupDirectionsControllerRestoreMutationVariables
+  > = (props) => {
+    const { groupId, directionId } = props ?? {};
+
+    return groupDirectionsControllerRestore(
+      groupId,
+      directionId,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GroupDirectionsControllerRestoreMutationResult = NonNullable<
+  Awaited<ReturnType<typeof groupDirectionsControllerRestore>>
+>;
+
+export type GroupDirectionsControllerRestoreMutationError = ApiErrorResponseDto;
+export type GroupDirectionsControllerRestoreMutationVariables = {
+  groupId: string;
+  directionId: string;
+};
+
+/**
+ * @summary Restore a group direction
+ */
+export const useGroupDirectionsControllerRestore = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof groupDirectionsControllerRestore>>,
+      TError,
+      GroupDirectionsControllerRestoreMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof groupDirectionsControllerRestore>>,
+  TError,
+  GroupDirectionsControllerRestoreMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getGroupDirectionsControllerRestoreMutationOptions(options),
     queryClient,
   );
 };

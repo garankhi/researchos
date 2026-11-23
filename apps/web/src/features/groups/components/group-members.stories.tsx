@@ -96,6 +96,33 @@ export const ReadonlyRoster: Story = {
   },
 };
 
+export const ArchivedRoster: Story = {
+  args: {
+    canManage: true,
+    archive: { showing: true, toggle: fn(), query },
+  },
+  play: async ({ canvas, userEvent, globals }) => {
+    const t = (globals.locale === 'en' ? en : vi).groups;
+    const body = within(document.body);
+    await expect(
+      canvas.getByRole('button', { name: t.archived }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(canvas.getByRole('button', { name: t.actions }));
+    await expect(
+      body.queryByRole('menuitem', { name: t.changeRole }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: t.restoreMember }),
+    );
+    const confirmation = await body.findByRole('alertdialog', {
+      name: t.restoreMember,
+    });
+    await expect(
+      within(confirmation).getByText(t.restoreMemberNotice),
+    ).toBeVisible();
+  },
+};
+
 export const Loading: Story = {
   args: { query: { ...query, data: undefined, isPending: true } },
   play: async ({ canvas }) => {
