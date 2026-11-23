@@ -6,6 +6,7 @@ import {
   SYSTEM_QUEUE,
   BACKGROUND_QUEUE,
   RESEARCH_UPDATES_QUEUE,
+  TOPIC_SUGGESTION_QUEUE,
   ARTICLE_PDF_METADATA_QUEUE,
 } from '@researchos/queue';
 import { ArticlePdfMetadataProcessor } from '../../processors/article-pdf-metadata.processor.js';
@@ -18,6 +19,9 @@ import {
 import { OutboxService } from './outbox.service.js';
 import { ArticlePdfMetadataService } from './article-pdf-metadata.service.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { TopicSuggestionProcessor } from '../../processors/topic-suggestion.processor.js';
+import { TopicEmbeddingIndexService } from './topic-embedding-index.service.js';
+import { TopicEmbeddingModel } from './topic-embedding-model.js';
 
 @Module({
   imports: [
@@ -34,6 +38,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     BullModule.registerQueue({ name: SYSTEM_QUEUE }),
     BullModule.registerQueue({ name: BACKGROUND_QUEUE }),
     BullModule.registerQueue({ name: RESEARCH_UPDATES_QUEUE }),
+    BullModule.registerQueue({ name: TOPIC_SUGGESTION_QUEUE }),
     BullModule.registerQueue({ name: ARTICLE_PDF_METADATA_QUEUE }),
   ],
   providers: [
@@ -44,6 +49,9 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     BackgroundJobProcessor,
     ResearchUpdateProcessor,
     OutboxService,
+    TopicSuggestionProcessor,
+    TopicEmbeddingIndexService,
+    TopicEmbeddingModel,
   ],
 })
 export class JobsModule {}

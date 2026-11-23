@@ -8401,6 +8401,151 @@
           "taxonomy"
         ]
       }
+    },
+    "/taxonomy/topic-suggestions": {
+      "post": {
+        "operationId": "TopicSuggestionsController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestTopicSuggestionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Suggestion request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicSuggestionRequestDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid title, abstract, or request ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Request Topic suggestions for an Article draft",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topic-suggestions/{requestId}": {
+      "get": {
+        "operationId": "TopicSuggestionsController_get",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "Suggestion request ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current suggestion status and results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicSuggestionStatusDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid title, abstract, or request ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No unexpired request with this ID belongs to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Read the Article Topic suggestion result",
+        "tags": [
+          "taxonomy"
+        ]
+      }
     }
   },
   "info": {
@@ -13516,6 +13661,88 @@
           "field"
         ]
       },
+      "RequestTopicSuggestionsDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Current Article title.",
+            "maxLength": 500
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Current Article abstract, if available.",
+            "nullable": true,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "TopicSuggestionRequestDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "ID to poll for the suggestion result.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId"
+        ]
+      },
+      "SuggestedTopicDto": {
+        "type": "object",
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "description": "Selectable ResearchOS Topic ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Current display name of the Topic."
+          },
+          "description": {
+            "type": "string",
+            "description": "Current description of the Topic.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "topicId",
+          "name",
+          "description"
+        ]
+      },
+      "TopicSuggestionStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Pending while processing, ready on success, or unavailable when manual selection can be used.",
+            "enum": [
+              "pending",
+              "ready",
+              "unavailable"
+            ]
+          },
+          "suggestions": {
+            "description": "Up to five active Topics in order of relevance.",
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestedTopicDto"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "suggestions"
+        ]
+      },
       "ApiErrorResponseDto": {
         "type": "object",
         "properties": {
@@ -15079,6 +15306,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/TopicDetailResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicSuggestionRequestDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicSuggestionRequestDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicSuggestionStatusDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicSuggestionStatusDto"
           },
           "message": {
             "type": "string",
