@@ -161,7 +161,9 @@ describe('OpportunitiesService', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ allowed: false }]);
 
-    await expect(service.create(actor, groupDraft, 'group-retry')).rejects.toMatchObject({
+    await expect(
+      service.create(actor, groupDraft, 'group-retry'),
+    ).rejects.toMatchObject({
       status: HttpStatus.FORBIDDEN,
       code: domainErrorCodes.opportunities.accessDenied,
     });
