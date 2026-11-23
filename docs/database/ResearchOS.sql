@@ -450,6 +450,32 @@ CREATE TABLE "research_subfields" (
   CONSTRAINT "ck_subfield_source" CHECK ((source = 'LOCAL' AND external_id IS NULL) OR (source <> 'LOCAL' AND external_id IS NOT NULL AND length(btrim(external_id)) > 0))
 );
 
+CREATE TABLE "topic_embedding_indexes" (
+  "version" text PRIMARY KEY,
+  "ready" boolean NOT NULL DEFAULT false,
+  "revision" bigint NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "topic_embeddings" (
+  "index_version" text NOT NULL,
+  "topic_id" uuid NOT NULL,
+  "pending_token" uuid DEFAULT (gen_random_uuid()),
+  "vector" bytea,
+  "failed_attempts" int NOT NULL DEFAULT 0,
+  "next_attempt_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY ("index_version", "topic_id")
+);
+
+CREATE TABLE "topic_suggestion_requests" (
+  "job_id" uuid PRIMARY KEY,
+  "title" varchar(500),
+  "abstract" text,
+  "status" varchar(16) NOT NULL DEFAULT 'pending',
+  "topic_ids" uuid[] NOT NULL DEFAULT ('{}'),
+  "deadline_at" timestamptz NOT NULL,
+  "expires_at" timestamptz NOT NULL
+);
+
 CREATE TABLE "research_topics" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "subfield_id" uuid NOT NULL,
@@ -1002,6 +1028,10 @@ CREATE UNIQUE INDEX ON "research_subfields" ("source", "external_id");
 
 CREATE INDEX ON "research_subfields" ("field_id");
 
+CREATE INDEX "idx_topic_embeddings_topic" ON "topic_embeddings" ("topic_id");
+
+CREATE INDEX "idx_topic_suggestions_expiry" ON "topic_suggestion_requests" ("expires_at");
+
 CREATE UNIQUE INDEX ON "research_topics" ("source", "external_id");
 
 CREATE INDEX "idx_topic_subfield_name" ON "research_topics" ("subfield_id", (lower(btrim(name))));
@@ -1223,6 +1253,12 @@ ALTER TABLE "research_subfields" ADD FOREIGN KEY ("field_id") REFERENCES "resear
 ALTER TABLE "research_topics" ADD FOREIGN KEY ("subfield_id") REFERENCES "research_subfields" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "research_topics" ADD FOREIGN KEY ("created_by") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "topic_embeddings" ADD FOREIGN KEY ("topic_id") REFERENCES "research_topics" ("id") ON DELETE CASCADE ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "topic_embeddings" ADD FOREIGN KEY ("index_version") REFERENCES "topic_embedding_indexes" ("version") ON DELETE CASCADE ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "topic_suggestion_requests" ADD FOREIGN KEY ("job_id") REFERENCES "background_jobs" ("id") ON DELETE CASCADE ON UPDATE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "research_interests" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -1788,6 +1824,37 @@ END $$;
 CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_fields FOR EACH ROW EXECUTE FUNCTION normalize_taxonomy();
 CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_subfields FOR EACH ROW EXECUTE FUNCTION normalize_taxonomy();
 CREATE TRIGGER normalize_taxonomy BEFORE INSERT OR UPDATE ON research_topics FOR EACH ROW EXECUTE FUNCTION normalize_taxonomy();
+
+CREATE INDEX idx_topic_embeddings_pending
+  ON topic_embeddings (index_version, next_attempt_at, topic_id) WHERE pending_token IS NOT NULL;
+CREATE INDEX idx_topic_suggestions_pending_deadline
+  ON topic_suggestion_requests (deadline_at) WHERE status = 'pending';
+
+CREATE FUNCTION queue_topic_embedding_refresh() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF (NEW.name, NEW.description, NEW.is_active)
+       IS NOT DISTINCT FROM (OLD.name, OLD.description, OLD.is_active) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  IF NEW.is_active THEN
+    INSERT INTO topic_embeddings (index_version, topic_id)
+    SELECT version, NEW.id FROM topic_embedding_indexes
+    ON CONFLICT (index_version, topic_id) DO UPDATE
+      SET pending_token = gen_random_uuid(), vector = NULL, failed_attempts = 0,
+          next_attempt_at = CURRENT_TIMESTAMP;
+  ELSE
+    DELETE FROM topic_embeddings WHERE topic_id = NEW.id;
+  END IF;
+
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER queue_topic_embedding_refresh
+AFTER INSERT OR UPDATE OF name, description, is_active ON research_topics
+FOR EACH ROW EXECUTE FUNCTION queue_topic_embedding_refresh();
 
 CREATE FUNCTION guard_revision() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -2581,6 +2648,7 @@ CREATE TRIGGER guard_field_provenance_lock BEFORE INSERT OR UPDATE ON field_prov
 -- Archive filters used by group hub reads.
 CREATE INDEX group_members_active_user_idx ON group_members (user_id, group_id) WHERE archived_at IS NULL;
 CREATE INDEX group_directions_active_group_idx ON group_directions (group_id, created_at) WHERE archived_at IS NULL;
+
 -- Standalone real-time chat domain (RES-166).
 CREATE TYPE "chat_conversation_type" AS ENUM (
   'DIRECT',

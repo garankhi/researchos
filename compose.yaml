@@ -2,6 +2,17 @@ name: researchos
 
 # Local dependencies. Web, API and worker run with pnpm on the host.
 services:
+  ollama:
+    profiles: [topic-suggestions]
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.24.0}
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
   postgres:
     image: postgres:18.6-alpine
     environment:
@@ -72,7 +83,17 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  grobid:
+    image: grobid/grobid:0.9.1-crf
+    profiles: [grobid]
+    init: true
+    ulimits:
+      core: 0
+    ports:
+      - "127.0.0.1:${GROBID_PORT:-8070}:8070"
+
 volumes:
+  ollama_models:
   postgres_data:
   redis_data:
   seaweedfs_data:

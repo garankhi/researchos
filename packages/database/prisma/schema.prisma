@@ -57,9 +57,9 @@ model background_jobs {
   kind                     String                    @db.VarChar(64)
   idempotency_key          String                    @db.VarChar(128)
   payload                  Json
-  status                   String                    @default("PENDING") @db.VarChar(16)
-  generation               Int                       @default(0)
-  attempts                 Int                       @default(0)
+  status                   String                     @default("PENDING") @db.VarChar(16)
+  generation               Int                        @default(0)
+  attempts                 Int                        @default(0)
   result                   Json?
   error_code               String?                   @db.VarChar(64)
   created_at               DateTime                  @default(now()) @db.Timestamptz(6)
@@ -67,6 +67,7 @@ model background_jobs {
   users                    users?                    @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   outbox                   outbox[]
   pending_research_updates pending_research_updates?
+  topic_suggestion_request topic_suggestion_requests?
 
   @@unique([owner_id, kind, idempotency_key], map: "uq_background_job_request")
   @@unique([queue_prefix, kind, idempotency_key], map: "uq_system_background_job_request", where: raw("(owner_id IS NULL)"))
@@ -847,11 +848,48 @@ model research_topics {
   output_topics      output_topics[]
   research_interests research_interests[]
   research_records   research_records[]
+  topic_embeddings   topic_embeddings[]
   users              users?               @relation(fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
   research_subfields research_subfields   @relation(fields: [subfield_id], references: [id], onUpdate: NoAction)
 
   @@unique([source, external_id], map: "research_topics_source_external_id_idx")
   @@index([name(ops: raw("gin_trgm_ops"))], map: "idx_topic_search", type: Gin)
+}
+
+model topic_embedding_indexes {
+  version    String             @id
+  ready      Boolean            @default(false)
+  revision   BigInt             @default(0)
+  embeddings topic_embeddings[]
+}
+
+model topic_embeddings {
+  index_version   String
+  topic_id        String                  @db.Uuid
+  pending_token   String?                 @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vector          Bytes?
+  failed_attempts Int                     @default(0)
+  next_attempt_at DateTime                @default(now()) @db.Timestamptz(6)
+  index           topic_embedding_indexes @relation(fields: [index_version], references: [version], onDelete: Cascade, onUpdate: NoAction)
+  topic           research_topics         @relation(fields: [topic_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([index_version, topic_id])
+  @@index([topic_id], map: "idx_topic_embeddings_topic")
+  @@index([index_version, next_attempt_at, topic_id], map: "idx_topic_embeddings_pending", where: raw("(pending_token IS NOT NULL)"))
+}
+
+model topic_suggestion_requests {
+  job_id      String          @id @db.Uuid
+  title       String?         @db.VarChar(500)
+  abstract    String?
+  status      String          @default("pending") @db.VarChar(16)
+  topic_ids   String[]        @default([]) @db.Uuid
+  deadline_at DateTime        @db.Timestamptz(6)
+  expires_at  DateTime        @db.Timestamptz(6)
+  job         background_jobs @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expires_at], map: "idx_topic_suggestions_expiry")
+  @@index([deadline_at], map: "idx_topic_suggestions_pending_deadline", where: raw("((status)::text = 'pending'::text)"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

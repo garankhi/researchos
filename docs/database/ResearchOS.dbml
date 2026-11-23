@@ -494,6 +494,38 @@ Table research_subfields {
   Note: 'OpenAlex Subfield belongs to exactly one Field. Import parent by its external ID before child. No Area Owner.'
 }
 
+Table topic_embedding_indexes {
+  version text [pk]
+  ready boolean [not null, default: false]
+  revision bigint [not null, default: 0]
+}
+
+Table topic_embeddings {
+  index_version text [not null]
+  topic_id uuid [not null]
+  pending_token uuid [default: `gen_random_uuid()`]
+  vector bytea
+  failed_attempts int [not null, default: 0]
+  next_attempt_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (index_version, topic_id) [pk]
+    topic_id [name: 'idx_topic_embeddings_topic']
+  }
+}
+
+Table topic_suggestion_requests {
+  job_id uuid [pk]
+  title varchar(500)
+  abstract text
+  status varchar(16) [not null, default: 'pending']
+  topic_ids "uuid[]" [not null, default: `'{}'`]
+  deadline_at timestamptz [not null]
+  expires_at timestamptz [not null]
+  indexes {
+    expires_at [name: 'idx_topic_suggestions_expiry']
+  }
+}
+
 Table research_topics {
   id uuid [pk, default: `gen_random_uuid()`]
   subfield_id uuid [not null]
@@ -1148,6 +1180,9 @@ Ref: user_sessions.(identity_id, user_id) > oidc_identities.(id, user_id) [delet
 Ref: research_subfields.field_id > research_fields.id [delete: restrict]
 Ref: research_topics.subfield_id > research_subfields.id [delete: restrict]
 Ref: research_topics.created_by >? users.id [delete: restrict]
+Ref: topic_embeddings.topic_id > research_topics.id [delete: cascade, update: no action]
+Ref: topic_embeddings.index_version > topic_embedding_indexes.version [delete: cascade, update: no action]
+Ref: background_jobs.id - topic_suggestion_requests.job_id [delete: cascade, update: no action]
 Ref: research_interests.user_id > users.id [delete: cascade]
 Ref: research_interests.topic_id > research_topics.id [delete: restrict]
 Ref: research_groups.lead_id > users.id [delete: restrict]
@@ -1260,6 +1295,9 @@ TableGroup Taxonomy {
   research_fields
   research_subfields
   research_topics
+  topic_embedding_indexes
+  topic_embeddings
+  topic_suggestion_requests
   research_interests
 }
 TableGroup Publications {

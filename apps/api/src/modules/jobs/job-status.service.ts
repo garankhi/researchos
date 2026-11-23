@@ -3,6 +3,7 @@ import { BackgroundJobsService, PrismaService } from '@researchos/database';
 import {
   DIGEST_SEND_JOB,
   DURABLE_PROBE_JOB,
+  TOPIC_SUGGESTION_JOB,
   digestDeliveryId,
 } from '@researchos/queue';
 import type { CreateProbeDto } from './dto/create-probe.dto.js';
@@ -41,16 +42,23 @@ export class JobStatusService {
   }): Promise<JobDto> {
     const deliveryId =
       job.kind === DIGEST_SEND_JOB ? digestDeliveryId(job.payload) : undefined;
-    const delivery =
-      deliveryId && job.owner_id
-        ? await this.prisma.digest_deliveries.findFirst({
-            where: { id: deliveryId, user_id: job.owner_id },
-            select: { attempts: true },
+    const delivery = deliveryId
+      ? await this.prisma.digest_deliveries.findFirst({
+          where: { id: deliveryId, user_id: job.owner_id },
+          select: { attempts: true },
+        })
+      : null;
+    // Suggestion processing ends at its deadline, even before the retention sweep.
+    const expiredSuggestion =
+      job.kind === TOPIC_SUGGESTION_JOB && job.status === 'PENDING'
+        ? await this.prisma.topic_suggestion_requests.findFirst({
+            where: { job_id: job.id, deadline_at: { lte: new Date() } },
+            select: { job_id: true },
           })
         : null;
     return {
       id: job.id,
-      status: job.status,
+      status: expiredSuggestion ? 'COMPLETED' : job.status,
       attempts: delivery?.attempts ?? job.attempts,
       statusUrl: `/jobs/${job.id}`,
     };
