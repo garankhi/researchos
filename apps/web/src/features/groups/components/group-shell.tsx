@@ -47,7 +47,7 @@ export function GroupShell({
   const [activeTab, setActiveTab] = useState<GroupTab>('outputs');
 
   const active = group.isActive && !group.archivedAt;
-  const isLeader = group.callerMembershipRole === 'GROUP_LEADER';
+  const isLeader = permissions.editInfo;
   const members = hub.members.data ?? [];
 
   return (

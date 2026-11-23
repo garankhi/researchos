@@ -60,9 +60,7 @@ export function useGroupHub(groupId: string) {
       ),
   );
   const permissions =
-    group.data && user
-      ? groupPermissions(group.data, user, members.data ?? [])
-      : null;
+    group.data && user ? groupPermissions(group.data, user) : null;
   const directions = useHubCollection(
     [...key, 'directions'],
     enabled,
