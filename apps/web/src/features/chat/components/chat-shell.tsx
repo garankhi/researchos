@@ -14,7 +14,7 @@ import {
   chakra,
 } from '@chakra-ui/react';
 import { ChatConversationTypeEnum } from '@researchos/chat';
-import { ArrowDown, ArrowLeft, Info, MessageSquare, Users } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Info, Users } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import {
@@ -893,8 +893,8 @@ export function ChatShell({
                     mt="2"
                     onClick={() => setNewDialogOpen(true)}
                   >
-                    <MessageSquare size={15} />
-                    {t('newConversation')}
+                    <Users size={15} />
+                    {t('createGroup')}
                   </Button>
                 }
               />

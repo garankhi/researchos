@@ -13,7 +13,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { MessageSquarePlus, Search, X } from 'lucide-react';
+import { UsersRound, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { stripMentionIdsForPreview } from '@researchos/chat';
@@ -87,29 +87,43 @@ export function ConversationList({
   }, [term]);
 
   const query = term.toLocaleLowerCase();
+  const matches = (value?: string | null) =>
+    value?.toLocaleLowerCase().includes(query);
   const matchingConversations = isSearching
-    ? conversations.filter((conversation) =>
-        [
-          conversation.title,
-          ...conversation.participants
-            .filter((participant) => participant.userId !== currentUserId)
-            .flatMap(({ user }) => [user.fullName, user.email]),
-        ].some((value) => value?.toLocaleLowerCase().includes(query)),
+    ? conversations.filter(
+        (conversation) =>
+          conversation.type === 'GROUP' &&
+          (matches(conversation.title) ||
+            conversation.participants.some(
+              ({ userId, user }) =>
+                userId !== currentUserId &&
+                [user.fullName, user.email].some(matches),
+            )),
       )
     : conversations;
-  const existingDirectUsers = new Set(
-    matchingConversations
-      .filter((conversation) => conversation.type === 'DIRECT')
-      .flatMap((conversation) =>
-        conversation.participants.map(({ userId }) => userId),
-      ),
-  );
-  const matchingPeople = searchReady
-    ? people.users.filter(
-        (person) =>
-          person.id !== currentUserId && !existingDirectUsers.has(person.id),
-      )
-    : [];
+  const peopleById = new Map<string, (typeof people.users)[number]>();
+  if (isSearching) {
+    for (const conversation of conversations) {
+      if (conversation.type !== 'DIRECT') continue;
+      const peer = conversation.participants.find(
+        ({ userId }) => userId !== currentUserId,
+      )?.user;
+      if (
+        peer &&
+        [peer.fullName, peer.email, peer.departmentUnit].some(matches)
+      ) {
+        peopleById.set(peer.id, peer);
+      }
+    }
+  }
+  if (searchReady) {
+    for (const person of people.users) {
+      if (person.id !== currentUserId && !peopleById.has(person.id)) {
+        peopleById.set(person.id, person);
+      }
+    }
+  }
+  const matchingPeople = [...peopleById.values()];
 
   const statusColorPalette =
     connectionStatus === 'connected'
@@ -153,8 +167,8 @@ export function ConversationList({
           variant="solid"
           onClick={onOpenNewDialog}
         >
-          <MessageSquarePlus size={14} />
-          {t('newConversation')}
+          <UsersRound size={14} />
+          {t('createGroup')}
         </Button>
       </Flex>
 
@@ -297,7 +311,7 @@ export function ConversationList({
                 mt="2"
                 onClick={onOpenNewDialog}
               >
-                {t('newConversation')}
+                {t('createGroup')}
               </Button>
             }
           />

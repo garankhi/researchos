@@ -667,7 +667,7 @@
   "chat": {
     "title": "Messages",
     "subtitle": "Real-time conversations with researchers",
-    "newConversation": "New chat",
+    "createGroup": "Create group",
     "jumpToLatest": "Jump to new messages",
     "sidebarSearch": {
       "label": "Find a person or chat",
@@ -687,11 +687,10 @@
     "searchPeopleLabel": "Search researchers",
     "searchPeoplePlaceholder": "Type a name or email...",
     "selectedParticipants": "Selected ({count})",
-    "createAction": "Start conversation",
     "conversationsEmptyTitle": "No conversations yet",
-    "conversationsEmptyMessage": "Start a direct or group conversation to collaborate in real time.",
+    "conversationsEmptyMessage": "Find someone to message or create a group.",
     "selectConversationTitle": "Select a conversation",
-    "selectConversationMessage": "Choose a conversation from the sidebar or start a new chat.",
+    "selectConversationMessage": "Choose a conversation or find someone in the sidebar.",
     "backToList": "Conversations",
     "participantsCount": "{count} participants",
     "untitledGroup": "Group chat",

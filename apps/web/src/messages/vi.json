@@ -667,7 +667,7 @@
   "chat": {
     "title": "Tin nhắn",
     "subtitle": "Trò chuyện thời gian thực cùng các nghiên cứu viên",
-    "newConversation": "Cuộc trò chuyện mới",
+    "createGroup": "Tạo nhóm",
     "jumpToLatest": "Đến tin nhắn mới",
     "sidebarSearch": {
       "label": "Tìm người hoặc cuộc trò chuyện",
@@ -687,11 +687,10 @@
     "searchPeopleLabel": "Tìm kiếm nghiên cứu viên",
     "searchPeoplePlaceholder": "Nhập họ tên hoặc email...",
     "selectedParticipants": "Đã chọn ({count})",
-    "createAction": "Bắt đầu trò chuyện",
     "conversationsEmptyTitle": "Chưa có cuộc trò chuyện nào",
-    "conversationsEmptyMessage": "Hãy bắt đầu cuộc trò chuyện trực tiếp hoặc nhóm để trao đổi thời gian thực.",
+    "conversationsEmptyMessage": "Tìm người để nhắn tin hoặc tạo nhóm.",
     "selectConversationTitle": "Chọn một cuộc trò chuyện",
-    "selectConversationMessage": "Chọn cuộc trò chuyện ở danh sách bên trái hoặc tạo cuộc trò chuyện mới.",
+    "selectConversationMessage": "Chọn cuộc trò chuyện hoặc tìm người trong danh sách bên trái.",
     "backToList": "Danh sách chat",
     "participantsCount": "{count} thành viên",
     "untitledGroup": "Nhóm trò chuyện",
