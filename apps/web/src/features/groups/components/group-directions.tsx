@@ -12,10 +12,12 @@ import {
   groupDirectionsControllerCreate,
   groupDirectionsControllerUpdate,
   groupDirectionsControllerRemove,
+  groupDirectionsControllerRestore,
 } from '@/lib/api';
 import { FormTextField } from '@/components/ui/form';
 import { ErrorState } from '@/components/ui/feedback';
 import type { Direction } from '../types';
+import type { HubArchive } from '../hooks/use-group-hub';
 import {
   HubAction,
   HubEditor,
@@ -136,19 +138,29 @@ export function GroupDirections({
   canPublish,
   canEdit,
   query,
+  archive,
 }: {
   groupId: string;
   canPublish: boolean;
   canEdit: boolean;
   query: Parameters<typeof HubList<Direction>>[0]['query'];
+  archive?: HubArchive<Direction>;
 }) {
   const t = useTranslations('groups');
   return (
     <HubSection
       title={t('directions')}
-      action={canPublish ? <DirectionEditor groupId={groupId} /> : null}
+      archive={archive}
+      action={
+        canPublish && !archive?.showing ? (
+          <DirectionEditor groupId={groupId} />
+        ) : null
+      }
     >
-      <HubList query={query}>
+      <HubList
+        query={archive?.showing ? archive.query : query}
+        archived={archive?.showing}
+      >
         {(directions) =>
           directions.map((direction, index) => (
             <Box
@@ -176,7 +188,18 @@ export function GroupDirections({
                     {direction.description}
                   </Text>
                 ) : null}
-                {canEdit ? (
+                {canEdit && archive?.showing ? (
+                  <HubMenu positioned>
+                    <HubAction
+                      groupId={groupId}
+                      label={t('restoreDirection')}
+                      confirm
+                      action={() =>
+                        groupDirectionsControllerRestore(groupId, direction.id)
+                      }
+                    />
+                  </HubMenu>
+                ) : canEdit ? (
                   <HubMenu positioned>
                     <DirectionEditor groupId={groupId} direction={direction} />
                     <HubAction

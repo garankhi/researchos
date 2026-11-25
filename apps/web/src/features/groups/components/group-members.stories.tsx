@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SnackbarProvider } from '@/components/providers/snackbar-provider';
 import en from '@/messages/en.json';
@@ -93,6 +93,35 @@ export const ReadonlyRoster: Story = {
       canvas.getByRole('link', { name: 'Sample Researcher' }),
     ).toBeVisible();
     await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
+  },
+};
+
+export const ArchivedRoster: Story = {
+  args: {
+    canManage: true,
+    archive: { showing: true, toggle: fn(), query },
+  },
+  play: async ({ canvas, userEvent, globals }) => {
+    const t = (globals.locale === 'en' ? en : vi).groups;
+    const body = within(document.body);
+    await expect(
+      canvas.getByRole('button', { name: t.archived }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(canvas.getByRole('button', { name: t.actions }));
+    await expect(
+      body.queryByRole('menuitem', { name: t.changeRole }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: t.restoreMember }),
+    );
+    const confirmation = await body.findByRole('alertdialog', {
+      name: t.restoreMember,
+    });
+    await waitFor(() =>
+      expect(
+        within(confirmation).getByText(t.restoreMemberNotice),
+      ).toBeVisible(),
+    );
   },
 };
 

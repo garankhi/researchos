@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GroupMemberRole } from '@researchos/database';
 import { IsEnum, IsUUID } from 'class-validator';
 import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
@@ -59,6 +59,12 @@ export class GroupMemberResponseDto {
     format: 'date-time',
   })
   joinedAt: string;
+
+  @ApiPropertyOptional({
+    description: 'Timestamp when the membership was archived.',
+    format: 'date-time',
+  })
+  archivedAt?: string;
 
   @ApiProperty({
     description: 'Full display name of the member.',

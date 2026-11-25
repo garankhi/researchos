@@ -4,10 +4,14 @@ import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   buildPaginationMeta,
-  PaginationQueryDto,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
+import {
+  archiveFilter,
+  type ArchiveListQueryDto,
+} from '../../common/dto/archive-list.query.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
+import { hasGroupManagementAuthority } from './group-management.js';
 import type {
   AddGroupMemberDto,
   GroupMemberPageDto,
@@ -46,11 +50,18 @@ export class GroupMembersService {
 
   async findAll(
     groupId: string,
-    query: PaginationQueryDto,
+    query: ArchiveListQueryDto,
     callerId: string,
   ): Promise<GroupMemberPageDto> {
     return this.prisma.$transaction(async (tx) => {
-      await this.authorize(tx, groupId, callerId, false);
+      await this.authorize(
+        tx,
+        groupId,
+        callerId,
+        query.archived === 'true' || query.archived === 'all'
+          ? 'readArchive'
+          : 'read',
+      );
       const orderBy = parseSortParam(
         query.sort,
         { joinedAt: 'joined_at', role: 'role', userId: 'user_id' } as const,
@@ -59,7 +70,7 @@ export class GroupMembersService {
       if (!orderBy) throw new BadRequestException('validation_failed');
       const page = query.page ?? 1;
       const limit = query.limit ?? 20;
-      const where = { group_id: groupId, archived_at: null };
+      const where = { group_id: groupId, ...archiveFilter(query.archived) };
       const total = await tx.group_members.count({ where });
       const rows = await tx.group_members.findMany({
         where,
@@ -84,7 +95,7 @@ export class GroupMembersService {
     callerId: string,
   ): Promise<GroupMemberResponseDto> {
     return this.write(async (tx) => {
-      await this.authorize(tx, groupId, callerId, true);
+      await this.authorize(tx, groupId, callerId, 'write');
       if (dto.userId.toLowerCase() === callerId.toLowerCase())
         throw new CodedHttpException(
           domainErrorCodes.groups.accessDenied,
@@ -135,7 +146,7 @@ export class GroupMembersService {
     callerId: string,
   ): Promise<GroupMemberResponseDto> {
     return this.write(async (tx) => {
-      await this.authorize(tx, groupId, callerId, true);
+      await this.authorize(tx, groupId, callerId, 'write');
       const row = await tx.group_members.update({
         where: {
           group_id_user_id: { group_id: groupId, user_id: userId },
@@ -156,7 +167,7 @@ export class GroupMembersService {
     callerId: string,
   ): Promise<void> {
     await this.write(async (tx) => {
-      const group = await this.authorize(tx, groupId, callerId, true);
+      const group = await this.authorize(tx, groupId, callerId, 'write');
       if (group.is_active && group.lead_id === userId.toLowerCase())
         throw new CodedHttpException(
           domainErrorCodes.groups.leadRemovalDenied,
@@ -172,16 +183,36 @@ export class GroupMembersService {
     });
   }
 
+  async restore(
+    groupId: string,
+    userId: string,
+    callerId: string,
+  ): Promise<GroupMemberResponseDto> {
+    return this.write(async (tx) => {
+      await this.authorize(tx, groupId, callerId, 'write');
+      return this.toResponse(
+        await tx.group_members.update({
+          where: {
+            group_id_user_id: { group_id: groupId, user_id: userId },
+            archived_at: { not: null },
+          },
+          data: { archived_at: null, role: GroupMemberRole.MEMBER },
+          include: { users: { include: { researcher_profiles: true } } },
+        }),
+      );
+    });
+  }
+
   private async authorize(
     tx: Prisma.TransactionClient,
     groupId: string,
     callerId: string,
-    write: boolean,
+    action: 'read' | 'readArchive' | 'write',
   ) {
     // Serialize membership changes with each other and with lead/archive changes.
     // Readers hold a shared lock until the private member list has been read.
     await tx.$queryRaw(
-      Prisma.sql`SELECT id FROM research_groups WHERE id = ${groupId}::uuid ${write ? Prisma.sql`FOR UPDATE` : Prisma.sql`FOR SHARE`}`,
+      Prisma.sql`SELECT id FROM research_groups WHERE id = ${groupId}::uuid ${action === 'write' ? Prisma.sql`FOR UPDATE` : Prisma.sql`FOR SHARE`}`,
     );
     const group = await tx.research_groups.findUnique({
       where: { id: groupId },
@@ -191,20 +222,23 @@ export class GroupMembersService {
         domainErrorCodes.groups.groupNotFound,
         HttpStatus.NOT_FOUND,
       );
-    if (group.lead_id === callerId.toLowerCase()) return group;
+    if (action !== 'read') {
+      if (!(await hasGroupManagementAuthority(tx, groupId, callerId)))
+        throw new CodedHttpException(
+          domainErrorCodes.groups.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      return group;
+    }
     // The roster of an active group is public to any signed-in researcher, so
     // the group hub is not empty for an outsider. An archived or inactive
     // group keeps its private roster: only the lead and its members read it.
     const active = group.is_active && group.archived_at === null;
-    if (!write && active) return group;
+    if (active || group.lead_id === callerId.toLowerCase()) return group;
     const member = await tx.group_members.findUnique({
       where: { group_id_user_id: { group_id: groupId, user_id: callerId } },
     });
-    if (
-      !member ||
-      member.archived_at ||
-      (write && member.role !== GroupMemberRole.GROUP_LEADER)
-    )
+    if (!member || member.archived_at)
       throw new CodedHttpException(
         domainErrorCodes.groups.accessDenied,
         HttpStatus.FORBIDDEN,
@@ -244,6 +278,7 @@ export class GroupMembersService {
       userId: row.user_id,
       role: row.role,
       joinedAt: row.joined_at.toISOString(),
+      ...(row.archived_at && { archivedAt: row.archived_at.toISOString() }),
       ...display,
     };
   }

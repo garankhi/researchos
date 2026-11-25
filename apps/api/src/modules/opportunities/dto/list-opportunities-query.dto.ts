@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OpportunityStatus } from '@researchos/database';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
-import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
+import { ArchiveListQueryDto } from '../../../common/dto/archive-list.query.dto.js';
 
 /**
  * Query parameters for listing visible research opportunities.
@@ -10,7 +10,7 @@ import { PaginationQueryDto } from '../../../common/dto/pagination.dto.js';
  * `limit` and `sort` — so this endpoint paginates the way every other list
  * endpoint in the API does.
  */
-export class ListOpportunitiesQueryDto extends PaginationQueryDto {
+export class ListOpportunitiesQueryDto extends ArchiveListQueryDto {
   @ApiPropertyOptional({
     description: 'Filter by group scope.',
     format: 'uuid',

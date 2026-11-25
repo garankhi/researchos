@@ -3406,7 +3406,7 @@
     },
     "/research-groups/{groupId}/members": {
       "get": {
-        "description": "The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.",
+        "description": "By default, only active memberships are listed. The active roster of an active group is readable by any signed-in account. An archived or inactive group keeps its roster private to the lead and current members.",
         "operationId": "GroupMembersController_findAll",
         "parameters": [
           {
@@ -3453,6 +3453,20 @@
               "example": "-createdAt",
               "type": "string"
             }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3468,6 +3482,16 @@
           },
           "400": {
             "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3544,6 +3568,16 @@
           },
           "400": {
             "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3650,6 +3684,16 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Caller lacks membership access or management permission, or tried to add themselves.",
             "content": {
@@ -3719,6 +3763,16 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Caller lacks membership access or management permission, or tried to add themselves.",
             "content": {
@@ -3761,8 +3815,97 @@
         ]
       }
     },
+    "/research-groups/{groupId}/members/{userId}/restore": {
+      "patch": {
+        "operationId": "GroupMembersController_restore",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "User whose membership is being restored.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membership restored with the MEMBER role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMemberResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore an archived group membership as an ordinary member",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
     "/research-groups/{groupId}/directions": {
       "get": {
+        "description": "By default, only active directions are listed.",
         "operationId": "GroupDirectionsController_list",
         "parameters": [
           {
@@ -3808,6 +3951,20 @@
             "schema": {
               "example": "-createdAt",
               "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
             }
           }
         ],
@@ -3878,7 +4035,7 @@
             "bearer": []
           }
         ],
-        "summary": "List published group directions with taxonomy paths",
+        "summary": "List group directions with taxonomy paths",
         "tags": [
           "group-directions"
         ]
@@ -4172,6 +4329,104 @@
           }
         ],
         "summary": "Archive a direction as a group leader, retaining the row and project references",
+        "tags": [
+          "group-directions"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/directions/{directionId}/restore": {
+      "patch": {
+        "operationId": "GroupDirectionsController_restore",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": true,
+            "in": "path",
+            "description": "Direction belonging to this group.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Direction restored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDirectionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore a group direction",
         "tags": [
           "group-directions"
         ]
@@ -5235,7 +5490,7 @@
         ]
       },
       "get": {
-        "description": "Status filtering uses persisted states. A background worker expires overdue open opportunities.",
+        "description": "Status filtering uses persisted states. Omitting the archive filter preserves ordinary opportunity visibility. Explicit archive views require a group the caller manages.",
         "operationId": "OpportunitiesController_findAll",
         "parameters": [
           {
@@ -5271,6 +5526,20 @@
             "schema": {
               "example": "-createdAt",
               "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
             }
           },
           {
@@ -5327,6 +5596,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpportunityPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Archived list requires management permission for the requested group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -10773,6 +11052,11 @@
             "description": "Timestamp when the user joined the group.",
             "format": "date-time"
           },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the membership was archived.",
+            "format": "date-time"
+          },
           "fullName": {
             "type": "string",
             "description": "Full display name of the member.",
@@ -10977,6 +11261,11 @@
           "createdAt": {
             "type": "string",
             "description": "Creation/publication timestamp.",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the direction was archived.",
             "format": "date-time"
           },
           "topicPath": {
