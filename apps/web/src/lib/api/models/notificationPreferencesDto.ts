@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { NotificationLocale } from './notificationLocale';
 import type { NotificationType } from './notificationType';
 
 export interface NotificationPreferencesDto {
@@ -16,4 +17,6 @@ export interface NotificationPreferencesDto {
   mutedTypes: NotificationType[];
   /** IANA time zone for the recipient. */
   timezone: string;
+  /** Locale the notification copy is rendered in. */
+  locale: NotificationLocale;
 }

@@ -12,6 +12,10 @@ export {
   notificationQueueScope,
   stageNotificationEvent,
 } from './notification-events.js';
+export {
+  NotificationLocale,
+  normalizeNotificationLocale,
+} from './notification-locale.js';
 export { OutputType } from './output-type.js';
 export {
   BackgroundJobsService,

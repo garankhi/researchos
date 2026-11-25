@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -71,6 +71,22 @@ export function NotificationInbox() {
     },
     onError: () => setError(true),
   });
+
+  // The copy of a notification follows the locale the reader uses in the
+  // app, so the language they browse in is the language they are told in.
+  const syncedLocale = useRef<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    const preference = locale === 'vi' ? 'vi' : 'en';
+    if (syncedLocale.current === preference) return;
+    syncedLocale.current = preference;
+    notificationsControllerUpdatePreferences({ locale: preference }).catch(
+      () => {
+        // The stored locale only picks the copy of a future notification.
+        syncedLocale.current = null;
+      },
+    );
+  }, [locale, userId]);
 
   function updatePreferences(values: UpdateNotificationPreferencesDto) {
     action.mutate(() => notificationsControllerUpdatePreferences(values));

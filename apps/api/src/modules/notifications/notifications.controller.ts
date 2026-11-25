@@ -21,7 +21,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { PrismaService } from '@researchos/database';
+import {
+  PrismaService,
+  normalizeNotificationLocale,
+} from '@researchos/database';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import {
   PaginationQueryDto,
@@ -43,11 +46,13 @@ const preferencesDto = (row: {
   push_enabled: boolean;
   muted_types: NotificationPreferencesDto['mutedTypes'];
   timezone: string;
+  locale: string;
 }): NotificationPreferencesDto => ({
   websocketEnabled: row.websocket_enabled,
   pushEnabled: row.push_enabled,
   mutedTypes: row.muted_types,
   timezone: row.timezone,
+  locale: normalizeNotificationLocale(row.locale),
 });
 
 @ApiCookieAuth()
@@ -115,11 +120,14 @@ export class NotificationsController {
     description: 'Number of newly read notifications.',
     type: NotificationCountDto,
   })
-  readAll(@CurrentUserId() userId: string): Promise<NotificationCountDto> {
-    return this.prisma.notifications.updateMany({
+  async readAll(
+    @CurrentUserId() userId: string,
+  ): Promise<NotificationCountDto> {
+    const { count } = await this.prisma.notifications.updateMany({
       where: { ...visibility(userId), read_at: null },
       data: { read_at: new Date() },
     });
+    return { count };
   }
 
   @Patch(':id/read')
@@ -197,6 +205,7 @@ export class NotificationsController {
           pushEnabled: true,
           mutedTypes: [],
           timezone: 'Asia/Ho_Chi_Minh',
+          locale: 'en',
         };
   }
 
@@ -217,6 +226,7 @@ export class NotificationsController {
       push_enabled: dto.pushEnabled ?? undefined,
       muted_types: dto.mutedTypes ?? undefined,
       timezone: dto.timezone ?? undefined,
+      locale: dto.locale ?? undefined,
     };
     const row = await this.prisma.notification_preferences.upsert({
       where: { user_id: userId },

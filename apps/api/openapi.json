@@ -10602,6 +10602,14 @@
         ],
         "description": "Event types excluded from notification delivery."
       },
+      "NotificationLocale": {
+        "type": "string",
+        "enum": [
+          "en",
+          "vi"
+        ],
+        "description": "Locale the notification copy is rendered in."
+      },
       "NotificationPreferencesDto": {
         "type": "object",
         "properties": {
@@ -10623,13 +10631,22 @@
           "timezone": {
             "type": "string",
             "description": "IANA time zone for the recipient."
+          },
+          "locale": {
+            "description": "Locale the notification copy is rendered in.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationLocale"
+              }
+            ]
           }
         },
         "required": [
           "websocketEnabled",
           "pushEnabled",
           "mutedTypes",
-          "timezone"
+          "timezone",
+          "locale"
         ]
       },
       "UpdateNotificationPreferencesDto": {
@@ -10653,6 +10670,14 @@
           "timezone": {
             "type": "string",
             "description": "IANA time zone for the recipient."
+          },
+          "locale": {
+            "description": "Locale the notification copy is rendered in.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationLocale"
+              }
+            ]
           }
         }
       },

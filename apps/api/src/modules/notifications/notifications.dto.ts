@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { NotificationType } from '@researchos/database';
+import { NotificationLocale, NotificationType } from '@researchos/database';
 import {
   ArrayUnique,
   IsBoolean,
@@ -63,6 +63,12 @@ export class NotificationPreferencesDto {
   mutedTypes!: NotificationType[];
   @ApiProperty({ description: 'IANA time zone for the recipient.' })
   timezone!: string;
+  @ApiProperty({
+    description: 'Locale the notification copy is rendered in.',
+    enum: NotificationLocale,
+    enumName: 'NotificationLocale',
+  })
+  locale!: NotificationLocale;
 }
 
 export class UpdateNotificationPreferencesDto {
@@ -92,4 +98,12 @@ export class UpdateNotificationPreferencesDto {
   @IsOptional()
   @IsTimeZone()
   timezone?: string;
+  @ApiPropertyOptional({
+    description: 'Locale the notification copy is rendered in.',
+    enum: NotificationLocale,
+    enumName: 'NotificationLocale',
+  })
+  @IsOptional()
+  @IsEnum(NotificationLocale)
+  locale?: NotificationLocale;
 }

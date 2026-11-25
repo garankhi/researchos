@@ -166,6 +166,7 @@ export * from './meDtoUserType';
 export * from './notificationCountDto';
 export * from './notificationCountDtoEnvelope';
 export * from './notificationDto';
+export * from './notificationLocale';
 export * from './notificationPageDto';
 export * from './notificationPageDtoEnvelope';
 export * from './notificationPreferencesDto';

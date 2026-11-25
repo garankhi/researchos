@@ -1,4 +1,8 @@
-import { Prisma } from '@researchos/database';
+import {
+  Prisma,
+  normalizeNotificationLocale,
+  type NotificationLocale,
+} from '@researchos/database';
 import { isJobUuid } from '@researchos/queue';
 import { UnrecoverableError } from 'bullmq';
 
@@ -63,21 +67,6 @@ const copy = {
 } satisfies Partial<Record<Event['event_type'], [string, string]>>;
 
 /**
- * The two locales the notification copy is written in.
- */
-type NotificationLocale = 'en' | 'vi';
-
-/**
- * Normalizes a locale tag to one of the two copy variants.
- *
- * A regional tag such as `en-GB` resolves to English, and anything the copy
- * does not exist for resolves to Vietnamese.
- */
-function normalizeLocale(value: string | undefined): NotificationLocale {
-  return value?.trim().toLowerCase().startsWith('en') ? 'en' : 'vi';
-}
-
-/**
  * Resolves the locale a recipient's notification is rendered in.
  *
  * The registered push device wins because it describes the screen the
@@ -93,7 +82,7 @@ export function resolveLocale({
   device?: string;
   preference?: string;
 }): NotificationLocale {
-  return normalizeLocale(device ?? preference);
+  return normalizeNotificationLocale(device ?? preference);
 }
 
 function stringValue(value: Prisma.JsonValue, key: string): string | undefined {
