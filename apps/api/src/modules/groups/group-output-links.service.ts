@@ -1,5 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { GroupOutputStatus, Prisma, PrismaService } from '@researchos/database';
+import {
+  GroupOutputStatus,
+  Prisma,
+  PrismaService,
+  stageNotificationEvent,
+} from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
   buildPaginationMeta,
@@ -248,6 +253,14 @@ export class GroupOutputLinksService {
                 removed_at: null,
               },
         });
+        if (!direct)
+          await this.notifyLink(
+            tx,
+            row,
+            callerId,
+            'GROUP_OUTPUT_REQUESTED',
+            now,
+          );
         return this.response(row);
       }
 
@@ -269,6 +282,8 @@ export class GroupOutputLinksService {
           accepted_at: direct ? now : null,
         },
       });
+      if (!direct)
+        await this.notifyLink(tx, row, callerId, 'GROUP_OUTPUT_REQUESTED', now);
       return this.response(row);
     });
   }
@@ -333,6 +348,13 @@ export class GroupOutputLinksService {
             : {}),
         },
       });
+      await this.notifyLink(
+        tx,
+        row,
+        callerId,
+        accepted ? 'GROUP_OUTPUT_ACCEPTED' : 'GROUP_OUTPUT_REJECTED',
+        now,
+      );
       return this.response(row);
     });
   }
@@ -390,6 +412,26 @@ export class GroupOutputLinksService {
         },
       });
       return this.response(row);
+    });
+  }
+
+  private notifyLink(
+    tx: Prisma.TransactionClient,
+    row: LinkRow,
+    callerId: string,
+    type:
+      | 'GROUP_OUTPUT_REQUESTED'
+      | 'GROUP_OUTPUT_ACCEPTED'
+      | 'GROUP_OUTPUT_REJECTED',
+    occurredAt: Date,
+  ) {
+    return stageNotificationEvent(tx, {
+      key: `${type}:${row.group_id}:${row.output_id}:${occurredAt.toISOString()}`,
+      type,
+      actorId: callerId,
+      subjectType: 'OUTPUT',
+      subjectId: row.output_id,
+      payload: { groupId: row.group_id, link: `/groups/${row.group_id}` },
     });
   }
 

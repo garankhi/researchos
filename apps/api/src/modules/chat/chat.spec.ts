@@ -488,6 +488,7 @@ describe('ChatService & ChatGateway', () => {
     };
 
     const tx = {
+      $executeRaw: vi.fn(),
       chat_messages: {
         create: vi.fn().mockResolvedValue({ id: MSG_ID }),
         findUniqueOrThrow: vi.fn().mockResolvedValue(hydratedMsg),

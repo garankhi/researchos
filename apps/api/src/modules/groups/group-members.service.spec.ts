@@ -61,7 +61,14 @@ function setup() {
   };
   const row = memberRow();
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([{ allowed: true }]),
+    $executeRaw: vi.fn(),
+    // The service locks the group first and then asks the policy helper
+    // whether the caller may manage it. The lock returns the group row and
+    // the policy returns the `allowed` flag.
+    $queryRaw: vi
+      .fn()
+      .mockResolvedValueOnce([{ id: groupId }])
+      .mockResolvedValue([{ allowed: true }]),
     research_groups: { findUnique: vi.fn().mockResolvedValue(group) },
     users: { findUnique: vi.fn().mockResolvedValue({ id: userId }) },
     group_members: {
