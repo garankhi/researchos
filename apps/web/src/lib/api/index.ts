@@ -10,6 +10,7 @@ export * from './health/health';
 export * from './identity/identity';
 export * from './interests/interests';
 export * from './jobs/jobs';
+export * from './notification-devices/notification-devices';
 export * from './openalex/openalex';
 export * from './opportunities/opportunities';
 export * from './output-files/output-files';

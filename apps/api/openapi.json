@@ -2489,6 +2489,94 @@
         ]
       }
     },
+    "/notifications/devices": {
+      "put": {
+        "operationId": "NotificationDevicesController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device registration ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredPushDeviceDtoEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The token is active for another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Registers or refreshes a push device for the signed-in user",
+        "tags": [
+          "notification-devices"
+        ]
+      }
+    },
+    "/notifications/devices/{id}": {
+      "delete": {
+        "operationId": "NotificationDevicesController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Registered device ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The device is revoked."
+          },
+          "404": {
+            "description": "The device is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revokes a push device owned by the signed-in user",
+        "tags": [
+          "notification-devices"
+        ]
+      }
+    },
     "/demo/slow": {
       "get": {
         "operationId": "DemoController_getSlow",
@@ -10555,6 +10643,54 @@
           "metadataErrorCode"
         ]
       },
+      "PushPlatform": {
+        "type": "string",
+        "enum": [
+          "WEB",
+          "ANDROID",
+          "IOS"
+        ],
+        "description": "Platform that obtained the registration token."
+      },
+      "RegisterPushDeviceDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Firebase registration token for the current device."
+          },
+          "platform": {
+            "description": "Platform that obtained the registration token.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PushPlatform"
+              }
+            ]
+          },
+          "locale": {
+            "type": "string",
+            "description": "Locale used for notifications on this device."
+          }
+        },
+        "required": [
+          "token",
+          "platform",
+          "locale"
+        ]
+      },
+      "RegisteredPushDeviceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the registered device.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "SearchCountsResponseDto": {
         "type": "object",
         "properties": {
@@ -14894,6 +15030,30 @@
           },
           "data": {
             "$ref": "#/components/schemas/ArticlePdfUploadStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "RegisteredPushDeviceDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegisteredPushDeviceDto"
           },
           "message": {
             "type": "string",
