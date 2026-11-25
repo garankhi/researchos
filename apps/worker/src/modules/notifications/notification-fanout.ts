@@ -62,6 +62,40 @@ const copy = {
   ],
 } satisfies Partial<Record<Event['event_type'], [string, string]>>;
 
+/**
+ * The two locales the notification copy is written in.
+ */
+type NotificationLocale = 'en' | 'vi';
+
+/**
+ * Normalizes a locale tag to one of the two copy variants.
+ *
+ * A regional tag such as `en-GB` resolves to English, and anything the copy
+ * does not exist for resolves to Vietnamese.
+ */
+function normalizeLocale(value: string | undefined): NotificationLocale {
+  return value?.trim().toLowerCase().startsWith('en') ? 'en' : 'vi';
+}
+
+/**
+ * Resolves the locale a recipient's notification is rendered in.
+ *
+ * The registered push device wins because it describes the screen the
+ * notification is actually read on. A recipient without a device falls back
+ * to the locale on their notification preferences, so an account that never
+ * enabled push still receives readable copy. The final default covers a
+ * recipient with neither.
+ */
+export function resolveLocale({
+  device,
+  preference,
+}: {
+  device?: string;
+  preference?: string;
+}): NotificationLocale {
+  return normalizeLocale(device ?? preference);
+}
+
 function stringValue(value: Prisma.JsonValue, key: string): string | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
   const item = value[key];
@@ -259,12 +293,10 @@ export async function fanOutNotification(
       })
     : null;
   const rendered = recipients.map(({ id }) => {
-    const locale = devicesByUser
-      .get(id)?.[0]
-      ?.locale.toLowerCase()
-      .startsWith('en')
-      ? 'en'
-      : 'vi';
+    const locale = resolveLocale({
+      device: devicesByUser.get(id)?.[0]?.locale,
+      preference: preferenceById.get(id)?.locale,
+    });
     const title = labels[locale === 'en' ? 1 : 0];
     return {
       recipient_id: id,
