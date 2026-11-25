@@ -6,16 +6,27 @@ import { resolve } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BackgroundJobsService, PrismaService } from '@researchos/database';
+import {
+  NOTIFICATION_NAMESPACE,
+  NotificationSocketEvent,
+} from '@researchos/chat';
+import {
+  BackgroundJobsService,
+  PrismaService,
+  notificationQueueScope,
+  stageNotificationEvent,
+} from '@researchos/database';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
   DURABLE_PROBE_JOB,
+  NOTIFICATION_QUEUE,
   backgroundTransportId,
   createQueueOptions,
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
+import { io, type Socket } from 'socket.io-client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Exercise the same compiled Nest metadata and providers as the deployed apps.
 import { AppModule } from '../dist/app.module.js';
@@ -38,6 +49,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
   let config: ConfigService;
   let queue: Queue;
   let dlq: Queue;
+  let notificationQueue: Queue;
   let worker: ChildProcess | undefined;
   let workerOutput = '';
   const { request, close } = createHttpTestClient();
@@ -66,6 +78,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     );
     queue = new Queue(BACKGROUND_QUEUE, options);
     dlq = new Queue(DEAD_LETTER_QUEUE, options);
+    notificationQueue = new Queue(NOTIFICATION_QUEUE, options);
     for (let index = 0; index < owners.length; index++) {
       await prisma.users.create({
         data: {
@@ -626,14 +639,221 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       .toBeDefined();
   });
 
+  it('stages, deduplicates and delivers a private notification to an offline inbox', async () => {
+    const [actor, recipient] = owners as [string, string, string];
+    const eventKey = `follow:test:${randomUUID()}`;
+    const liveEventKey = `follow:test:${randomUUID()}`;
+    const event = {
+      key: eventKey,
+      type: 'FOLLOW' as const,
+      actorId: actor,
+      subjectType: 'RESEARCHER' as const,
+      subjectId: recipient,
+      payload: { link: `/profile/${actor}` },
+    };
+    const api = request(app.getHttpServer());
+    const token = randomUUID();
+    let secondApi: INestApplication | undefined;
+    let unauthorized: Socket | undefined;
+    let live: Socket | undefined;
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await stageNotificationEvent(tx, event, prefix);
+        throw new Error('rolled back');
+      }),
+    ).rejects.toThrow('rolled back');
+    expect(
+      await prisma.notification_events.count({
+        where: { event_key: eventKey },
+      }),
+    ).toBe(0);
+
+    try {
+      await prisma.user_role_assignments.createMany({
+        data: [actor, recipient].map((user_id) => ({
+          user_id,
+          role: 'RESEARCHER' as const,
+          grant_source: 'SYSTEM' as const,
+          granted_at: grantedAt,
+        })),
+      });
+      await prisma.researcher_profiles.create({
+        data: { user_id: recipient, profile_confirmed_at: new Date() },
+      });
+      const register = () =>
+        api
+          .put('/notifications/devices')
+          .set('Cookie', cookie(1))
+          .send({ token, platform: 'WEB', locale: 'en' })
+          .expect(200);
+      const device = await register();
+      expect((await register()).body.data.id).toBe(device.body.data.id);
+      await api
+        .patch('/notifications/preferences')
+        .set('Cookie', cookie(1))
+        .send({ pushEnabled: false })
+        .expect(200);
+      await prisma.$transaction(async (tx) => {
+        await tx.user_follows.create({
+          data: {
+            follower_id: actor,
+            entity_type: 'RESEARCHER',
+            entity_id: recipient,
+          },
+        });
+        await stageNotificationEvent(tx, event, prefix);
+        await stageNotificationEvent(tx, event, prefix);
+      });
+      await startWorker();
+      await expect
+        .poll(
+          () => prisma.notifications.count({ where: { event_key: eventKey } }),
+          { timeout: 20_000, message: workerOutput },
+        )
+        .toBe(1);
+      const notice = await prisma.notifications.findFirstOrThrow({
+        where: { event_key: eventKey },
+      });
+      expect(notice.recipient_id).toBe(recipient);
+      expect(
+        await prisma.notification_deliveries.count({
+          where: { notification_id: notice.id, channel: 'FCM' },
+        }),
+      ).toBe(0);
+      await api
+        .patch(`/notifications/${notice.id}/read`)
+        .set('Cookie', cookie())
+        .expect(404);
+      const inbox = await api
+        .get('/notifications')
+        .set('Cookie', cookie(1))
+        .expect(200);
+      expect(inbox.body.data.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: notice.id,
+            title: 'You have a new follower',
+          }),
+        ]),
+      );
+      await api
+        .patch(`/notifications/${notice.id}/read`)
+        .set('Cookie', cookie(1))
+        .expect(204);
+      await api
+        .patch(`/notifications/${notice.id}/read`)
+        .set('Cookie', cookie(1))
+        .expect(204);
+      await api
+        .patch(`/notifications/${notice.id}/archive`)
+        .set('Cookie', cookie(1))
+        .expect(204);
+
+      secondApi = await NestFactory.create(AppModule, { logger: false });
+      await secondApi.listen(0, '127.0.0.1');
+      const address = (await secondApi.getUrl()) + NOTIFICATION_NAMESPACE;
+      const socketOptions = {
+        autoConnect: false,
+        reconnection: false,
+        transports: ['websocket'],
+      };
+      let rejected: unknown;
+      unauthorized = io(address, socketOptions);
+      unauthorized.on(NotificationSocketEvent.ERROR, (payload: unknown) => {
+        rejected = payload;
+      });
+      unauthorized.connect();
+      await expect.poll(() => rejected).toMatchObject({ code: 'unauthorized' });
+      let ready = false;
+      let hint: unknown;
+      live = io(address, {
+        ...socketOptions,
+        extraHeaders: { Cookie: cookie(1) },
+      });
+      live.on(NotificationSocketEvent.READY, () => {
+        ready = true;
+      });
+      live.on(NotificationSocketEvent.CREATED, (payload: unknown) => {
+        hint = payload;
+      });
+      live.connect();
+      await expect.poll(() => ready).toBe(true);
+      await prisma.$transaction((tx) =>
+        stageNotificationEvent(tx, { ...event, key: liveEventKey }, prefix),
+      );
+      await expect
+        .poll(
+          async () => {
+            const delivery = await prisma.notification_deliveries.findFirst({
+              where: {
+                channel: 'WEBSOCKET',
+                notification: { event_key: liveEventKey },
+              },
+              select: { status: true, last_error: true },
+            });
+            return delivery;
+          },
+          {
+            timeout: 12_000,
+            message: 'Worker did not deliver the WebSocket notification',
+          },
+        )
+        .toMatchObject({ status: 'SENT' });
+      await expect
+        .poll(() => hint, { timeout: 12_000 })
+        .toMatchObject({ id: expect.any(String) });
+      const liveNotice = await prisma.notifications.findFirstOrThrow({
+        where: { event_key: liveEventKey },
+      });
+      expect(hint).toEqual({ id: liveNotice.id });
+    } finally {
+      unauthorized?.disconnect();
+      live?.disconnect();
+      await secondApi?.close();
+      await stopWorker();
+      await prisma.notifications.deleteMany({
+        where: { event_key: { in: [eventKey, liveEventKey] } },
+      });
+      await prisma.notification_events.deleteMany({
+        where: { event_key: { in: [eventKey, liveEventKey] } },
+      });
+      await prisma.notification_preferences.deleteMany({
+        where: { user_id: recipient },
+      });
+      await prisma.push_devices.deleteMany({ where: { token } });
+      await prisma.user_follows.deleteMany({
+        where: {
+          follower_id: actor,
+          entity_type: 'RESEARCHER',
+          entity_id: recipient,
+        },
+      });
+      await prisma.researcher_profiles.deleteMany({
+        where: { user_id: recipient },
+      });
+      await prisma.user_role_assignments.deleteMany({
+        where: { user_id: { in: [actor, recipient] }, role: 'RESEARCHER' },
+      });
+    }
+  });
+
   afterAll(async () => {
     await stopWorker();
     try {
       await queue?.obliterate({ force: true });
       await dlq?.obliterate({ force: true });
+      await notificationQueue?.obliterate({ force: true });
       if (prisma) {
         await prisma.background_jobs.deleteMany({
-          where: { owner_id: { in: owners } },
+          where: {
+            OR: [
+              { owner_id: { in: owners } },
+              { queue_prefix: notificationQueueScope(prefix) },
+            ],
+          },
+        });
+        await prisma.notification_events.deleteMany({
+          where: { actor_id: { in: owners } },
         });
         await prisma.user_sessions.deleteMany({
           where: { user_id: { in: owners } },
@@ -646,6 +866,7 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
     } finally {
       await queue?.close();
       await dlq?.close();
+      await notificationQueue?.close();
       await app?.close();
       close();
       if (previousPrefix === undefined) delete process.env.QUEUE_PREFIX;
