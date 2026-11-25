@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mergeGrobidMetadata } from './article-pdf-grobid.js';
 import {
   readAbstract,
@@ -57,6 +57,21 @@ function xmpMetadata(fields: string): string {
 }
 
 describe('extractArticlePdfMetadata', () => {
+  it('loads PDF.js standard font data for a PDF with an unembedded Helvetica font', async () => {
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      const { metadata } = await inspectArticlePdf(
+        pdf([[12, 720, 'Abstract: Results of a water-quality study.']]),
+      );
+      expect(metadata.abstract).toBe('Results of a water-quality study.');
+      expect(warning).not.toHaveBeenCalledWith(
+        expect.stringMatching(/standardFontDataUrl|Unable to load font data/),
+      );
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('identifies a wrapped heading and same-size marked byline below an article type', async () => {
     const result = await extractArticlePdfMetadata(
       pdf(

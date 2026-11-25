@@ -25,6 +25,7 @@
     "@hookform/resolvers": "^7.0.0",
     "@researchos/chat": "workspace:*",
     "@researchos/error-codes": "workspace:*",
+    "@researchos/publication-metadata": "workspace:*",
     "@tanstack/react-query": "^5.105.0",
     "axios": "^1.21.0",
     "boneyard-js": "1.10.0",

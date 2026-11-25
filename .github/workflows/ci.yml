@@ -95,8 +95,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         run: pnpm --filter web exec playwright install --with-deps chromium
-      - name: Build workspace contracts for Storybook
-        run: pnpm --filter @researchos/chat build
+      - name: Build web workspace dependencies
+        run: pnpm --filter "web^..." build
       - name: Build Storybook
         run: pnpm --filter web build-storybook
       - name: Test Storybook

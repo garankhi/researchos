@@ -11,7 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Chakra UI v3
 
 - Use the shared Chakra system in `src/theme/theme.ts`. Prefer semantic tokens and mobile-first responsive props.
-- Use square corners throughout the UI. Keep Chakra radius tokens and Boneyard bone radii at zero. The header’s Add new button is the approved pill-shaped exception. Add another exception only when explicitly requested. The avatar’s circle is part of its image artwork.
+- Use square corners throughout the UI. Keep Chakra radius tokens and Boneyard bone radii at zero. Use pill-shaped treatments on approved controls such as the header’s Add new button and the Add research drawer’s Close hover. Add another exception only when explicitly requested. The avatar’s circle is part of its image artwork.
 - Use `layerStyle="interactiveRow"` on full-width action rows in menus, drawers, and similar lists. The shared style adds a gray background and a 2 px leading-edge indicator on hover and keyboard highlight without moving the content. Disabled rows stay muted.
 - Use the `overlayPanel` shadow on raised menus, drawers, popovers, and dialogs. Use `drawerBackdrop` for a modal drawer’s translucent backdrop. See [Chakra UI and responsive layout](../../.cursor/skills/researchos-ui/reference/chakra-and-responsive.md#interactive-rows-and-elevation).
 - Put controls that render browser-only theme state from `useTheme()` inside Chakra's `ClientOnly`. Keep the server and first client render identical.
@@ -19,6 +19,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Compose localized navigation with Chakra `asChild` and `src/components/ui/link.tsx`. Use the localized router for redirects.
 - Keep account and language overlays keyboard accessible. Check portaled content in both themes, including the first load after changing the provider.
 - Use shared form controls, translated inline errors and `FormSubmitButton`. Use the snackbar for transient confirmations and failures outside a panel or field.
+
+## Form and drawer visual hierarchy
+
+- For full-page entry forms such as Article creation, separate the page, form panel, and input surfaces with semantic tokens. Use `bg.panel` for the form and Chakra’s `subtle` variant for text inputs, textareas, and selects. Use `layerStyle="formFields"` on the field stack for bold labels and a visible input edge. Check text, placeholder, keyboard focus, and invalid states in both color modes.
+- Use consistent vertical spacing between fields. Add a divider where the task changes, such as between PDF selection and Article metadata. Keep related controls together and let rows wrap or stack on narrow screens.
+- The Add research subpanel uses a plain text Back button with a separate decorative chevron. Keep the text label as the pointer target and retain visible keyboard focus. Align Close with the drawer’s trailing edge and use inverted foreground and background tokens for its pill-shaped hover.
 
 ## Loading UI
 

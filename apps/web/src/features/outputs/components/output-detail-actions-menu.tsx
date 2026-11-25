@@ -8,7 +8,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { Ellipsis, Eye } from 'lucide-react';
+import { Ellipsis, Eye, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
@@ -19,6 +19,7 @@ import { resolveErrorCode } from '@/utils/error-messages';
 import type { OutputCapability } from '@/utils/output-capability';
 import { useOutputVisibility } from '../hooks/use-output-visibility';
 import type { OutputDetail } from '../types';
+import { EditPublishedArticle } from './edit-published-article';
 
 type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
 
@@ -45,10 +46,14 @@ export function OutputDetailActionsMenu({
   const t = useTranslations('outputs');
   const tError = useTranslations('errors');
   const tCommon = useTranslations('common');
+  const articleEdit = useTranslations('articleEdit');
   const { showSnackbar } = useSnackbar();
   const { updateVisibility, isPending } = useOutputVisibility();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<
+    (OutputDetail & { revision: NonNullable<OutputDetail['revision']> }) | null
+  >(null);
   const [selection, setSelection] = useState<VisibilityChoice>(
     output.visibility === 'RESEARCH_GROUP'
       ? 'RESEARCH_GROUP'
@@ -59,6 +64,12 @@ export function OutputDetailActionsMenu({
   const hasGroup = Boolean(output.accessGroupId);
   const isShared = output.sharingStatus === 'SHARED';
   const canChangeVisibility = isShared && capability.canChangeVisibility;
+  const revision = output.revision;
+  const canEditArticle =
+    isShared &&
+    capability.isOwner &&
+    revision?.outputType === 'ARTICLE' &&
+    revision.releasedAt;
 
   const openDialog = () => {
     if (!canChangeVisibility) return;
@@ -111,6 +122,16 @@ export function OutputDetailActionsMenu({
         <Portal>
           <Menu.Positioner>
             <Menu.Content boxShadow="overlayPanel">
+              {canEditArticle && revision && (
+                <Menu.Item
+                  value="edit-article"
+                  layerStyle="interactiveRow"
+                  onSelect={() => setEditing({ ...output, revision })}
+                >
+                  <Pencil />
+                  {articleEdit('edit')}
+                </Menu.Item>
+              )}
               <Menu.Item
                 value="visibility"
                 layerStyle="interactiveRow"
@@ -129,6 +150,14 @@ export function OutputDetailActionsMenu({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
+
+      {editing && capability.isOwner && capability.userId && (
+        <EditPublishedArticle
+          output={editing}
+          userId={capability.userId}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       <ConfirmationModal
         open={dialogOpen}

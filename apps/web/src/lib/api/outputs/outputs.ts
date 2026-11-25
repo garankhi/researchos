@@ -39,6 +39,8 @@ import type {
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
+  UpdateArticleAbstractDto,
+  UpdateArticleDto,
   UpdateArticlePdfVisibilityDto,
   UpdateOutputRevisionDto,
   UpdateOutputVisibilityDto,
@@ -1013,6 +1015,212 @@ export function useOutputsControllerFindFiles<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+/**
+ * @summary Update the metadata of a released Article
+ */
+export const outputsControllerUpdateArticle = (
+  outputId: string,
+  updateArticleDto: UpdateArticleDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/article`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateArticleDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateArticleMutationKey = () =>
+  ['outputsControllerUpdateArticle'] as const;
+
+export const getOutputsControllerUpdateArticleMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticle>>,
+    TError,
+    OutputsControllerUpdateArticleMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticle>>,
+  TError,
+  OutputsControllerUpdateArticleMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerUpdateArticleMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticle>>,
+    OutputsControllerUpdateArticleMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerUpdateArticle(outputId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateArticleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticle>>
+>;
+export type OutputsControllerUpdateArticleMutationBody = UpdateArticleDto;
+export type OutputsControllerUpdateArticleMutationError = ApiErrorResponseDto;
+export type OutputsControllerUpdateArticleMutationVariables = {
+  outputId: string;
+  data: UpdateArticleDto;
+};
+
+/**
+ * @summary Update the metadata of a released Article
+ */
+export const useOutputsControllerUpdateArticle = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateArticle>>,
+      TError,
+      OutputsControllerUpdateArticleMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticle>>,
+  TError,
+  OutputsControllerUpdateArticleMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateArticleMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Save the abstract of a released Article as a new revision
+ */
+export const outputsControllerUpdateArticleAbstract = (
+  outputId: string,
+  updateArticleAbstractDto: UpdateArticleAbstractDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputRevisionResponseDtoEnvelope>(
+    {
+      url: `/outputs/${outputId}/article-abstract`,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      data: updateArticleAbstractDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOutputsControllerUpdateArticleAbstractMutationKey = () =>
+  ['outputsControllerUpdateArticleAbstract'] as const;
+
+export const getOutputsControllerUpdateArticleAbstractMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>,
+    TError,
+    OutputsControllerUpdateArticleAbstractMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>,
+  TError,
+  OutputsControllerUpdateArticleAbstractMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOutputsControllerUpdateArticleAbstractMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>,
+    OutputsControllerUpdateArticleAbstractMutationVariables
+  > = (props) => {
+    const { outputId, data } = props ?? {};
+
+    return outputsControllerUpdateArticleAbstract(
+      outputId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OutputsControllerUpdateArticleAbstractMutationResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>
+>;
+export type OutputsControllerUpdateArticleAbstractMutationBody =
+  UpdateArticleAbstractDto;
+export type OutputsControllerUpdateArticleAbstractMutationError =
+  ApiErrorResponseDto;
+export type OutputsControllerUpdateArticleAbstractMutationVariables = {
+  outputId: string;
+  data: UpdateArticleAbstractDto;
+};
+
+/**
+ * @summary Save the abstract of a released Article as a new revision
+ */
+export const useOutputsControllerUpdateArticleAbstract = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>,
+      TError,
+      OutputsControllerUpdateArticleAbstractMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof outputsControllerUpdateArticleAbstract>>,
+  TError,
+  OutputsControllerUpdateArticleAbstractMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOutputsControllerUpdateArticleAbstractMutationOptions(options),
+    queryClient,
+  );
+};
 /**
  * The owner attaches a verified upload and releases a successor revision. Replacing a PDF revokes access to the replaced file in every revision.
  * @summary Add or replace the PDF of a released Article

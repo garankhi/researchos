@@ -111,6 +111,22 @@ try {
       'utf8',
     ),
   );
+  await db.query(
+    await readFile(
+      new URL(
+        '20261123120000_group_management_authority/migration.sql',
+        migrations,
+      ),
+      'utf8',
+    ),
+  );
+  const groupAuthority = async (actor) =>
+    (
+      await db.query(
+        'SELECT has_group_management_authority($1,$2) AS allowed',
+        [actor, ids.group],
+      )
+    ).rows[0].allowed;
   const policy = async (actor, opportunity) =>
     (
       await db.query('SELECT can_manage_opportunity($1,$2) AS allowed', [
@@ -149,6 +165,8 @@ try {
     },
   );
   await check('group scope grants only its active managers', async () => {
+    assert.equal(await groupAuthority(ids.lead), true);
+    assert.equal(await groupAuthority(ids.delegated), true);
     assert.equal(await policy(ids.lead, ids.groupOpportunity), true);
     assert.equal(await policy(ids.delegated, ids.groupOpportunity), true);
     assert.equal(await policy(ids.creator, ids.groupOpportunity), false);
@@ -170,6 +188,7 @@ try {
         false,
       );
       assert.equal(await policy(ids.delegated, ids.groupOpportunity), false);
+      assert.equal(await groupAuthority(ids.delegated), false);
       assert.equal(
         (
           await db.query('SELECT can_manage_group($1,$2) AS allowed', [
@@ -189,6 +208,29 @@ try {
         [ids.group, ids.delegated],
       );
       assert.equal(await policy(ids.delegated, ids.groupOpportunity), true);
+    },
+  );
+  await check(
+    'an archived membership leaves the designated lead in charge',
+    async () => {
+      await db.query(
+        `INSERT INTO group_members (group_id,user_id,role,archived_at)
+       VALUES ($1,$2,'GROUP_LEADER',clock_timestamp())`,
+        [ids.group, ids.lead],
+      );
+      assert.equal(await groupAuthority(ids.lead), true);
+      assert.equal(await policy(ids.lead, ids.groupOpportunity), true);
+    },
+  );
+  await check(
+    'an active ordinary member has no management authority',
+    async () => {
+      await db.query(
+        `INSERT INTO group_members (group_id,user_id,role) VALUES ($1,$2,'MEMBER')`,
+        [ids.group, ids.creator],
+      );
+      assert.equal(await groupAuthority(ids.creator), false);
+      assert.equal(await policy(ids.creator, ids.groupOpportunity), false);
     },
   );
   await check(
@@ -229,6 +271,51 @@ try {
     );
     assert.equal(await policy(ids.projectLead, ids.projectOpportunity), false);
   });
+  await check(
+    'restored opportunities keep their lifecycle and only OPEN ones return to search',
+    async () => {
+      const opportunity = ids.groupOpportunity;
+      const inSearch = async () =>
+        (
+          await db.query(
+            "SELECT 1 FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=$1",
+            [opportunity],
+          )
+        ).rows.length === 1;
+      const archiveAndRestore = async (status) => {
+        await db.query(
+          'UPDATE research_opportunities SET archived_at=clock_timestamp() WHERE id=$1',
+          [opportunity],
+        );
+        assert.equal(await inSearch(), false);
+        const {
+          rows: [restored],
+        } = await db.query(
+          'UPDATE research_opportunities SET archived_at=NULL WHERE id=$1 RETURNING status, published_at',
+          [opportunity],
+        );
+        assert.equal(restored.status, status);
+        assert.equal(restored.published_at === null, status === 'DRAFT');
+        assert.equal(await inSearch(), status === 'OPEN');
+      };
+      await archiveAndRestore('DRAFT');
+      await db.query(
+        "UPDATE research_opportunities SET status='OPEN', description='Published details', application_deadline=clock_timestamp() + interval '7 days' WHERE id=$1",
+        [opportunity],
+      );
+      assert.equal(await inSearch(), true);
+      await archiveAndRestore('OPEN');
+      await db.query(
+        "UPDATE research_opportunities SET status='FILLED' WHERE id=$1",
+        [opportunity],
+      );
+      await db.query(
+        "UPDATE research_opportunities SET status='CLOSED' WHERE id=$1",
+        [opportunity],
+      );
+      await archiveAndRestore('CLOSED');
+    },
+  );
   console.log(`Passed ${checks} PostgreSQL integration checks.`);
 } finally {
   await db.end().catch(() => {});

@@ -26,7 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
+import { ArchiveListQueryDto } from '../../common/dto/archive-list.query.dto.js';
 import {
   CreateGroupDirectionDto,
   UpdateGroupDirectionDto,
@@ -63,7 +63,8 @@ export class GroupDirectionsController {
 
   @Get()
   @ApiOperation({
-    summary: 'List published group directions with taxonomy paths',
+    summary: 'List group directions with taxonomy paths',
+    description: 'By default, only active directions are listed.',
   })
   @ApiOkResponse({
     description: 'Paginated directions visible to the caller.',
@@ -72,7 +73,7 @@ export class GroupDirectionsController {
   list(
     @Param('groupId', ParseUUIDPipe) groupId: string,
     @CurrentUserId() actorId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ArchiveListQueryDto,
   ): Promise<GroupDirectionPageDto> {
     return this.directions.list(groupId, actorId, query);
   }
@@ -114,6 +115,26 @@ export class GroupDirectionsController {
     @Body() dto: UpdateGroupDirectionDto,
   ): Promise<GroupDirectionResponseDto> {
     return this.directions.update(groupId, directionId, actorId, dto);
+  }
+
+  @Patch(':directionId/restore')
+  @Roles('RESEARCHER')
+  @ApiParam({
+    name: 'directionId',
+    format: 'uuid',
+    description: 'Direction belonging to this group.',
+  })
+  @ApiOperation({ summary: 'Restore a group direction' })
+  @ApiOkResponse({
+    description: 'Direction restored.',
+    type: GroupDirectionResponseDto,
+  })
+  restore(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('directionId', ParseUUIDPipe) directionId: string,
+    @CurrentUserId() actorId: string,
+  ): Promise<GroupDirectionResponseDto> {
+    return this.directions.restore(groupId, directionId, actorId);
   }
 
   @Delete(':directionId')

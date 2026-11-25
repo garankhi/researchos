@@ -26,6 +26,8 @@ export interface GroupDirectionResponseDto {
   description: string | null;
   /** Creation/publication timestamp. */
   createdAt: string;
+  /** Timestamp when the direction was archived. */
+  archivedAt?: string;
   /**
    * Full taxonomy context, or null for an unlinked direction.
    * @nullable

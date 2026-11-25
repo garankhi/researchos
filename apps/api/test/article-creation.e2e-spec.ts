@@ -20,6 +20,7 @@ import {
   DEAD_LETTER_QUEUE,
   RESEARCH_UPDATES_QUEUE,
   SYSTEM_QUEUE,
+  TOPIC_SUGGESTION_QUEUE,
   articlePdfMetadataScope,
   backgroundTransportId,
   createQueueOptions,
@@ -413,6 +414,7 @@ describe('Article creation', () => {
     // The worker has already exited. Delete only queues in this run's UUID prefix.
     for (const name of [
       ARTICLE_PDF_METADATA_QUEUE,
+      TOPIC_SUGGESTION_QUEUE,
       BACKGROUND_QUEUE,
       DEAD_LETTER_QUEUE,
       RESEARCH_UPDATES_QUEUE,
@@ -1184,6 +1186,259 @@ describe('Article creation', () => {
     await submit(submission, key).expect(201);
   });
 
+  it('only rewrites author rows whose name or byline position changed', async () => {
+    const { body } = await submit({
+      ...input,
+      authors: [
+        { displayName: 'An' },
+        { displayName: 'Binh' },
+        { displayName: 'Chi' },
+      ],
+    }).expect(201);
+    const { outputId, revisionId } = body.data;
+    const article = (await detail(outputId).expect(200)).body.data;
+    const readByline = async () =>
+      (
+        await db.query(
+          `SELECT id, author_name_string AS name, ctid::text AS row_version
+           FROM output_authors WHERE output_id = $1 ORDER BY author_order`,
+          [outputId],
+        )
+      ).rows;
+    const before = await readByline();
+    const authors = article.authors.map((author, index) => ({
+      authorId: author.id,
+      displayName: index === 1 ? 'Bình' : author.authorNameString,
+    }));
+    const path = `/outputs/${outputId}/article`;
+    const renamed = await request('owner')
+      .patch(path)
+      .send({ expectedRevisionId: revisionId, authors })
+      .expect(200);
+    const afterRename = await readByline();
+    expect(afterRename[0]).toEqual(before[0]);
+    expect(afterRename[1]).toMatchObject({ id: before[1].id, name: 'Bình' });
+    expect(afterRename[1].row_version).not.toBe(before[1].row_version);
+    expect(afterRename[2]).toEqual(before[2]);
+
+    await request('owner')
+      .patch(path)
+      .send({
+        expectedRevisionId: renamed.body.data.currentReleaseId,
+        authors: [...authors].reverse(),
+      })
+      .expect(200);
+    const afterReorder = await readByline();
+    expect(afterReorder.map(({ id }) => id)).toEqual(
+      [...before].reverse().map(({ id }) => id),
+    );
+    expect(afterReorder[1]).toEqual(afterRename[1]);
+  });
+
+  it('edits a released Article while preserving author claims, private files and the previous release', async () => {
+    const upload = await verifiedPdf();
+    const { body } = await submit({
+      ...input,
+      authors: [
+        { displayName: 'Owner' },
+        { displayName: 'Co-author', userId: actors.researcher },
+      ],
+      topicIds: [activeTopic],
+      uploadId: upload.uploadId,
+      fileVisibility: 'PRIVATE',
+    }).expect(201);
+    const { outputId, revisionId } = body.data;
+    const path = `/outputs/${outputId}/article`;
+    const original = (await detail(outputId).expect(200)).body.data;
+    const filesPath = `/outputs/${outputId}/files`;
+    const file = (await request('owner').get(filesPath).expect(200)).body
+      .data[0];
+    const [owner, coauthor] = original.authors;
+    await db.query(
+      `INSERT INTO publication_claims (output_id, user_id, author_id, match_source)
+       VALUES ($1, $2, $3, 'TEST')`,
+      [outputId, actors.researcher, coauthor.id],
+    );
+    const change = {
+      expectedRevisionId: revisionId,
+      title: 'Revised Article',
+      publicationDate: '2025-11',
+      doi: 'https://doi.org/10.1234/REVISED-ARTICLE',
+      abstract: 'Updated summary',
+      journal: 'Updated journal',
+      volume: '10',
+      issue: '4',
+      pages: '1–9',
+      peerReviewed: false,
+      topicIds: [secondTopic],
+      authors: [
+        {
+          authorId: coauthor.id,
+          displayName: coauthor.authorNameString,
+          userId: actors.researcher,
+        },
+        { displayName: 'New author' },
+        { authorId: owner.id, displayName: owner.authorNameString },
+      ],
+    };
+    await request('researcher').patch(path).send(change).expect(403);
+    await request('owner')
+      .patch(path)
+      .send({ expectedRevisionId: revisionId, title: null })
+      .expect(400);
+    await request('owner')
+      .patch(path)
+      .send({ ...change, topicIds: [inactiveTopic] })
+      .expect(400);
+    const blocked = await request('owner')
+      .patch(path)
+      .send({ ...change, authors: change.authors.slice(1) })
+      .expect(409);
+    expect(blocked.body.message).toBe('output_author_claimed');
+    const takenDoi = '10.1234/taken-edit-doi';
+    await submit({ ...input, doi: takenDoi }).expect(201);
+    const duplicate = await request('owner')
+      .patch(path)
+      .send({ ...change, doi: takenDoi })
+      .expect(409);
+    expect(duplicate.body.message).toBe('output_doi_conflict');
+    const unchanged = await request('owner')
+      .patch(path)
+      .send({ expectedRevisionId: revisionId })
+      .expect(200);
+    expect(unchanged.body.data.currentReleaseId).toBe(revisionId);
+    expect(
+      unchanged.body.data.authors.map(({ id }: { id: string }) => id),
+    ).toEqual([owner.id, coauthor.id]);
+    const saved = (await request('owner').patch(path).send(change).expect(200))
+      .body.data;
+    await request('owner').patch(path).send(change).expect(409);
+    const reloaded = (await detail(outputId).expect(200)).body.data;
+    expect(reloaded).toMatchObject({
+      id: outputId,
+      currentReleaseId: saved.currentReleaseId,
+      firstSharedAt: original.firstSharedAt,
+      doi: '10.1234/revised-article',
+      currentRevision: {
+        title: change.title,
+        publicationDate: '2025-11',
+        publicationYear: 2025,
+        abstract: change.abstract,
+        venue: change.journal,
+        volume: change.volume,
+        issue: change.issue,
+        pages: change.pages,
+        peerReviewed: false,
+      },
+      authors: [
+        { id: coauthor.id, userId: actors.researcher },
+        { authorNameString: 'New author' },
+        { id: owner.id },
+      ],
+      topics: [{ topicId: secondTopic }],
+    });
+    expect(saved.currentReleaseId).not.toBe(revisionId);
+    const before = await db.query(
+      'SELECT title, authors_snapshot FROM output_revisions WHERE id = $1',
+      [revisionId],
+    );
+    expect(before.rows[0].title).toBe(input.title);
+    expect(
+      before.rows[0].authors_snapshot.map(({ id }: { id: string }) => id),
+    ).toEqual([owner.id, coauthor.id]);
+    const claims = await db.query(
+      'SELECT author_id FROM publication_claims WHERE output_id = $1',
+      [outputId],
+    );
+    expect(claims.rows).toEqual([{ author_id: coauthor.id }]);
+    expect(
+      (await request('owner').get(filesPath).expect(200)).body.data,
+    ).toEqual([file]);
+    expect(
+      (await request('reader').get(filesPath).expect(200)).body.data,
+    ).toEqual([]);
+    const cleared = (
+      await request('owner')
+        .patch(path)
+        .send({
+          expectedRevisionId: saved.currentReleaseId,
+          doi: null,
+          abstract: null,
+          topicIds: [],
+        })
+        .expect(200)
+    ).body.data;
+    expect(cleared).toMatchObject({
+      doi: null,
+      topics: [],
+      currentRevision: {
+        abstract: null,
+        title: change.title,
+        publicationDate: '2025-11',
+      },
+    });
+  });
+
+  it('adds an abstract to a released Article without changing the previous revision or file access', async () => {
+    const upload = await verifiedPdf();
+    const created = await submit({
+      ...input,
+      topicIds: [activeTopic],
+      uploadId: upload.uploadId,
+      fileVisibility: 'PRIVATE',
+    }).expect(201);
+    const { outputId, revisionId } = created.body.data;
+    const path = `/outputs/${outputId}/article-abstract`;
+    const original = (await detail(outputId).expect(200)).body.data;
+    const filesPath = `/outputs/${outputId}/files`;
+    const ownerFiles = (await request('owner').get(filesPath).expect(200)).body
+      .data;
+    expect(ownerFiles).toHaveLength(1);
+    const change = {
+      expectedRevisionId: revisionId,
+      abstract: '  New abstract.  ',
+    };
+
+    await request('researcher').patch(path).send(change).expect(403);
+    await request('owner')
+      .patch(path)
+      .send({ ...change, abstract: '   ' })
+      .expect(400);
+    const saved = await request('owner').patch(path).send(change).expect(200);
+    const nextId = saved.body.data.id;
+    expect(nextId).not.toBe(revisionId);
+    await request('owner').patch(path).send(change).expect(409);
+    const replay = await request('owner')
+      .patch(path)
+      .send({ ...change, expectedRevisionId: nextId })
+      .expect(200);
+    expect(replay.body.data.id).toBe(nextId);
+
+    const reloaded = (await detail(outputId).expect(200)).body.data;
+    expect(reloaded).toMatchObject({
+      currentReleaseId: nextId,
+      firstSharedAt: original.firstSharedAt,
+      visibility: original.visibility,
+      authors: original.authors,
+      topics: original.topics,
+      currentRevision: {
+        title: original.currentRevision.title,
+        abstract: 'New abstract.',
+      },
+    });
+    expect(
+      (await request('owner').get(filesPath).expect(200)).body.data,
+    ).toEqual(ownerFiles);
+    expect(
+      (await request('reader').get(filesPath).expect(200)).body.data,
+    ).toEqual([]);
+    const old = await db.query(
+      'SELECT abstract FROM output_revisions WHERE id = $1',
+      [revisionId],
+    );
+    expect(old.rows).toEqual([{ abstract: original.currentRevision.abstract }]);
+  });
+
   it('lets the owner manage an Article PDF and withdraws replaced files from group-pinned revisions', async () => {
     const created = await submit({ ...input, topicIds: [activeTopic] }).expect(
       201,
@@ -1226,6 +1481,18 @@ describe('Article creation', () => {
     await request('reader')
       .get(`/output-files/${oldFile}/download`)
       .expect(200);
+    await request('owner')
+      .patch(`${pdfPath}/${oldFile}`)
+      .send({ fileVisibility: 'PRIVATE' })
+      .expect(200);
+    await request('reader')
+      .get(`/output-files/${oldFile}/download`)
+      .expect(403);
+    await request('owner').get(`/output-files/${oldFile}/download`).expect(200);
+    await request('owner')
+      .patch(`${pdfPath}/${oldFile}`)
+      .send(publicFile)
+      .expect(200);
 
     const groupId = randomUUID();
     await db.query(
@@ -1251,6 +1518,14 @@ describe('Article creation', () => {
       .put(pdfPath)
       .send({ ...replacementInput, expectedRevisionId: revisionId })
       .expect(409);
+    const unverified = await preparePdf();
+    await request('owner')
+      .put(pdfPath)
+      .send({ ...replacementInput, uploadId: unverified.uploadId })
+      .expect(409);
+    await request('reader')
+      .get(`/output-files/${oldFile}/download`)
+      .expect(200);
     const replaced = await request('owner')
       .put(pdfPath)
       .send(replacementInput)
@@ -1676,8 +1951,11 @@ describe('Article creation', () => {
     ).toBe('output_doi_conflict');
   });
 
-  it('freezes the verified author link when an OpenAlex Article is accepted and published', async () => {
+  it('freezes the published byline and relinks the correct OpenAlex author after reordering', async () => {
+    const { OpenAlexIngestService } =
+      await import('../dist/modules/openalex/openalex-ingest.service.js');
     const outputId = randomUUID();
+    const workId = 'https://openalex.org/W101175';
     await db.query(
       "INSERT INTO research_outputs (id, created_by, import_state) VALUES ($1, $2, 'CANDIDATE')",
       [outputId, actors.researcher],
@@ -1696,13 +1974,18 @@ describe('Article creation', () => {
             orcid: importedOrcid,
             isCorresponding: true,
           },
+          { name: 'Other author', order: 2 },
         ]),
       ],
     );
     await db.query(
       `INSERT INTO output_authors (output_id, author_name_string, author_order, is_corresponding_author)
-       VALUES ($1, 'Imported author', 1, true)`,
+       VALUES ($1, 'Imported author', 1, true), ($1, 'Other author', 2, false)`,
       [outputId],
+    );
+    await db.query(
+      "INSERT INTO output_external_ids (output_id, source, external_id) VALUES ($1, 'OPENALEX', $2)",
+      [outputId, workId],
     );
     const server = app.getHttpServer();
     const cookie = cookies.get('researcher')!;
@@ -1725,6 +2008,7 @@ describe('Article creation', () => {
         userId: actors.researcher,
         isCorrespondingAuthor: true,
       },
+      { authorNameString: 'Other author', userId: null },
     ]);
     await db.query(
       'UPDATE output_authors SET user_id = NULL WHERE output_id = $1',
@@ -1733,6 +2017,56 @@ describe('Article creation', () => {
     expect((await detail(outputId).expect(200)).body.data.authors).toEqual(
       article.authors,
     );
+
+    await request('researcher')
+      .patch(`/outputs/${outputId}/article`)
+      .send({
+        expectedRevisionId: article.currentReleaseId,
+        authors: [...article.authors].reverse().map((author) => ({
+          authorId: author.id,
+          displayName: author.authorNameString,
+        })),
+      })
+      .expect(200);
+    const ingest = await app
+      .get(OpenAlexIngestService)
+      .upsertWork(actors.researcher, {
+        id: workId,
+        shortId: 'W101175',
+        doi: null,
+        title: 'Imported Article',
+        abstract: null,
+        venue: null,
+        publicationYear: null,
+        rawType: 'article',
+        outputType: 'ARTICLE',
+        url: null,
+        authors: [
+          {
+            order: 1,
+            name: 'Imported author',
+            isCorresponding: true,
+            authorId: 'https://openalex.org/A101',
+            orcid: importedOrcid,
+          },
+          {
+            order: 2,
+            name: 'Other author',
+            isCorresponding: false,
+            authorId: 'https://openalex.org/A102',
+            orcid: null,
+          },
+        ],
+      });
+    expect(ingest.authorOrder).toBe(2);
+    const byline = await db.query(
+      'SELECT author_name_string, user_id FROM output_authors WHERE output_id = $1 ORDER BY author_order',
+      [outputId],
+    );
+    expect(byline.rows).toEqual([
+      { author_name_string: 'Other author', user_id: null },
+      { author_name_string: 'Imported author', user_id: actors.researcher },
+    ]);
   });
 
   it('rolls back the Article and retry record when pinning the released revision fails', async () => {
