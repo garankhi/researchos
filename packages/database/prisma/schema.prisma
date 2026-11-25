@@ -8,6 +8,151 @@ datasource db {
   provider = "postgresql"
 }
 
+enum notification_type {
+  OUTPUT_SHARED
+  REVISION_RELEASED
+  OUTPUT_LINKED
+  OPPORTUNITY_OPENED
+  SEMINAR_PUBLISHED
+  CHAT_MENTION
+  DIRECT_MESSAGE
+  GROUP_MEMBER_ADDED
+  GROUP_MEMBER_REMOVED
+  GROUP_OUTPUT_REQUESTED
+  GROUP_OUTPUT_ACCEPTED
+  GROUP_OUTPUT_REJECTED
+  APPLICATION_RECEIVED
+  APPLICATION_ACCEPTED
+  APPLICATION_DECLINED
+  APPLICATION_WITHDRAWN
+  OPPORTUNITY_EXPIRED
+  FOLLOW
+  CONVERSATION_PARTICIPANT_ADDED
+}
+
+enum notification_subject_type {
+  OUTPUT
+  GROUP
+  OPPORTUNITY
+  SEMINAR
+  MESSAGE
+  CONVERSATION
+  APPLICATION
+  RESEARCHER
+}
+
+enum notification_channel {
+  WEBSOCKET
+  FCM
+}
+
+enum notification_delivery_status {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum push_platform {
+  WEB
+  ANDROID
+  IOS
+}
+
+model notification_events {
+  id           String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event_key    String                    @unique @db.VarChar(200)
+  event_type   notification_type
+  actor_id     String?                   @db.Uuid
+  subject_type notification_subject_type
+  subject_id   String                    @db.Uuid
+  payload      Json
+  created_at   DateTime                  @default(now()) @db.Timestamptz(6)
+  processed_at DateTime?                 @db.Timestamptz(6)
+  actor        users?                    @relation(fields: [actor_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([created_at, id], map: "idx_notification_events_pending", where: raw("(processed_at IS NULL)"))
+  @@index([actor_id])
+}
+
+model notifications {
+  id               String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipient_id     String                    @db.Uuid
+  event_key        String                    @db.VarChar(200)
+  event_type       notification_type
+  actor_id         String?                   @db.Uuid
+  subject_type     notification_subject_type
+  subject_id       String                    @db.Uuid
+  title            String
+  body             String
+  link             String
+  locale           String                    @db.VarChar(10)
+  content_snapshot Json
+  read_at          DateTime?                 @db.Timestamptz(6)
+  archived_at      DateTime?                 @db.Timestamptz(6)
+  created_at       DateTime                  @default(now()) @db.Timestamptz(6)
+  recipient        users                     @relation("NotificationRecipient", fields: [recipient_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  actor            users?                    @relation("NotificationActor", fields: [actor_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  deliveries       notification_deliveries[]
+
+  @@unique([recipient_id, event_key])
+  @@index([recipient_id, created_at(sort: Desc), id(sort: Desc)], map: "idx_notifications_inbox", where: raw("(archived_at IS NULL)"))
+  @@index([recipient_id], map: "idx_notifications_unread", where: raw("((archived_at IS NULL) AND (read_at IS NULL))"))
+  @@index([actor_id])
+}
+
+model notification_deliveries {
+  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notification_id     String                       @db.Uuid
+  channel             notification_channel
+  device_id           String?                      @db.Uuid
+  status              notification_delivery_status @default(PENDING)
+  attempts            Int                          @default(0)
+  next_attempt_at     DateTime                     @default(now()) @db.Timestamptz(6)
+  locked_until        DateTime?                    @db.Timestamptz(6)
+  provider_message_id String?
+  last_error          String?
+  sent_at             DateTime?                    @db.Timestamptz(6)
+  created_at          DateTime                     @default(now()) @db.Timestamptz(6)
+  notification        notifications                @relation(fields: [notification_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  device              push_devices?                @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([notification_id, channel, device_id])
+  @@unique([notification_id, channel], map: "uq_notification_delivery_without_device", where: raw("(device_id IS NULL)"))
+  @@index([device_id])
+  @@index([next_attempt_at, id], map: "idx_notification_deliveries_ready", where: raw("(status = 'PENDING'::notification_delivery_status)"))
+  @@index([locked_until], map: "idx_notification_deliveries_lease", where: raw("(status = 'PROCESSING'::notification_delivery_status)"))
+}
+
+model push_devices {
+  id         String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String                    @db.Uuid
+  token      String                    @unique @db.VarChar(1024)
+  platform   push_platform
+  locale     String                    @db.VarChar(10)
+  is_active  Boolean                   @default(true)
+  revoked_at DateTime?                 @db.Timestamptz(6)
+  created_at DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime                  @default(now()) @db.Timestamptz(6)
+  user       users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deliveries notification_deliveries[]
+
+  @@index([user_id, is_active])
+}
+
+model notification_preferences {
+  user_id           String              @id @db.Uuid
+  websocket_enabled Boolean             @default(true)
+  push_enabled      Boolean             @default(true)
+  muted_types       notification_type[] @default([])
+  timezone          String              @default("Asia/Ho_Chi_Minh") @db.VarChar(100)
+  locale            String              @default("en") @db.VarChar(10)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  user              users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
 /// Generic audit trail. Every domain table that records a meaningful change
 /// references an entry here so that provenance is queryable.
 model AuditLog {
@@ -1051,6 +1196,11 @@ model user_sessions {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model users {
+  notification_events                                                   notification_events[]
+  received_notifications                                                notifications[]                  @relation("NotificationRecipient")
+  acted_notifications                                                   notifications[]                  @relation("NotificationActor")
+  notification_preferences                                              notification_preferences?
+  push_devices                                                          push_devices[]
   article_creation_uploads                                              article_creation_uploads[]
   background_jobs                                                       background_jobs[]
   id                                                                    String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
