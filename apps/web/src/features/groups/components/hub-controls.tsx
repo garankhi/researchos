@@ -26,7 +26,7 @@ import { FormModal } from '@/components/ui/form-modal';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode, apiFieldErrorCodes } from '@/lib/api-error';
 import { resolveErrorCode } from '@/utils/error-messages';
-import { useHubMutation } from '../hooks/use-group-hub';
+import { useHubMutation, type HubCollection } from '../hooks/use-group-hub';
 
 export type HubField = {
   name: string;
@@ -343,6 +343,7 @@ export function HubAction({
   confirm = false,
   disabled = false,
   danger = false,
+  confirmationMessage,
 }: {
   groupId: string;
   label: string;
@@ -350,6 +351,7 @@ export function HubAction({
   confirm?: boolean;
   disabled?: boolean;
   danger?: boolean;
+  confirmationMessage?: string;
 }) {
   const t = useTranslations('groups');
   const errors = useTranslations('errors');
@@ -372,7 +374,7 @@ export function HubAction({
         body={
           <>
             <Text textStyle="sm" color="fg.muted">
-              {t('confirmAction', { action: label })}
+              {confirmationMessage ?? t('confirmAction', { action: label })}
             </Text>
             {mutation.isError ? (
               <ErrorState
@@ -411,18 +413,11 @@ export function HubAction({
 
 export function HubList<T>({
   query,
+  archived = false,
   children,
 }: {
-  query: {
-    data?: T[];
-    isPending: boolean;
-    isError: boolean;
-    error: unknown;
-    refetch: () => unknown;
-    hasNextPage?: boolean;
-    isFetchingNextPage?: boolean;
-    fetchNextPage?: () => unknown;
-  };
+  query: HubCollection<T>;
+  archived?: boolean;
   children: (items: T[]) => ReactNode;
 }) {
   const t = useTranslations('groups');
@@ -443,7 +438,7 @@ export function HubList<T>({
   return (
     <Stack gap="4">
       {!query.data?.length ? (
-        <EmptyState title={t('empty')} />
+        <EmptyState title={t(archived ? 'emptyArchive' : 'empty')} />
       ) : (
         // The rows carry their own bottom border, so they stack tightly
         // and the rule reads as a separator rather than a gap.
@@ -465,13 +460,16 @@ export function HubList<T>({
 export function HubSection({
   title,
   action,
+  archive,
   children,
 }: {
   title: string;
   /** Rendered on the right of the section heading. */
   action?: ReactNode;
+  archive?: { showing: boolean; toggle: () => void };
   children: ReactNode;
 }) {
+  const t = useTranslations('groups');
   return (
     <Box as="section" bg="bg.panel" boxShadow="xs">
       <Flex
@@ -487,7 +485,19 @@ export function HubSection({
         <Heading as="h2" size="md" fontWeight="bold">
           {title}
         </Heading>
-        {action}
+        <Flex gap="2" wrap="wrap">
+          {archive ? (
+            <Button
+              size="sm"
+              variant={archive.showing ? 'solid' : 'outline'}
+              aria-pressed={archive.showing}
+              onClick={archive.toggle}
+            >
+              {t('archived')}
+            </Button>
+          ) : null}
+          {action}
+        </Flex>
       </Flex>
       <Box p={{ base: '4', md: '6' }}>
         <Stack gap="4">{children}</Stack>

@@ -9,6 +9,7 @@ import {
 } from '../provenance/provenance.service.js';
 import { OpenAlexClient } from './openalex.client.js';
 import type { OpenAlexWork } from './openalex.types.js';
+import { snapshotAuthors } from '../outputs/article-byline.js';
 
 /** The `output_external_ids.source` convention for OpenAlex rows. */
 export const OPENALEX_SOURCE = 'OPENALEX';
@@ -239,6 +240,7 @@ export class OpenAlexIngestService {
           authors_snapshot: work.authors.map((author) => ({
             name: author.name === '' ? 'Unknown author' : author.name,
             order: author.order,
+            openAlexAuthorId: author.authorId,
             orcid: author.orcid,
             isCorresponding: author.isCorresponding,
           })),
@@ -311,7 +313,7 @@ export class OpenAlexIngestService {
    * Links the requesting researcher to their authorship row.
    *
    * Already linked → no-op. ORCID matches an authorship whose row has no
-   * user yet → claim that position. No match and no existing link → leave
+   * user yet → claim the matching byline entry. No match and no existing link → leave
    * the rows alone; the SUGGESTED claim (RES-155) still makes the work
    * visible. Never inserts a work row, never touches `owner_id`.
    */
@@ -321,6 +323,13 @@ export class OpenAlexIngestService {
     userId: string,
     work: OpenAlexWork,
   ): Promise<number | null> {
+    // Serialize with published Article edits before reading the release/byline.
+    const [output] = await tx.$queryRaw<
+      { current_release_id: string | null }[]
+    >`
+      SELECT current_release_id FROM research_outputs
+      WHERE id = ${outputId}::uuid FOR NO KEY UPDATE
+    `;
     const linked = await tx.output_authors.findFirst({
       where: { output_id: outputId, user_id: userId },
       select: { author_order: true },
@@ -342,6 +351,42 @@ export class OpenAlexIngestService {
     const matchedOrder = this.matchAuthorOrder(profile.orcid_id, work);
     if (matchedOrder === null) {
       return null;
+    }
+
+    if (output?.current_release_id) {
+      const release = await tx.output_revisions.findUniqueOrThrow({
+        where: { id: output.current_release_id },
+        select: { authors_snapshot: true },
+      });
+      const sourceAuthor = work.authors.find(
+        ({ order }) => order === matchedOrder,
+      );
+      const openAlexAuthorId = sourceAuthor?.authorId;
+      const orcid = normalizeOrcid(profile.orcid_id);
+      const matches = snapshotAuthors(release.authors_snapshot).filter(
+        (author) =>
+          typeof author.openAlexAuthorId === 'string' && openAlexAuthorId
+            ? author.openAlexAuthorId === openAlexAuthorId
+            : normalizeOrcid(author.orcid) === orcid,
+      );
+      // A removed source author or a manually entered byline has no match.
+      if (matches.length !== 1) return null;
+      const author = matches[0];
+      const row = await tx.output_authors.findFirst({
+        where: {
+          output_id: outputId,
+          ...(typeof author.id === 'string'
+            ? { id: author.id }
+            : { author_order: author.order, author_name_string: author.name }),
+        },
+        select: { id: true, user_id: true, author_order: true },
+      });
+      if (!row || row.user_id !== null) return null;
+      await tx.output_authors.update({
+        where: { id: row.id },
+        data: { user_id: userId },
+      });
+      return row.author_order;
     }
 
     const row = await tx.output_authors.findUnique({

@@ -25,7 +25,7 @@ import {
   type ArticlePdfVisibility,
 } from './article-pdf.dto.js';
 
-class CreateArticleAuthorDto {
+export class CreateArticleAuthorDto {
   @ApiProperty({
     type: String,
     description: 'Name as it appears in the confirmed byline.',

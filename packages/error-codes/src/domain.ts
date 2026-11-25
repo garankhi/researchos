@@ -131,6 +131,7 @@ export const domainErrorCodes = {
     outputIdempotencyKeyConflict: 'output_idempotency_key_conflict',
     outputDoiConflict: 'output_doi_conflict',
     outputAuthorInvalid: 'output_author_invalid',
+    outputAuthorClaimed: 'output_author_claimed',
     outputTopicInvalid: 'output_topic_invalid',
   },
   storage: {

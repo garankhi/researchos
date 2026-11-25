@@ -8,7 +8,7 @@ import type { OutputAuthorResponseDto } from './dto/output-author-response.dto.j
 
 type SnapshotAuthor = Prisma.JsonObject & { name: string; order: number };
 
-function snapshotAuthors(snapshot: Prisma.JsonValue): SnapshotAuthor[] {
+export function snapshotAuthors(snapshot: Prisma.JsonValue): SnapshotAuthor[] {
   if (!Array.isArray(snapshot)) return [];
   return snapshot.filter(
     (author): author is SnapshotAuthor =>
@@ -45,6 +45,7 @@ export function completeArticleByline(
       author?.author_name_string === entry.name ? author : undefined;
     return {
       ...entry,
+      ...(entry.id === undefined && match && { id: match.id }),
       userId:
         entry.userId === undefined ? (match?.user_id ?? null) : entry.userId,
       isCorresponding:

@@ -351,6 +351,9 @@ importers:
       '@researchos/error-codes':
         specifier: workspace:*
         version: link:../../packages/error-codes
+      '@researchos/publication-metadata':
+        specifier: workspace:*
+        version: link:../../packages/publication-metadata
       '@tanstack/react-query':
         specifier: ^5.105.0
         version: 5.105.0(@types/react@19.3.0)(react@19.3.0)

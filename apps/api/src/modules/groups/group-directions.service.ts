@@ -5,18 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GroupMemberRole, Prisma, PrismaService } from '@researchos/database';
+import { Prisma, PrismaService } from '@researchos/database';
 import {
   buildPaginationMeta,
-  PaginationQueryDto,
   parseSortParam,
 } from '../../common/dto/pagination.dto.js';
+import {
+  archiveFilter,
+  type ArchiveListQueryDto,
+} from '../../common/dto/archive-list.query.dto.js';
 import { readDatabaseFailure } from '../../common/errors/database-errors.js';
 import type {
   CreateGroupDirectionDto,
   UpdateGroupDirectionDto,
   GroupDirectionResponseDto,
 } from './dto/group-direction.dto.js';
+import { hasGroupManagementAuthority } from './group-management.js';
 
 const include = {
   research_topics: {
@@ -35,7 +39,7 @@ export class GroupDirectionsService {
     tx: Prisma.TransactionClient,
     groupId: string,
     actorId: string,
-    action: 'read' | 'publish' | 'edit',
+    action: 'read' | 'readArchive' | 'edit',
   ) {
     // Use the same parent lock as membership and lead changes.
     await tx.$queryRaw`SELECT id FROM research_groups WHERE id = ${groupId}::uuid FOR SHARE`;
@@ -43,23 +47,18 @@ export class GroupDirectionsService {
       where: { id: groupId },
     });
     if (!group) throw new NotFoundException('Group not found');
-    const lead = group.lead_id === actorId.toLowerCase();
     const active = group.is_active && group.archived_at === null;
-    if (action === 'read' && active) return;
-    const member = await tx.group_members.findUnique({
-      where: { group_id_user_id: { group_id: groupId, user_id: actorId } },
-    });
-    const activeMember = member && !member.archived_at ? member : null;
     if (action === 'read') {
-      if (!lead && !activeMember) throw new ForbiddenException();
+      if (active || group.lead_id === actorId.toLowerCase()) return;
+      const member = await tx.group_members.findUnique({
+        where: { group_id_user_id: { group_id: groupId, user_id: actorId } },
+      });
+      if (!member || member.archived_at) throw new ForbiddenException();
       return;
     }
-    if (!lead && activeMember?.role !== GroupMemberRole.GROUP_LEADER)
+    if (!(await hasGroupManagementAuthority(tx, groupId, actorId)))
       throw new ForbiddenException();
-    if (!active)
-      throw new ConflictException(
-        'Archived or inactive groups cannot publish or change directions',
-      );
+    if (!active && action === 'edit') throw new ConflictException('conflict');
   }
 
   private async topic(
@@ -94,7 +93,7 @@ export class GroupDirectionsService {
     }
   }
 
-  async list(groupId: string, actorId: string, query: PaginationQueryDto) {
+  async list(groupId: string, actorId: string, query: ArchiveListQueryDto) {
     const orderBy = parseSortParam(
       query.sort,
       { createdAt: 'created_at', title: 'title' },
@@ -103,8 +102,15 @@ export class GroupDirectionsService {
     if (!orderBy)
       throw new BadRequestException('Unsupported direction sort field');
     return this.run(async (tx) => {
-      await this.authorize(tx, groupId, actorId, 'read');
-      const where = { group_id: groupId, archived_at: null };
+      await this.authorize(
+        tx,
+        groupId,
+        actorId,
+        query.archived === 'true' || query.archived === 'all'
+          ? 'readArchive'
+          : 'read',
+      );
+      const where = { group_id: groupId, ...archiveFilter(query.archived) };
       const rows = await tx.group_directions.findMany({
         where,
         include,
@@ -126,7 +132,7 @@ export class GroupDirectionsService {
     dto: CreateGroupDirectionDto,
   ): Promise<GroupDirectionResponseDto> {
     return this.run(async (tx) => {
-      await this.authorize(tx, groupId, actorId, 'publish');
+      await this.authorize(tx, groupId, actorId, 'edit');
       await this.topic(tx, dto.topicId);
       return this.response(
         await tx.group_directions.create({
@@ -193,6 +199,23 @@ export class GroupDirectionsService {
     });
   }
 
+  async restore(
+    groupId: string,
+    directionId: string,
+    actorId: string,
+  ): Promise<GroupDirectionResponseDto> {
+    return this.run(async (tx) => {
+      await this.authorize(tx, groupId, actorId, 'edit');
+      return this.response(
+        await tx.group_directions.update({
+          where: { id_group_id: { id: directionId, group_id: groupId } },
+          data: { archived_at: null },
+          include,
+        }),
+      );
+    });
+  }
+
   private response(row: DirectionRow): GroupDirectionResponseDto {
     const topic = row.research_topics;
     const subfield = topic?.research_subfields;
@@ -204,6 +227,7 @@ export class GroupDirectionsService {
       title: row.title,
       description: row.description,
       createdAt: row.created_at.toISOString(),
+      ...(row.archived_at && { archivedAt: row.archived_at.toISOString() }),
       topicPath:
         topic && subfield && field
           ? {

@@ -1,6 +1,13 @@
 'use client';
 
-import { Button, CloseButton, Dialog, Portal, Stack } from '@chakra-ui/react';
+import {
+  Button,
+  CloseButton,
+  Dialog,
+  Portal,
+  Stack,
+  chakra,
+} from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { useEffect, type ReactNode } from 'react';
 import {
@@ -45,6 +52,7 @@ export function FormModal<
   size = 'lg',
   trigger,
   resetKey,
+  disablePristine = false,
 }: {
   /** Whether the dialog is open. */
   open: boolean;
@@ -96,12 +104,14 @@ export function FormModal<
    * fresh values each time the dialog opens on a different record.
    */
   resetKey?: string;
+  disablePristine?: boolean;
 }) {
   const t = useTranslations('common');
   const methods = useForm<TValues, TContext>({
     resolver,
     defaultValues,
   });
+  const { isDirty } = methods.formState;
 
   // The form picks up the fresh values whenever the dialog opens, and
   // again when it opens on a different record.
@@ -154,7 +164,13 @@ export function FormModal<
             </Dialog.Header>
 
             <FormProvider {...methods}>
-              <form onSubmit={handleSubmit} noValidate>
+              <chakra.form
+                display="flex"
+                flexDirection="column"
+                minH="0"
+                onSubmit={handleSubmit}
+                noValidate
+              >
                 <Dialog.Body>
                   <Stack gap="4">{children}</Stack>
                 </Dialog.Body>
@@ -170,12 +186,12 @@ export function FormModal<
                   <Button
                     type="submit"
                     loading={isSubmitting}
-                    disabled={isSubmitDisabled}
+                    disabled={isSubmitDisabled || (disablePristine && !isDirty)}
                   >
                     {submitLabel}
                   </Button>
                 </Dialog.Footer>
-              </form>
+              </chakra.form>
             </FormProvider>
 
             <Dialog.CloseTrigger asChild>

@@ -50,6 +50,7 @@ function makeWork(
 
 function makeTx(overrides: Record<string, unknown> = {}) {
   return {
+    $queryRaw: vi.fn(async () => [{ current_release_id: null }]),
     output_external_ids: {
       findUnique: vi.fn(async () => null),
       upsert: vi.fn(async () => ({})),
@@ -176,6 +177,52 @@ describe('OpenAlexIngestService', () => {
     expect(upsert).toHaveBeenCalledOnce();
     expect(upsert.mock.calls[0][0].update).toEqual({});
     expect(upsert.mock.calls[0][0].create.status).toBe('SUGGESTED');
+  });
+
+  it('relinks a published author by source identity after the byline is reordered', async () => {
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'original-author-row',
+        user_id: null,
+        author_order: 2,
+      });
+    const update = vi.fn();
+    const tx = makeTx({
+      $queryRaw: vi.fn(async () => [
+        { current_release_id: 'published-revision' },
+      ]),
+      output_external_ids: {
+        findUnique: vi.fn(async () => ({ output_id: OUTPUT_ID })),
+      },
+      output_revisions: {
+        findUniqueOrThrow: vi.fn(async () => ({
+          authors_snapshot: [
+            { id: 'other-row', name: 'Other author', order: 1 },
+            {
+              id: 'original-author-row',
+              name: 'Nguyen Van An',
+              order: 2,
+              openAlexAuthorId: 'https://openalex.org/A1',
+            },
+          ],
+        })),
+      },
+      output_authors: { findFirst, update },
+    });
+    const { service } = makeService(tx);
+    const result = await service.upsertWork(USER_ID, makeWork('W1'));
+    expect(result.authorOrder).toBe(2);
+    expect(findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { output_id: OUTPUT_ID, id: 'original-author-row' },
+      }),
+    );
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'original-author-row' },
+      data: { user_id: USER_ID },
+    });
   });
 
   it('ensures the claim on the DOI attach path for the second researcher', async () => {
