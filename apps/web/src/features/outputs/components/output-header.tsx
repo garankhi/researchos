@@ -17,6 +17,7 @@ import {
 import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
+import { parsePublicationDate } from '@researchos/publication-metadata';
 import { doiUrl } from '@/lib/doi-url';
 import type { OutputDetail } from '../types';
 import { EntityLink } from '@/features/discovery';
@@ -60,6 +61,30 @@ export function formatPublishedDate(
   return null;
 }
 
+export function formatOutputPublicationDate(
+  format: ReturnType<typeof useFormatter>,
+  output: OutputDetail,
+): string | null {
+  const revision = output.revision;
+  if (revision?.outputType !== 'ARTICLE') {
+    return formatPublishedDate(
+      format,
+      revision?.releasedAt ?? null,
+      output.firstSharedAt,
+      revision?.publicationYear ?? null,
+    );
+  }
+  const date = parsePublicationDate(revision.publicationDate ?? '');
+  if (!date || date.length === 4)
+    return date ?? revision.publicationYear?.toString() ?? null;
+  return format.dateTime(new Date(date.length === 7 ? `${date}-01` : date), {
+    year: 'numeric',
+    month: 'long',
+    day: date.length === 10 ? 'numeric' : undefined,
+    timeZone: 'UTC',
+  });
+}
+
 export function OutputHeader({
   output,
   groupName,
@@ -87,12 +112,7 @@ export function OutputHeader({
     : null;
 
   const isDraft = output.sharingStatus !== 'SHARED';
-  const publishedDate = formatPublishedDate(
-    format,
-    revision?.releasedAt ?? null,
-    output.firstSharedAt,
-    revision?.publicationYear ?? null,
-  );
+  const publishedDate = formatOutputPublicationDate(format, output);
 
   const dateAndVenue = [publishedDate, revision?.venue, revision?.publisher]
     .filter(Boolean)

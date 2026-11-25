@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
+  ARTICLE_PDF_METADATA_QUEUE,
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
   DIGEST_QUEUE,
@@ -257,6 +258,7 @@ describe('Article Topic suggestions: HTTP, outbox, worker and active taxonomy', 
       [
         SYSTEM_QUEUE,
         BACKGROUND_QUEUE,
+        ARTICLE_PDF_METADATA_QUEUE,
         RESEARCH_UPDATES_QUEUE,
         DIGEST_QUEUE,
         DEAD_LETTER_QUEUE,

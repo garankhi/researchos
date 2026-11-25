@@ -8,7 +8,6 @@
 import type { DownloadablePdfDto } from './downloadablePdfDto';
 import type { OutputAuthorResponseDto } from './outputAuthorResponseDto';
 import type { OutputResponseDtoAccessGroupId } from './outputResponseDtoAccessGroupId';
-import type { OutputResponseDtoCurrentReleaseId } from './outputResponseDtoCurrentReleaseId';
 import type { OutputResponseDtoDoi } from './outputResponseDtoDoi';
 import type { OutputResponseDtoFirstSharedAt } from './outputResponseDtoFirstSharedAt';
 import type { OutputResponseDtoImportState } from './outputResponseDtoImportState';
@@ -46,7 +45,7 @@ export interface OutputResponseDto {
    * UUID of the currently pinned / released revision (`output_revisions.id`).
    * @nullable
    */
-  currentReleaseId: OutputResponseDtoCurrentReleaseId;
+  currentReleaseId: string | null;
   /**
    * Timestamp when the output was first shared publicly.
    * @nullable

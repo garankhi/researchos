@@ -43,6 +43,11 @@ export interface OutputRevisionSummary {
   venue: string | null;
   publisher: string | null;
   publicationYear: number | null;
+  publicationDate?: string | null;
+  volume?: string | null;
+  issue?: string | null;
+  pages?: string | null;
+  peerReviewed?: boolean | null;
   externalUrl: string | null;
   outputType: string;
   releasedAt: string | null;
@@ -68,6 +73,8 @@ export interface OutputFile {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
+  visibility?: OutputFileResponseDto['visibility'];
+  isCurrentReleaseAttachment?: boolean;
 }
 
 export function mapAuthor(dto: OutputAuthorResponseDto): OutputAuthor {
@@ -110,6 +117,12 @@ export function mapOutputDetail(dto: OutputResponseDto): OutputDetail {
           venue: asString(rev.venue),
           publisher: asString(rev.publisher),
           publicationYear: asNumber(rev.publicationYear),
+          publicationDate: asString(rev.publicationDate),
+          volume: asString(rev.volume),
+          issue: asString(rev.issue),
+          pages: asString(rev.pages),
+          peerReviewed:
+            typeof rev.peerReviewed === 'boolean' ? rev.peerReviewed : null,
           externalUrl: asString(rev.externalUrl),
           outputType: rev.outputType,
           releasedAt: asString(rev.releasedAt),
@@ -129,5 +142,7 @@ export function mapOutputFile(dto: OutputFileResponseDto): OutputFile {
     fileName: dto.fileName,
     mimeType: dto.mimeType,
     sizeBytes: dto.sizeBytes,
+    visibility: dto.visibility,
+    isCurrentReleaseAttachment: dto.isCurrentReleaseAttachment,
   };
 }

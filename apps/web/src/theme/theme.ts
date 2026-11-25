@@ -70,6 +70,32 @@ const config = defineConfig({
       },
     },
     layerStyles: {
+      formFields: {
+        value: {
+          '& :where([data-scope="field"][data-part="label"], [data-scope="fieldset"][data-part="legend"], [data-scope="combobox"][data-part="label"])':
+            { fontWeight: 'bold' },
+          '& :where(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"]), textarea, select)':
+            {
+              borderColor: 'transparent',
+              borderBottomColor: 'fg.muted',
+              _placeholder: { color: 'fg.muted' },
+              _invalid: { borderBottomColor: 'border.error' },
+              _focus: {
+                outline: 'none',
+                boxShadow: 'inset 0 -1px 0 var(--chakra-colors-blue-solid)',
+                borderColor: 'transparent',
+                borderBottomColor: 'blue.solid',
+                _invalid: {
+                  borderBottomColor: 'border.error',
+                  boxShadow: 'inset 0 -1px 0 var(--chakra-colors-border-error)',
+                },
+                '@media (forced-colors: active)': {
+                  borderBottomColor: 'Highlight',
+                },
+              },
+            },
+        },
+      },
       interactiveRow: {
         value: {
           position: 'relative',
