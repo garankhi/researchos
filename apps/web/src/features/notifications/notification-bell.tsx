@@ -20,7 +20,7 @@ import { useTranslations } from 'next-intl';
 import { io } from 'socket.io-client';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import NextLink from '@/components/ui/link';
-import { useChatSocket } from '@/features/chat/hooks/use-chat-socket';
+import { useChatSocket } from '@/features/chat';
 import { useSession } from '@/features/identity';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import {
