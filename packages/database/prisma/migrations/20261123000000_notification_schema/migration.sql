@@ -91,6 +91,7 @@ CREATE TABLE "notification_preferences" (
     "push_enabled" BOOLEAN NOT NULL DEFAULT true,
     "muted_types" "notification_type"[] NOT NULL DEFAULT ARRAY[]::"notification_type"[],
     "timezone" VARCHAR(100) NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+    "locale" VARCHAR(10) NOT NULL DEFAULT 'en',
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
