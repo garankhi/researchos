@@ -1480,6 +1480,7 @@ Table notification_preferences {
   push_enabled boolean [not null, default: true]
   muted_types "notification_type[]" [not null, default: `ARRAY[]::notification_type[]`]
   timezone varchar(100) [not null, default: 'Asia/Ho_Chi_Minh']
+  locale varchar(10) [not null, default: 'en']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 }
