@@ -34,6 +34,22 @@ const copy = {
     'Có yêu cầu liên kết công trình',
     'A work link was requested',
   ],
+  FILE_ACCESS_REQUESTED: [
+    'Có yêu cầu truy cập tệp',
+    'Someone requested access to a file',
+  ],
+  FILE_ACCESS_APPROVED: [
+    'Yêu cầu truy cập tệp được chấp nhận',
+    'Your file access request was approved',
+  ],
+  FILE_ACCESS_DECLINED: [
+    'Yêu cầu truy cập tệp bị từ chối',
+    'Your file access request was declined',
+  ],
+  FILE_ACCESS_REVOKED: [
+    'Quyền truy cập tệp đã bị thu hồi',
+    'Your access to a file was revoked',
+  ],
   GROUP_OUTPUT_ACCEPTED: [
     'Yêu cầu liên kết được chấp nhận',
     'Your work link was accepted',
@@ -98,6 +114,46 @@ async function eligibleUsers(tx: Prisma.TransactionClient, event: Event) {
   const groupId = isJobUuid(group) ? group : null;
   const recipientId = isJobUuid(recipient) ? recipient : null;
   const subject = event.subject_id;
+  if (
+    event.event_type === 'FILE_ACCESS_REQUESTED' ||
+    event.event_type === 'FILE_ACCESS_APPROVED' ||
+    event.event_type === 'FILE_ACCESS_DECLINED' ||
+    event.event_type === 'FILE_ACCESS_REVOKED'
+  ) {
+    const requestId = stringValue(event.payload, 'requestId');
+    const fileId = stringValue(event.payload, 'fileId');
+    if (!recipientId || !isJobUuid(requestId) || !isJobUuid(fileId)) return [];
+
+    if (event.event_type === 'FILE_ACCESS_REVOKED') {
+      const grantId = stringValue(event.payload, 'grantId');
+      if (!isJobUuid(grantId)) return [];
+      return tx.$queryRaw<{ id: string }[]>`
+        SELECT u.id FROM users u
+        JOIN file_access_grants g ON g.grantee_id = u.id
+        JOIN output_files f ON f.id = g.file_id AND f.output_id = ${subject}::uuid
+        WHERE u.id = ${recipientId}::uuid AND u.is_active
+          AND g.id = ${grantId}::uuid AND g.revoked_at IS NOT NULL
+          AND g.request_id = ${requestId}::uuid AND g.file_id = ${fileId}::uuid
+      `;
+    }
+    if (event.event_type === 'FILE_ACCESS_REQUESTED') {
+      return tx.$queryRaw<{ id: string }[]>`
+        SELECT u.id FROM users u
+        JOIN file_access_requests r ON r.id = ${requestId}::uuid
+        WHERE u.id = ${recipientId}::uuid AND u.is_active AND u.id IS DISTINCT FROM ${actor}::uuid
+          AND r.status = 'PENDING' AND r.output_id = ${subject}::uuid AND r.file_id = ${fileId}::uuid
+          AND can_manage_output(u.id, r.output_id)
+      `;
+    }
+    const status =
+      event.event_type === 'FILE_ACCESS_APPROVED' ? 'APPROVED' : 'DECLINED';
+    return tx.$queryRaw<{ id: string }[]>`
+      SELECT u.id FROM users u
+      JOIN file_access_requests r ON r.requester_id = u.id
+      WHERE u.id = ${recipientId}::uuid AND u.is_active AND r.id = ${requestId}::uuid
+        AND r.status::text = ${status} AND r.output_id = ${subject}::uuid AND r.file_id = ${fileId}::uuid
+    `;
+  }
   if (event.event_type === 'FOLLOW') {
     return tx.$queryRaw<{ id: string }[]>`
       SELECT u.id FROM users u
