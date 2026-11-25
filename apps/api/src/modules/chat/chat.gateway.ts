@@ -383,6 +383,9 @@ export class ChatGateway
         ChatServerEvent.READ_UPDATED,
         readPayload,
       );
+      await this.broadcastConversationToParticipants(dto.conversationId, [
+        userId,
+      ]);
       return readPayload;
     });
   }

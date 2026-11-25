@@ -10,7 +10,7 @@ import {
   Menu,
   Portal,
 } from '@chakra-ui/react';
-import { ChevronDown, ListChecks, Mail } from 'lucide-react';
+import { ChevronDown, ListChecks } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { NotificationBell } from '@/features/notifications';
@@ -18,11 +18,6 @@ import { BrandLink } from './brand-link';
 import NextLink from './link';
 
 const morePages = ['opportunities', 'groups'] as const;
-
-const activityActions = [
-  { label: 'messages', icon: Mail, href: '/chat' },
-  { label: 'requests', icon: ListChecks, href: undefined },
-] as const;
 
 type MoreMenuProps = {
   moreAction: {
@@ -150,42 +145,16 @@ function HeaderActions({
     >
       {mobileSearch}
       <NotificationBell />
-      {activityActions.map(({ label, icon: Icon, href }) => {
-        const actionLabel = t(label);
-
-        if (href) {
-          return (
-            <IconButton
-              key={label}
-              asChild
-              variant="ghost"
-              size="sm"
-              data-header-icon="compact"
-              aria-label={actionLabel}
-              title={actionLabel}
-            >
-              <NextLink href={href}>
-                <Icon aria-hidden />
-              </NextLink>
-            </IconButton>
-          );
-        }
-
-        return (
-          <IconButton
-            key={label}
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-header-icon="compact"
-            aria-label={actionLabel}
-            title={actionLabel}
-            aria-disabled="true"
-          >
-            <Icon aria-hidden />
-          </IconButton>
-        );
-      })}
+      <IconButton
+        variant="ghost"
+        size="sm"
+        data-header-icon="compact"
+        aria-label={t('requests')}
+        title={t('requests')}
+        aria-disabled="true"
+      >
+        <ListChecks aria-hidden />
+      </IconButton>
       {children}
     </Flex>
   );

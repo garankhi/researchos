@@ -859,11 +859,13 @@ describe('ChatService & ChatGateway', () => {
       },
     });
 
+    const broadcast = vi.spyOn(gateway, 'broadcastConversationToParticipants');
     const readAck = await gateway.onMarkRead(bobSocket, {
       conversationId: CONV_ID,
       messageId: MSG_ID,
     });
     expect(readAck.ok).toBe(true);
+    expect(broadcast).toHaveBeenCalledWith(CONV_ID, [BOB_ID]);
     expect(roomEmitter.emit).toHaveBeenCalledWith(
       ChatServerEvent.READ_UPDATED,
       expect.objectContaining({

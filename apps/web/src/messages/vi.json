@@ -796,6 +796,12 @@
   "notifications": {
     "title": "Thông báo",
     "bell": "Thông báo ({count} chưa đọc)",
+    "seeAll": "Xem tất cả thông báo",
+    "unread": "Chưa đọc",
+    "chatUnread": "Tin nhắn ({count} chưa đọc)",
+    "newChat": "Bạn có tin nhắn mới.",
+    "newNotification": "Bạn có thông báo mới.",
+    "close": "Đóng",
     "preferences": "Tùy chọn",
     "readAll": "Đánh dấu tất cả đã đọc",
     "actionFailed": "Không thể thực hiện thao tác. Vui lòng thử lại.",
