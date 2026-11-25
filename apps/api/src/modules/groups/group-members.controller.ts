@@ -23,10 +23,11 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
+import { ArchiveListQueryDto } from '../../common/dto/archive-list.query.dto.js';
 import {
   AddGroupMemberDto,
   GroupMemberPageDto,
@@ -37,6 +38,7 @@ import { GroupMembersService } from './group-members.service.js';
 
 @ApiTags('groups')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({ description: 'Authentication required.' })
 @ApiParam({
   name: 'groupId',
   description: 'Group the membership belongs to.',
@@ -60,7 +62,7 @@ export class GroupMembersController {
   @ApiOperation({
     summary: 'List group members',
     description:
-      'The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.',
+      'By default, only active memberships are listed. The active roster of an active group is readable by any signed-in account. An archived or inactive group keeps its roster private to the lead and current members.',
   })
   @ApiOkResponse({
     description: 'Paginated group member list.',
@@ -68,7 +70,7 @@ export class GroupMembersController {
   })
   findAll(
     @Param('groupId', ParseUUIDPipe) groupId: string,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ArchiveListQueryDto,
     @CurrentUserId() callerId: string,
   ): Promise<GroupMemberPageDto> {
     return this.members.findAll(groupId, query, callerId);
@@ -111,6 +113,28 @@ export class GroupMembersController {
     @CurrentUserId() callerId: string,
   ): Promise<GroupMemberResponseDto> {
     return this.members.update(groupId, userId, dto, callerId);
+  }
+
+  @Patch(':userId/restore')
+  @Roles('RESEARCHER')
+  @ApiOperation({
+    summary: 'Restore an archived group membership as an ordinary member',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'User whose membership is being restored.',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Membership restored with the MEMBER role.',
+    type: GroupMemberResponseDto,
+  })
+  restore(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<GroupMemberResponseDto> {
+    return this.members.restore(groupId, userId, callerId);
   }
 
   @Delete(':userId')

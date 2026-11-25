@@ -154,7 +154,7 @@ export const useOpportunitiesControllerCreate = <
   );
 };
 /**
- * Status filtering uses persisted states. A background worker expires overdue open opportunities.
+ * Status filtering uses persisted states. Omitting the archive filter preserves ordinary opportunity visibility. Explicit archive views require a group the caller manages.
  * @summary Lists published opportunities and opportunities managed by the caller
  */
 export const opportunitiesControllerFindAll = (
@@ -176,7 +176,7 @@ export const getOpportunitiesControllerFindAllQueryKey = (
 
 export const getOpportunitiesControllerFindAllQueryOptions = <
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: OpportunitiesControllerFindAllParams,
   options?: {
@@ -210,11 +210,11 @@ export const getOpportunitiesControllerFindAllQueryOptions = <
 export type OpportunitiesControllerFindAllQueryResult = NonNullable<
   Awaited<ReturnType<typeof opportunitiesControllerFindAll>>
 >;
-export type OpportunitiesControllerFindAllQueryError = unknown;
+export type OpportunitiesControllerFindAllQueryError = ApiErrorResponseDto;
 
 export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: OpportunitiesControllerFindAllParams,
   options: {
@@ -241,7 +241,7 @@ export function useOpportunitiesControllerFindAll<
 };
 export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: OpportunitiesControllerFindAllParams,
   options?: {
@@ -268,7 +268,7 @@ export function useOpportunitiesControllerFindAll<
 };
 export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: OpportunitiesControllerFindAllParams,
   options?: {
@@ -291,7 +291,7 @@ export function useOpportunitiesControllerFindAll<
 
 export function useOpportunitiesControllerFindAll<
   TData = Awaited<ReturnType<typeof opportunitiesControllerFindAll>>,
-  TError = unknown,
+  TError = ApiErrorResponseDto,
 >(
   params: OpportunitiesControllerFindAllParams,
   options?: {

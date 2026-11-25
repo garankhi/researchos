@@ -184,7 +184,6 @@ export function OutputDownloadPrimaryButton({
   const tError = useTranslations('errors');
   const { showSnackbar } = useSnackbar();
   const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   if (!file) return null;
 
@@ -195,7 +194,6 @@ export function OutputDownloadPrimaryButton({
 
   async function handleDownload() {
     setDownloading(true);
-    setDownloadError(null);
     try {
       const blob = await outputDownloadControllerDownloadFile(target.id);
       downloadBlob(blob, target.fileName);
@@ -204,36 +202,30 @@ export function OutputDownloadPrimaryButton({
         message: t('detail.downloadStarted'),
       });
     } catch (error) {
-      setDownloadError(
-        resolveErrorCode(
+      showSnackbar({
+        severity: 'error',
+        message: resolveErrorCode(
           tError,
           apiErrorCode(error),
           t('detail.downloadError'),
         ),
-      );
+      });
     } finally {
       setDownloading(false);
     }
   }
 
   return (
-    <Flex direction="column" gap="1" align="flex-end">
-      <Button
-        variant="solid"
-        size="sm"
-        {...buttonProps}
-        loading={downloading}
-        loadingText={t('detail.downloading')}
-        onClick={() => void handleDownload()}
-      >
-        {label ?? t('detail.downloadPrimary')}
-      </Button>
-      {downloadError ? (
-        <Text textStyle="xs" color="fg.error" role="alert">
-          {downloadError}
-        </Text>
-      ) : null}
-    </Flex>
+    <Button
+      variant="solid"
+      size="sm"
+      {...buttonProps}
+      loading={downloading}
+      loadingText={t('detail.downloading')}
+      onClick={() => void handleDownload()}
+    >
+      {label ?? t('detail.downloadPrimary')}
+    </Button>
   );
 }
 

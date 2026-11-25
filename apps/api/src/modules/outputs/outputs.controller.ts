@@ -49,6 +49,8 @@ import {
 } from './dto/output-response.dto.js';
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
+import { UpdateArticleAbstractDto } from './dto/update-article-abstract.dto.js';
+import { UpdateArticleDto } from './dto/update-article.dto.js';
 import { UpdateOutputRevisionDto } from './dto/update-output-revision.dto.js';
 import { UpdateOutputVisibilityDto } from './dto/update-output-visibility.dto.js';
 import { OutputsService } from './outputs.service.js';
@@ -243,6 +245,61 @@ export class OutputsController {
     @CurrentUserId() callerId: string,
   ): Promise<OutputFileResponseDto[]> {
     return this.outputsService.findFiles(outputId, callerId);
+  }
+
+  @Patch(':outputId/article')
+  @Roles('RESEARCHER')
+  @ApiOperation({ summary: 'Update the metadata of a released Article' })
+  @ApiParam({ name: 'outputId', format: 'uuid', description: 'Article ID.' })
+  @ApiOkResponse({
+    type: OutputResponseDto,
+    description: 'Article with the current released revision.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid Article metadata or references.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher owner is required.',
+  })
+  @ApiNotFoundResponse({ description: 'The output was not found.' })
+  @ApiConflictResponse({
+    description:
+      'The release changed, an author has a claim, or the DOI is already in use.',
+  })
+  async updateArticle(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @CurrentUserId() callerId: string,
+    @Body() dto: UpdateArticleDto,
+  ): Promise<OutputResponseDto> {
+    return this.outputsService.updateArticle(outputId, callerId, dto);
+  }
+
+  @Patch(':outputId/article-abstract')
+  @Roles('RESEARCHER')
+  @ApiOperation({
+    summary: 'Save the abstract of a released Article as a new revision',
+  })
+  @ApiParam({ name: 'outputId', format: 'uuid', description: 'Article ID.' })
+  @ApiOkResponse({
+    type: OutputRevisionResponseDto,
+    description: 'Current released revision.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid abstract or revision ID.' })
+  @ApiUnauthorizedResponse({ description: 'Caller is not authenticated.' })
+  @ApiForbiddenResponse({
+    description: 'An active researcher owner is required.',
+  })
+  @ApiNotFoundResponse({ description: 'The output was not found.' })
+  @ApiConflictResponse({
+    description: 'The release changed or the Article cannot be edited.',
+  })
+  async updateArticleAbstract(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @CurrentUserId() callerId: string,
+    @Body() dto: UpdateArticleAbstractDto,
+  ): Promise<OutputRevisionResponseDto> {
+    return this.outputsService.updateArticleAbstract(outputId, callerId, dto);
   }
 
   @Put(':outputId/article-pdf')

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { parentPort, workerData } from 'node:worker_threads';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { normalizeArticleDoi } from '@researchos/publication-metadata';
@@ -31,6 +32,13 @@ import {
 const errors = domainErrorCodes.storage;
 const maxPages = 5;
 const maxTextLength = 50_000;
+const standardFontDataUrl =
+  fileURLToPath(
+    new URL(
+      '../../standard_fonts',
+      import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs'),
+    ),
+  ) + '/';
 
 export interface PdfEvidence {
   firstPage: PdfHeaderLine[];
@@ -63,6 +71,7 @@ export async function inspectArticlePdf(
     data: bytes,
     stopAtErrors: true,
     useSystemFonts: false,
+    standardFontDataUrl,
   });
   try {
     const pdf = await task.promise;

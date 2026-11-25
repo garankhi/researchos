@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { homeResearchFeedKey } from '@/features/outputs/home-research-feed-key';
 import { outputsControllerFindHomeFeed } from '@/lib/api';
 import { toResearchCard } from './research-feed-data';
 
@@ -19,7 +20,7 @@ export function useResearchFeed(userId: string) {
     fetchNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['home-research-feed', userId],
+    queryKey: [...homeResearchFeedKey, userId],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) =>
       outputsControllerFindHomeFeed(

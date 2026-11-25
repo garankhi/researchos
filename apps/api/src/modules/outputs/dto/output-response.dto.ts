@@ -85,6 +85,7 @@ export class OutputResponseDto {
   @ApiProperty({
     description:
       'UUID of the currently pinned / released revision (`output_revisions.id`).',
+    type: String,
     format: 'uuid',
     nullable: true,
     example: '33333333-3333-4333-8333-333333333333',

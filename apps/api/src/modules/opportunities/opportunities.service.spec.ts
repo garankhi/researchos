@@ -150,6 +150,26 @@ describe('OpportunitiesService', () => {
     });
   });
 
+  it('denies replay of a group opportunity create after management is revoked', async () => {
+    const groupDraft = { ...draft, groupId: id };
+    await service.create(actor, groupDraft, 'group-retry');
+    tx.research_opportunities.findUnique.mockResolvedValue(
+      tx.research_opportunities.update.mock.calls[0][0].data,
+    );
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ allowed: true }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ allowed: false }]);
+
+    await expect(
+      service.create(actor, groupDraft, 'group-retry'),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.opportunities.accessDenied,
+    });
+    expect(tx.research_opportunities.create).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a project scoped to a different group', async () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ allowed: true }])
@@ -365,6 +385,89 @@ describe('OpportunitiesService', () => {
       },
     });
   });
+
+  it.each(['true', 'all'] as const)(
+    'requires group management to request archived=%s',
+    async (archived) => {
+      await expect(
+        service.findAll(actor, { page: 1, limit: 20, archived }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
+      tx.$queryRaw.mockResolvedValueOnce([{ allowed: false }]);
+      await expect(
+        service.findAll(actor, { page: 1, limit: 20, archived, groupId: id }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(tx.research_opportunities.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['false', 'true', 'all', undefined] as const)(
+    'applies archived=%s without widening visibility or pagination totals',
+    async (archived) => {
+      if (archived === 'true' || archived === 'all')
+        tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
+      tx.$queryRaw
+        .mockResolvedValueOnce([{ id, can_manage: true }])
+        .mockResolvedValueOnce([{ total: 3n }]);
+      tx.research_opportunities.findMany.mockResolvedValue([row]);
+      const result = await service.findAll(actor, {
+        page: 1,
+        limit: 1,
+        archived,
+        groupId: id,
+      });
+      const [pageCall, countCall] = tx.$queryRaw.mock.calls.slice(-2);
+      const conditions = pageCall[2] as { text: string };
+      expect(countCall[1]).toBe(conditions);
+      expect(conditions.text).toContain('can_manage_opportunity');
+      expect(conditions.text).toContain('AND o.group_id =');
+      const filters = {
+        all: ['o.archived_at IS NULL'],
+        true: ['o.archived_at IS NULL', 'o.archived_at IS NOT NULL'],
+        false: ['o.archived_at IS NULL', 'o.archived_at IS NULL'],
+      };
+      expect(conditions.text.match(/o\.archived_at IS (?:NOT )?NULL/g)).toEqual(
+        filters[archived ?? 'all'],
+      );
+      expect(result.meta.total).toBe(3);
+    },
+  );
+
+  it.each([
+    OpportunityStatus.DRAFT,
+    OpportunityStatus.OPEN,
+    OpportunityStatus.CLOSED,
+  ])(
+    'restores a %s opportunity without changing its lifecycle',
+    async (status) => {
+      const publishedAt =
+        status === OpportunityStatus.DRAFT ? null : new Date();
+      const current = {
+        ...row,
+        status,
+        title: 'Title',
+        description: 'Details',
+        application_deadline: new Date(),
+        published_at: publishedAt,
+        archived_at: new Date(),
+      };
+      tx.research_opportunities.findUniqueOrThrow.mockResolvedValue(current);
+      tx.research_opportunities.update.mockResolvedValue({
+        ...current,
+        archived_at: null,
+      });
+      const restored = await service.update(actor, id, { archivedAt: null });
+      const data = tx.research_opportunities.update.mock.calls[0][0].data;
+      expect(data.archived_at).toBeNull();
+      expect(data).not.toHaveProperty('status');
+      expect(data).not.toHaveProperty('published_at');
+      expect(restored).toMatchObject({
+        status,
+        archivedAt: null,
+        publishedAt: publishedAt?.toISOString() ?? null,
+      });
+    },
+  );
 
   it('returns per-opportunity management permissions from the database policy', async () => {
     tx.$queryRaw

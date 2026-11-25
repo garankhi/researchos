@@ -14,9 +14,11 @@ import { EntityLink } from '@/features/discovery';
 import {
   groupMembersControllerAdd,
   groupMembersControllerRemove,
+  groupMembersControllerRestore,
   groupMembersControllerUpdate,
 } from '@/lib/api';
 import type { Member } from '../types';
+import type { HubArchive } from '../hooks/use-group-hub';
 import {
   HubAction,
   HubEditor,
@@ -31,12 +33,14 @@ export function GroupMembers({
   active,
   canManage,
   query,
+  archive,
 }: {
   groupId: string;
   leadId: string;
   active: boolean;
   canManage: boolean;
   query: Parameters<typeof HubList<Member>>[0]['query'];
+  archive?: HubArchive<Member>;
 }) {
   const t = useTranslations('groups');
   const roles = (['MEMBER', 'GROUP_LEADER'] as const).map((value) => ({
@@ -46,8 +50,9 @@ export function GroupMembers({
   return (
     <HubSection
       title={t('members')}
+      archive={archive}
       action={
-        canManage ? (
+        canManage && !archive?.showing ? (
           <HubEditor
             groupId={groupId}
             label={t('addMember')}
@@ -76,7 +81,10 @@ export function GroupMembers({
         ) : null
       }
     >
-      <HubList query={query}>
+      <HubList
+        query={archive?.showing ? archive.query : query}
+        archived={archive?.showing}
+      >
         {(members) =>
           members.map((member, index) => (
             <Box
@@ -132,7 +140,19 @@ export function GroupMembers({
                   <Badge alignSelf="start" variant="subtle" colorPalette="gray">
                     {t(`roles.${member.role}`)}
                   </Badge>
-                  {canManage ? (
+                  {archive?.showing && canManage ? (
+                    <HubMenu positioned>
+                      <HubAction
+                        groupId={groupId}
+                        label={t('restoreMember')}
+                        confirm
+                        confirmationMessage={t('restoreMemberNotice')}
+                        action={() =>
+                          groupMembersControllerRestore(groupId, member.userId)
+                        }
+                      />
+                    </HubMenu>
+                  ) : canManage ? (
                     <HubMenu positioned>
                       <HubEditor
                         groupId={groupId}

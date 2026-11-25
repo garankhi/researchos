@@ -757,7 +757,7 @@ export function useGroupsControllerPreview<
 }
 
 /**
- * The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.
+ * By default, only active memberships are listed. The active roster of an active group is readable by any signed-in account. An archived or inactive group keeps its roster private to the lead and current members.
  * @summary List group members
  */
 export const groupMembersControllerFindAll = (
@@ -1243,6 +1243,104 @@ export const useGroupMembersControllerRemove = <
 > => {
   return useMutation(
     getGroupMembersControllerRemoveMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Restore an archived group membership as an ordinary member
+ */
+export const groupMembersControllerRestore = (
+  groupId: string,
+  userId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<GroupMemberResponseDtoEnvelope>(
+    {
+      url: `/research-groups/${groupId}/members/${userId}/restore`,
+      method: 'PATCH',
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGroupMembersControllerRestoreMutationKey = () =>
+  ['groupMembersControllerRestore'] as const;
+
+export const getGroupMembersControllerRestoreMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof groupMembersControllerRestore>>,
+    TError,
+    GroupMembersControllerRestoreMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof groupMembersControllerRestore>>,
+  TError,
+  GroupMembersControllerRestoreMutationVariables,
+  TContext
+> => {
+  const mutationKey = getGroupMembersControllerRestoreMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof groupMembersControllerRestore>>,
+    GroupMembersControllerRestoreMutationVariables
+  > = (props) => {
+    const { groupId, userId } = props ?? {};
+
+    return groupMembersControllerRestore(groupId, userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GroupMembersControllerRestoreMutationResult = NonNullable<
+  Awaited<ReturnType<typeof groupMembersControllerRestore>>
+>;
+
+export type GroupMembersControllerRestoreMutationError = ApiErrorResponseDto;
+export type GroupMembersControllerRestoreMutationVariables = {
+  groupId: string;
+  userId: string;
+};
+
+/**
+ * @summary Restore an archived group membership as an ordinary member
+ */
+export const useGroupMembersControllerRestore = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof groupMembersControllerRestore>>,
+      TError,
+      GroupMembersControllerRestoreMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof groupMembersControllerRestore>>,
+  TError,
+  GroupMembersControllerRestoreMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getGroupMembersControllerRestoreMutationOptions(options),
     queryClient,
   );
 };

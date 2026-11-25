@@ -21,16 +21,11 @@ export type GroupTab =
 export function groupPermissions(
   group: Group,
   user: { id: string; roles: string[] },
-  members: Member[],
 ) {
   const researcher = user.roles.includes('RESEARCHER');
   const lead = group.leadId === user.id;
   const active = group.isActive && !group.archivedAt;
-  const leader =
-    group.callerMembershipRole === 'GROUP_LEADER' ||
-    members.some(
-      (member) => member.userId === user.id && member.role === 'GROUP_LEADER',
-    );
+  const leader = group.callerMembershipRole === 'GROUP_LEADER';
   const manager = researcher && (lead || leader);
   return {
     editInfo: manager,

@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { OpportunitiesControllerFindAllArchived } from './opportunitiesControllerFindAllArchived';
 import type { OpportunitiesControllerFindAllStatus } from './opportunitiesControllerFindAllStatus';
 
 export type OpportunitiesControllerFindAllParams = {
@@ -23,6 +24,10 @@ export type OpportunitiesControllerFindAllParams = {
    * Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.
    */
   sort?: string;
+  /**
+   * Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.
+   */
+  archived?: OpportunitiesControllerFindAllArchived;
   /**
    * Filter by group scope.
    */
