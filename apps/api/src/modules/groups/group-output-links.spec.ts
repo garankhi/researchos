@@ -76,6 +76,7 @@ describe('Group output links HTTP contract', () => {
   const client = createHttpTestClient();
   const request = () => client.request(app.getHttpServer());
   const tx = {
+    $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
     group_output_links: {
       findUnique: vi.fn(),

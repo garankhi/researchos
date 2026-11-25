@@ -5,6 +5,11 @@ import type { RedisOptions } from 'ioredis';
 export const SYSTEM_QUEUE = 'system-checks';
 export const PROBE_JOB = 'probe';
 export const BACKGROUND_QUEUE = 'background-jobs';
+export const NOTIFICATION_QUEUE = 'notification-jobs';
+
+export function notificationRedisChannel(prefix: string): string {
+  return `${prefix}:notification:created`;
+}
 export const DIGEST_QUEUE = 'digest-jobs';
 export const TOPIC_SUGGESTION_QUEUE = 'topic-suggestion-jobs';
 export const RESEARCH_UPDATES_QUEUE = 'research-updates';

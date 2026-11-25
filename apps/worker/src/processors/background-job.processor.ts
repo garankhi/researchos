@@ -5,6 +5,9 @@ import {
   PrismaService,
   OPPORTUNITY_EXPIRY_JOB,
   RESEARCH_UPDATE_JOB,
+  NOTIFICATION_FANOUT_JOB,
+  notificationQueueScope,
+  stageNotificationEvent,
   type Prisma,
 } from '@researchos/database';
 import {
@@ -13,12 +16,14 @@ import {
   DURABLE_PROBE_JOB,
   JOB_ATTEMPTS,
   RESEARCH_UPDATES_QUEUE,
+  NOTIFICATION_QUEUE,
   isBackgroundJobPayload,
   type BackgroundJobPayload,
 } from '@researchos/queue';
 import { Job, UnrecoverableError } from 'bullmq';
 import { expireOpportunityBatch } from '../modules/jobs/opportunity-expiry.service.js';
 import { researchUpdateScope } from '../modules/jobs/research-update-scope.js';
+import { fanOutNotification } from '../modules/notifications/notification-fanout.js';
 
 type BackgroundJobOutcome =
   { result: Prisma.InputJsonValue } | { error: Error };
@@ -37,6 +42,10 @@ const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
   [DURABLE_PROBE_JOB, runDiagnosticProbe],
   [OPPORTUNITY_EXPIRY_JOB, runOpportunityExpiry],
   [RESEARCH_UPDATE_JOB, publishResearchUpdate],
+  [
+    NOTIFICATION_FANOUT_JOB,
+    ({ tx, job }) => fanOutNotification(tx, job.payload),
+  ],
 ]);
 
 function unsupportedJob(): BackgroundJobOutcome {
@@ -80,7 +89,9 @@ async function publishResearchUpdate({
     return unsupportedJob();
   }
 
-  const [published] = await tx.$queryRaw<Array<{ event_key: string }>>`
+  const [published] = await tx.$queryRaw<
+    Array<Prisma.research_updatesGetPayload<undefined>>
+  >`
     WITH pending AS (
       DELETE FROM pending_research_updates
       WHERE job_id = ${job.id}::uuid AND event_key = ${payload.eventKey}
@@ -93,7 +104,7 @@ async function publishResearchUpdate({
     SELECT event_key, event_type, actor_id, output_id, revision_id,
       group_id, opportunity_id, seminar_id, occurred_at FROM pending
     ON CONFLICT (event_key) DO NOTHING
-    RETURNING event_key
+    RETURNING *
   `;
 
   if (!published) {
@@ -102,8 +113,62 @@ async function publishResearchUpdate({
       select: { event_key: true },
     });
     if (!existing) return unsupportedJob();
+  } else {
+    await stageResearchNotification(tx, published);
   }
   return { result: { eventKey: payload.eventKey } };
+}
+
+async function stageResearchNotification(
+  tx: Prisma.TransactionClient,
+  update: Prisma.research_updatesGetPayload<undefined>,
+) {
+  const common = {
+    key: `research-update:${update.id}`,
+    actorId: update.actor_id,
+  };
+  const groupId = update.group_id;
+  if (
+    update.output_id &&
+    (update.event_type === 'OUTPUT_SHARED' ||
+      update.event_type === 'OUTPUT_REVISION_RELEASED' ||
+      update.event_type === 'OUTPUT_LINKED_TO_GROUP')
+  ) {
+    const type =
+      update.event_type === 'OUTPUT_SHARED'
+        ? 'OUTPUT_SHARED'
+        : update.event_type === 'OUTPUT_REVISION_RELEASED'
+          ? 'REVISION_RELEASED'
+          : 'OUTPUT_LINKED';
+    await stageNotificationEvent(tx, {
+      ...common,
+      type,
+      subjectType: 'OUTPUT',
+      subjectId: update.output_id,
+      payload: { groupId, link: `/outputs/${update.output_id}` },
+    });
+  }
+  if (update.event_type === 'OPPORTUNITY_OPENED' && update.opportunity_id) {
+    await stageNotificationEvent(tx, {
+      ...common,
+      type: 'OPPORTUNITY_OPENED',
+      subjectType: 'OPPORTUNITY',
+      subjectId: update.opportunity_id,
+      payload: { groupId, link: `/opportunities/${update.opportunity_id}` },
+    });
+  }
+  if (update.event_type === 'SEMINAR_PUBLISHED' && update.seminar_id) {
+    await stageNotificationEvent(tx, {
+      ...common,
+      type: 'SEMINAR_PUBLISHED',
+      subjectType: 'SEMINAR',
+      subjectId: update.seminar_id,
+      payload: {
+        groupId,
+        link: groupId ? `/groups/${groupId}` : '/profile/my-profile',
+      },
+    });
+  }
 }
 
 async function runOpportunityExpiry({
@@ -253,6 +318,21 @@ export class ResearchUpdateProcessor extends ScopedBackgroundProcessor {
     super(
       runner,
       researchUpdateScope(config.get<string>('QUEUE_PREFIX') ?? 'researchos'),
+    );
+  }
+}
+
+@Processor(NOTIFICATION_QUEUE, { concurrency: 2 })
+export class NotificationFanoutProcessor extends ScopedBackgroundProcessor {
+  constructor(
+    @Inject(BackgroundJobRunner) runner: BackgroundJobRunner,
+    @Inject(ConfigService) config: ConfigService,
+  ) {
+    super(
+      runner,
+      notificationQueueScope(
+        config.get<string>('QUEUE_PREFIX') ?? 'researchos',
+      ),
     );
   }
 }

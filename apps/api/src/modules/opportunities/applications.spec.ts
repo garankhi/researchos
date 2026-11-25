@@ -88,6 +88,7 @@ describe('Applications HTTP contract', () => {
   const client = createHttpTestClient();
   const request = () => client.request(app.getHttpServer());
   const tx = {
+    $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
     research_opportunities: { findUnique: vi.fn() },
     group_members: { findUnique: vi.fn() },

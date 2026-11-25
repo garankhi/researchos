@@ -17,6 +17,7 @@ import {
   ChatReceiptStatus,
   Prisma,
   PrismaService,
+  stageNotificationEvent,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
@@ -508,18 +509,28 @@ export class ChatService {
 
     await this.assertActiveUsersExist([dto.userId]);
 
-    const created = await this.prisma.chat_conversation_participants.create({
-      data: {
-        conversation_id: conversationId,
-        user_id: dto.userId,
-        role: dto.role ?? ChatParticipantRole.MEMBER,
-      },
-      include: { users: { select: USER_SUMMARY_SELECT } },
-    });
-
-    await this.prisma.chat_conversations.update({
-      where: { id: conversationId },
-      data: { updated_at: new Date() },
+    const created = await this.prisma.$transaction(async (tx) => {
+      const participant = await tx.chat_conversation_participants.create({
+        data: {
+          conversation_id: conversationId,
+          user_id: dto.userId,
+          role: dto.role ?? ChatParticipantRole.MEMBER,
+        },
+        include: { users: { select: USER_SUMMARY_SELECT } },
+      });
+      await tx.chat_conversations.update({
+        where: { id: conversationId },
+        data: { updated_at: new Date() },
+      });
+      await stageNotificationEvent(tx, {
+        key: `conversation-participant-added:${conversationId}:${dto.userId}:${participant.joined_at.toISOString()}`,
+        type: 'CONVERSATION_PARTICIPANT_ADDED',
+        actorId: callerId,
+        subjectType: 'CONVERSATION',
+        subjectId: conversationId,
+        payload: { recipientId: dto.userId, link: `/chat/${conversationId}` },
+      });
+      return participant;
     });
 
     return this.mapParticipant(created);
@@ -861,6 +872,27 @@ export class ChatService {
           where: { id: dto.conversationId },
           data: { updated_at: now },
         });
+
+        const notification = {
+          actorId: senderId,
+          subjectType: 'MESSAGE' as const,
+          subjectId: createdMsg.id,
+          payload: { link: `/chat/${dto.conversationId}` },
+        };
+        if (targetMentionIds.length > 0) {
+          await stageNotificationEvent(tx, {
+            ...notification,
+            key: `chat-mention:${createdMsg.id}`,
+            type: 'CHAT_MENTION',
+          });
+        }
+        if (conv.type === ChatConversationType.DIRECT) {
+          await stageNotificationEvent(tx, {
+            ...notification,
+            key: `direct-message:${createdMsg.id}`,
+            type: 'DIRECT_MESSAGE',
+          });
+        }
 
         return tx.chat_messages.findUniqueOrThrow({
           where: { id: createdMsg.id },

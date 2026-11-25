@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   OPPORTUNITY_EXPIRY_JOB,
   PrismaService,
+  stageNotificationEvent,
   type Prisma,
 } from '@researchos/database';
 import type { Queue } from 'bullmq';
@@ -101,6 +102,16 @@ export async function expireOpportunityBatch(
     [{ now: Date }]
   >`SELECT clock_timestamp() AS now`;
   if (expired.length) {
+    for (const { id, effective_expiry } of expired) {
+      await stageNotificationEvent(tx, {
+        key: `opportunity-expired:${id}:${effective_expiry}`,
+        type: 'OPPORTUNITY_EXPIRED',
+        actorId: null,
+        subjectType: 'OPPORTUNITY',
+        subjectId: id,
+        payload: { link: `/opportunities/${id}` },
+      });
+    }
     await tx.auditLog.createMany({
       data: expired.map(({ id, effective_expiry }) => ({
         actorId: null,
