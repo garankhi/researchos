@@ -100,6 +100,7 @@ function fakePrisma(world: World) {
     auditLog: { create: vi.fn() },
     file_access_requests: {
       findFirst: vi.fn(async () => null),
+      count: vi.fn(async () => 0),
       findUnique: vi.fn(async () => ({
         requester_id: reader,
         file_id: fileId,
@@ -108,6 +109,7 @@ function fakePrisma(world: World) {
       update: vi.fn(async () => ({})),
     },
     file_access_grants: {
+      findFirst: vi.fn(async () => null),
       findUnique: vi.fn(async () => ({
         request_id: requestId,
         file_id: fileId,
@@ -189,6 +191,76 @@ describe('FileAccessService', () => {
 
       expect(tx.file_access_requests.create).not.toHaveBeenCalled();
       expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    describe('request limit', () => {
+      const limited = domainErrorCodes.fileAccess.requestLimited;
+
+      it('refuses a new request within a day of a decline', async () => {
+        const { prisma, tx } = fakePrisma(world);
+        tx.file_access_requests.findFirst.mockImplementation((async (args: {
+          where: { status: string };
+        }) =>
+          args.where.status === 'DECLINED'
+            ? { id: requestId }
+            : null) as never);
+
+        expect(
+          await codeOf(
+            new FileAccessService(prisma).submit(reader, fileId, {}),
+          ),
+        ).toBe(limited);
+        expect(tx.file_access_requests.create).not.toHaveBeenCalled();
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+      });
+
+      it('refuses a new request within a day of a revoke', async () => {
+        const { prisma, tx } = fakePrisma(world);
+        tx.file_access_grants.findFirst.mockResolvedValue({
+          id: grantId,
+        } as never);
+
+        expect(
+          await codeOf(
+            new FileAccessService(prisma).submit(reader, fileId, {}),
+          ),
+        ).toBe(limited);
+        expect(tx.file_access_requests.create).not.toHaveBeenCalled();
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+      });
+
+      it('caps new requests per file per day, withdrawn ones included', async () => {
+        const { prisma, tx } = fakePrisma(world);
+        tx.file_access_requests.count.mockResolvedValue(3);
+
+        expect(
+          await codeOf(
+            new FileAccessService(prisma).submit(reader, fileId, {}),
+          ),
+        ).toBe(limited);
+        expect(tx.file_access_requests.create).not.toHaveBeenCalled();
+
+        tx.file_access_requests.count.mockResolvedValue(2);
+        expect(
+          await codeOf(
+            new FileAccessService(prisma).submit(reader, fileId, {}),
+          ),
+        ).toBe('resolved');
+      });
+
+      it('does not limit resending a pending request', async () => {
+        const { prisma, tx } = fakePrisma(world);
+        tx.file_access_requests.findFirst.mockResolvedValue({
+          id: requestId,
+        } as never);
+        tx.file_access_requests.count.mockResolvedValue(3);
+
+        expect(
+          await codeOf(
+            new FileAccessService(prisma).submit(reader, fileId, {}),
+          ),
+        ).toBe('resolved');
+      });
     });
 
     it.each([
