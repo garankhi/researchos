@@ -3158,6 +3158,574 @@
         ]
       }
     },
+    "/output-files/{fileId}/access-requests": {
+      "post": {
+        "description": "Sends a PENDING request to the Article owner. Sending again while a request is pending returns that request.",
+        "operationId": "FileAccessSubmitController_submit",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "description": "The requested file.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The pending request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or message, or the caller owns the file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file does not exist or the caller cannot view its Article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The file is not an available Private file of the current release, or the caller can already download it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Request access to a Private file",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
+    "/file-access-requests": {
+      "get": {
+        "description": "`sent` lists the caller’s requests. `received` lists requests for Articles the caller currently manages.",
+        "operationId": "FileAccessRequestsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "box",
+            "required": true,
+            "in": "query",
+            "description": "`sent` lists the caller’s own requests; `received` lists requests for Articles the caller manages.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sent",
+                "received"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only requests in this status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "DECLINED",
+                "WITHDRAWN",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "outputId",
+            "required": false,
+            "in": "query",
+            "description": "Only requests for this Article.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated file access requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List file access requests",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
+    "/file-access-requests/{requestId}/approve": {
+      "post": {
+        "description": "Approves the request and grants access to that exact file. Approving an approved request again returns it unchanged.",
+        "operationId": "FileAccessRequestsController_approve",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "The request.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideFileAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The approved request with its grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The requester cannot decide their own request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist or the caller does not manage its Article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request was already answered, the file is no longer requestable, or the requester can no longer view the Article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Approve a file access request",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
+    "/file-access-requests/{requestId}/decline": {
+      "post": {
+        "description": "Declining a declined request again returns it unchanged.",
+        "operationId": "FileAccessRequestsController_decline",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "The request.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideFileAccessRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The declined request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The requester cannot decide their own request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist or the caller does not manage its Article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request was already answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Decline a file access request",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
+    "/file-access-requests/{requestId}/withdraw": {
+      "post": {
+        "description": "Only the requester can withdraw, and only while it is pending.",
+        "operationId": "FileAccessRequestsController_withdraw",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "The request.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawn request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier or payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist or was not sent by the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request was already answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Withdraw a file access request",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
+    "/file-access-grants/{grantId}/revoke": {
+      "post": {
+        "description": "Ends the grant at once. Revoking a revoked grant again returns it unchanged. A revoked grant is never restored.",
+        "operationId": "FileAccessGrantsController_revoke",
+        "parameters": [
+          {
+            "name": "grantId",
+            "required": true,
+            "in": "path",
+            "description": "The grant.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request with its revoked grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAccessRequestResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The grantee cannot revoke their own access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The grant does not exist or the caller does not manage its Article.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revoke access to a Private file",
+        "tags": [
+          "file-access"
+        ]
+      }
+    },
     "/follows": {
       "post": {
         "operationId": "FollowController_create",
@@ -11073,7 +11641,11 @@
           "APPLICATION_WITHDRAWN",
           "OPPORTUNITY_EXPIRED",
           "FOLLOW",
-          "CONVERSATION_PARTICIPANT_ADDED"
+          "CONVERSATION_PARTICIPANT_ADDED",
+          "FILE_ACCESS_REQUESTED",
+          "FILE_ACCESS_APPROVED",
+          "FILE_ACCESS_DECLINED",
+          "FILE_ACCESS_REVOKED"
         ],
         "description": "Event types excluded from notification delivery."
       },
@@ -11373,6 +11945,243 @@
           "items",
           "meta"
         ]
+      },
+      "CreateFileAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Optional note to the Article owner explaining the request.",
+            "maxLength": 1000,
+            "example": "I am reviewing related work for my thesis."
+          }
+        }
+      },
+      "FileAccessArticleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Article identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the current release, or null when the caller can no longer view the Article.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "FileAccessFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "File identifier.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "File name, or null when the caller can no longer view the Article.",
+            "nullable": true
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "description": "Whether the file is still available."
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "isAvailable"
+        ]
+      },
+      "FileAccessPersonDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User identifier.",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Display name of the user."
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "FileAccessGrantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Grant identifier, used to revoke access.",
+            "format": "uuid"
+          },
+          "grantedAt": {
+            "type": "string",
+            "description": "When access was granted.",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": "string",
+            "description": "When access was revoked, or null while it is active.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "grantedAt",
+          "revokedAt"
+        ]
+      },
+      "FileAccessRequestResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Request identifier.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Request status.",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "DECLINED",
+              "WITHDRAWN",
+              "CANCELLED"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Note from the requester.",
+            "nullable": true
+          },
+          "response": {
+            "type": "string",
+            "description": "Reply from the Article owner.",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "description": "Why the request was cancelled, e.g. `FILE_UNAVAILABLE`; null otherwise.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the request was sent.",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "type": "string",
+            "description": "When the request left PENDING, or null while pending.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "article": {
+            "description": "Article the file belongs to.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileAccessArticleDto"
+              }
+            ]
+          },
+          "file": {
+            "description": "The requested file.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileAccessFileDto"
+              }
+            ]
+          },
+          "requester": {
+            "description": "Who asked for access.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileAccessPersonDto"
+              }
+            ]
+          },
+          "owner": {
+            "description": "Current Article owner, or null when the Article has none.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileAccessPersonDto"
+              }
+            ]
+          },
+          "grant": {
+            "description": "The grant issued on approval, or null.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileAccessGrantDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "message",
+          "response",
+          "cancelReason",
+          "createdAt",
+          "decidedAt",
+          "article",
+          "file",
+          "requester",
+          "owner",
+          "grant"
+        ]
+      },
+      "FileAccessRequestPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "File access requests on this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileAccessRequestResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "DecideFileAccessRequestDto": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string",
+            "description": "Optional reply shown to the requester.",
+            "maxLength": 1000
+          }
+        }
       },
       "FollowEntityType": {
         "type": "string",
@@ -13530,6 +14339,63 @@
           "fileName"
         ]
       },
+      "RequestableFileRequestDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The caller’s latest access request for this file.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of that request: PENDING, APPROVED, DECLINED, WITHDRAWN or CANCELLED."
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      },
+      "RequestableFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "File identifier, used to request access.",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original filename."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "MIME type of the file."
+          },
+          "sizeBytes": {
+            "type": "number",
+            "description": "File size in bytes."
+          },
+          "myRequest": {
+            "description": "The caller’s latest request for this file, or null.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RequestableFileRequestDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "mimeType",
+          "sizeBytes",
+          "myRequest"
+        ]
+      },
       "OutputResponseDto": {
         "type": "object",
         "properties": {
@@ -13638,6 +14504,13 @@
           "hasRestrictedPdf": {
             "type": "boolean",
             "description": "On the detail view, whether the current release has a private PDF unavailable to the caller."
+          },
+          "requestableFiles": {
+            "description": "On the detail view, Private files of the current release the caller cannot download yet and may request.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestableFileDto"
+            }
           }
         },
         "required": [
@@ -15735,6 +16608,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/PaginatedSearchResultsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "FileAccessRequestResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/FileAccessRequestResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "FileAccessRequestPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/FileAccessRequestPageDto"
           },
           "message": {
             "type": "string",
