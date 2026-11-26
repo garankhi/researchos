@@ -84,8 +84,8 @@ Adding a previously archived member restores the existing membership instead of
 inserting a duplicate. Archived directions cannot be edited and are excluded from
 lists and counts. Soft deletion keeps project references valid.
 
-The Prisma schema, DBML source, PostgreSQL feature source and generated
-`docs/database/ResearchOS.sql` are updated together. Partial indexes support active
+The Prisma schema and `docs/database/ResearchOS.sql` are updated together, along
+with a migration. Partial indexes support active
 membership and direction reads. Existing historical migrations are unchanged.
 
 **Deployment:** apply the new migration before deploying the new API, using the
@@ -194,7 +194,7 @@ no additional schema migration was introduced during scope reduction.
 
 Passed on the final validation run:
 
-- Code generation and DBML editor diagnostics/SQL export.
+- Code generation and the schema source build.
 - Full workspace production build and web TypeScript checking.
 - Full workspace lint: no errors; pre-existing API warnings are retained after
   reverting unrelated cleanup.

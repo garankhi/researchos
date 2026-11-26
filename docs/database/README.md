@@ -5,11 +5,7 @@ Cập nhật ngày 30/10/2026. Bản 4.3 sửa bàn giao khi INSERT bị bỏ qu
 ## File để dùng
 
 - [DB-FLOWS.vi.md](DB-FLOWS.vi.md): giải thích dễ đọc theo thao tác người dùng, ví dụ xuyên suốt, bảng đọc/ghi và các phiên bản đang hiển thị. Nên đọc trước nếu mới tìm hiểu database.
-- [ResearchOS.dbml](ResearchOS.dbml): copy **toàn bộ file** vào dbdiagram.io; tự chứa enum, bảng, FK và TableGroup.
-- [ResearchOS.sql](ResearchOS.sql): SQL đầy đủ, gồm phần export DBML và bổ sung PostgreSQL.
-- [postgres-features.sql](postgres-features.sql): nguồn của partial index, view, function và trigger; không chạy riêng trên database trống.
-- [build-schema.ps1](build-schema.ps1): kiểm tra editor rồi tạo lại SQL bằng parser v2/exporter chính thức, lấy từ bộ `@dbml/cli@11.0.0`.
-- [schema-tools.cjs](schema-tools.cjs): dùng `@dbml/parse` để lấy diagnostics giống editor và `@dbml/core` để parse/export. Có kiểm tra hồi quy cho FK đơn và FK ghép nullable.
+- [ResearchOS.sql](ResearchOS.sql): **nguồn sự thật của schema**. SQL đầy đủ, gồm bảng, enum, FK, CHECK, partial index, view, function và trigger. Sửa trực tiếp file này khi đổi schema.
 - [schema-smoke.sql](schema-smoke.sql): kiểm tra nghiệp vụ, tự rollback fixtures.
 - [schema-auth-smoke.sql](schema-auth-smoke.sql): kiểm tra STAFF/ADMIN, grant MANUAL/SYSTEM, credentials, session LOCAL/OIDC và không vượt quyền tài nguyên; tự rollback fixtures.
 - [schema-policy-smoke.sql](schema-policy-smoke.sql): kiểm tra policy, DOI gồm tab/CR/LF, group singleton của sinh viên researcher, giữ nội dung khi inactive, bàn giao và conflict không gây đổi người thiếu lịch sử; tự rollback fixtures.
@@ -19,17 +15,43 @@ Cập nhật ngày 30/10/2026. Bản 4.3 sửa bàn giao khi INSERT bị bỏ qu
 
 Toàn bộ các file `schema-*-smoke.sql` được chạy tự động bằng `pnpm db:smoke`: lệnh dựng database tạm từ **cả hai** bản dựng schema — `ResearchOS.sql` và chuỗi migration trong `packages/database/prisma/migrations/` — chạy test trên cả hai rồi xoá database tạm. CI chạy lệnh này ở job `db-smoke`.
 
-DBML không biểu diễn đầy đủ partial index, trigger và chính sách truy vấn của PostgreSQL. Vì vậy dùng DBML để xem sơ đồ; dùng **ResearchOS.sql** khi tạo database. Không dùng riêng SQL export từ web rồi cho rằng đã có các ràng buộc bổ sung.
+## Workflow: SQL là nguồn sự thật
+
+Trước đây schema được sinh từ `ResearchOS.dbml` + `postgres-features.sql` bằng `build-schema.ps1`. Cả hai file đó **đã bị xoá**: DBML không biểu diễn được partial index, trigger, view và function, nên exporter luôn phải vá thêm bằng tay — và chính những phần vá đó đã lệch. Giờ **`ResearchOS.sql` là nguồn sự thật duy nhất** và được sửa trực tiếp.
+
+Khi đổi schema, làm đủ ba việc:
+
+1. **Sửa `docs/database/ResearchOS.sql`.** Đây là bản dựng cho database mới.
+2. **Thêm một migration** trong `packages/database/prisma/migrations/`. Database đang chạy được nâng cấp bằng migration, không bằng file SQL. Đừng sửa migration đã áp dụng.
+3. **Cập nhật `packages/database/prisma/schema.prisma`** nếu model Prisma thay đổi (bảng, cột, enum, quan hệ). Chạy `pnpm db:drift` để kiểm tra; lệnh dựng database tạm từ SQL rồi so với datamodel bằng `prisma migrate diff`.
+
+Hai lệnh kiểm tra trong CI:
+
+| Lệnh | So sánh gì | Bắt được lỗi gì |
+|---|---|---|
+| `pnpm db:drift` | `ResearchOS.sql` ↔ `schema.prisma` | Model Prisma lệch với SQL |
+| `pnpm db:smoke` | SQL ↔ chuỗi migration | Migration thiếu thay đổi trong SQL, và hành vi trigger/view/function sai |
+
+`db:drift` chỉ nhìn bảng, cột, enum và quan hệ — Prisma không có khái niệm function, view hay trigger, nên `db:smoke` mới là lớp kiểm tra thứ hai.
+
+### Vì sao bỏ DBML
+
+DBML không biểu diễn được partial index (`WHERE`), view, function, trigger, cũng không biểu diễn được `DEFERRABLE` hay tên ràng buộc FK tùy ý. Mỗi lần export phải chèn thêm phần PostgreSQL bằng tay, và phần chèn đó không được kiểm tra bởi bất kỳ công cụ nào — nên nó trôi dần khỏi SQL thật. Cụ thể:
+
+- Toàn bộ domain chat (RES-166) — 8 bảng, 19 FK, 3 function, 7 trigger — có trong SQL và migration nhưng **không** có trong DBML, nên lần export lại sẽ xoá sạch nó.
+- `has_group_management_authority` chỉ có trong migration; API gọi trực tiếp hàm này. Thiếu nó thì database dựng từ SQL **lỗi 500** ở endpoint đó.
+
+Xem [docs/database-prisma-sync.md](../database-prisma-sync.md) cho quy trình đồng bộ Prisma.
 
 ### Sửa thông báo nullable trong dbdiagram — 30/10/2026
 
 Đã đổi 36 quan hệ tùy chọn từ `>` sang `>?`, gồm các FK đơn nullable và ba FK ghép có toàn bộ cột nullable. Giữ nguyên định nghĩa cột, FK, CHECK và quy tắc nghiệp vụ. Ví dụ `revoked_by` được NULL trước khi thu hồi quyền; `released_by` được NULL khi revision còn nháp; opportunity cá nhân vẫn không bắt buộc group/project.
 
+Lịch sử: các quan hệ này từng được viết bằng cú pháp DBML, nên thông báo nullable của dbdiagram được sửa ở bản 4.0. Nay schema nằm trong SQL nên không còn bước kiểm tra diagnostics của DBML editor; nullability được kiểm soát bằng `db:smoke` và `db:drift`.
+
 Theo [cú pháp quan hệ DBML](https://dbml.dbdiagram.io/docs/#relationships--foreign-key-definitions), `>?` biểu diễn parent tùy chọn. Với FK ghép, bộ kiểm tra editor xét nullability của tuple; những tuple có cột bắt buộc giữ `>` nếu không có thông báo không khớp. SQL vẫn giữ hành vi FK PostgreSQL và các CHECK đi kèm.
 
-Nguyên nhân kiểm tra cũ bỏ sót: export SQL/parse thành công chưa có nghĩa là editor không có diagnostics. Bộ diagnostics editor báo 75 vị trí (nhiều vị trí cùng trỏ tới một quan hệ), trong khi parser/export cũ vẫn chạy được. Parser cũ của lệnh `dbml2sql` cũng không nhận cú pháp `>?`, nên script build hiện dùng parser v2 và kiểm tra toàn bộ editor diagnostics trước khi export.
-
-Riêng lần sửa cú pháp v4.0 đã kiểm chứng: 75 diagnostics trước sửa → **0 sau sửa**, SQL giữ nguyên khi bỏ comment/khoảng trắng. Bản 4.1 tiếp tục dùng kiểm tra editor này nhưng có thay đổi cấu trúc identity/auth theo bảng dưới. Kiểm chứng qua API diagnostics chính thức, chưa thao tác trên giao diện website.
+Lịch sử kiểm tra: bộ diagnostics editor báo 75 vị trí (nhiều vị trí cùng trỏ tới một quan hệ), trong khi parser/export cũ vẫn chạy được. Riêng lần sửa cú pháp v4.0 đã kiểm chứng: 75 diagnostics trước sửa → **0 sau sửa**, SQL giữ nguyên khi bỏ comment/khoảng trắng. Kiểm chứng qua API diagnostics chính thức, chưa thao tác trên giao diện website.
 
 ## Thay đổi identity/auth ở v4.1
 
@@ -343,7 +365,7 @@ OIDC xác minh token/state/identity trước theo flow SSO, rồi trong transact
 | `idx_handover_output_history (output_id, performed_at) WHERE output_id IS NOT NULL` | Lịch sử công trình, không chứa các dòng bàn giao group |
 | `idx_handover_group_history (group_id, performed_at) WHERE group_id IS NOT NULL` | Lịch sử group, không chứa các dòng bàn giao công trình |
 
-Hai index lịch sử partial thay hai index toàn bảng tương ứng, không tạo thêm bản sao. DBML ghi chú chúng; định nghĩa thực nằm trong `postgres-features.sql` và SQL sinh ra. Đây là lựa chọn theo điều kiện truy vấn, chưa phải kết quả benchmark tải. Khi có dữ liệu đại diện, dùng `EXPLAIN (ANALYZE, BUFFERS)` để đánh giá; không thêm index hàng loạt chỉ vì có FK.
+Hai index lịch sử partial thay hai index toàn bảng tương ứng, không tạo thêm bản sao. Định nghĩa thực nằm trong `ResearchOS.sql`. Đây là lựa chọn theo điều kiện truy vấn, chưa phải kết quả benchmark tải. Khi có dữ liệu đại diện, dùng `EXPLAIN (ANALYZE, BUFFERS)` để đánh giá; không thêm index hàng loạt chỉ vì có FK.
 
 ### ADMIN và grant MANUAL/SYSTEM
 
@@ -492,30 +514,30 @@ Các function đều chạy theo quyền SQL caller mặc định; **chưa bật
 
 ## Phần F0 mới: import state, provenance và search index — 31/10/2026
 
-Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchOS.sql`. Nay đã chuyển về đúng nguồn: enum, bảng, check và FK nằm trong `ResearchOS.dbml`; view, function, trigger và index đặc biệt nằm trong `postgres-features.sql`. `ResearchOS.sql` được sinh lại từ hai file đó, nên không còn sửa tay và có thể tái tạo.
+Ba nhóm object này trước đây được thêm trực tiếp vào `ResearchOS.sql`, rồi chuyển sang DBML và `postgres-features.sql` để tránh sửa tay file sinh ra. Nay cả hai nguồn đó đã bị xoá: **`ResearchOS.sql` là nguồn sự thật duy nhất** và được sửa trực tiếp (xem mục "Workflow: SQL là nguồn sự thật").
 
-| Thành phần | Nguồn | Ghi chú |
+| Thành phần | Loại | Ghi chú |
 |---|---|---|
-| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED — trạng thái **của công trình**, không phải của người review; xem mục "Từ chối theo từng researcher" bên dưới |
-| `research_outputs.import_state` + `ck_output_import_owner` | DBML | ACCEPTED bắt buộc có `owner_id` |
-| `field_provenance` | DBML | PK 4 cột `(entity_type, entity_id, field_name, source_ref)` để giữ lịch sử khi ghi đè; `ck_field_provenance_ref` chặn `source_ref` trắng |
-| `search_entity_type` | DBML | Enum 4 giá trị: OUTPUT / RESEARCHER / GROUP / OPPORTUNITY |
-| `search_index` | DBML | PK `(entity_type, entity_id)`; `entity_id` đa hình nên không có FK, trigger `guard_search_index_entity` canh giữ |
-| `owner_output_versions` + `visible_owner_output_versions` | postgres-features.sql | Bản làm việc của owner: công trình ACCEPTED chưa publish, không vào Discovery/Search |
-| `visible_search_index` | postgres-features.sql | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity, kể cả điều kiện tài khoản active |
-| `sync_search_index` + trigger | postgres-features.sql | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
-| `sync_search_index_output` | postgres-features.sql | Hàm dựng lại dòng index OUTPUT cho một bài; dùng chung cho nhánh publish, cho thay đổi tác giả và cho rebuild |
-| `sync_researcher_search_index`, `sync_group_search_index`, `sync_opportunity_search_index` | postgres-features.sql | Hàm dựng lại dòng index cho một researcher / group / opportunity; trigger và rebuild cùng gọi |
-| `rebuild_search_index` | postgres-features.sql | Dựng lại toàn bộ index từ bảng nguồn; dùng chung hàm phụ với trigger nên hai đường không lệch nhau |
-| `sync_search_index_authors` | postgres-features.sql | Trigger `output_authors` insert/update/delete → dựng lại document của bài |
-| `sync_search_index_profile_del` | postgres-features.sql | Trigger `researcher_profiles` delete → xoá dòng index RESEARCHER kể cả khi account còn lại |
-| `idx_revision_fts`, `idx_output_visibility_lookup`, `idx_search_index_*` | postgres-features.sql | GIN FTS, GIN trigram và index lọc theo scope |
+| `output_import_state` | enum | NONE / CANDIDATE / ACCEPTED — trạng thái **của công trình**, không phải của người review; xem mục "Từ chối theo từng researcher" bên dưới |
+| `research_outputs.import_state` + `ck_output_import_owner` | cột + CHECK | ACCEPTED bắt buộc có `owner_id` |
+| `field_provenance` | bảng | PK 4 cột `(entity_type, entity_id, field_name, source_ref)` để giữ lịch sử khi ghi đè; `ck_field_provenance_ref` chặn `source_ref` trắng |
+| `search_entity_type` | enum | 4 giá trị: OUTPUT / RESEARCHER / GROUP / OPPORTUNITY |
+| `search_index` | bảng | PK `(entity_type, entity_id)`; `entity_id` đa hình nên không có FK, trigger `guard_search_index_entity` canh giữ |
+| `owner_output_versions` + `visible_owner_output_versions` | view + function | Bản làm việc của owner: công trình ACCEPTED chưa publish, không vào Discovery/Search |
+| `visible_search_index` | view | Lọc quyền theo đúng `can_view_output` cho cả 4 loại entity, kể cả điều kiện tài khoản active |
+| `sync_search_index` + trigger | function + trigger | Index là bảng thường nên publish thấy ngay, không chờ lịch refresh |
+| `sync_search_index_output` | function | Hàm dựng lại dòng index OUTPUT cho một bài; dùng chung cho nhánh publish, cho thay đổi tác giả và cho rebuild |
+| `sync_researcher_search_index`, `sync_group_search_index`, `sync_opportunity_search_index` | function | Hàm dựng lại dòng index cho một researcher / group / opportunity; trigger và rebuild cùng gọi |
+| `rebuild_search_index` | function | Dựng lại toàn bộ index từ bảng nguồn; dùng chung hàm phụ với trigger nên hai đường không lệch nhau |
+| `sync_search_index_authors` | trigger | Trigger `output_authors` insert/update/delete → dựng lại document của bài |
+| `sync_search_index_profile_del` | trigger | Trigger `researcher_profiles` delete → xoá dòng index RESEARCHER kể cả khi account còn lại |
+| `idx_revision_fts`, `idx_output_visibility_lookup`, `idx_search_index_*` | index | GIN FTS, GIN trigram và index lọc theo scope |
 
 `search_index.entity_type` dùng enum `search_entity_type` riêng, không dùng lại enum `entity_types` cũ: enum cũ có `PROJECT` và `TOPIC` nhưng thiếu `OPPORTUNITY`, nên tập giá trị không khớp. `ck_search_index_entity_type` được giữ lại như một ràng buộc tường minh, trùng với enum nhưng vẫn trả lỗi `23514` như thiết kế cũ.
 
 ## Sửa 3 lỗi review của PR #1 — 01/11/2026
 
-Ba nhận xét review trên PR #1 (RES-152) được sửa trong `postgres-features.sql` và `ResearchOS.dbml`; `ResearchOS.sql` được sinh lại từ hai file đó.
+Ba nhận xét review trên PR #1 (RES-152) được sửa trong `ResearchOS.sql`.
 
 | Vấn đề | Sửa |
 |---|---|
@@ -547,14 +569,14 @@ Smoke test mới `schema-search-rebuild-smoke.sql` kiểm tra: rebuild trên dat
 
 Quyết định của một researcher giờ nằm ở `publication_claims.status = 'REJECTED'` — đúng bảng vốn đã có hình dạng một dòng cho mỗi (công trình, researcher). Cột `import_state` chỉ còn `NONE` / `CANDIDATE` / `ACCEPTED`, và một bài bị từ chối **vẫn là `CANDIDATE`**.
 
-| Thành phần | Nguồn | Ghi chú |
+| Thành phần | Loại | Ghi chú |
 |---|---|---|
-| `output_import_state` | DBML | NONE / CANDIDATE / ACCEPTED |
-| `can_view_candidate` | postgres-features.sql | Candidate không có owner và không được share, nên `can_view_output` không mở được cho nó. Quy tắc riêng: researcher có claim cho bài đó, hoặc chính researcher đó pull bài đó |
-| `visible_candidate_reviews(actor)` | postgres-features.sql | Toàn bộ candidate mà actor được xem |
-| `visible_candidate_suggestions(actor)` | postgres-features.sql | Trên, trừ claim `REJECTED` — bài đã từ chối thì không còn hiện để gợi ý |
-| `visible_rejected_candidates(actor)` | postgres-features.sql | Rejection list — bài vẫn tìm được và accept lại được, vì dòng claim không bao giờ bị xoá |
-| `publication_claims (user_id, status)` | DBML | Index phục vụ cả hai danh sách, không phải quét mọi claim của một công trình |
+| `output_import_state` | enum | NONE / CANDIDATE / ACCEPTED |
+| `can_view_candidate` | function | Candidate không có owner và không được share, nên `can_view_output` không mở được cho nó. Quy tắc riêng: researcher có claim cho bài đó, hoặc chính researcher đó pull bài đó |
+| `visible_candidate_reviews(actor)` | function | Toàn bộ candidate mà actor được xem |
+| `visible_candidate_suggestions(actor)` | function | Trên, trừ claim `REJECTED` — bài đã từ chối thì không còn hiện để gợi ý |
+| `visible_rejected_candidates(actor)` | function | Rejection list — bài vẫn tìm được và accept lại được, vì dòng claim không bao giờ bị xoá |
+| `publication_claims (user_id, status)` | index | Index phục vụ cả hai danh sách, không phải quét mọi claim của một công trình |
 
 Mỗi function join claim **của riêng actor**, nên một công trình là **một dòng** trong mỗi danh sách dù bao nhiêu researcher cùng claim nó, và việc một người từ chối không ảnh hưởng tới người khác.
 
@@ -566,7 +588,6 @@ Migration `20261109090000_per_researcher_rejection` dựng lại kiểu enum (Po
 
 Đã kiểm tra lại bản 4.3 ngày 30/10/2026:
 
-- Build qua parser v2/exporter và diagnostics editor chính thức từ bộ `@dbml/cli@11.0.0`: thành công, **0 diagnostics**; fixture chống tái xuất hiện nullable/`>` vẫn qua.
 - Khởi tạo toàn bộ SQL trong PostgreSQL **18.4** cục bộ, cluster thử nghiệm riêng: thành công. Thiết kế nhắm PostgreSQL 15+; chưa chạy bộ test trên 15/16/17.
 - `schema-auth-smoke.sql`: PASS A–J theo yêu cầu mới: FACULTY baseline; STUDENT/STAFF guest; ADMIN độc lập RESEARCHER; future grant/revoke/inactive; CHECK MANUAL/SYSTEM/actor và role không default; email/mã trường/credentials; session LOCAL/OIDC đúng user; hết hạn/idle/logout; đổi/reset hash revoke session; ADMIN không bypass owner/group/PRIVATE ngay cả khi có cả RESEARCHER.
 - `schema-policy-smoke.sql`: PASS helper admin cuối cùng, sinh viên researcher tạo group singleton, DOI nhiều cách viết gồm tab/CR/LF bị chặn trùng (INSERT/UPDATE và blank → NULL), inactive giữ nội dung và revoke session, bàn giao owner/Leader nguyên tử, ON CONFLICT no-op cho cả output/group, căn cứ, request cũ, lịch sử bất biến và không mở quyền cho admin thực hiện.
@@ -575,7 +596,7 @@ Migration `20261109090000_per_researcher_rejection` dựng lại kiểu enum (Po
 - `schema-concurrency.py`: hai kết nối thực; chỉ một đơn chưa rút khi nộp trùng; rút/phản hồi chỉ một bên thắng; insert chờ đóng rồi bị từ chối; hai bàn giao cùng người cũ chỉ một lần thành công; hai transaction dùng helper khóa admin giữ admin cuối cùng. Bổ sung LOCAL/OIDC login–deactivation theo cả hai thứ tự, mở lại tài khoản không hồi sinh phiên; login–reset theo thứ tự khóa user → credentials, login đọc hash mới hoặc session vừa tạo bị revoke. Hash trong test là dữ liệu giả, không phải kiểm thử xác thực mật khẩu.
 - `schema-search-rebuild-smoke.sql` (mới, 07/11/2026): PASS rebuild trên index rỗng, dựng lại sau khi xoá sạch index, idempotent khi gọi hai lần, gỡ dòng của bản nháp/tài khoản bị vô hiệu hoá/group đã archive/opportunity đã đóng, và cho index giống hệt index do trigger tạo.
 - `pnpm db:smoke` (mới, 07/11/2026): PASS toàn bộ 5 file smoke test trên **cả hai** bản dựng schema — `ResearchOS.sql` và chuỗi migration — trên PostgreSQL 18.3. Migration mới `20261107160000_search_index_rebuild` áp sạch trên database trống, và `rebuild_search_index()` tồn tại sau khi áp chuỗi migration.
-- **Kiểm tra âm:** gỡ vòng lặp `OPPORTUNITY` trong `rebuild_search_index()` rồi sinh lại `ResearchOS.sql` làm smoke test **fail** với `Assertion failed: the rebuild indexes the open opportunity`. Cùng lúc đó, bản dựng từ chuỗi migration vẫn pass — đúng như mong đợi, vì migration không bị đổi. Đây là lý do `pnpm db:smoke` phải chạy cả hai bản dựng.
+- **Kiểm tra âm:** gỡ vòng lặp `OPPORTUNITY` trong `rebuild_search_index()` rồi sửa `ResearchOS.sql` làm smoke test **fail** với `Assertion failed: the rebuild indexes the open opportunity`. Cùng lúc đó, bản dựng từ chuỗi migration vẫn pass — đúng như mong đợi, vì migration không bị đổi. Đây là lý do `pnpm db:smoke` phải chạy cả hai bản dựng.
 - Chưa chạy giao diện dbdiagram.io; xác nhận bằng parser chính thức, không khẳng định đã thao tác trên website.
 - Không chạy vào database có dữ liệu của dự án. Chỉ dùng dữ liệu giả trong cluster mới riêng biệt, không chạy verify mật khẩu/login/API, không gọi IdP/OpenAlex/email/AI. Test quyền là test predicate/ràng buộc DB, không khẳng định API quản trị đã hoạt động. Cluster thử nghiệm được dừng sau kiểm tra.
 
@@ -586,11 +607,8 @@ Migration `20261109090000_per_researcher_rejection` dựng lại kiểu enum (Po
 # Lệnh tự dựng và tự xoá database thử; không đụng database dev.
 pnpm db:smoke
 
-# Chỉ kiểm tra parser và editor diagnostics, không ghi lại SQL.
-./docs/database/build-schema.ps1 -CheckOnly
-
-# Tạo lại SQL trong repo; không kết nối database.
-./docs/database/build-schema.ps1
+# So sánh ResearchOS.sql với schema.prisma.
+pnpm db:drift
 
 # Chỉ chạy với database rỗng ở cluster thử nghiệm của bạn.
 psql -X -h 127.0.0.1 -p 55440 -U schema_test -v ON_ERROR_STOP=1 -d researchos_test -f docs/database/ResearchOS.sql

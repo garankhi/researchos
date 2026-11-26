@@ -14,8 +14,8 @@ với API job bền vững bên dưới.
 
 PostgreSQL là nguồn trạng thái: `background_jobs` giữ owner, loại job,
 idempotency key, payload, kết quả và số lần thực thi; `outbox` giữ các lần phát
-`WORK`/`DLQ`. Schema nguồn nằm trong DBML + PostgreSQL supplement, được sinh
-thành `ResearchOS.sql`; hai migration additive bổ sung các bảng và queue scope.
+`WORK`/`DLQ`. Schema nguồn nằm trong `docs/database/ResearchOS.sql`; hai migration
+additive bổ sung các bảng và queue scope.
 Chạy `pnpm db:migrate:deploy` trước khi khởi động code mới.
 
 Các endpoint đều dùng session cookie và envelope tiêu chuẩn:

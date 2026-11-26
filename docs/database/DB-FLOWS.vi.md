@@ -1,6 +1,6 @@
 # Hiểu database ResearchOS qua các flow sử dụng
 
-Tài liệu dành cho người cần hiểu **người dùng làm gì, dữ liệu đi vào bảng nào và vì sao cần bảng đó**. Nội dung bám theo [ResearchOS.dbml](ResearchOS.dbml) và [ResearchOS.sql](ResearchOS.sql), phiên bản 4.3 ngày 30/10/2026. MVP đăng nhập bằng email/mật khẩu; OIDC/SSO được giữ cho giai đoạn sau.
+Tài liệu dành cho người cần hiểu **người dùng làm gì, dữ liệu đi vào bảng nào và vì sao cần bảng đó**. Nội dung bám theo [ResearchOS.sql](ResearchOS.sql) — nguồn sự thật duy nhất của schema — phiên bản 4.3 ngày 30/10/2026. MVP đăng nhập bằng email/mật khẩu; OIDC/SSO được giữ cho giai đoạn sau.
 
 Các flow dưới đây mô tả cách ứng dụng cần vận hành theo thiết kế. Database đã có ràng buộc và kiểm tra liên quan, nhưng API đăng nhập LOCAL, cấp/reset mật khẩu, bootstrap admin, SSO thực tế, đồng bộ OpenAlex và gửi email chưa được triển khai trong phần việc này. Chi tiết kỹ thuật và kết quả kiểm chứng nằm trong [README](README.md).
 
@@ -606,4 +606,4 @@ Backend phải dùng thao tác INSERT này cho bàn giao một người phụ tr
 | Các hàm hỗ trợ đọc bài/file/application theo actor | Dùng đúng hàm/policy trong search, API và tải file; không expose bảng gốc bỏ qua quyền |
 | Ledger sự kiện/email, chống trùng item và giới hạn attempts | Lịch gửi, matching, kiểm tra visibility lần cuối và retry SMTP |
 
-Các sơ đồ và tên bảng giúp đọc thiết kế; chúng không thay thế việc triển khai và kiểm thử API. Khi cần viết code hoặc đối chiếu chính xác cột/ràng buộc, xem [schema DBML](ResearchOS.dbml), [SQL đầy đủ](ResearchOS.sql) và [README kỹ thuật](README.md).
+Các sơ đồ và tên bảng giúp đọc thiết kế; chúng không thay thế việc triển khai và kiểm thử API. Khi cần viết code hoặc đối chiếu chính xác cột/ràng buộc, xem [SQL đầy đủ](ResearchOS.sql) và [README kỹ thuật](README.md).
