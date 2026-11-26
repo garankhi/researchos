@@ -50,6 +50,7 @@ const SMOKE_FILES = [
   'schema-smoke.sql',
   'schema-auth-smoke.sql',
   'schema-policy-smoke.sql',
+  'schema-scope-smoke.sql',
   'schema-search-smoke.sql',
   'schema-search-rebuild-smoke.sql',
 ];
