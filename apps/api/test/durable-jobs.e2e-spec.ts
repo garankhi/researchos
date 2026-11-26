@@ -16,6 +16,7 @@ import {
   notificationQueueScope,
   stageNotificationEvent,
 } from '@researchos/database';
+import { createS3Storage } from '@researchos/storage';
 import {
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
@@ -638,6 +639,70 @@ describe('durable jobs: HTTP → PostgreSQL outbox → Redis → standalone work
       })
       .toBeDefined();
   });
+
+  it.skipIf(process.env.ARTICLE_UPLOAD_E2E_STORAGE !== 'seaweedfs')(
+    'exports both LLKH formats through the real worker and signs downloads only for the job owner',
+    async () => {
+      const client = request(app.getHttpServer());
+      const storage = createS3Storage();
+      await prisma.researcher_profiles.create({
+        data: { user_id: owners[0]! },
+      });
+      await startWorker();
+      try {
+        for (const format of ['docx', 'xlsx']) {
+          const key = randomUUID();
+          const submitExport = () =>
+            client
+              .post('/exports/llkh')
+              .set('Cookie', cookie())
+              .set('Idempotency-Key', key)
+              .send({ format })
+              .expect(202);
+          const { body } = await submitExport();
+          const id = body.data.jobId as string;
+          expect((await submitExport()).body.data.jobId).toBe(id);
+          const completed = await waitStatus(id, 'COMPLETED');
+          const { fileKey } = completed.result as { fileKey: string };
+          try {
+            const status = await client
+              .get(`/jobs/${id}`)
+              .set('Cookie', cookie())
+              .expect(200);
+            expect(status.body.data.exportLevel).toBe(2);
+            const path = `/exports/download/${id}`;
+            await client.get(path).set('Cookie', cookie(1)).expect(403);
+            const response = await client
+              .get(path)
+              .set('Cookie', cookie())
+              .expect(200);
+            expect(response.body.data).toMatchObject({
+              exportLevel: 2,
+              fileName: `LLKH.${format}`,
+            });
+            const url = new URL(response.body.data.downloadUrl as string);
+            expect(url.searchParams.get('X-Amz-Expires')).toBe('900');
+            const file = await fetch(url);
+            expect(file.status).toBe(200);
+            expect(
+              Array.from(new Uint8Array(await file.arrayBuffer()).slice(0, 4)),
+            ).toEqual([80, 75, 3, 4]);
+          } finally {
+            await storage.deleteObject(fileKey);
+          }
+        }
+        const profile = await prisma.researcher_profiles.findUniqueOrThrow({
+          where: { user_id: owners[0]! },
+        });
+        expect(profile.llkh_last_exported_at).toBeInstanceOf(Date);
+      } finally {
+        await stopWorker();
+        await prisma.researcher_profiles.delete({
+          where: { user_id: owners[0]! },
+        });
+      }
+    },
+  );
 
   it('stages, deduplicates and delivers a private notification to an offline inbox', async () => {
     const [actor, recipient] = owners as [string, string, string];
