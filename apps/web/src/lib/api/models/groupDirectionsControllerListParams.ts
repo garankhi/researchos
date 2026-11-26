@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { GroupDirectionsControllerListArchived } from './groupDirectionsControllerListArchived';
 
 export type GroupDirectionsControllerListParams = {
   /**
@@ -22,4 +23,8 @@ export type GroupDirectionsControllerListParams = {
    * Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.
    */
   sort?: string;
+  /**
+   * Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.
+   */
+  archived?: GroupDirectionsControllerListArchived;
 };

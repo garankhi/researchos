@@ -5,9 +5,11 @@ import { useRef, useState, type ReactNode } from 'react';
 import Header from '@/components/ui/header';
 import { SearchBar } from '@/features/discovery';
 import { AddResearchDrawer } from '@/features/identity';
+import { useRouter } from '@/i18n/navigation';
 
 export function AppHeader({ accountSlot }: { accountSlot?: ReactNode }) {
   const t = useTranslations('addResearch');
+  const router = useRouter();
   const moreTrigger = useRef<HTMLButtonElement>(null);
   const [addResearchOpen, setAddResearchOpen] = useState(false);
 
@@ -26,6 +28,7 @@ export function AppHeader({ accountSlot }: { accountSlot?: ReactNode }) {
         inHeader
         open={addResearchOpen}
         onOpenChange={setAddResearchOpen}
+        onSelectArticle={() => router.push('/outputs/new/article')}
         finalFocusEl={() =>
           moreTrigger.current?.offsetWidth ? moreTrigger.current : null
         }

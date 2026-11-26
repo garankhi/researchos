@@ -1,5 +1,9 @@
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { Prisma, PrismaService } from '@researchos/database';
+import {
+  Prisma,
+  PrismaService,
+  stageNotificationEvent,
+} from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
@@ -58,15 +62,16 @@ export class FollowService {
       );
     }
 
-    const [result] = await this.prisma.$queryRaw<
-      Array<{
-        allowed: boolean;
-        targetExists: boolean;
-        followedAt: Date | null;
-        displayName: string | null;
-        state: string | null;
-      }>
-    >`
+    const result = await this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<
+        Array<{
+          allowed: boolean;
+          targetExists: boolean;
+          followedAt: Date | null;
+          displayName: string | null;
+          state: string | null;
+        }>
+      >`
       WITH caller AS (
         SELECT is_researcher(${callerId}::uuid) AS allowed
       ), target AS (
@@ -86,6 +91,18 @@ export class FollowService {
         target.display_name AS "displayName", target.state
       FROM caller LEFT JOIN target ON true LEFT JOIN inserted ON true
     `;
+      if (row.followedAt && entityType === FollowEntityType.RESEARCHER) {
+        await stageNotificationEvent(tx, {
+          key: `follow:${callerId}:${entityId}:${row.followedAt.toISOString()}`,
+          type: 'FOLLOW',
+          actorId: callerId,
+          subjectType: 'RESEARCHER',
+          subjectId: entityId,
+          payload: { link: `/profile/${callerId}` },
+        });
+      }
+      return row;
+    });
     if (!result.allowed)
       throw new CodedHttpException(
         domainErrorCodes.identity.researcherRequired,

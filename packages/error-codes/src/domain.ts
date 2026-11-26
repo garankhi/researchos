@@ -112,6 +112,9 @@ export const domainErrorCodes = {
     alreadyAnswered: 'application_already_answered',
     alreadyWithdrawn: 'application_already_withdrawn',
     invalidState: 'application_invalid_state',
+    capacityReached: 'application_capacity_reached',
+    noteRequired: 'application_note_required',
+    noteTooLong: 'application_note_too_long',
   },
   outputs: {
     outputNotFound: 'output_not_found',
@@ -128,6 +131,7 @@ export const domainErrorCodes = {
     outputIdempotencyKeyConflict: 'output_idempotency_key_conflict',
     outputDoiConflict: 'output_doi_conflict',
     outputAuthorInvalid: 'output_author_invalid',
+    outputAuthorClaimed: 'output_author_claimed',
     outputTopicInvalid: 'output_topic_invalid',
   },
   storage: {

@@ -43,7 +43,8 @@ export function opportunityPermissions(
     /** Whether the caller may apply to the opportunity. */
     canApply:
       researcher &&
-      !canManage &&
+      !isCreator &&
+      !opportunity.myApplicationStatus &&
       opportunity.status === 'OPEN' &&
       !opportunity.archivedAt,
     /** Whether the caller may see the applications the opportunity received. */

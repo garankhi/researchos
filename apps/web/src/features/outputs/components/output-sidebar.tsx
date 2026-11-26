@@ -15,7 +15,7 @@ import { ExternalLink, Users } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { FollowButton } from '@/features/follow';
 import type { OutputDetail } from '../types';
-import { formatPublishedDate } from './output-header';
+import { formatOutputPublicationDate } from './output-header';
 import { EntityLink } from '@/features/discovery';
 
 export function OutputSidebar({
@@ -28,15 +28,11 @@ export function OutputSidebar({
   groupLoading?: boolean;
 }) {
   const t = useTranslations('outputs');
+  const article = useTranslations('articleDetails');
   const format = useFormatter();
   const rev = output.revision;
 
-  const publishedDate = formatPublishedDate(
-    format,
-    rev?.releasedAt ?? null,
-    output.firstSharedAt,
-    rev?.publicationYear ?? null,
-  );
+  const publishedDate = formatOutputPublicationDate(format, output);
 
   const visibilityLabel =
     output.sharingStatus !== 'SHARED'
@@ -87,6 +83,24 @@ export function OutputSidebar({
               <Text textStyle="sm">{rev.publisher}</Text>
             </Box>
           ) : null}
+
+          {rev?.outputType === 'ARTICLE' &&
+            (['volume', 'issue', 'pages'] as const).map((key) => {
+              return rev[key] ? (
+                <Box key={key}>
+                  <Text textStyle="xs" color="fg.muted">
+                    {article(key)}
+                  </Text>
+                  <Text textStyle="sm">{rev[key]}</Text>
+                </Box>
+              ) : null;
+            })}
+
+          {rev?.outputType === 'ARTICLE' && rev.peerReviewed != null && (
+            <Text textStyle="sm">
+              {article(rev.peerReviewed ? 'yes' : 'no')}
+            </Text>
+          )}
 
           {output.doi ? (
             <Box>

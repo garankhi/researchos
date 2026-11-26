@@ -9,6 +9,7 @@ export { useOutputCapability } from './hooks/use-output-capability';
 export { useOutputFiles } from './hooks/use-output-files';
 export { useOutputGroup } from './hooks/use-output-group';
 export { useOutputVisibility } from './hooks/use-output-visibility';
+export { ArticleCreationFlow } from './components/article-creation-flow';
 export { OutputDetailActionsMenu } from './components/output-detail-actions-menu';
 export { OutputDetailShell } from './components/output-detail-shell';
 export { OutputHeader } from './components/output-header';

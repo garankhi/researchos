@@ -11,6 +11,7 @@ import {
   opportunitiesControllerClose,
 } from '@/lib/api';
 import type { Opportunity } from '../types';
+import type { HubArchive } from '../hooks/use-group-hub';
 import {
   HubAction,
   HubEditor,
@@ -85,6 +86,19 @@ function OpportunityEditor({
           label: t('expertiseTags'),
           initial: opportunity?.requiredExpertiseTags.join(', '),
         },
+        ...(!opportunity || opportunity.status === 'DRAFT'
+          ? [
+              {
+                name: 'autoFillOnAcceptance',
+                label: t('fillPolicy'),
+                initial: String(opportunity?.autoFillOnAcceptance ?? false),
+                options: [
+                  { value: 'false', label: t('manualFill') },
+                  { value: 'true', label: t('singleApplicant') },
+                ],
+              },
+            ]
+          : []),
         {
           name: 'responseSlaDays',
           label: t('slaDays'),
@@ -113,6 +127,10 @@ function OpportunityEditor({
             .map((tag) => tag.trim())
             .filter(Boolean),
           responseSlaDays: Number(values.responseSlaDays),
+          autoFillOnAcceptance:
+            values.autoFillOnAcceptance === undefined
+              ? undefined
+              : values.autoFillOnAcceptance === 'true',
           applicationDeadline: values.applicationDeadline
             ? new Date(values.applicationDeadline).toISOString()
             : null,
@@ -129,19 +147,29 @@ export function GroupOpportunities({
   groupId,
   canManage,
   query,
+  archive,
 }: {
   groupId: string;
   canManage: boolean;
   query: Parameters<typeof HubList<Opportunity>>[0]['query'];
+  archive?: HubArchive<Opportunity>;
 }) {
   const t = useTranslations('groups');
   const locale = useLocale();
   return (
     <HubSection
       title={t('opportunities')}
-      action={canManage ? <OpportunityEditor groupId={groupId} /> : null}
+      archive={archive}
+      action={
+        canManage && !archive?.showing ? (
+          <OpportunityEditor groupId={groupId} />
+        ) : null
+      }
     >
-      <HubList query={query}>
+      <HubList
+        query={archive?.showing ? archive.query : query}
+        archived={archive?.showing}
+      >
         {(items) =>
           items.map((opportunity, index) => (
             <Box
@@ -196,9 +224,22 @@ export function GroupOpportunities({
                     })}
                   </Text>
                 ) : null}
-                {canManage &&
-                opportunity.canManage === true &&
-                !opportunity.archivedAt ? (
+                {archive?.showing && canManage && opportunity.canManage ? (
+                  <HubMenu positioned>
+                    <HubAction
+                      groupId={groupId}
+                      label={t('restoreOpportunity')}
+                      confirm
+                      action={() =>
+                        opportunitiesControllerUpdate(opportunity.id, {
+                          archivedAt: null,
+                        })
+                      }
+                    />
+                  </HubMenu>
+                ) : canManage &&
+                  opportunity.canManage === true &&
+                  !opportunity.archivedAt ? (
                   <HubMenu positioned>
                     <OpportunityEditor
                       groupId={groupId}

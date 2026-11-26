@@ -223,4 +223,53 @@ BEGIN
  PERFORM pg_temp.expect_error(format('DELETE FROM digest_items WHERE delivery_id=%L',delivery),'23514');
  RAISE NOTICE 'PASS follow/digest eligibility, event creation, deduplication, opt-out, empty/terminal guards';
 END $$;
+DO $$
+DECLARE
+  actor uuid := gen_random_uuid();
+  recipient uuid := gen_random_uuid();
+  notice uuid := gen_random_uuid();
+  device uuid := gen_random_uuid();
+  event_identity text := 'smoke-notification:' || notice;
+BEGIN
+  INSERT INTO users (id, user_type, email, full_name, department_unit) VALUES
+    (actor, 'FACULTY', actor || '@notifications.test.invalid', 'Actor', 'FPTU'),
+    (recipient, 'FACULTY', recipient || '@notifications.test.invalid', 'Recipient', 'FPTU');
+  INSERT INTO notification_events (event_key, event_type, actor_id, subject_type, subject_id, payload)
+    VALUES (event_identity, 'FOLLOW', actor, 'RESEARCHER', actor, '{}');
+  INSERT INTO notifications (id, recipient_id, event_key, event_type, actor_id, subject_type, subject_id, title, body, link, locale, content_snapshot)
+    VALUES (notice, recipient, event_identity, 'FOLLOW', actor, 'RESEARCHER', actor, 'Follower', 'A researcher followed you', '/profile/' || actor, 'en', '{}');
+  PERFORM pg_temp.expect_error(format(
+    'INSERT INTO notifications (recipient_id, event_key, event_type, subject_type, subject_id, title, body, link, locale, content_snapshot)
+     SELECT recipient_id, event_key, event_type, subject_type, subject_id, title, body, link, locale, content_snapshot FROM notifications WHERE id = %L', notice
+  ), '23505');
+  INSERT INTO notification_preferences (user_id) VALUES (recipient);
+  INSERT INTO push_devices (id, user_id, token, platform, locale)
+    VALUES (device, recipient, 'smoke-token:' || device, 'WEB', 'en');
+  INSERT INTO notification_deliveries (notification_id, channel, device_id)
+    VALUES (notice, 'WEBSOCKET', NULL), (notice, 'FCM', device);
+  PERFORM pg_temp.expect_error(format(
+    'INSERT INTO notification_deliveries (notification_id, channel) VALUES (%L, ''WEBSOCKET'')', notice
+  ), '23505');
+  PERFORM pg_temp.expect_error(format(
+    'INSERT INTO notification_deliveries (notification_id, channel) VALUES (%L, ''FCM'')', notice
+  ), '23514');
+  PERFORM pg_temp.expect_error(format(
+    'INSERT INTO notification_deliveries (notification_id, channel, device_id) VALUES (%L, ''FCM'', %L)', notice, device
+  ), '23505');
+
+  DELETE FROM users WHERE id = actor;
+  PERFORM pg_temp.assert_true(
+    EXISTS (SELECT FROM notifications WHERE id = notice AND actor_id IS NULL)
+    AND EXISTS (SELECT FROM notification_events WHERE event_key = event_identity AND actor_id IS NULL),
+    'deleting a notification actor preserves the inbox and event'
+  );
+  DELETE FROM users WHERE id = recipient;
+  PERFORM pg_temp.assert_true(
+    NOT EXISTS (SELECT FROM notifications WHERE id = notice)
+    AND NOT EXISTS (SELECT FROM notification_deliveries WHERE notification_id = notice)
+    AND NOT EXISTS (SELECT FROM push_devices WHERE id = device)
+    AND NOT EXISTS (SELECT FROM notification_preferences WHERE user_id = recipient),
+    'deleting a recipient cascades to notification data'
+  );
+END $$;
 ROLLBACK;

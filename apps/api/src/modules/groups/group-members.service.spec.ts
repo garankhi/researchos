@@ -61,7 +61,14 @@ function setup() {
   };
   const row = memberRow();
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([{ id: groupId }]),
+    $executeRaw: vi.fn(),
+    // The service locks the group first and then asks the policy helper
+    // whether the caller may manage it. The lock returns the group row and
+    // the policy returns the `allowed` flag.
+    $queryRaw: vi
+      .fn()
+      .mockResolvedValueOnce([{ id: groupId }])
+      .mockResolvedValue([{ allowed: true }]),
     research_groups: { findUnique: vi.fn().mockResolvedValue(group) },
     users: { findUnique: vi.fn().mockResolvedValue({ id: userId }) },
     group_members: {
@@ -102,12 +109,7 @@ describe('Group membership policies', () => {
 
   it('does not let an archived GROUP_LEADER membership grant management access', async () => {
     const { service, tx } = setup();
-    tx.group_members.findUnique.mockResolvedValue(
-      memberRow({
-        role: GroupMemberRole.GROUP_LEADER,
-        archived_at: new Date(),
-      }),
-    );
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
     await expect(
       service.update(groupId, userId, dto, callerId),
     ).rejects.toMatchObject({ status: HttpStatus.FORBIDDEN });
@@ -240,32 +242,29 @@ describe('Group membership policies', () => {
     });
   });
 
-  it.each([null, { role: GroupMemberRole.MEMBER }])(
-    'rejects membership writes by a non-manager: %j',
-    async (membership) => {
-      const { service, tx } = setup();
-      tx.group_members.findUnique.mockResolvedValue(membership);
-      await expect(service.add(groupId, dto, callerId)).rejects.toMatchObject({
-        status: HttpStatus.FORBIDDEN,
-        code: domainErrorCodes.groups.accessDenied,
-      });
-      await expect(
-        service.update(groupId, userId, dto, callerId),
-      ).rejects.toMatchObject({
-        status: HttpStatus.FORBIDDEN,
-        code: domainErrorCodes.groups.accessDenied,
-      });
-      await expect(
-        service.remove(groupId, userId, callerId),
-      ).rejects.toMatchObject({
-        status: HttpStatus.FORBIDDEN,
-        code: domainErrorCodes.groups.accessDenied,
-      });
-      expect(tx.group_members.create).not.toHaveBeenCalled();
-      expect(tx.group_members.update).not.toHaveBeenCalled();
-      expect(tx.group_members.delete).not.toHaveBeenCalled();
-    },
-  );
+  it('rejects membership writes when group management is denied', async () => {
+    const { service, tx } = setup();
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
+    await expect(service.add(groupId, dto, callerId)).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
+    await expect(
+      service.update(groupId, userId, dto, callerId),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
+    await expect(
+      service.remove(groupId, userId, callerId),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+      code: domainErrorCodes.groups.accessDenied,
+    });
+    expect(tx.group_members.create).not.toHaveBeenCalled();
+    expect(tx.group_members.update).not.toHaveBeenCalled();
+    expect(tx.group_members.delete).not.toHaveBeenCalled();
+  });
 
   it('rejects self-addition even with uppercase UUIDs', async () => {
     const { service, tx } = setup();
@@ -394,6 +393,65 @@ describe('Group membership policies', () => {
     );
     expect(result.items).toHaveLength(1);
     expect(tx.group_members.findMany).toHaveBeenCalled();
+  });
+
+  it.each(['true', 'all'] as const)(
+    'filters and counts the roster with archived=%s',
+    async (archived) => {
+      const { service, tx } = setup();
+      const archivedAt = new Date('2026-11-19T00:00:00Z');
+      tx.group_members.findMany.mockResolvedValue([
+        memberRow({ archived_at: archivedAt }),
+      ]);
+      tx.group_members.count.mockResolvedValue(3);
+      const result = await service.findAll(
+        groupId,
+        { page: 1, limit: 1, archived },
+        leadId,
+      );
+      const where =
+        archived === 'true'
+          ? { group_id: groupId, archived_at: { not: null } }
+          : { group_id: groupId };
+      expect(tx.group_members.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where, take: 1 }),
+      );
+      expect(tx.group_members.count).toHaveBeenCalledWith({ where });
+      expect(result.meta.total).toBe(3);
+      expect(result.items[0].archivedAt).toBe(archivedAt.toISOString());
+    },
+  );
+
+  it('denies archive reads and restores when the caller lacks management permission', async () => {
+    const { service, tx } = setup();
+    tx.$queryRaw.mockResolvedValue([{ allowed: false }]);
+    for (const archived of ['true', 'all'] as const) {
+      await expect(
+        service.findAll(groupId, { page: 1, limit: 20, archived }, callerId),
+      ).rejects.toMatchObject({ status: 403 });
+    }
+    await expect(
+      service.restore(groupId, userId, callerId),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(tx.group_members.findMany).not.toHaveBeenCalled();
+    expect(tx.group_members.update).not.toHaveBeenCalled();
+  });
+
+  it('restores only an archived membership and resets its role', async () => {
+    const { service, tx } = setup();
+    tx.group_members.update.mockResolvedValue(memberRow({ archived_at: null }));
+    const result = await service.restore(groupId, userId, leadId);
+    expect(tx.group_members.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          group_id_user_id: { group_id: groupId, user_id: userId },
+          archived_at: { not: null },
+        },
+        data: { archived_at: null, role: GroupMemberRole.MEMBER },
+      }),
+    );
+    expect(result.role).toBe(GroupMemberRole.MEMBER);
+    expect(result.archivedAt).toBeUndefined();
   });
 
   it('denies an outsider the roster of an archived group', async () => {

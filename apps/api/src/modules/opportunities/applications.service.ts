@@ -10,6 +10,7 @@ import {
   OpportunityApplicationStatus,
   Prisma,
   PrismaService,
+  stageNotificationEvent,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -134,6 +135,16 @@ export class ApplicationsService {
       return await this.prisma.$transaction(operation);
     } catch (error) {
       const failure = readDatabaseFailure(error);
+      if (failure?.sqlState === 'P0168')
+        throw new CodedHttpException(
+          domainErrorCodes.applications.accessDenied,
+          HttpStatus.FORBIDDEN,
+        );
+      if (failure?.sqlState === 'P0167')
+        throw new CodedHttpException(
+          domainErrorCodes.applications.capacityReached,
+          HttpStatus.CONFLICT,
+        );
       if (failure?.sqlState === '23514' || failure?.prismaCode === 'P2034')
         throw new CodedHttpException(
           domainErrorCodes.applications.invalidState,
@@ -195,6 +206,12 @@ export class ApplicationsService {
         },
         include: applicantInclude,
       });
+      await this.notifyApplication(
+        tx,
+        application,
+        actorId,
+        'APPLICATION_RECEIVED',
+      );
       return this.response(application, await this.now(tx));
     });
   }
@@ -242,15 +259,31 @@ export class ApplicationsService {
           domainErrorCodes.applications.notFound,
           HttpStatus.NOT_FOUND,
         );
-      const [opportunity] = await tx.$queryRaw<{ allowed: boolean }[]>`
-        SELECT can_manage_opportunity(${actorId}::uuid, o.id) AS allowed
-        FROM research_opportunities o WHERE o.id = ${application.opportunity_id}::uuid FOR SHARE OF o
+      const accepting = dto.decision === OpportunityApplicationStatus.ACCEPTED;
+      const lock = accepting
+        ? Prisma.sql`FOR UPDATE OF o`
+        : Prisma.sql`FOR SHARE OF o`;
+      const [opportunity] = await tx.$queryRaw<
+        { allowed: boolean; group_id: string | null }[]
+      >`
+        SELECT can_manage_opportunity(${actorId}::uuid, o.id) AS allowed, o.group_id
+        FROM research_opportunities o WHERE o.id = ${application.opportunity_id}::uuid ${lock}
       `;
       if (!opportunity?.allowed)
         throw new CodedHttpException(
           domainErrorCodes.applications.accessDenied,
           HttpStatus.FORBIDDEN,
         );
+      if (
+        accepting &&
+        application.status === OpportunityApplicationStatus.ACCEPTED
+      ) {
+        const accepted = await tx.opportunity_applications.findUniqueOrThrow({
+          where: { id: applicationId },
+          include: applicantInclude,
+        });
+        return this.acceptanceResponse(tx, accepted, opportunity.group_id);
+      }
       // Only a pending application can be answered. Answering one that is
       // already answered is a conflict, not a silent second answer.
       if (application.status !== OpportunityApplicationStatus.PENDING)
@@ -281,8 +314,41 @@ export class ApplicationsService {
           domainErrorCodes.applications.alreadyAnswered,
           HttpStatus.CONFLICT,
         );
-      return this.response(answered[0], await this.now(tx));
+      await this.notifyApplication(
+        tx,
+        answered[0],
+        actorId,
+        accepting ? 'APPLICATION_ACCEPTED' : 'APPLICATION_DECLINED',
+      );
+      return accepting
+        ? this.acceptanceResponse(tx, answered[0], opportunity.group_id)
+        : this.response(answered[0], await this.now(tx));
     });
+  }
+
+  private async acceptanceResponse(
+    tx: Prisma.TransactionClient,
+    application: ApplicationRowWithApplicant,
+    groupId: string | null,
+  ): Promise<ApplicationResponseDto> {
+    const member = groupId
+      ? await tx.group_members.findUnique({
+          where: {
+            group_id_user_id: {
+              group_id: groupId,
+              user_id: application.applicant_id,
+            },
+            archived_at: null,
+          },
+        })
+      : null;
+    const response = this.response(application, await this.now(tx));
+    response.membership = member && {
+      groupId: member.group_id,
+      userId: member.user_id,
+      role: member.role,
+    };
+    return response;
   }
 
   /**
@@ -331,6 +397,12 @@ export class ApplicationsService {
           domainErrorCodes.applications.alreadyWithdrawn,
           HttpStatus.CONFLICT,
         );
+      await this.notifyApplication(
+        tx,
+        withdrawn[0],
+        actorId,
+        'APPLICATION_WITHDRAWN',
+      );
       return this.response(withdrawn[0], await this.now(tx));
     });
   }
@@ -343,6 +415,26 @@ export class ApplicationsService {
    * lock is taken before the row is read, so the read returns the state the
    * lock holder sees.
    */
+  private notifyApplication(
+    tx: Prisma.TransactionClient,
+    row: ApplicationRow,
+    actorId: string,
+    type:
+      | 'APPLICATION_RECEIVED'
+      | 'APPLICATION_ACCEPTED'
+      | 'APPLICATION_DECLINED'
+      | 'APPLICATION_WITHDRAWN',
+  ) {
+    return stageNotificationEvent(tx, {
+      key: `${type}:${row.id}`,
+      type,
+      actorId,
+      subjectType: 'APPLICATION',
+      subjectId: row.id,
+      payload: { link: `/opportunities/${row.opportunity_id}` },
+    });
+  }
+
   private async lock(
     tx: Prisma.TransactionClient,
     applicationId: string,

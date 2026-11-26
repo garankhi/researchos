@@ -222,10 +222,17 @@ export class AuthService {
     const tokenHash = hashSessionToken(token);
 
     await this.prisma.$executeRaw`
-      UPDATE user_sessions
-      SET revoked_at = clock_timestamp(), revocation_reason = 'LOGOUT'
-      WHERE session_token_hash = ${tokenHash}
-        AND revoked_at IS NULL
+      WITH revoked_session AS (
+        UPDATE user_sessions
+        SET revoked_at = clock_timestamp(), revocation_reason = 'LOGOUT'
+        WHERE session_token_hash = ${tokenHash}
+          AND revoked_at IS NULL
+        RETURNING user_id
+      )
+      UPDATE push_devices AS device
+      SET is_active = false, revoked_at = clock_timestamp(), updated_at = clock_timestamp()
+      FROM revoked_session AS session
+      WHERE device.user_id = session.user_id AND device.is_active
     `;
   }
 

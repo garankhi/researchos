@@ -159,10 +159,13 @@ export async function handleLlkhExport(
   const format = payload?.format;
   if (format !== 'docx' && format !== 'xlsx')
     return { error: new Error('Invalid LLKH format') };
-  const fileKey = `exports/llkh/${job.owner_id}/${job.id}/${job.generation}.${format}`;
+  // System jobs have no owner and never reach this handler.
+  const ownerId = job.owner_id;
+  if (!ownerId) return { error: new Error('LLKH export requires a job owner') };
+  const fileKey = `exports/llkh/${ownerId}/${job.id}/${job.generation}.${format}`;
   let exportLevel: number;
   try {
-    const data = await fetchData(tx, job.owner_id);
+    const data = await fetchData(tx, ownerId);
     const rendered = await renderWithFallback(data, format);
     exportLevel = rendered.exportLevel;
     await (storage ??= createS3Storage()).putObject(
@@ -180,7 +183,7 @@ export async function handleLlkhExport(
   const exportedAt = new Date();
   await tx.researcher_profiles.updateMany({
     where: {
-      user_id: job.owner_id,
+      user_id: ownerId,
       OR: [
         { llkh_last_exported_at: null },
         { llkh_last_exported_at: { lt: exportedAt } },

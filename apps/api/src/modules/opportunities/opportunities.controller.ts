@@ -65,7 +65,11 @@ export class OpportunitiesController {
     summary:
       'Lists published opportunities and opportunities managed by the caller',
     description:
-      'Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.',
+      'Status filtering uses persisted states. Omitting the archive filter preserves ordinary opportunity visibility. Explicit archive views require a group the caller manages.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Archived list requires management permission for the requested group.',
   })
   @ApiOkResponse({
     description: 'Visible opportunities and pagination information.',
@@ -82,7 +86,7 @@ export class OpportunitiesController {
   @ApiOperation({
     summary: 'Returns a visible research opportunity',
     description:
-      'An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.',
+      'The status reflects the last committed change. Scheduled expiry updates an overdue open opportunity.',
   })
   @ApiParam({
     name: 'opportunityId',
@@ -108,7 +112,7 @@ export class OpportunitiesController {
   @ApiOperation({
     summary: 'Updates a research opportunity managed by the caller',
     description:
-      'Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.',
+      'A scheduled worker expires overdue opportunities. An extension made before the sweep can prevent expiry. Extending an expired opportunity keeps it expired.',
   })
   @ApiParam({
     name: 'opportunityId',
@@ -116,8 +120,7 @@ export class OpportunitiesController {
     format: 'uuid',
   })
   @ApiOkResponse({
-    description:
-      'Updated opportunity details, including automatic deadline expiry.',
+    description: 'Updated opportunity details and current persisted status.',
     type: OpportunityResponseDto,
   })
   update(

@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { extractArticlePdfMetadata } from './article-pdf-parser.js';
+import { describe, expect, it, vi } from 'vitest';
+import { mergeGrobidMetadata } from './article-pdf-grobid.js';
+import {
+  readAbstract,
+  readFrontMatter,
+  readPdfLines,
+} from './article-pdf-layout.js';
+import {
+  extractArticlePdfMetadata,
+  inspectArticlePdf,
+} from './article-pdf-parser.js';
 
 function pdf(
   lines: Array<[size: number, y: number, text: string, x?: number]>,
@@ -48,6 +57,448 @@ function xmpMetadata(fields: string): string {
 }
 
 describe('extractArticlePdfMetadata', () => {
+  it('loads PDF.js standard font data for a PDF with an unembedded Helvetica font', async () => {
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      const { metadata } = await inspectArticlePdf(
+        pdf([[12, 720, 'Abstract: Results of a water-quality study.']]),
+      );
+      expect(metadata.abstract).toBe('Results of a water-quality study.');
+      expect(warning).not.toHaveBeenCalledWith(
+        expect.stringMatching(/standardFontDataUrl|Unable to load font data/),
+      );
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it('identifies a wrapped heading and same-size marked byline below an article type', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [8, 765, 'JOURNAL OF HEALTH'],
+          [18, 735, 'Research Article'],
+          [14, 705, 'HOW VOLUNTEERING AFFECTS'],
+          [14, 688, 'HEALTH IN MARRIED ADULTS:'],
+          [14, 671, 'Results From a Longitudinal Study'],
+          [7, 651, '1', 214],
+          [14, 645, 'Mai Nguyen, Bao Tran,'],
+          [7, 634, '2', 136],
+          [14, 628, 'and An Le'],
+          [9, 609, 'University of Hanoi'],
+          [9, 584, 'Abstract: A study of older adults.'],
+        ],
+        '/Title (PROD8826) /Author (Comp10)',
+      ),
+    );
+    expect(result).toEqual({
+      title:
+        'HOW VOLUNTEERING AFFECTS HEALTH IN MARRIED ADULTS: Results From a Longitudinal Study',
+      authorNames: ['Mai Nguyen', 'Bao Tran', 'An Le'],
+      abstract: 'A study of older adults.',
+    });
+  });
+
+  it.each([true, false])(
+    'validates the full byline across a grid of marked and unmarked rows (intact: %s)',
+    async (intact) => {
+      const result = await extractArticlePdfMetadata(
+        pdf([
+          [20, 765, 'Measuring River Flow'],
+          [7, 728, '*', 134],
+          [10, 724, 'Mai Nguyen', 80],
+          [10, 724, 'Bao Tran', 220],
+          [7, 700, '*', 350],
+          [10, 696, 'An Le', 80],
+          [10, 696, 'Sarah Hall', 300],
+          [10, 668, intact ? 'Hannah Smith' : '?? Smith', 80],
+          [10, 668, 'John Smith', 230],
+          [9, 635, 'University of Hanoi'],
+          [9, 610, 'Abstract: We measured changes in river flow.'],
+        ]),
+      );
+      expect(result).toEqual({
+        title: 'Measuring River Flow',
+        ...(intact && {
+          authorNames: [
+            'Mai Nguyen',
+            'Bao Tran',
+            'An Le',
+            'Sarah Hall',
+            'Hannah Smith',
+            'John Smith',
+          ],
+        }),
+        abstract: 'We measured changes in river flow.',
+      });
+    },
+  );
+
+  it('omits unsupported PDF Info fields and preserves typed XMP creators', async () => {
+    const lines: Parameters<typeof pdf>[0] = [
+      [18, 740, 'Review Article'],
+      [10, 685, 'Abstract: We studied river samples.'],
+    ];
+    const info = '/Title (PROD8826) /Author (Comp10)';
+    const abstract = 'We studied river samples.';
+    expect(await extractArticlePdfMetadata(pdf(lines, info))).toEqual({
+      abstract,
+    });
+    expect(
+      await extractArticlePdfMetadata(
+        pdf(
+          lines,
+          info,
+          xmpMetadata(
+            '<dc:title>River quality across seasons</dc:title>' +
+              '<dc:creator><rdf:Seq><rdf:li>Sting</rdf:li>' +
+              '<rdf:li>University of Hanoi</rdf:li><rdf:li>Nguy&#7877;n Th&#7883; Mai</rdf:li>' +
+              '</rdf:Seq></dc:creator>',
+          ),
+        ),
+      ),
+    ).toEqual({
+      title: 'River quality across seasons',
+      authorNames: ['Sting', 'University of Hanoi', 'Nguyễn Thị Mai'],
+      abstract,
+    });
+  });
+
+  it('keeps an article-type word when it wraps inside the full heading', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [12, 765, 'Editorial'],
+          [20, 733, 'How to Write a Review'],
+          [20, 710, 'Article'],
+          [10, 685, 'Mai Nguyen, Bao Tran'],
+          [9, 672, 'University of Hanoi'],
+        ],
+        '/Title (PROD8826)',
+      ),
+    );
+    expect(result).toEqual({ title: 'How to Write a Review Article' });
+  });
+
+  it('excludes name-like affiliation groups between marked author rows', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 765, 'Measuring River Flow'],
+        [7, 728, '*', 134],
+        [10, 724, 'Mai Nguyen', 80],
+        [10, 724, 'Bao Tran', 220],
+        [10, 713, 'Acme Research', 80],
+        [10, 713, 'River Science', 220],
+        [10, 702, 'mai@example.org', 80],
+        [7, 690, '*', 340],
+        [10, 686, 'An Le', 80],
+        [10, 686, 'Sarah Hall', 300],
+        [9, 622, 'Abstract: We measured changes in river flow.'],
+      ]),
+    );
+    expect(result).toEqual({
+      title: 'Measuring River Flow',
+      authorNames: ['Mai Nguyen', 'Bao Tran', 'An Le', 'Sarah Hall'],
+      abstract: 'We measured changes in river flow.',
+    });
+  });
+
+  it('omits a prefix when a later author row follows an unclassified address', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 765, 'Measuring River Flow'],
+        [12, 734, 'Mai Nguyen'],
+        [10, 723, 'mai@example.org', 290],
+        [10, 710, '123 Main Street'],
+        [12, 681, 'Bao Tran'],
+        [12, 681, 'bao@example.org', 290],
+        [9, 638, 'Abstract: We measured changes in river flow.'],
+      ]),
+    );
+    expect(result).toEqual({
+      title: 'Measuring River Flow',
+      abstract: 'We measured changes in river flow.',
+    });
+  });
+  it('uses the earliest official date from a first-page bibliography and an anchored publication footer', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [12, 750, 'Published in print: September 2025'],
+        [14, 650, '1. Introduction'],
+        [10, 630, 'Available online 7 April 2025'],
+        [9, 100, 'https://doi.org/10.1234/river-study'],
+        [9, 87, 'Received 31 March 2025; Accepted 10 April 2025'],
+        [9, 74, 'Available online 5 May 2025'],
+      ]),
+    );
+    expect(result).toEqual({
+      doi: '10.1234/river-study',
+      publicationDate: '2025-05-05',
+    });
+  });
+
+  it.each([
+    ['Received 2 May 2025; Accepted 5 May 2025', undefined],
+    [
+      'Received 12 December 2024, accepted 26 December 2024, date of publication 14 January 2025, date of current version 29 January 2025.',
+      '2025-01-14',
+    ],
+    [
+      'Revised 8 January 2025 Accepted 14 January 2025 Published January 22, 2025',
+      '2025-01-22',
+    ],
+    [
+      'Accepted January 22, 2025; Date of current version 14 April 2025',
+      undefined,
+    ],
+    ['Published online 2025-05', '2025-05'],
+    ['First published: 30 February 2025', undefined],
+    ['Published online: 05/06/2025', undefined],
+    ['Published in print: 2025', '2025'],
+    ['Published online: 2025; Published in print: 5 September 2025', '2025'],
+    ['Published in print: 2025-09; Published: 12 May 2025', '2025-05-12'],
+    ['Available online: 2025-05; Published online: 5 May 2025', '2025-05-05'],
+    ['Published: 1999; Published: 2002', undefined],
+  ])(
+    'classifies and preserves the precision of %s',
+    async (label, expected) => {
+      expect(
+        (await extractArticlePdfMetadata(pdf([[12, 700, label]])))
+          .publicationDate,
+      ).toBe(expected);
+    },
+  );
+
+  it('prefers the paper title, ordered byline and column abstract over conflicting embedded fields', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [21, 750, 'Title: Calibration of rainfall sensors'],
+          [12, 726, 'Authors: Mai Nguyen and Bao Tran'],
+          [10, 695, 'A R T I C L E  I N F O', 40],
+          [10, 695, 'A B S T R A C T', 220],
+          [9, 672, 'Keywords: Sensors', 40],
+          [10, 672, 'We calibrated rainfall sensors across two sites.', 220],
+          [9, 659, 'Publication notes', 40],
+          [10, 659, 'The readings agreed after calibration.', 220],
+          [13, 630, '1. Introduction'],
+        ],
+        '/Title (Journal of Measurement) /Author (Bao Tran; Mai Nguyen)',
+        xmpMetadata(
+          '<dc:description>Abstract: This describes a different article.</dc:description>',
+        ),
+      ),
+    );
+    expect(result).toEqual({
+      title: 'Calibration of rainfall sensors',
+      authorNames: ['Mai Nguyen', 'Bao Tran'],
+      abstract:
+        'We calibrated rainfall sensors across two sites. The readings agreed after calibration.',
+    });
+  });
+
+  it('prefers a DOI aligned with the paper citation over a stale embedded identifier', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [12, 730, 'DOI: 10.1234/river-study'],
+          [14, 670, '1. Introduction'],
+        ],
+        '',
+        xmpMetadata('<prism:doi>10.1234/previous-figure</prism:doi>'),
+      ),
+    );
+    expect(result.doi).toBe('10.1234/river-study');
+  });
+
+  it('keeps the full visible title and rejects a conflicting middle name', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [18, 730, 'Title: Rainfall in the Mekong Basin'],
+          [12, 700, 'Authors: Mai Anh Nguyen and Bao Tran'],
+        ],
+        '/Title (Rainfall) /Author (Mai Bich Nguyen; Bao Tran)',
+      ),
+    );
+    expect(result).toMatchObject({
+      title: 'Rainfall in the Mekong Basin',
+      authorNames: ['Mai Anh Nguyen', 'Bao Tran'],
+    });
+  });
+
+  it('reads wrapped names below the article heading independently of an editorial sidebar', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [20, 748, 'Distribution of river sediments', 155],
+          [12, 715, 'Mai Nguyen, Bao Tran,', 155],
+          [12, 699, 'An Le', 155],
+          [10, 680, 'Institute of River Studies', 155],
+          [8, 715, 'Academic Editor:', 36],
+          [8, 700, 'Jan Nowak', 36],
+          [11, 650, 'Abstract: We sampled the river in spring.', 155],
+          [11, 632, 'Keywords: sediments', 155],
+        ],
+        '/Title (Journal of River Studies) /Author (Mai Nguyen)',
+      ),
+    );
+    expect(result).toMatchObject({
+      title: 'Distribution of river sediments',
+      authorNames: ['Mai Nguyen', 'Bao Tran', 'An Le'],
+    });
+  });
+
+  it('uses the main title and byline when a translated summary sidebar lists a shorter version', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [18, 744, 'Seasonal variation in river clarity'],
+        [12, 720, 'Mai Nguyen, Bao Tran and An Le'],
+        [11, 666, 'Abstract: River clarity varied across the sites.', 233],
+        [9, 650, 'Title: Variaciones', 36],
+        [9, 637, 'Author: Mai Nguyen, Bao', 36],
+        [11, 628, 'Keywords: clarity', 233],
+        [13, 574, '1. Introduction'],
+      ]),
+    );
+    expect(result).toMatchObject({
+      title: 'Seasonal variation in river clarity',
+      authorNames: ['Mai Nguyen', 'Bao Tran', 'An Le'],
+    });
+  });
+
+  it('joins split glyphs in headings and keeps only one language of the abstract', () => {
+    const lines = readPdfLines(
+      [
+        { text: 'R', x: 52, y: 130, width: 7, height: 12 },
+        { text: 'ÉSUMÉ', x: 59, y: 130, width: 40, height: 12 },
+        {
+          text: 'Les résultats sont cohérents.',
+          x: 52,
+          y: 146,
+          width: 164,
+          height: 11,
+        },
+        { text: 'ABSTRACT', x: 52, y: 171, width: 52, height: 12 },
+        {
+          text: 'The results are consistent.',
+          x: 52,
+          y: 188,
+          width: 132,
+          height: 11,
+        },
+        { text: 'KEYWORDS: results', x: 52, y: 211, width: 130, height: 11 },
+        { text: 'Nguyễ', x: 238, y: 86, width: 39, height: 12 },
+        { text: 'n Thị Mai', x: 277, y: 86, width: 49, height: 12 },
+      ],
+      612,
+    );
+    expect(lines.find(({ y }) => y === 86)?.text).toBe('Nguyễn Thị Mai');
+    expect(readAbstract([lines])).toBe('Les résultats sont cohérents.');
+  });
+
+  it('uses superscript positions to separate closely spaced authors', () => {
+    const lines = readPdfLines(
+      [
+        {
+          text: 'Seasonal variation in river clarity',
+          x: 72,
+          y: 52,
+          width: 320,
+          height: 20,
+        },
+        { text: 'Mai Nguyen', x: 72, y: 80, width: 64, height: 12 },
+        { text: '1', x: 136, y: 76, width: 4, height: 7 },
+        { text: 'Bao Tran', x: 143, y: 80, width: 49, height: 12 },
+        { text: '2', x: 192, y: 76, width: 4, height: 7 },
+        {
+          text: 'River Research Institute',
+          x: 72,
+          y: 98,
+          width: 110,
+          height: 10,
+        },
+        { text: 'Abstract', x: 72, y: 127, width: 52, height: 12 },
+      ],
+      612,
+    );
+    expect(readFrontMatter(lines).authorNames).toEqual([
+      'Mai Nguyen',
+      'Bao Tran',
+    ]);
+  });
+
+  it('leaves the date and DOI empty when a cited work appears in the references footer', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [14, 300, 'References'],
+        [9, 100, 'https://doi.org/10.1234/cited-work'],
+        [9, 87, 'Accepted 10 April 2025'],
+        [9, 74, 'Available online 5 May 2025'],
+      ]),
+    );
+    expect(result).toEqual({});
+  });
+  it.each([false, true])(
+    'uses a grounded multi-paragraph abstract and skips prose after Introduction (%s)',
+    async (withIntroduction) => {
+      const first = [
+        'This abstract explains the context of the river analysis and the main',
+        'purpose of the work before presenting the most important measures and',
+        'observations from each monitoring station during the first portion of',
+        'the study and the corresponding findings from the spring season.',
+      ];
+      const second = [
+        'The second paragraph presents the results in the main watershed and',
+        'describes how the investigators used repeated observations near four',
+        'monitoring stations across the entire valley to estimate changes in',
+        'the water supply and compare their results over the previous years.',
+      ];
+      const lines = (paragraph: string[], y: number) =>
+        paragraph.map((line, index): [number, number, string, number] => [
+          10,
+          y - index * 12,
+          line,
+          85,
+        ]);
+      const { metadata, evidence } = await inspectArticlePdf(
+        pdf([
+          [18, 703, 'Predicting River Floods', 205],
+          [6, 671, '1', 346],
+          [10, 666, 'Mai Nguyen', 268],
+          [10, 654, 'River Analytics, Inc., 5 Mill Road', 220],
+          [10, 626, 'Bao Tran', 270],
+          [10, 614, 'University of Hanoi', 240],
+          ...(withIntroduction
+            ? [[12, 578, '1. Introduction', 85] as const]
+            : lines(first, 578)
+          ).map(([size, y, text, x]): [number, number, string, number] => [
+            size,
+            y,
+            text,
+            x,
+          ]),
+          ...lines(second, 510),
+          [12, 442, withIntroduction ? '2. Nomenclature' : 'Nomenclature', 230],
+        ]),
+        true,
+      );
+      if (!evidence) throw new Error('Missing first-page evidence');
+      const paragraphs = withIntroduction
+        ? ''
+        : [first, second]
+            .map((part) => '<p>' + part.join(' ') + '</p>')
+            .join('');
+      const xml =
+        '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><profileDesc>' +
+        '<abstract>' +
+        paragraphs +
+        '</abstract></profileDesc></teiHeader></TEI>';
+      expect(mergeGrobidMetadata(metadata, evidence, xml).abstract).toBe(
+        withIntroduction ? undefined : [...first, ...second].join(' '),
+      );
+    },
+  );
   it('finds an unlabeled title and byline and ends a multi-paragraph abstract at a numbered heading', async () => {
     const result = await extractArticlePdfMetadata(
       pdf([
@@ -191,6 +642,28 @@ describe('extractArticlePdfMetadata', () => {
     );
   });
 
+  it('keeps a multi-paragraph abstract beside editor notes and checks the entire embedded Subject', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf(
+        [
+          [20, 748, 'Distribution of river sediments', 155],
+          [12, 717, 'Mai Nguyen and Bao Tran', 155],
+          [11, 675, 'Abstract', 155],
+          [11, 651, 'We sampled the river in spring.', 155],
+          [8, 651, 'Academic Editor: Jan Nowak', 36],
+          [11, 623, 'The samples were collected by both teams.', 155],
+          [8, 623, 'Received: 2024-10-01', 36],
+          [11, 610, 'The upstream station had clearer water.', 155],
+          [11, 587, 'Keywords: sediments', 155],
+        ],
+        '/Subject (We sampled the river in spring. All records were missing. The upstream station had clearer water.)',
+      ),
+    );
+    expect(result.abstract).toBe(
+      'We sampled the river in spring. The samples were collected by both teams. The upstream station had clearer water.',
+    );
+  });
+
   it.each([750, 724])(
     'leaves the title empty when only the masthead at y=%i is prominent',
     async (y) => {
@@ -272,15 +745,51 @@ describe('extractArticlePdfMetadata', () => {
       pdf([
         [20, 740, 'Seasonal oxygen in the Mekong', 200],
         [11, 680, 'Abstract: We measured river oxygen.', 200],
-        [9, 660, 'Citation: Nguyen M. 2025.', 36],
+        [9, 660, 'Citation: Nguyen M. 2025. Seasonal oxygen', 36],
         [11, 655, 'Oxygen rose during the summer.', 200],
-        [9, 647, 'River Studies 3. doi:10.1234/study.', 36],
-        [9, 632, 'Editor: Bao Tran', 36],
+        [9, 647, 'in the Mekong. River Studies 3.', 36],
+        [9, 634, 'https://doi.org/10.1234/', 36],
+        [9, 621, 'study', 36],
+        [9, 606, 'Editor: Bao Tran', 36],
         [9, 550, 'Fig 1. Oxygen measurements by site.', 200],
         [9, 538, 'doi:10.1234/study.g001', 200],
       ]),
     );
     expect(result.doi).toBe('10.1234/study');
+  });
+
+  it('ignores a bibliography block that identifies a different article', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [19, 740, 'Seasonal oxygen in the Mekong'],
+        [12, 710, 'Mai Nguyen'],
+        [11, 680, 'Abstract: We sampled the river in spring.'],
+        [11, 666, 'Citation: Bao Tran. Rainfall in the highlands.'],
+        [11, 652, 'DOI: 10.1234/rain'],
+        [13, 620, '1. Introduction'],
+      ]),
+    );
+    expect(result.doi).toBeUndefined();
+  });
+
+  it('associates the running journal DOI and the publication date with the article', async () => {
+    const result = await extractArticlePdfMetadata(
+      pdf([
+        [20, 746, 'Seasonal oxygen in the Mekong', 150],
+        [12, 722, 'Mai Nguyen', 150],
+        [12, 680, 'Abstract: We measured river oxygen.', 150],
+        [12, 540, '1. Introduction', 150],
+        [8, 103, 'Received: 8 June 2025', 36],
+        [8, 90, 'Accepted: 11 June 2025', 36],
+        [8, 77, 'Published: 14 June 2025', 36],
+        [8, 32, 'River Studies 2025, 12, 25', 36],
+        [8, 32, 'https://doi.org/10.1234/river-study', 405],
+      ]),
+    );
+    expect(result).toMatchObject({
+      doi: '10.1234/river-study',
+      publicationDate: '2025-06-14',
+    });
   });
 
   it.each([

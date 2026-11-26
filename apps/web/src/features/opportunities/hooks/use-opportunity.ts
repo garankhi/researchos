@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  getOpportunitiesControllerFindOneQueryKey,
   useOpportunitiesControllerFindOne,
   useApplicationsControllerReceived,
 } from '@/lib/api';
@@ -16,13 +17,19 @@ import type { Opportunity } from '../types';
  */
 export function useOpportunity({
   opportunityId,
+  viewerId,
   enabled = true,
 }: {
   opportunityId?: string;
+  viewerId?: string;
   enabled?: boolean;
 }) {
   const query = useOpportunitiesControllerFindOne(opportunityId ?? '', {
     query: {
+      queryKey: [
+        ...getOpportunitiesControllerFindOneQueryKey(opportunityId ?? ''),
+        viewerId ?? null,
+      ],
       enabled: Boolean(opportunityId && enabled),
       staleTime: 60 * 1000,
     },

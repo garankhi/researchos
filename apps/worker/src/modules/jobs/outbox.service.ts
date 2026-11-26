@@ -6,14 +6,17 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '@researchos/database';
+import { PrismaService, notificationQueueScope } from '@researchos/database';
 import {
   ARTICLE_PDF_METADATA_QUEUE,
   BACKGROUND_QUEUE,
   DEAD_LETTER_QUEUE,
   DIGEST_QUEUE,
   DIGEST_SEND_JOB,
+  NOTIFICATION_QUEUE,
   RESEARCH_UPDATES_QUEUE,
+  TOPIC_SUGGESTION_JOB,
+  TOPIC_SUGGESTION_QUEUE,
   articlePdfMetadataScope,
   backgroundTransportId,
   createQueueOptions,
@@ -21,6 +24,7 @@ import {
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { researchUpdateScope } from './research-update-scope.js';
+import { TopicEmbeddingModel } from './topic-embedding-model.js';
 
 /** DB row locks coordinate dispatchers. A crash after add but before commit
  * republishes the same transport ID; the processor also deduplicates in SQL. */
@@ -33,16 +37,21 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly connection: Redis;
   private readonly work: Queue;
   private readonly researchUpdates: Queue;
+  private readonly notifications: Queue;
+  private readonly topicSuggestions: Queue;
   private readonly articlePdfMetadata: Queue;
   private readonly deadLetters: Queue;
   private readonly prefix: string;
   private readonly digestWork?: Queue;
   private readonly researchScope: string;
   private readonly articlePdfScope: string;
+  private readonly notificationScope: string;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(ConfigService) config: ConfigService,
+    @Inject(TopicEmbeddingModel)
+    private readonly topicModel?: TopicEmbeddingModel,
   ) {
     const options = createQueueOptions(
       config.getOrThrow<string>('REDIS_URL'),
@@ -51,10 +60,13 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     this.prefix = options.prefix!;
     this.researchScope = researchUpdateScope(this.prefix);
     this.articlePdfScope = articlePdfMetadataScope(this.prefix);
+    this.notificationScope = notificationQueueScope(this.prefix);
     this.connection = new Redis(options.connection);
     const queueOptions = { ...options, connection: this.connection };
     this.work = new Queue(BACKGROUND_QUEUE, queueOptions);
     this.researchUpdates = new Queue(RESEARCH_UPDATES_QUEUE, queueOptions);
+    this.notifications = new Queue(NOTIFICATION_QUEUE, queueOptions);
+    this.topicSuggestions = new Queue(TOPIC_SUGGESTION_QUEUE, queueOptions);
     this.articlePdfMetadata = new Queue(
       ARTICLE_PDF_METADATA_QUEUE,
       queueOptions,
@@ -66,6 +78,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     for (const queue of [
       this.work,
       this.researchUpdates,
+      this.notifications,
+      this.topicSuggestions,
       this.articlePdfMetadata,
       this.deadLetters,
       this.digestWork,
@@ -101,6 +115,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         Promise.all([
           this.work.waitUntilReady(),
           this.researchUpdates.waitUntilReady(),
+          this.notifications.waitUntilReady(),
+          this.topicModel?.version && this.topicSuggestions.waitUntilReady(),
           this.articlePdfMetadata.waitUntilReady(),
           this.deadLetters.waitUntilReady(),
           this.digestWork?.waitUntilReady(),
@@ -133,16 +149,19 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         >`
         SELECT o.*, j.kind, j.queue_prefix
         FROM outbox o JOIN background_jobs j ON j.id = o.job_id
+        LEFT JOIN topic_suggestion_requests topic_request ON topic_request.job_id = j.id
         LEFT JOIN digest_deliveries d ON d.id = CASE
           WHEN j.kind = ${DIGEST_SEND_JOB} AND j.payload->>'deliveryId' ~*
             '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
           THEN (j.payload->>'deliveryId')::uuid END AND d.user_id = j.owner_id
-        WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope}, ${this.articlePdfScope})
+        WHERE j.queue_prefix IN (${this.prefix}, ${this.researchScope}, ${this.articlePdfScope}, ${this.notificationScope})
           AND o.available_at <= now() AND (
           o.dispatched_at IS NULL OR (
             o.destination = 'WORK' AND j.status = 'PENDING'
             AND o.generation = j.generation
-            AND o.dispatched_at < now() - interval '30 seconds'
+            -- Suggestions expire after 15 seconds, before the general recovery period.
+            AND o.dispatched_at < now() - CASE WHEN j.kind = ${TOPIC_SUGGESTION_JOB}
+              THEN interval '3 seconds' ELSE interval '30 seconds' END
           )
         ) AND (
           o.destination <> 'WORK' OR j.kind <> ${DIGEST_SEND_JOB} OR (
@@ -150,6 +169,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
             AND (d.id IS NULL OR d.status IN ('SENT', 'CANCELLED') OR (
               d.next_attempt_at <= now() AND (d.locked_until IS NULL OR d.locked_until <= now())
             ))
+          )
+        ) AND (
+          o.destination <> 'WORK' OR j.kind <> ${TOPIC_SUGGESTION_JOB} OR (
+            ${this.topicModel?.version != null}
+            AND topic_request.status = 'pending' AND topic_request.deadline_at > now()
           )
         ) ORDER BY o.available_at LIMIT 10 FOR UPDATE OF o SKIP LOCKED
       `;
@@ -160,13 +184,17 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
               ? this.articlePdfMetadata
               : row.queue_prefix === this.researchScope
                 ? this.researchUpdates
-                : this.work;
+                : row.queue_prefix === this.notificationScope
+                  ? this.notifications
+                  : this.work;
           const queue =
             row.destination === 'DLQ'
               ? this.deadLetters
               : digest
                 ? this.digestWork
-                : work;
+                : row.kind === TOPIC_SUGGESTION_JOB
+                  ? this.topicSuggestions
+                  : work;
           if (!queue) continue;
           const transportId = backgroundTransportId(row.job_id, row.generation);
           const existing = await queue.getJob(transportId);
@@ -240,6 +268,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.work.close(),
       this.researchUpdates.close(),
+      this.notifications.close(),
+      this.topicSuggestions.close(),
       this.articlePdfMetadata.close(),
       this.deadLetters.close(),
       this.digestWork?.close(),

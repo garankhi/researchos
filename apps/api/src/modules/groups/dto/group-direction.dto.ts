@@ -114,6 +114,12 @@ export class GroupDirectionResponseDto {
   })
   createdAt: string;
 
+  @ApiPropertyOptional({
+    description: 'Timestamp when the direction was archived.',
+    format: 'date-time',
+  })
+  archivedAt?: string;
+
   @ApiProperty({
     description: 'Full taxonomy context, or null for an unlinked direction.',
     type: DirectionTopicPathDto,

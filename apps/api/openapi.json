@@ -2489,6 +2489,425 @@
         ]
       }
     },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification inbox page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists the signed-in user’s inbox",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Unread notification count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationCountDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Counts unread notifications for the signed-in user",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/read-all": {
+      "patch": {
+        "operationId": "NotificationsController_readAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Number of newly read notifications.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationCountDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Marks all visible notifications as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "operationId": "NotificationsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the notification.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The notification is read."
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The notification is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Marks one notification as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/archive": {
+      "patch": {
+        "operationId": "NotificationsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the notification.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The notification is archived."
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The notification is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Archives one notification",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/preferences": {
+      "get": {
+        "operationId": "NotificationsController_preferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Notification preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Reads the signed-in user’s notification preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "patch": {
+        "operationId": "NotificationsController_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated notification preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Updates the signed-in user’s notification preferences",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/devices": {
+      "put": {
+        "operationId": "NotificationDevicesController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device registration ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredPushDeviceDtoEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The token is active for another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Registers or refreshes a push device for the signed-in user",
+        "tags": [
+          "notification-devices"
+        ]
+      }
+    },
+    "/notifications/devices/{id}": {
+      "delete": {
+        "operationId": "NotificationDevicesController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Registered device ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The device is revoked."
+          },
+          "404": {
+            "description": "The device is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revokes a push device owned by the signed-in user",
+        "tags": [
+          "notification-devices"
+        ]
+      }
+    },
     "/demo/slow": {
       "get": {
         "operationId": "DemoController_getSlow",
@@ -3406,7 +3825,7 @@
     },
     "/research-groups/{groupId}/members": {
       "get": {
-        "description": "The roster of an active group is readable by any signed-in account, including students without researcher access. An archived or inactive group keeps its roster private to the lead and current members.",
+        "description": "By default, only active memberships are listed. The active roster of an active group is readable by any signed-in account. An archived or inactive group keeps its roster private to the lead and current members.",
         "operationId": "GroupMembersController_findAll",
         "parameters": [
           {
@@ -3453,6 +3872,20 @@
               "example": "-createdAt",
               "type": "string"
             }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3468,6 +3901,16 @@
           },
           "400": {
             "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3544,6 +3987,16 @@
           },
           "400": {
             "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3650,6 +4103,16 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Caller lacks membership access or management permission, or tried to add themselves.",
             "content": {
@@ -3719,6 +4182,16 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Caller lacks membership access or management permission, or tried to add themselves.",
             "content": {
@@ -3761,8 +4234,97 @@
         ]
       }
     },
+    "/research-groups/{groupId}/members/{userId}/restore": {
+      "patch": {
+        "operationId": "GroupMembersController_restore",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group the membership belongs to.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "User whose membership is being restored.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membership restored with the MEMBER role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMemberResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, role or pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks membership access or management permission, or tried to add themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, user or membership does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore an archived group membership as an ordinary member",
+        "tags": [
+          "groups"
+        ]
+      }
+    },
     "/research-groups/{groupId}/directions": {
       "get": {
+        "description": "By default, only active directions are listed.",
         "operationId": "GroupDirectionsController_list",
         "parameters": [
           {
@@ -3808,6 +4370,20 @@
             "schema": {
               "example": "-createdAt",
               "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
             }
           }
         ],
@@ -3878,7 +4454,7 @@
             "bearer": []
           }
         ],
-        "summary": "List published group directions with taxonomy paths",
+        "summary": "List group directions with taxonomy paths",
         "tags": [
           "group-directions"
         ]
@@ -4172,6 +4748,104 @@
           }
         ],
         "summary": "Archive a direction as a group leader, retaining the row and project references",
+        "tags": [
+          "group-directions"
+        ]
+      }
+    },
+    "/research-groups/{groupId}/directions/{directionId}/restore": {
+      "patch": {
+        "operationId": "GroupDirectionsController_restore",
+        "parameters": [
+          {
+            "name": "groupId",
+            "required": true,
+            "in": "path",
+            "description": "Group publishing the directions.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": true,
+            "in": "path",
+            "description": "Direction belonging to this group.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Direction restored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDirectionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID, topic, payload or pagination.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks group access or the required publishing/editing authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group, direction within the group, or topic does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Group is inactive/archived, a direction is in use, or a concurrent change occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore a group direction",
         "tags": [
           "group-directions"
         ]
@@ -5389,7 +6063,7 @@
         ]
       },
       "get": {
-        "description": "Overdue OPEN opportunities are persisted as EXPIRED before status filtering and pagination.",
+        "description": "Status filtering uses persisted states. Omitting the archive filter preserves ordinary opportunity visibility. Explicit archive views require a group the caller manages.",
         "operationId": "OpportunitiesController_findAll",
         "parameters": [
           {
@@ -5425,6 +6099,20 @@
             "schema": {
               "example": "-createdAt",
               "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "Use false for active rows, true for archived rows, or all for both. Archived rows require management permission.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false",
+                "true",
+                "all"
+              ]
             }
           },
           {
@@ -5484,6 +6172,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Archived list requires management permission for the requested group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5499,7 +6197,7 @@
     },
     "/opportunities/{opportunityId}": {
       "get": {
-        "description": "An OPEN opportunity is persisted as EXPIRED when its application deadline has been reached.",
+        "description": "The status reflects the last committed change. Scheduled expiry updates an overdue open opportunity.",
         "operationId": "OpportunitiesController_findOne",
         "parameters": [
           {
@@ -5556,7 +6254,7 @@
         ]
       },
       "patch": {
-        "description": "Deadline-based OPEN to EXPIRED changes are automatic. Extending an expired record deadline does not reopen it.",
+        "description": "A scheduled worker expires overdue opportunities. An extension made before the sweep can prevent expiry. Extending an expired opportunity keeps it expired.",
         "operationId": "OpportunitiesController_update",
         "parameters": [
           {
@@ -5582,7 +6280,7 @@
         },
         "responses": {
           "200": {
-            "description": "Updated opportunity details, including automatic deadline expiry.",
+            "description": "Updated opportunity details and current persisted status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6255,7 +6953,7 @@
     },
     "/applications/{applicationId}/respond": {
       "post": {
-        "description": "Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.",
+        "description": "Only the opportunity creator, the group lead and the group leaders may answer. The database timestamps the response. Acceptance enrolls a group applicant and returns the membership. For single-applicant opportunities, acceptance fills an open opportunity before the deadline.",
         "operationId": "ApplicationsController_respond",
         "parameters": [
           {
@@ -6969,6 +7667,202 @@
           }
         ],
         "summary": "List authorized files of a research output",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/article": {
+      "patch": {
+        "operationId": "OutputsController_updateArticle",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Article ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateArticleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Article with the current released revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Article metadata or references.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active researcher owner is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The release changed, an author has a claim, or the DOI is already in use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Update the metadata of a released Article",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
+    "/outputs/{outputId}/article-abstract": {
+      "patch": {
+        "operationId": "OutputsController_updateArticleAbstract",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Article ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateArticleAbstractDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current released revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputRevisionResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid abstract or revision ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "An active researcher owner is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The release changed or the Article cannot be edited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Save the abstract of a released Article as a new revision",
         "tags": [
           "outputs"
         ]
@@ -8555,6 +9449,151 @@
           "taxonomy"
         ]
       }
+    },
+    "/taxonomy/topic-suggestions": {
+      "post": {
+        "operationId": "TopicSuggestionsController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestTopicSuggestionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Suggestion request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicSuggestionRequestDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid title, abstract, or request ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Request Topic suggestions for an Article draft",
+        "tags": [
+          "taxonomy"
+        ]
+      }
+    },
+    "/taxonomy/topic-suggestions/{requestId}": {
+      "get": {
+        "operationId": "TopicSuggestionsController_get",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "Suggestion request ID.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current suggestion status and results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicSuggestionStatusDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid title, abstract, or request ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session cookie is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No unexpired request with this ID belongs to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The API rate limit was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Read the Article Topic suggestion result",
+        "tags": [
+          "taxonomy"
+        ]
+      }
     }
   },
   "info": {
@@ -10089,6 +11128,236 @@
           "metadataErrorCode"
         ]
       },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique notification ID.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title in the recipient’s preferred language."
+          },
+          "body": {
+            "type": "string",
+            "description": "Notification detail or actor name."
+          },
+          "link": {
+            "type": "string",
+            "description": "Relative path to the notification target."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the notification was created.",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "description": "When the notification was read, if read.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "link",
+          "createdAt",
+          "readAt"
+        ]
+      },
+      "NotificationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Notifications in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "NotificationCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of notifications counted or updated.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "NotificationType": {
+        "type": "string",
+        "enum": [
+          "OUTPUT_SHARED",
+          "REVISION_RELEASED",
+          "OUTPUT_LINKED",
+          "OPPORTUNITY_OPENED",
+          "SEMINAR_PUBLISHED",
+          "CHAT_MENTION",
+          "DIRECT_MESSAGE",
+          "GROUP_MEMBER_ADDED",
+          "GROUP_MEMBER_REMOVED",
+          "GROUP_OUTPUT_REQUESTED",
+          "GROUP_OUTPUT_ACCEPTED",
+          "GROUP_OUTPUT_REJECTED",
+          "APPLICATION_RECEIVED",
+          "APPLICATION_ACCEPTED",
+          "APPLICATION_DECLINED",
+          "APPLICATION_WITHDRAWN",
+          "OPPORTUNITY_EXPIRED",
+          "FOLLOW",
+          "CONVERSATION_PARTICIPANT_ADDED"
+        ],
+        "description": "Event types excluded from notification delivery."
+      },
+      "NotificationLocale": {
+        "type": "string",
+        "enum": [
+          "en",
+          "vi"
+        ],
+        "description": "Locale the notification copy is rendered in."
+      },
+      "NotificationPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "websocketEnabled": {
+            "type": "boolean",
+            "description": "Whether live WebSocket delivery is enabled."
+          },
+          "pushEnabled": {
+            "type": "boolean",
+            "description": "Whether device push delivery is enabled."
+          },
+          "mutedTypes": {
+            "type": "array",
+            "description": "Event types excluded from notification delivery.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone for the recipient."
+          },
+          "locale": {
+            "description": "Locale the notification copy is rendered in.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationLocale"
+              }
+            ]
+          }
+        },
+        "required": [
+          "websocketEnabled",
+          "pushEnabled",
+          "mutedTypes",
+          "timezone",
+          "locale"
+        ]
+      },
+      "UpdateNotificationPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "websocketEnabled": {
+            "type": "boolean",
+            "description": "Whether live WebSocket delivery is enabled."
+          },
+          "pushEnabled": {
+            "type": "boolean",
+            "description": "Whether device push delivery is enabled."
+          },
+          "mutedTypes": {
+            "type": "array",
+            "description": "Event types excluded from notification delivery.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationType"
+            }
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone for the recipient."
+          },
+          "locale": {
+            "description": "Locale the notification copy is rendered in.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationLocale"
+              }
+            ]
+          }
+        }
+      },
+      "PushPlatform": {
+        "type": "string",
+        "enum": [
+          "WEB",
+          "ANDROID",
+          "IOS"
+        ],
+        "description": "Platform that obtained the registration token."
+      },
+      "RegisterPushDeviceDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Firebase registration token for the current device."
+          },
+          "platform": {
+            "description": "Platform that obtained the registration token.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PushPlatform"
+              }
+            ]
+          },
+          "locale": {
+            "type": "string",
+            "description": "Locale used for notifications on this device."
+          }
+        },
+        "required": [
+          "token",
+          "platform",
+          "locale"
+        ]
+      },
+      "RegisteredPushDeviceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the registered device.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "SearchCountsResponseDto": {
         "type": "object",
         "properties": {
@@ -10586,6 +11855,11 @@
             "description": "Timestamp when the user joined the group.",
             "format": "date-time"
           },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the membership was archived.",
+            "format": "date-time"
+          },
           "fullName": {
             "type": "string",
             "description": "Full display name of the member.",
@@ -10790,6 +12064,11 @@
           "createdAt": {
             "type": "string",
             "description": "Creation/publication timestamp.",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": "string",
+            "description": "Timestamp when the direction was archived.",
             "format": "date-time"
           },
           "topicPath": {
@@ -11429,6 +12708,11 @@
             "description": "Opportunity details; required before publication.",
             "nullable": true
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft.",
+            "default": false
+          },
           "responseSlaDays": {
             "type": "number",
             "description": "Response SLA in calendar days, including weekends and holidays.",
@@ -11468,6 +12752,18 @@
           "canManage": {
             "type": "boolean",
             "description": "Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes."
+          },
+          "myApplicationStatus": {
+            "type": "string",
+            "description": "Current caller's most recent application status. Returned by detail reads; null means the caller has never applied.",
+            "enum": [
+              "PENDING",
+              "INVITED_TO_DISCUSS",
+              "DECLINED",
+              "WITHDRAWN",
+              "ACCEPTED"
+            ],
+            "nullable": true
           },
           "id": {
             "type": "string",
@@ -11535,6 +12831,10 @@
             "type": "number",
             "description": "Response SLA measured in calendar days."
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Whether acceptance automatically fills this opportunity before its deadline."
+          },
           "applicationDeadline": {
             "type": "string",
             "description": "Exact application cutoff timestamp.",
@@ -11577,6 +12877,7 @@
           "requiredExpertiseTags",
           "description",
           "responseSlaDays",
+          "autoFillOnAcceptance",
           "applicationDeadline",
           "status",
           "publishedAt",
@@ -11653,6 +12954,11 @@
             "description": "Opportunity details; required before publication.",
             "nullable": true
           },
+          "autoFillOnAcceptance": {
+            "type": "boolean",
+            "description": "Single-applicant mode. Acceptance fills an open opportunity before the deadline. Editable in draft.",
+            "default": false
+          },
           "responseSlaDays": {
             "type": "number",
             "description": "Response SLA in calendar days, including weekends and holidays.",
@@ -11687,9 +12993,47 @@
           "applicantNote"
         ]
       },
+      "AcceptedGroupMembershipDto": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Group the applicant joined."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Accepted applicant identifier."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "MEMBER",
+              "GROUP_LEADER"
+            ],
+            "description": "Current role of the applicant in the group."
+          }
+        },
+        "required": [
+          "groupId",
+          "userId",
+          "role"
+        ]
+      },
       "ApplicationResponseDto": {
         "type": "object",
         "properties": {
+          "membership": {
+            "nullable": true,
+            "description": "Current active membership returned when accepting a group application. Personal applications have no group membership.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedGroupMembershipDto"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "description": "Application identifier.",
@@ -11742,7 +13086,8 @@
               "PENDING",
               "INVITED_TO_DISCUSS",
               "DECLINED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "ACCEPTED"
             ]
           },
           "responseNote": {
@@ -11841,6 +13186,16 @@
       "GroupApplicationResponseDto": {
         "type": "object",
         "properties": {
+          "membership": {
+            "nullable": true,
+            "description": "Current active membership returned when accepting a group application. Personal applications have no group membership.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AcceptedGroupMembershipDto"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "description": "Application identifier.",
@@ -11893,7 +13248,8 @@
               "PENDING",
               "INVITED_TO_DISCUSS",
               "DECLINED",
-              "WITHDRAWN"
+              "WITHDRAWN",
+              "ACCEPTED"
             ]
           },
           "responseNote": {
@@ -11994,10 +13350,11 @@
         "properties": {
           "decision": {
             "type": "string",
-            "description": "The owner's answer: invite the applicant to a discussion, or decline.",
+            "description": "The owner's answer: invite the applicant to a discussion, decline, or accept.",
             "enum": [
               "INVITED_TO_DISCUSS",
-              "DECLINED"
+              "DECLINED",
+              "ACCEPTED"
             ]
           },
           "responseNote": {
@@ -12453,7 +13810,7 @@
             "example": "NONE"
           },
           "currentReleaseId": {
-            "type": "object",
+            "type": "string",
             "description": "UUID of the currently pinned / released revision (`output_revisions.id`).",
             "format": "uuid",
             "nullable": true,
@@ -12656,6 +14013,132 @@
           "accessGroupId",
           "uploadedAt",
           "isCurrentReleaseAttachment"
+        ]
+      },
+      "UpdateArticleAuthorDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Name as it appears in the confirmed byline.",
+            "maxLength": 255,
+            "example": "Nguyen Minh"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ResearchOS account explicitly selected for this author."
+          },
+          "authorId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of an author already on the current release."
+          }
+        },
+        "required": [
+          "displayName"
+        ]
+      },
+      "UpdateArticleDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Article title."
+          },
+          "publicationDate": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "18-11-2026",
+            "description": "Publication date as YYYY, YYYY-MM, YYYY-MM-DD or DD-MM-YYYY. Partial dates retain their precision."
+          },
+          "doi": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://doi.org/10.1234/article",
+            "description": "A DOI, optionally prefixed by doi: or a doi.org resolver URL."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Article abstract.",
+            "maxLength": 20000,
+            "nullable": true
+          },
+          "journal": {
+            "type": "string",
+            "description": "Journal name, returned as venue on the revision.",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "volume": {
+            "type": "string",
+            "description": "Journal volume.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "issue": {
+            "type": "string",
+            "description": "Journal issue.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "pages": {
+            "type": "string",
+            "description": "Page range or article number.",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "peerReviewed": {
+            "type": "boolean",
+            "description": "Whether the Article was peer-reviewed. Null means unspecified.",
+            "nullable": true
+          },
+          "topicIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Active ResearchOS Topic IDs confirmed by the submitter."
+          },
+          "expectedRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Current release ID observed by the editor."
+          },
+          "authors": {
+            "minItems": 1,
+            "description": "The complete byline in publication order. Omit to keep the current byline.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateArticleAuthorDto"
+            }
+          }
+        },
+        "required": [
+          "expectedRevisionId"
+        ]
+      },
+      "UpdateArticleAbstractDto": {
+        "type": "object",
+        "properties": {
+          "expectedRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Current release ID observed by the editor."
+          },
+          "abstract": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "description": "The non-empty abstract to save on the Article."
+          }
+        },
+        "required": [
+          "expectedRevisionId",
+          "abstract"
         ]
       },
       "AttachArticlePdfDto": {
@@ -13736,6 +15219,88 @@
           "field"
         ]
       },
+      "RequestTopicSuggestionsDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Current Article title.",
+            "maxLength": 500
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Current Article abstract, if available.",
+            "nullable": true,
+            "maxLength": 20000
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "TopicSuggestionRequestDto": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "ID to poll for the suggestion result.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "requestId"
+        ]
+      },
+      "SuggestedTopicDto": {
+        "type": "object",
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "description": "Selectable ResearchOS Topic ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Current display name of the Topic."
+          },
+          "description": {
+            "type": "string",
+            "description": "Current description of the Topic.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "topicId",
+          "name",
+          "description"
+        ]
+      },
+      "TopicSuggestionStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Pending while processing, ready on success, or unavailable when manual selection can be used.",
+            "enum": [
+              "pending",
+              "ready",
+              "unavailable"
+            ]
+          },
+          "suggestions": {
+            "description": "Up to five active Topics in order of relevance.",
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestedTopicDto"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "suggestions"
+        ]
+      },
       "ApiErrorResponseDto": {
         "type": "object",
         "properties": {
@@ -14198,6 +15763,102 @@
           },
           "data": {
             "$ref": "#/components/schemas/ArticlePdfUploadStatusDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationCountDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationCountDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "NotificationPreferencesDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationPreferencesDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "RegisteredPushDeviceDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegisteredPushDeviceDto"
           },
           "message": {
             "type": "string",
@@ -15008,6 +16669,30 @@
           "message"
         ]
       },
+      "OutputRevisionResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OutputRevisionResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
       "AttachArticlePdfResponseDtoEnvelope": {
         "type": "object",
         "properties": {
@@ -15068,30 +16753,6 @@
           },
           "data": {
             "$ref": "#/components/schemas/OutputFileResponseDto"
-          },
-          "message": {
-            "type": "string",
-            "default": ""
-          }
-        },
-        "required": [
-          "success",
-          "data",
-          "message"
-        ]
-      },
-      "OutputRevisionResponseDtoEnvelope": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [
-              true
-            ],
-            "default": true
-          },
-          "data": {
-            "$ref": "#/components/schemas/OutputRevisionResponseDto"
           },
           "message": {
             "type": "string",
@@ -15347,6 +17008,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/TopicDetailResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicSuggestionRequestDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicSuggestionRequestDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "TopicSuggestionStatusDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TopicSuggestionStatusDto"
           },
           "message": {
             "type": "string",

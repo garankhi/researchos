@@ -7,9 +7,19 @@
 
 export { PrismaModule } from './prisma.module.js';
 export { PrismaService } from './prisma.service.js';
+export {
+  NOTIFICATION_FANOUT_JOB,
+  notificationQueueScope,
+  stageNotificationEvent,
+} from './notification-events.js';
+export {
+  NotificationLocale,
+  normalizeNotificationLocale,
+} from './notification-locale.js';
 export { OutputType } from './output-type.js';
 export {
   BackgroundJobsService,
+  OPPORTUNITY_EXPIRY_JOB,
   RESEARCH_UPDATE_JOB,
 } from './background-jobs.service.js';
 
@@ -39,6 +49,8 @@ export {
   chat_conversation_type as ChatConversationType,
   chat_participant_role as ChatParticipantRole,
   chat_receipt_status as ChatReceiptStatus,
+  notification_type as NotificationType,
+  push_platform as PushPlatform,
 } from './generated/prisma/client.js';
 export type { data_provenance_type as DataProvenance } from './generated/prisma/client.js';
 

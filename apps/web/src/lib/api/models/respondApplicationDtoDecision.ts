@@ -7,7 +7,7 @@
  */
 
 /**
- * The owner's answer: invite the applicant to a discussion, or decline.
+ * The owner's answer: invite the applicant to a discussion, decline, or accept.
  */
 export type RespondApplicationDtoDecision =
   (typeof RespondApplicationDtoDecision)[keyof typeof RespondApplicationDtoDecision];
@@ -15,4 +15,5 @@ export type RespondApplicationDtoDecision =
 export const RespondApplicationDtoDecision = {
   INVITED_TO_DISCUSS: 'INVITED_TO_DISCUSS',
   DECLINED: 'DECLINED',
+  ACCEPTED: 'ACCEPTED',
 } as const;

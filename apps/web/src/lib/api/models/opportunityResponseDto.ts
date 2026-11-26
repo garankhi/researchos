@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { OpportunityResponseDtoMyApplicationStatus } from './opportunityResponseDtoMyApplicationStatus';
 import type { OpportunityResponseDtoOpportunityKind } from './opportunityResponseDtoOpportunityKind';
 import type { OpportunityResponseDtoStatus } from './opportunityResponseDtoStatus';
 import type { OpportunityResponseDtoTargetAudience } from './opportunityResponseDtoTargetAudience';
@@ -12,6 +13,11 @@ import type { OpportunityResponseDtoTargetAudience } from './opportunityResponse
 export interface OpportunityResponseDto {
   /** Whether the current caller may manage this opportunity. Returned by list and detail reads; the API independently enforces this policy on writes. */
   canManage?: boolean;
+  /**
+   * Current caller's most recent application status. Returned by detail reads; null means the caller has never applied.
+   * @nullable
+   */
+  myApplicationStatus?: OpportunityResponseDtoMyApplicationStatus;
   /** Opportunity identifier. */
   id: string;
   /**
@@ -46,6 +52,8 @@ export interface OpportunityResponseDto {
   description: string | null;
   /** Response SLA measured in calendar days. */
   responseSlaDays: number;
+  /** Whether acceptance automatically fills this opportunity before its deadline. */
+  autoFillOnAcceptance: boolean;
   /**
    * Exact application cutoff timestamp.
    * @nullable

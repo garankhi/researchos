@@ -150,7 +150,7 @@ export class ApplicationsController {
   @ApiOperation({
     summary: "Answer a pending application as the opportunity's owner",
     description:
-      'Only the opportunity creator, the group lead and the group leaders may answer. The response timestamp is written by the database.',
+      'Only the opportunity creator, the group lead and the group leaders may answer. The database timestamps the response. Acceptance enrolls a group applicant and returns the membership. For single-applicant opportunities, acceptance fills an open opportunity before the deadline.',
   })
   @ApiOkResponse({
     description:
