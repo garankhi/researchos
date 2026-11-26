@@ -24,6 +24,7 @@ import {
   articlePdfVisibilities,
   type ArticlePdfVisibility,
 } from './article-pdf.dto.js';
+import { OutputScopeDto } from './output-scope.dto.js';
 
 export class CreateArticleAuthorDto {
   @ApiProperty({
@@ -59,6 +60,19 @@ export class CreateArticleDto {
   @ValidateIf((_object, value) => value !== undefined)
   @Equals(OutputType.ARTICLE, { message: 'article_type_invalid' })
   outputType?: typeof OutputType.ARTICLE;
+
+  @ApiPropertyOptional({
+    type: OutputScopeDto,
+    description:
+      'Where the Article is posted. Defaults to a personal post. Posting ' +
+      'inside a group or a project hands the post to that container: the ' +
+      'poster keeps the right to edit the content, but the container leads ' +
+      'decide who may read it. The scope is fixed at creation.',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @ValidateNested({ each: true, message: 'output_scope_invalid' })
+  @Type(() => OutputScopeDto)
+  scope?: OutputScopeDto;
 
   @ApiProperty({ type: String, maxLength: 500, description: 'Article title.' })
   @Transform(trimText)

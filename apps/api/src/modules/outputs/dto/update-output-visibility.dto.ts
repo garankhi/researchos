@@ -1,48 +1,41 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OutputFileVisibility } from '@researchos/database';
-import { IsIn, IsUUID, ValidateIf } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { OutputAudience } from '@researchos/database';
+import { IsIn } from 'class-validator';
 
 /**
  * Changes who may see an already shared work.
  *
- * The affiliation (`accessGroupId`) records whose banner the work carries
- * while `visibility` alone decides who may read it, so a `FPTU_COMMUNITY`
- * work may keep its group. `RESEARCH_GROUP` still requires a group. Send
- * `accessGroupId: null` to clear the affiliation; omit it to keep the
- * stored one.
+ * The audience follows the scope of the work, and only the container
+ * managers may change it: the owner of a personal work, the leads of the
+ * group of a group work, or the project lead and the parent group leads
+ * of a project work. The poster of a container work may not: the container
+ * owns the post.
+ *
+ * The audience is the only thing that changes. The scope is fixed at
+ * creation, and the affiliation (`accessGroupId`) records whose banner
+ * the work carries - it grants no authority.
  */
 export class UpdateOutputVisibilityDto {
   @ApiProperty({
     description:
-      'Who may see the work. FPTU_COMMUNITY opens it to the whole ' +
-      'FPTU community even when the work carries a group affiliation; ' +
-      'RESEARCH_GROUP restricts it to the members of the access group.',
+      'Who may see the work. PRIVATE is the owner-only draft and is only ' +
+      'offered for a personal work. CONTAINER restricts it to the members ' +
+      'of the group or the project and is only offered for a container ' +
+      'work. FPTU_COMMUNITY opens it to every signed-in researcher.',
     enum: [
-      OutputFileVisibility.FPTU_COMMUNITY,
-      OutputFileVisibility.RESEARCH_GROUP,
+      OutputAudience.PRIVATE,
+      OutputAudience.CONTAINER,
+      OutputAudience.FPTU_COMMUNITY,
     ],
-    example: OutputFileVisibility.FPTU_COMMUNITY,
+    example: OutputAudience.FPTU_COMMUNITY,
   })
   @IsIn(
-    [OutputFileVisibility.FPTU_COMMUNITY, OutputFileVisibility.RESEARCH_GROUP],
-    { message: 'visibility_invalid' },
+    [
+      OutputAudience.PRIVATE,
+      OutputAudience.CONTAINER,
+      OutputAudience.FPTU_COMMUNITY,
+    ],
+    { message: 'output_visibility_invalid' },
   )
-  visibility:
-    | typeof OutputFileVisibility.FPTU_COMMUNITY
-    | typeof OutputFileVisibility.RESEARCH_GROUP;
-
-  @ApiPropertyOptional({
-    description:
-      'The affiliated research group whose banner the work carries. Required ' +
-      'when visibility is RESEARCH_GROUP; optional when visibility is ' +
-      'FPTU_COMMUNITY and rejected when visibility is PRIVATE. Send null ' +
-      'to clear the affiliation; omit it to keep the stored one. The group ' +
-      'must be one the caller is a member of.',
-    format: 'uuid',
-    nullable: true,
-    example: '55555555-5555-4555-8555-555555555555',
-  })
-  @ValidateIf((_object, value) => value !== undefined && value !== null)
-  @IsUUID('4', { message: 'access_group_id_invalid' })
-  accessGroupId?: string | null;
+  audience: OutputAudience;
 }

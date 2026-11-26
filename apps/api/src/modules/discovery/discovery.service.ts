@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
-  OutputFileVisibility,
+  OutputAudience,
+  OutputScopeType,
   Prisma,
   PrismaService,
   SearchEntityType,
@@ -45,7 +46,10 @@ interface RawSearchIndexRow {
   entity_id: string;
   revision_id: string | null;
   owner_id: string | null;
-  visibility: OutputFileVisibility;
+  scope_type: OutputScopeType;
+  scope_group_id: string | null;
+  scope_project_id: string | null;
+  audience: OutputAudience;
   access_group_id: string | null;
   title: string;
   body: string | null;
@@ -309,7 +313,10 @@ export class DiscoveryService {
             v.entity_id,
             v.revision_id,
             v.owner_id,
-            v.visibility,
+            v.scope_type,
+            v.scope_group_id,
+            v.scope_project_id,
+            v.audience,
             v.access_group_id,
             v.title,
             v.body,
@@ -409,7 +416,8 @@ export class DiscoveryService {
       entityId: row.entity_id,
       revisionId: row.revision_id ?? null,
       ownerId: row.owner_id ?? null,
-      visibility: row.visibility,
+      scopeType: row.scope_type,
+      audience: row.audience,
       accessGroupId: row.access_group_id ?? null,
       title: row.title,
       body: row.body ?? null,

@@ -1,42 +1,42 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OutputFileVisibility } from '@researchos/database';
+import { OutputAudience } from '@researchos/database';
 import { IsIn, IsOptional, IsUUID } from 'class-validator';
 
 /**
- * The visibility decision that accompanies a publish.
+ * The audience decision that accompanies a publish.
  *
  * `PRIVATE` is deliberately not accepted: publishing *is* the act of
  * sharing, so an unpublished work is the private state, not a publish
- * option. See `docs/database.md` §5.1.3.
+ * option.
+ *
+ * The audience follows the scope of the work. A personal work is published
+ * to the community; a container work is published to its container, or to
+ * the community when the container leads choose that.
  */
 export class PublishOutputDto {
   @ApiProperty({
     description:
-      'Who may see the published work. FPTU_COMMUNITY opens it to the whole ' +
-      'FPTU community; RESEARCH_GROUP opens it to the members of the access group.',
-    enum: [
-      OutputFileVisibility.FPTU_COMMUNITY,
-      OutputFileVisibility.RESEARCH_GROUP,
-    ],
-    example: OutputFileVisibility.FPTU_COMMUNITY,
+      'Who may see the published work. CONTAINER opens it to the members of ' +
+      'the group or the project, and is only valid for a container work. ' +
+      'FPTU_COMMUNITY opens it to the whole FPTU community.',
+    enum: [OutputAudience.CONTAINER, OutputAudience.FPTU_COMMUNITY],
+    example: OutputAudience.FPTU_COMMUNITY,
   })
-  @IsIn(
-    [OutputFileVisibility.FPTU_COMMUNITY, OutputFileVisibility.RESEARCH_GROUP],
-    { message: 'visibility_invalid' },
-  )
-  visibility:
-    | typeof OutputFileVisibility.FPTU_COMMUNITY
-    | typeof OutputFileVisibility.RESEARCH_GROUP;
+  @IsIn([OutputAudience.CONTAINER, OutputAudience.FPTU_COMMUNITY], {
+    message: 'output_visibility_invalid',
+  })
+  audience:
+    typeof OutputAudience.CONTAINER | typeof OutputAudience.FPTU_COMMUNITY;
 
   @ApiPropertyOptional({
     description:
-      'The affiliated research group whose banner the work carries. Required ' +
-      'when visibility is RESEARCH_GROUP; optional when visibility is ' +
-      'FPTU_COMMUNITY and must be a group the caller is a member of.',
+      'The affiliated research group whose banner the work carries. Display ' +
+      'information only: it grants no authority over the work. Must be a ' +
+      'group the caller is a member of.',
     format: 'uuid',
     example: '55555555-5555-4555-8555-555555555555',
   })
   @IsOptional()
-  @IsUUID('4', { message: 'access_group_id_invalid' })
+  @IsUUID(undefined, { message: 'access_group_id_invalid' })
   accessGroupId?: string;
 }

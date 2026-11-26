@@ -2,7 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   DataProvenanceType,
+  OutputAudience,
   OutputFileVisibility,
+  OutputScopeType,
   OutputSharingStatus,
   OutputType,
   Prisma,
@@ -52,6 +54,7 @@ import {
   PaginatedOutputsResponseDto,
 } from './dto/output-response.dto.js';
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
+import type { OutputScopeDto } from './dto/output-scope.dto.js';
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import type { UpdateArticleAbstractDto } from './dto/update-article-abstract.dto.js';
@@ -134,6 +137,151 @@ export class OutputsService {
     private readonly articleUploads: ArticleCreationUploadService,
   ) {}
 
+  /**
+   * Resolves where a work is posted and who may read it.
+   *
+   * The scope is fixed at creation, because moving a work to another
+   * container would silently change who may edit it. The audience follows
+   * it: a personal work starts private - the owner-only draft - and a
+   * container work inherits the default audience of its group.
+   *
+   * The caller has to be a member of the group they post into. For a
+   * project, the parent group is read from the project itself, so a
+   * project post belongs to the whole group and the group leads manage
+   * it too.
+   *
+   * `published` picks the personal audience: an unpublished personal work
+   * is the owner-only draft, and a published one reaches the community.
+   */
+  private async resolveOutputScope(
+    tx: Prisma.TransactionClient,
+    callerId: string,
+    scope: OutputScopeDto | undefined,
+    published = false,
+  ): Promise<{
+    scopeType: OutputScopeType;
+    scopeGroupId: string | null;
+    scopeProjectId: string | null;
+    audience: OutputAudience;
+  }> {
+    const scopeType = scope?.scopeType ?? OutputScopeType.PERSONAL;
+
+    if (scopeType === OutputScopeType.PERSONAL) {
+      return {
+        scopeType,
+        scopeGroupId: null,
+        scopeProjectId: null,
+        audience: published
+          ? OutputAudience.FPTU_COMMUNITY
+          : OutputAudience.PRIVATE,
+      };
+    }
+
+    if (scopeType === OutputScopeType.GROUP) {
+      if (!scope?.scopeGroupId) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputScopeInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
+        SELECT is_group_member(${callerId}::uuid, ${scope.scopeGroupId}::uuid) AS allowed
+      `;
+      if (!member?.allowed) {
+        throw new CodedHttpException(
+          domainErrorCodes.outputs.outputScopeInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const [row] = await tx.$queryRaw<{ audience: OutputAudience }[]>`
+        SELECT group_default_audience(${scope.scopeGroupId}::uuid) AS audience
+      `;
+      return {
+        scopeType,
+        scopeGroupId: scope.scopeGroupId,
+        scopeProjectId: null,
+        audience: this.containerAudience(row?.audience),
+      };
+    }
+
+    if (!scope?.scopeProjectId) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputScopeInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // The project carries its parent group. Reading it here keeps the
+    // scope honest: a project post is readable by the whole group, so the
+    // scope names that group and the group leads manage the post too.
+    const [project] = await tx.$queryRaw<
+      { lead_id: string; group_id: string | null }[]
+    >`
+      SELECT lead_id, group_id
+      FROM research_projects
+      WHERE id = ${scope.scopeProjectId}::uuid
+        AND archived_at IS NULL
+    `;
+    if (!project) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputScopeInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
+      SELECT is_researcher(${callerId}::uuid) AND (
+        EXISTS (
+          SELECT 1 FROM research_projects p
+          WHERE p.id = ${scope.scopeProjectId}::uuid AND p.lead_id = ${callerId}::uuid
+        )
+        OR EXISTS (
+          SELECT 1 FROM project_members pm
+          WHERE pm.project_id = ${scope.scopeProjectId}::uuid AND pm.user_id = ${callerId}::uuid
+        )
+        OR (
+          ${project.group_id}::uuid IS NOT NULL
+          AND is_group_member(${callerId}::uuid, ${project.group_id}::uuid)
+        )
+      ) AS allowed
+    `;
+    if (!member?.allowed) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputScopeInvalid,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const scopeGroupId = project.group_id ?? null;
+    const [row] = await tx.$queryRaw<{ audience: OutputAudience }[]>`
+      SELECT CASE
+        WHEN ${scopeGroupId}::uuid IS NULL THEN 'CONTAINER'::output_audience
+        ELSE group_default_audience(${scopeGroupId}::uuid)
+      END AS audience
+    `;
+    return {
+      scopeType,
+      scopeGroupId,
+      scopeProjectId: scope.scopeProjectId,
+      audience: this.containerAudience(row?.audience),
+    };
+  }
+
+  /**
+   * A container work has two audiences: its container and the community.
+   *
+   * A group default of PRIVATE would leave a post nobody but its author
+   * can read inside a group that is supposed to share it, so it falls
+   * back to the container.
+   */
+  private containerAudience(
+    wanted: OutputAudience | undefined,
+  ): OutputAudience {
+    return wanted === OutputAudience.FPTU_COMMUNITY
+      ? OutputAudience.FPTU_COMMUNITY
+      : OutputAudience.CONTAINER;
+  }
+
   async createArticle(
     callerId: string,
     dto: CreateArticleDto,
@@ -204,12 +352,22 @@ export class OutputsService {
           }
 
           await this.validateArticleReferences(tx, article);
+          const resolvedScope = await this.resolveOutputScope(
+            tx,
+            callerId,
+            dto.scope,
+            true,
+          );
           const output = await tx.research_outputs.create({
             data: {
               doi: article.doi,
               owner_id: callerId,
               created_by: callerId,
               provenance_tag: DataProvenanceType.HUMAN,
+              scope_type: resolvedScope.scopeType,
+              scope_group_id: resolvedScope.scopeGroupId,
+              scope_project_id: resolvedScope.scopeProjectId,
+              audience: resolvedScope.audience,
               create_idempotency_key: requestKey,
               create_request_hash: hash,
             },
@@ -274,7 +432,7 @@ export class OutputsService {
             revisionId: revision.id,
             callerId,
             sharing: {
-              visibility: OutputFileVisibility.FPTU_COMMUNITY,
+              audience: resolvedScope.audience,
               accessGroupId: null,
             },
           });
@@ -673,6 +831,12 @@ export class OutputsService {
       );
     }
 
+    // The database decides who may change the audience, so the client does
+    // not have to re-implement the scope rules.
+    const [capability] = await this.prisma.$queryRaw<{ allowed: boolean }[]>`
+      SELECT can_change_output_visibility(${callerId}::uuid, ${outputId}::uuid) AS allowed
+    `;
+
     let revision = exists.current_release_id
       ? await this.prisma.output_revisions.findUnique({
           where: { id: exists.current_release_id },
@@ -712,6 +876,7 @@ export class OutputsService {
       revision,
       exists.output_authors,
       topics,
+      capability?.allowed ?? false,
     );
     if (!exists.current_release_id || exists.owner_id === callerId)
       return output;
@@ -1611,7 +1776,7 @@ export class OutputsService {
   /**
    * Publishes a work: releases its draft revision and shares it.
    *
-   * This is the single visibility action, whether the draft came from an
+   * This is the single publish action, whether the draft came from an
    * OpenAlex pull or from a work created inside the platform. The
    * endpoint is origin-blind on purpose — `import_state` records where
    * the work came from, `sharing_status` records whether it is shared.
@@ -1626,33 +1791,31 @@ export class OutputsService {
    * `publication_status` is untouched too: a preprint shared internally
    * is still unpublished in its journal.
    *
-   * The visibility decision is the caller's, but the affiliation is
-   * checked: the caller has to be a member of the group the work carries,
-   * so a work cannot be pointed at a group the caller does not
-   * belong to. Affiliation no longer decides who may read: a
-   * FPTU_COMMUNITY work may keep its group and stays public.
+   * The audience follows the scope of the work. A personal work is
+   * published to the community. A container work is published to its
+   * container, or to the community - but only the container leads may
+   * widen it, so the publish of a container work is the owner's request
+   * and the leads settle it afterwards.
+   *
+   * The affiliation is checked separately: the caller has to be a member
+   * of the group the work carries, so a work cannot be pointed at a group
+   * the caller does not belong to. Affiliation grants no authority.
    */
   async publish(
     outputId: string,
     callerId: string,
     dto: PublishOutputDto,
   ): Promise<OutputResponseDto> {
-    const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
-
-    if (isGroupScope && !dto.accessGroupId) {
-      throw new CodedHttpException(
-        domainErrorCodes.outputs.outputVisibilityInvalid,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     return this.prisma.$transaction(async (tx) => {
       // Serialize publication with OpenAlex acceptance so the byline includes
       // author links confirmed before we release the draft.
       const [output] = await tx.$queryRaw<
-        Pick<ResearchOutput, 'owner_id' | 'sharing_status'>[]
+        Pick<
+          ResearchOutput,
+          'owner_id' | 'sharing_status' | 'scope_type' | 'scope_group_id'
+        >[]
       >`
-        SELECT owner_id, sharing_status
+        SELECT owner_id, sharing_status, scope_type, scope_group_id
         FROM research_outputs
         WHERE id = ${outputId}::uuid
         FOR NO KEY UPDATE
@@ -1718,13 +1881,34 @@ export class OutputsService {
         revisionId: draft.id,
         callerId,
         sharing: {
-          visibility: dto.visibility,
+          audience: this.publishAudience(output.scope_type, dto.audience),
           accessGroupId: dto.accessGroupId ?? null,
         },
         authorsSnapshot,
       });
       return this.loadResponse(tx, outputId);
     });
+  }
+
+  /**
+   * The audience a publish actually writes.
+   *
+   * A personal work has no container, so it publishes to the community.
+   * A container work keeps its container unless the caller asked for the
+   * community - and then only if the caller may widen it. The database
+   * enforces the same rule through `can_set_output_audience`, so this
+   * only narrows what a caller can ask for up front.
+   */
+  private publishAudience(
+    scopeType: OutputScopeType,
+    requested: OutputAudience,
+  ): OutputAudience {
+    if (scopeType === OutputScopeType.PERSONAL) {
+      return OutputAudience.FPTU_COMMUNITY;
+    }
+    return requested === OutputAudience.FPTU_COMMUNITY
+      ? OutputAudience.FPTU_COMMUNITY
+      : OutputAudience.CONTAINER;
   }
 
   private async releaseRevision(
@@ -1759,7 +1943,7 @@ export class OutputsService {
        * `sharing` deliberately.
        */
       sharing?: {
-        visibility: OutputFileVisibility;
+        audience: OutputAudience;
         accessGroupId: string | null;
       };
       authorsSnapshot?: Prisma.InputJsonArray;
@@ -1784,7 +1968,7 @@ export class OutputsService {
         ...(sharing && {
           sharing_status: OutputSharingStatus.SHARED,
           first_shared_at: now,
-          visibility: sharing.visibility,
+          audience: sharing.audience,
           access_group_id: sharing.accessGroupId,
         }),
       },
@@ -1792,27 +1976,28 @@ export class OutputsService {
   }
 
   /**
-   * Changes the visibility (and optionally the affiliation) of a shared work.
+   * Changes the audience of a shared work.
    *
-   * The owner may always change it. The lead of the affiliated group may
-   * too, so a group keeps control of works carrying its banner. The check
-   * reads the stored affiliation, so a lead keeps control even when
-   * switching the work between public and group-only.
+   * The authority follows the scope, and the database decides it: the
+   * owner of a personal work, the leads of the group of a group work, or
+   * the project lead and the parent group leads of a project work. The
+   * poster of a container work may not - the container owns the post.
+   *
+   * The scope is fixed, so the affiliation stays where it is. Only the
+   * audience moves, and only to a layer that the scope allows.
    */
   async updateVisibility(
     outputId: string,
     callerId: string,
     dto: UpdateOutputVisibilityDto,
   ): Promise<OutputResponseDto> {
-    const isGroupScope = dto.visibility === OutputFileVisibility.RESEARCH_GROUP;
-
     return this.prisma.$transaction(async (tx) => {
       const output = await tx.research_outputs.findUnique({
         where: { id: outputId },
         select: {
           id: true,
           sharing_status: true,
-          access_group_id: true,
+          scope_type: true,
         },
       });
 
@@ -1830,20 +2015,12 @@ export class OutputsService {
         );
       }
 
-      const effectiveGroupId =
-        dto.accessGroupId !== undefined
-          ? dto.accessGroupId
-          : output.access_group_id;
-
-      if (isGroupScope && !effectiveGroupId) {
-        throw new CodedHttpException(
-          domainErrorCodes.outputs.outputVisibilityInvalid,
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
       const [allowed] = await tx.$queryRaw<{ allowed: boolean }[]>`
-        SELECT can_change_output_visibility(${callerId}::uuid, ${outputId}::uuid) AS allowed
+        SELECT can_set_output_audience(
+          ${callerId}::uuid,
+          ${outputId}::uuid,
+          ${dto.audience}::output_audience
+        ) AS allowed
       `;
       if (!allowed?.allowed) {
         throw new CodedHttpException(
@@ -1852,26 +2029,10 @@ export class OutputsService {
         );
       }
 
-      if (dto.accessGroupId) {
-        const [member] = await tx.$queryRaw<{ allowed: boolean }[]>`
-          SELECT is_group_member(${callerId}::uuid, ${dto.accessGroupId}::uuid) AS allowed
-        `;
-        if (!member?.allowed) {
-          throw new CodedHttpException(
-            domainErrorCodes.outputs.outputAccessGroupInvalid,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-      }
-
       await tx.research_outputs.update({
         where: { id: outputId },
         data: {
-          visibility: dto.visibility,
-          access_group_id:
-            dto.accessGroupId !== undefined
-              ? dto.accessGroupId
-              : output.access_group_id,
+          audience: dto.audience,
         },
       });
 
@@ -2037,6 +2198,7 @@ export class OutputsService {
     revision: OutputRevision | null,
     authors: OutputAuthor[],
     topics: OutputTopicResponseDto[],
+    canChangeVisibility = false,
   ): OutputResponseDto {
     // Older releases may have no byline snapshot. Keep their authors readable.
     const byline =
@@ -2048,7 +2210,11 @@ export class OutputsService {
       doi: output.doi ?? null,
       ownerId: output.owner_id ?? null,
       sharingStatus: output.sharing_status,
-      visibility: output.visibility,
+      scopeType: output.scope_type,
+      scopeGroupId: output.scope_group_id ?? null,
+      scopeProjectId: output.scope_project_id ?? null,
+      audience: output.audience,
+      canChangeVisibility,
       accessGroupId: output.access_group_id ?? null,
       importState: output.import_state,
       currentReleaseId: output.current_release_id ?? null,

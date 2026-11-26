@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  OutputAudience,
   OutputFileVisibility,
   OutputImportState,
+  OutputScopeType,
   OutputSharingStatus,
 } from '@researchos/database';
 import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
@@ -99,15 +101,58 @@ export class OutputResponseDto {
 
   @ApiProperty({
     description:
-      'Visibility scope (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).',
-    enum: OutputFileVisibility,
-    example: OutputFileVisibility.FPTU_COMMUNITY,
+      'Where the work was posted: PERSONAL (its author owns it), GROUP (the ' +
+      'group owns it) or PROJECT (the project owns it). Fixed at creation.',
+    enum: OutputScopeType,
+    example: OutputScopeType.PERSONAL,
   })
-  visibility: OutputFileVisibility;
+  scopeType: OutputScopeType;
 
   @ApiProperty({
     description:
-      'Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.',
+      'The group the work was posted in. For a GROUP scope it is the group ' +
+      'itself; for a PROJECT scope it is the parent group, when the project ' +
+      'has one. Null for a personal work.',
+    format: 'uuid',
+    nullable: true,
+    example: null,
+  })
+  scopeGroupId: string | null;
+
+  @ApiProperty({
+    description:
+      'The project the work was posted in. Set only for a PROJECT scope.',
+    format: 'uuid',
+    nullable: true,
+    example: null,
+  })
+  scopeProjectId: string | null;
+
+  @ApiProperty({
+    description:
+      'Who may read the work: PRIVATE (the owner alone), CONTAINER (the ' +
+      'narrow audience of the group or project) or FPTU_COMMUNITY (every ' +
+      'signed-in researcher).',
+    enum: OutputAudience,
+    example: OutputAudience.FPTU_COMMUNITY,
+  })
+  audience: OutputAudience;
+
+  @ApiProperty({
+    description:
+      'Whether the caller may change the audience of this work. The owner ' +
+      'may for a personal work; the group leads may for a group work; the ' +
+      'project lead and the parent group leads may for a project work. The ' +
+      'poster of a container work may not: the container owns the post.',
+    type: Boolean,
+    example: false,
+  })
+  canChangeVisibility: boolean;
+
+  @ApiProperty({
+    description:
+      'Affiliated research group whose banner the work carries. Display ' +
+      'information only: it grants no authority over the work.',
     format: 'uuid',
     nullable: true,
     example: null,
