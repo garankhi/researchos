@@ -3,6 +3,7 @@ export * from './auth/auth';
 export * from './chat/chat';
 export * from './discovery/discovery';
 export * from './exports/exports';
+export * from './file-access/file-access';
 export * from './follows/follows';
 export * from './group-directions/group-directions';
 export * from './group-outputs/group-outputs';

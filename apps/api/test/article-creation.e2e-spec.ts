@@ -307,6 +307,8 @@ describe('Article creation', () => {
       await import('../dist/modules/identity/identity.module.js');
     const { OutputsModule } =
       await import('../dist/modules/outputs/outputs.module.js');
+    const { FileAccessModule } =
+      await import('../dist/modules/file-access/file-access.module.js');
     const { ObjectStorageService } =
       await import('../dist/modules/storage/object-storage.service.js');
     const { StorageModule } =
@@ -344,6 +346,7 @@ describe('Article creation', () => {
         PrismaModule,
         IdentityModule,
         OutputsModule,
+        FileAccessModule,
         StorageModule,
         OpenAlexModule,
       ],
@@ -2096,5 +2099,544 @@ describe('Article creation', () => {
       );
     }
     await submit(body, key).expect(201);
+  });
+
+  describe('Private file access (RES-176)', () => {
+    const fileAccessCodes = {
+      self: 'file_access_self_request',
+      granted: 'file_access_already_granted',
+      notPending: 'file_access_request_not_pending',
+      denied: 'file_access_decision_denied',
+      requestMissing: 'file_access_request_not_found',
+      grantMissing: 'file_access_grant_not_found',
+      notRequestable: 'file_access_not_requestable',
+    };
+
+    /** A shared Article whose current release carries one Private PDF. */
+    async function privateArticle() {
+      const created = await submit(input).expect(201);
+      const { outputId, revisionId } = created.body.data;
+      const upload = await verifiedPdf();
+      const attached = await request('owner')
+        .put(`/outputs/${outputId}/article-pdf`)
+        .send({
+          uploadId: upload.uploadId,
+          fileVisibility: 'PRIVATE',
+          expectedRevisionId: revisionId,
+        })
+        .expect(200);
+      return {
+        outputId: outputId as string,
+        firstRevisionId: revisionId as string,
+        revisionId: attached.body.data.revisionId as string,
+        fileId: attached.body.data.fileId as string,
+      };
+    }
+
+    const ask = (fileId: string, actor: Actor = 'reader', body: object = {}) =>
+      request(actor).post(`/output-files/${fileId}/access-requests`).send(body);
+    const act = (
+      actor: Actor,
+      requestId: string,
+      action: 'approve' | 'decline' | 'withdraw',
+      body: object = {},
+    ) =>
+      request(actor)
+        .post(`/file-access-requests/${requestId}/${action}`)
+        .send(body);
+    const revoke = (actor: Actor, grantId: string) =>
+      request(actor).post(`/file-access-grants/${grantId}/revoke`).send({});
+    const download = (actor: Actor, fileId: string) =>
+      request(actor).get(`/output-files/${fileId}/download`);
+    const received = (query: string, actor: Actor) =>
+      request(actor)
+        .get(`/file-access-requests?box=received${query}`)
+        .expect(200);
+    const count = async (sql: string, params: unknown[]) =>
+      Number((await db.query(sql, params)).rows[0].count);
+
+    /** Runs the worker fan-out for one staged event on real PostgreSQL. */
+    async function fanOut(eventKey: string): Promise<string[]> {
+      const { PrismaService } = await import('@researchos/database');
+      const { fanOutNotification } =
+        await import('../../worker/dist/modules/notifications/notification-fanout.js');
+      const { rows } = await db.query(
+        'SELECT id FROM notification_events WHERE event_key = $1',
+        [eventKey],
+      );
+      expect(rows).toHaveLength(1);
+      const prisma = app.get(PrismaService);
+      await prisma.$transaction((tx) =>
+        fanOutNotification(tx, { eventId: rows[0].id }),
+      );
+      const delivered = await db.query(
+        `SELECT recipient_id, body, content_snapshot::text AS snapshot
+         FROM notifications WHERE event_key = $1`,
+        [eventKey],
+      );
+      for (const row of delivered.rows) {
+        expect(row.body).not.toContain('secret note');
+        expect(row.snapshot).not.toContain('secret note');
+      }
+      return delivered.rows.map(
+        (row: { recipient_id: string }) => row.recipient_id,
+      );
+    }
+
+    it('lets a reader request, receive and lose access to exactly one Private file', async () => {
+      const article = await privateArticle();
+      const other = await privateArticle();
+      await db.query(
+        `INSERT INTO user_follows (follower_id, entity_type, entity_id)
+         VALUES ($1, 'RESEARCHER', $2) ON CONFLICT DO NOTHING`,
+        [actors.researcher, actors.owner],
+      );
+
+      // The reader discovers the file id through the Article detail.
+      const before = (await detail(article.outputId).expect(200)).body.data;
+      expect(before.hasRestrictedPdf).toBe(true);
+      expect(before.requestableFiles).toEqual([
+        expect.objectContaining({ id: article.fileId, myRequest: null }),
+      ]);
+      await download('reader', article.fileId).expect(403);
+
+      await http
+        .request(app.getHttpServer())
+        .post(`/output-files/${article.fileId}/access-requests`)
+        .send({})
+        .expect(401);
+      const self = await ask(article.fileId, 'owner').expect(400);
+      expect(self.body.message).toBe(fileAccessCodes.self);
+
+      const sent = await ask(article.fileId, 'reader', {
+        message: 'secret note',
+      }).expect(201);
+      const requestId: string = sent.body.data.id;
+      expect(sent.body.data).toMatchObject({
+        status: 'PENDING',
+        message: 'secret note',
+        requester: { id: actors.reader, fullName: 'reader' },
+        owner: { id: actors.owner, fullName: 'owner' },
+        grant: null,
+      });
+      expect(JSON.stringify(sent.body)).not.toContain('@article.test.invalid');
+      const again = await ask(article.fileId).expect(201);
+      expect(again.body.data.id).toBe(requestId);
+      const pendingDetail = (await detail(article.outputId).expect(200)).body
+        .data;
+      expect(pendingDetail.requestableFiles[0].myRequest).toEqual({
+        id: requestId,
+        status: 'PENDING',
+      });
+      expect(await fanOut(`file-access:${requestId}:requested`)).toEqual([
+        actors.owner,
+      ]);
+
+      // Only the current manager sees and decides it.
+      const scope = `&outputId=${article.outputId}`;
+      expect((await received(scope, 'owner')).body.data.meta.total).toBe(1);
+      expect((await received(scope, 'researcher')).body.data.meta.total).toBe(
+        0,
+      );
+      const mine = await request('reader')
+        .get('/file-access-requests?box=sent&status=PENDING&limit=100')
+        .expect(200);
+      expect(
+        mine.body.data.items.map((item: { id: string }) => item.id),
+      ).toContain(requestId);
+      expect(
+        (await act('researcher', requestId, 'approve').expect(404)).body
+          .message,
+      ).toBe(fileAccessCodes.requestMissing);
+      expect(
+        (await act('reader', requestId, 'approve').expect(403)).body.message,
+      ).toBe(fileAccessCodes.denied);
+
+      const approved = await act('owner', requestId, 'approve', {
+        response: 'Granted',
+      }).expect(200);
+      expect(approved.body.data).toMatchObject({
+        status: 'APPROVED',
+        response: 'Granted',
+        grant: { revokedAt: null },
+      });
+      const grantId: string = approved.body.data.grant.id;
+      const replay = await act('owner', requestId, 'approve').expect(200);
+      expect(replay.body.data.grant.id).toBe(grantId);
+      expect(
+        await count(
+          'SELECT count(*) FROM file_access_grants WHERE request_id = $1',
+          [requestId],
+        ),
+      ).toBe(1);
+      expect(
+        await count(
+          "SELECT count(*) FROM audit_logs WHERE action = 'file_access.approved' AND entity_id = $1",
+          [requestId],
+        ),
+      ).toBe(1);
+      expect(await fanOut(`file-access:${requestId}:approved`)).toEqual([
+        actors.reader,
+      ]);
+
+      // Exact file: the verified bytes of this file, never another Article's.
+      const bytes = await download('reader', article.fileId)
+        .buffer(true)
+        .parse((res, done) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => done(null, Buffer.concat(chunks)));
+        })
+        .expect(200);
+      expect(Buffer.compare(bytes.body as Buffer, pdf)).toBe(0);
+      await download('reader', other.fileId).expect(403);
+      expect(
+        (await detail(article.outputId).expect(200)).body.data.requestableFiles,
+      ).toEqual([]);
+      expect((await ask(article.fileId).expect(409)).body.message).toBe(
+        fileAccessCodes.granted,
+      );
+
+      // A metadata-only revision keeps the same file and the grant.
+      await request('owner')
+        .patch(`/outputs/${article.outputId}/article-abstract`)
+        .send({ expectedRevisionId: article.revisionId, abstract: 'Updated.' })
+        .expect(200);
+      await download('reader', article.fileId).expect(200);
+
+      // A requester whose account is deactivated loses the file.
+      await db.query('BEGIN');
+      try {
+        await db.query('UPDATE users SET is_active = false WHERE id = $1', [
+          actors.reader,
+        ]);
+        const { rows } = await db.query(
+          'SELECT can_view_output_file($1, $2) AS allowed',
+          [actors.reader, article.fileId],
+        );
+        expect(rows[0].allowed).toBe(false);
+      } finally {
+        await db.query('ROLLBACK');
+      }
+
+      // A grant never opens a revision pinned by a group the reader is not in.
+      await db.query('BEGIN');
+      try {
+        const groupId = randomUUID();
+        await db.query(
+          'INSERT INTO research_groups (id, code, name, lead_id) VALUES ($1, $2, $3, $4)',
+          [
+            groupId,
+            `fa-${groupId.slice(0, 8)}`,
+            'File access pin',
+            actors.owner,
+          ],
+        );
+        await db.query(
+          `INSERT INTO group_output_links (
+             output_id, group_id, requested_revision_id, requested_by, status,
+             decided_by, decided_at, accepted_revision_id, accepted_by, accepted_at
+           ) VALUES ($1, $2, $3, $4, 'ACCEPTED', $4, now(), $3, $4, now())`,
+          [article.outputId, groupId, article.revisionId, actors.owner],
+        );
+        await db.query(
+          'UPDATE research_outputs SET current_release_id = $1 WHERE id = $2',
+          [article.firstRevisionId, article.outputId],
+        );
+        const { rows } = await db.query(
+          'SELECT can_view_output_file($1, $3) AS reader, can_view_output_file($2, $3) AS owner',
+          [actors.reader, actors.owner, article.fileId],
+        );
+        expect(rows[0]).toEqual({ reader: false, owner: true });
+      } finally {
+        await db.query('ROLLBACK');
+      }
+
+      // Handover: the new owner manages the grant, the former one does not.
+      await db.query(
+        'UPDATE research_outputs SET owner_id = $1 WHERE id = $2',
+        [actors.researcher, article.outputId],
+      );
+      try {
+        expect((await received(scope, 'owner')).body.data.meta.total).toBe(0);
+        expect((await revoke('owner', grantId).expect(404)).body.message).toBe(
+          fileAccessCodes.grantMissing,
+        );
+        expect((await revoke('reader', grantId).expect(403)).body.message).toBe(
+          fileAccessCodes.denied,
+        );
+        await download('reader', article.fileId).expect(200);
+        const revoked = await revoke('researcher', grantId).expect(200);
+        expect(revoked.body.data.grant.revokedAt).not.toBeNull();
+        await revoke('researcher', grantId).expect(200);
+      } finally {
+        await db.query(
+          'UPDATE research_outputs SET owner_id = $1 WHERE id = $2',
+          [actors.owner, article.outputId],
+        );
+      }
+      expect(
+        await count(
+          "SELECT count(*) FROM audit_logs WHERE action = 'file_access.revoked' AND entity_id = $1",
+          [grantId],
+        ),
+      ).toBe(1);
+      expect(await fanOut(`file-access-grant:${grantId}:revoked`)).toEqual([
+        actors.reader,
+      ]);
+      await download('reader', article.fileId).expect(403);
+
+      // A revoked grant is never restored; a new request issues a new grant.
+      const second = await ask(article.fileId).expect(201);
+      expect(second.body.data.id).not.toBe(requestId);
+      const regranted = await act(
+        'owner',
+        second.body.data.id,
+        'approve',
+      ).expect(200);
+      expect(regranted.body.data.grant.id).not.toBe(grantId);
+      await download('reader', article.fileId).expect(200);
+      const oldReplay = await act('owner', requestId, 'approve').expect(200);
+      expect(oldReplay.body.data.grant.revokedAt).not.toBeNull();
+    });
+
+    it('declines, withdraws and refuses answered requests', async () => {
+      const article = await privateArticle();
+      const first: string = (await ask(article.fileId).expect(201)).body.data
+        .id;
+      const declined = await act('owner', first, 'decline', {
+        response: 'Not yet',
+      }).expect(200);
+      expect(declined.body.data).toMatchObject({
+        status: 'DECLINED',
+        grant: null,
+      });
+      await act('owner', first, 'decline').expect(200);
+      expect(
+        (await act('owner', first, 'approve').expect(409)).body.message,
+      ).toBe(fileAccessCodes.notPending);
+      expect(
+        (await act('reader', first, 'withdraw').expect(409)).body.message,
+      ).toBe(fileAccessCodes.notPending);
+      expect(await fanOut(`file-access:${first}:declined`)).toEqual([
+        actors.reader,
+      ]);
+
+      const second: string = (await ask(article.fileId).expect(201)).body.data
+        .id;
+      expect(second).not.toBe(first);
+      await act('owner', second, 'withdraw').expect(404);
+      const withdrawn = await act('reader', second, 'withdraw').expect(200);
+      expect(withdrawn.body.data.status).toBe('WITHDRAWN');
+      await act('reader', second, 'withdraw').expect(200);
+      await act('owner', second, 'approve').expect(409);
+      expect(
+        await count(
+          'SELECT count(*) FROM file_access_grants WHERE file_id = $1',
+          [article.fileId],
+        ),
+      ).toBe(0);
+    });
+
+    it('cancels pending requests and audits when the file becomes unavailable', async () => {
+      const article = await privateArticle();
+      const pending: string = (await ask(article.fileId).expect(201)).body.data
+        .id;
+      await request('owner')
+        .delete(`/outputs/${article.outputId}/article-pdf/${article.fileId}`)
+        .expect(200);
+
+      const { rows } = await db.query(
+        'SELECT status, cancel_reason, decided_by FROM file_access_requests WHERE id = $1',
+        [pending],
+      );
+      expect(rows[0]).toEqual({
+        status: 'CANCELLED',
+        cancel_reason: 'FILE_UNAVAILABLE',
+        decided_by: actors.owner,
+      });
+      const audit = await db.query(
+        "SELECT payload FROM audit_logs WHERE action = 'output_file.unavailable' AND entity_id = $1",
+        [article.fileId],
+      );
+      expect(audit.rows).toEqual([
+        {
+          payload: {
+            outputId: article.outputId,
+            cancelledRequestIds: [pending],
+            revokedGrantIds: [],
+          },
+        },
+      ]);
+      expect(
+        (await act('owner', pending, 'approve').expect(409)).body.message,
+      ).toBe(fileAccessCodes.notPending);
+      expect((await ask(article.fileId).expect(409)).body.message).toBe(
+        fileAccessCodes.notRequestable,
+      );
+
+      // A file with no requests is still audited once.
+      const quiet = await privateArticle();
+      await request('owner')
+        .delete(`/outputs/${quiet.outputId}/article-pdf/${quiet.fileId}`)
+        .expect(200);
+      expect(
+        await count(
+          "SELECT count(*) FROM audit_logs WHERE action = 'output_file.unavailable' AND entity_id = $1",
+          [quiet.fileId],
+        ),
+      ).toBe(1);
+    });
+
+    it('ends requests and grants when a file stops being Private', async () => {
+      const article = await privateArticle();
+      const pdfPath = `/outputs/${article.outputId}/article-pdf/${article.fileId}`;
+      const granted: string = (await ask(article.fileId).expect(201)).body.data
+        .id;
+      const grantId: string = (
+        await act('owner', granted, 'approve').expect(200)
+      ).body.data.grant.id;
+      await request('researcher')
+        .post(`/output-files/${article.fileId}/access-requests`)
+        .send({})
+        .expect(201);
+      await download('reader', article.fileId).expect(200);
+
+      await request('owner')
+        .patch(pdfPath)
+        .send({ fileVisibility: 'FPTU_COMMUNITY' })
+        .expect(200);
+      const audit = await db.query(
+        "SELECT payload FROM audit_logs WHERE action = 'output_file.left_private' AND entity_id = $1",
+        [article.fileId],
+      );
+      expect(audit.rows).toHaveLength(1);
+      expect(audit.rows[0].payload.revokedGrantIds).toEqual([grantId]);
+      expect(audit.rows[0].payload.cancelledRequestIds).toHaveLength(1);
+      expect(
+        await count(
+          "SELECT count(*) FROM file_access_requests WHERE file_id = $1 AND status = 'PENDING'",
+          [article.fileId],
+        ),
+      ).toBe(0);
+
+      // Making the file Private again does not bring the old grant back.
+      await request('owner')
+        .patch(pdfPath)
+        .send({ fileVisibility: 'PRIVATE' })
+        .expect(200);
+      await download('reader', article.fileId).expect(403);
+      expect(
+        (await act('owner', granted, 'approve').expect(200)).body.data.grant
+          .revokedAt,
+      ).not.toBeNull();
+    });
+
+    it('keeps one request, one grant and one audit under concurrent calls', async () => {
+      const article = await privateArticle();
+      const submits = await Promise.all([
+        ask(article.fileId),
+        ask(article.fileId),
+        ask(article.fileId),
+      ]);
+      expect(submits.map((r) => r.status)).toEqual([201, 201, 201]);
+      expect(new Set(submits.map((r) => r.body.data.id)).size).toBe(1);
+      const requestId: string = submits[0]!.body.data.id;
+
+      const approvals = await Promise.all([
+        act('owner', requestId, 'approve'),
+        act('owner', requestId, 'approve'),
+      ]);
+      expect(approvals.map((r) => r.status)).toEqual([200, 200]);
+      const grantId: string = approvals[0]!.body.data.grant.id;
+      expect(approvals[1]!.body.data.grant.id).toBe(grantId);
+      const once: [string, unknown[]][] = [
+        [
+          'SELECT count(*) FROM file_access_grants WHERE request_id = $1',
+          [requestId],
+        ],
+        [
+          "SELECT count(*) FROM audit_logs WHERE action = 'file_access.approved' AND entity_id = $1",
+          [requestId],
+        ],
+        [
+          'SELECT count(*) FROM notification_events WHERE event_key = $1',
+          [`file-access:${requestId}:approved`],
+        ],
+      ];
+      for (const [sql, params] of once) {
+        expect(await count(sql, params)).toBe(1);
+      }
+
+      const revokes = await Promise.all([
+        revoke('owner', grantId),
+        revoke('owner', grantId),
+      ]);
+      expect(revokes.map((r) => r.status)).toEqual([200, 200]);
+      expect(
+        await count(
+          "SELECT count(*) FROM audit_logs WHERE action = 'file_access.revoked' AND entity_id = $1",
+          [grantId],
+        ),
+      ).toBe(1);
+
+      // Approval racing a withdrawal: exactly one wins.
+      const raced: string = (await ask(article.fileId).expect(201)).body.data
+        .id;
+      const [approve, withdraw] = await Promise.all([
+        act('owner', raced, 'approve'),
+        act('reader', raced, 'withdraw'),
+      ]);
+      expect([approve.status, withdraw.status].sort()).toEqual([200, 409]);
+      const final = await db.query(
+        'SELECT status FROM file_access_requests WHERE id = $1',
+        [raced],
+      );
+      const grants = await count(
+        'SELECT count(*) FROM file_access_grants WHERE request_id = $1',
+        [raced],
+      );
+      expect(grants).toBe(final.rows[0].status === 'APPROVED' ? 1 : 0);
+
+      // Approval racing removal of the file never leaves a usable grant.
+      const removal = await privateArticle();
+      const pending: string = (await ask(removal.fileId).expect(201)).body.data
+        .id;
+      await Promise.all([
+        act('owner', pending, 'approve'),
+        request('owner').delete(
+          `/outputs/${removal.outputId}/article-pdf/${removal.fileId}`,
+        ),
+      ]);
+      const after = await db.query(
+        'SELECT status FROM file_access_requests WHERE id = $1',
+        [pending],
+      );
+      expect(['APPROVED', 'CANCELLED']).toContain(after.rows[0].status);
+      await download('reader', removal.fileId).expect(403);
+    });
+
+    it('rejects a grant that disagrees with its request', async () => {
+      const article = await privateArticle();
+      const requestId: string = (await ask(article.fileId).expect(201)).body
+        .data.id;
+      await expect(
+        db.query(
+          `INSERT INTO file_access_grants (request_id, file_id, grantee_id, granted_by)
+           VALUES ($1, $2, $3, $4)`,
+          [requestId, article.fileId, actors.researcher, actors.owner],
+        ),
+      ).rejects.toThrow();
+      await expect(
+        db.query(
+          `INSERT INTO file_access_grants (request_id, file_id, grantee_id, granted_by)
+           VALUES ($1, $2, $3, $4)`,
+          [requestId, article.fileId, actors.reader, actors.owner],
+        ),
+      ).rejects.toThrow(/approved request/);
+      await expect(
+        db.query('DELETE FROM file_access_requests WHERE id = $1', [requestId]),
+      ).rejects.toThrow(/history/);
+    });
   });
 });

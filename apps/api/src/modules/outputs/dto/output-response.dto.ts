@@ -24,6 +24,45 @@ export class DownloadablePdfDto {
   fileName: string;
 }
 
+export class RequestableFileRequestDto {
+  @ApiProperty({
+    description: 'The caller’s latest access request for this file.',
+    format: 'uuid',
+  })
+  id: string;
+
+  @ApiProperty({
+    description:
+      'Status of that request: PENDING, APPROVED, DECLINED, WITHDRAWN or CANCELLED.',
+    type: String,
+  })
+  status: string;
+}
+
+export class RequestableFileDto {
+  @ApiProperty({
+    description: 'File identifier, used to request access.',
+    format: 'uuid',
+  })
+  id: string;
+
+  @ApiProperty({ description: 'Original filename.', type: String })
+  fileName: string;
+
+  @ApiProperty({ description: 'MIME type of the file.', type: String })
+  mimeType: string;
+
+  @ApiProperty({ description: 'File size in bytes.', type: Number })
+  sizeBytes: number;
+
+  @ApiProperty({
+    description: 'The caller’s latest request for this file, or null.',
+    type: RequestableFileRequestDto,
+    nullable: true,
+  })
+  myRequest: RequestableFileRequestDto | null;
+}
+
 /**
  * Full details of a research output with its pinned / current release.
  */
@@ -135,6 +174,13 @@ export class OutputResponseDto {
     type: Boolean,
   })
   hasRestrictedPdf?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'On the detail view, Private files of the current release the caller cannot download yet and may request.',
+    type: [RequestableFileDto],
+  })
+  requestableFiles?: RequestableFileDto[];
 }
 
 /**

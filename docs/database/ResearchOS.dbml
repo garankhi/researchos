@@ -798,6 +798,73 @@ Table article_creation_uploads {
   Note: 'Owner-scoped temporary Article PDF. Consumption links the verified object to its durable file record. Cleanup deletes only expired unconsumed objects.'
 }
 
+Enum file_access_request_status {
+  PENDING
+  APPROVED
+  DECLINED
+  WITHDRAWN
+  CANCELLED
+}
+
+Table file_access_requests {
+  id uuid [pk, default: `gen_random_uuid()`]
+  output_id uuid [not null]
+  file_id uuid [not null]
+  requester_id uuid [not null]
+  status file_access_request_status [not null, default: 'PENDING']
+  message varchar(1000)
+  response varchar(1000)
+  decided_by uuid
+  decided_at timestamptz
+  cancel_reason varchar(32)
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (id, file_id, requester_id) [unique, name: 'uq_file_access_request_identity']
+    (file_id, requester_id) [unique, name: 'uq_file_access_request_pending', note: 'WHERE status = PENDING']
+    (requester_id, created_at, id) [name: 'idx_file_access_requests_requester']
+    (output_id, created_at, id) [name: 'idx_file_access_requests_output']
+    decided_by [name: 'idx_file_access_requests_decided_by']
+  }
+  checks {
+    `(message IS NULL OR length(btrim(message)) > 0) AND (response IS NULL OR length(btrim(response)) > 0)` [name: 'ck_file_access_request_text']
+    `(status = 'PENDING' AND decided_by IS NULL AND decided_at IS NULL) OR (status <> 'PENDING' AND decided_by IS NOT NULL AND decided_at IS NOT NULL)` [name: 'ck_file_access_request_decision']
+    `status <> 'WITHDRAWN' OR decided_by = requester_id` [name: 'ck_file_access_request_withdrawal']
+    `response IS NULL OR status IN ('APPROVED', 'DECLINED')` [name: 'ck_file_access_request_response']
+    `(status = 'CANCELLED') = (cancel_reason IS NOT NULL)` [name: 'ck_file_access_request_cancel']
+  }
+  Note: 'A reader''s request for one exact Private output file. At most one pending request per requester and file. Guard trigger keeps decided requests final and forbids deletes.'
+}
+
+Table file_access_grants {
+  id uuid [pk, default: `gen_random_uuid()`]
+  request_id uuid [not null, unique]
+  file_id uuid [not null]
+  grantee_id uuid [not null]
+  granted_by uuid [not null]
+  granted_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  revoked_by uuid
+  revoked_at timestamptz
+  indexes {
+    (file_id, grantee_id) [unique, name: 'uq_file_access_grant_active', note: 'WHERE revoked_at IS NULL']
+    grantee_id [name: 'idx_file_access_grants_grantee']
+    granted_by [name: 'idx_file_access_grants_granted_by']
+    revoked_by [name: 'idx_file_access_grants_revoked_by']
+  }
+  checks {
+    `(revoked_by IS NULL) = (revoked_at IS NULL)` [name: 'ck_file_access_grant_revocation']
+  }
+  Note: 'Access to one exact Private file, issued by approving a request. Guard trigger requires the approved request; revocation is final. Read by can_view_output_file.'
+}
+
+Ref fk_file_access_request_file: file_access_requests.(output_id, file_id) > output_files.(output_id, id) [delete: restrict]
+Ref: file_access_requests.requester_id > users.id [delete: restrict]
+Ref: file_access_requests.decided_by >? users.id [delete: restrict]
+Ref fk_file_access_grant_request: file_access_grants.(request_id, file_id, grantee_id) - file_access_requests.(id, file_id, requester_id) [delete: restrict]
+Ref: file_access_grants.grantee_id > users.id [delete: restrict]
+Ref: file_access_grants.granted_by > users.id [delete: restrict]
+Ref: file_access_grants.revoked_by >? users.id [delete: restrict]
+
 Table output_revision_files {
   output_id uuid [not null]
   revision_id uuid [not null]
@@ -1367,6 +1434,10 @@ Enum notification_type {
   OPPORTUNITY_EXPIRED
   FOLLOW
   CONVERSATION_PARTICIPANT_ADDED
+  FILE_ACCESS_REQUESTED
+  FILE_ACCESS_APPROVED
+  FILE_ACCESS_DECLINED
+  FILE_ACCESS_REVOKED
 }
 
 Enum notification_subject_type {

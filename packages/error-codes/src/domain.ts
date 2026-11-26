@@ -149,6 +149,16 @@ export const domainErrorCodes = {
     articlePdfMetadataTimeout: 'article_pdf_metadata_timeout',
     articlePdfMetadataUnavailable: 'article_pdf_metadata_unavailable',
   },
+  fileAccess: {
+    requestNotFound: 'file_access_request_not_found',
+    grantNotFound: 'file_access_grant_not_found',
+    notRequestable: 'file_access_not_requestable',
+    selfRequest: 'file_access_self_request',
+    alreadyGranted: 'file_access_already_granted',
+    requestNotPending: 'file_access_request_not_pending',
+    decisionDenied: 'file_access_decision_denied',
+    requesterIneligible: 'file_access_requester_ineligible',
+  },
   profiles: {
     profileNotFound: 'profile_not_found',
     profileAccessDenied: 'profile_access_denied',
