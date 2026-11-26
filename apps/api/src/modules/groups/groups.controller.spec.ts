@@ -8,6 +8,7 @@ import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { describe, expect, it, vi } from 'vitest';
 import { AccessService } from '../identity/access.service.js';
+import { CreateResearchGroupDto } from './dto/create-research-group.dto.js';
 import { ListResearchGroupsQueryDto } from './dto/list-research-groups.query.dto.js';
 import { UpdateResearchGroupDto } from './dto/update-research-group.dto.js';
 import { GroupsController } from './groups.controller.js';
@@ -56,6 +57,7 @@ describe('GroupsController', () => {
       },
       group_members: {
         findUnique: vi.fn(),
+        create: vi.fn(),
       },
     };
     return {
@@ -115,9 +117,10 @@ describe('GroupsController', () => {
           description: 'Deep learning and NLP research.',
         },
       });
+      expect(prismaMock.group_members.create).not.toHaveBeenCalled();
     });
 
-    it('throws 404 user_not_found when explicit leadId does not exist', async () => {
+    it('throws 400 group_leader_ineligible when explicit leadId does not exist', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUnique.mockResolvedValue(null);
 
@@ -134,10 +137,34 @@ describe('GroupsController', () => {
         ),
       ).rejects.toThrow(
         expect.objectContaining({
-          status: HttpStatus.NOT_FOUND,
-          code: domainErrorCodes.identity.userNotFound,
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.groups.groupLeaderIneligible,
         }),
       );
+    });
+
+    it('trims the code and name before validating required fields and limits', async () => {
+      const pipe = new ValidationPipe({
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      });
+      const metadata = {
+        type: 'body',
+        metatype: CreateResearchGroupDto,
+      } as const;
+
+      await expect(
+        pipe.transform({ code: ' \t ', name: 'AI Lab' }, metadata),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        pipe.transform({ code: 'AI-LAB', name: ' \n ' }, metadata),
+      ).rejects.toThrow(BadRequestException);
+
+      const code = 'X'.repeat(50);
+      const name = 'X'.repeat(255);
+      await expect(
+        pipe.transform({ code: ` ${code} `, name: ` ${name} ` }, metadata),
+      ).resolves.toMatchObject({ code, name });
     });
 
     it('throws 400 group_leader_ineligible when designated leader is not an active researcher', async () => {
@@ -367,6 +394,22 @@ describe('GroupsController', () => {
   });
 
   describe('update', () => {
+    it('preserves 404 user_not_found when an edited group specifies an unknown lead', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.$queryRaw.mockResolvedValue([{ allowed: true }]);
+      prismaMock.research_groups.findUnique.mockResolvedValue(mockGroup);
+      prismaMock.users.findUnique.mockResolvedValue(null);
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.update(groupId, { leadId: outsiderId }, leadId),
+      ).rejects.toMatchObject({
+        status: HttpStatus.NOT_FOUND,
+        code: domainErrorCodes.identity.userNotFound,
+      });
+      expect(prismaMock.research_groups.update).not.toHaveBeenCalled();
+    });
+
     it('archives a group by setting is_active=false and archived_at', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.$queryRaw.mockResolvedValue([{ allowed: true }]);

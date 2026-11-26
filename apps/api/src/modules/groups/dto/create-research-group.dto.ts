@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
   IsOptional,
@@ -6,6 +7,7 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
+import { trimText } from '../../../common/dto/submitted-value.js';
 
 /**
  * Payload for creating a new research group.
@@ -16,6 +18,7 @@ export class CreateResearchGroupDto {
     example: 'AI-LAB',
     maxLength: 50,
   })
+  @Transform(trimText)
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
@@ -26,6 +29,7 @@ export class CreateResearchGroupDto {
     example: 'Artificial Intelligence & Machine Learning Lab',
     maxLength: 255,
   })
+  @Transform(trimText)
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

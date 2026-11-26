@@ -3433,7 +3433,7 @@
             }
           },
           "400": {
-            "description": "Invalid payload or designated leader is not an active researcher.",
+            "description": "Invalid payload, or the designated lead does not exist or lacks active researcher access.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3444,16 +3444,6 @@
           },
           "403": {
             "description": "Caller does not hold the RESEARCHER role.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The specified leader user account was not found.",
             "content": {
               "application/json": {
                 "schema": {
