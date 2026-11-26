@@ -194,6 +194,7 @@ function LiveActivity({ userId }: { userId: string }) {
           <IconButton
             size="sm"
             variant="ghost"
+            data-header-icon="compact"
             position="relative"
             aria-label={t('bell', { count })}
           >
