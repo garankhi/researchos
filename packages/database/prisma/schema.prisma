@@ -764,7 +764,7 @@ model research_groups {
   research_seminars        research_seminars[]
   research_updates         research_updates[]
   resource_handovers       resource_handovers[]
-  research_outputs_scope   research_outputs[]               @relation("research_outputs_scope_group_id")
+  research_outputs_scope   research_outputs[]         @relation("research_outputs_scope_group_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -899,7 +899,7 @@ model research_projects {
   users                  users                    @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
   research_records       research_records[]
   research_updates       research_updates[]
-  research_outputs_scope research_outputs[]        @relation("research_outputs_scope_project_id")
+  research_outputs_scope research_outputs[]       @relation("research_outputs_scope_project_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1130,7 +1130,7 @@ model search_index {
   entity_id        String                  @db.Uuid
   revision_id      String?                 @db.Uuid
   owner_id         String?                 @db.Uuid
-  scope_type       output_scope_type        @default(PERSONAL)
+  scope_type       output_scope_type       @default(PERSONAL)
   scope_group_id   String?                 @db.Uuid
   scope_project_id String?                 @db.Uuid
   audience         output_audience         @default(FPTU_COMMUNITY)

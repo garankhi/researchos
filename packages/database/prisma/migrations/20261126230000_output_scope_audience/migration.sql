@@ -204,35 +204,6 @@ CREATE FUNCTION can_manage_output_content(actor uuid, target uuid) RETURNS boole
       ));
 $$;
 
--- The file uploader manages the access to their own file.
---
--- File access is about the research, not about the group's narrative, so the
--- researcher who uploaded a PDF decides who may read it - even inside a group
--- or a project. This is the one deliberate exception to "the container owns
--- the post".
-CREATE FUNCTION can_manage_output_file(actor uuid, target_file uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
-  SELECT is_researcher(actor) AND EXISTS (
-    SELECT 1 FROM output_files f JOIN research_outputs o ON o.id = f.output_id
-    WHERE f.id = target_file
-      AND (f.uploaded_by = actor OR can_manage_output_content(actor, o.id)));
-$$;
-
--- The group a file is restricted to.
---
--- The file names a group of its own, but that group only counts when it is
--- the container of the work the file belongs to. A file of a personal post
--- cannot borrow a group's audience, and a file of a project post cannot
--- borrow an unrelated group: the file is never wider than its post.
-CREATE FUNCTION output_file_group_member(actor uuid, target_file uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM output_files f
-    JOIN research_outputs o ON o.id = f.output_id
-    WHERE f.id = target_file
-      AND f.access_group_id IS NOT NULL
-      AND f.access_group_id = o.scope_group_id
-      AND is_group_member(actor, f.access_group_id));
-$$;
-
 -- The default audience of a group: the audience its new posts inherit.
 --
 -- A post snapshots the default when it is created, so changing the default
@@ -247,19 +218,6 @@ $$;
 CREATE OR REPLACE FUNCTION can_change_output_visibility(actor uuid, target uuid)
 RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT can_manage_output_content(actor, target);
-$$;
-
--- Who may answer a private-file access request.
---
--- The uploader alone answers. The container leads own the narrative of the
--- group or the project, but they did not produce the file and they cannot
--- vouch for it, so they never decide who may read it.
-CREATE OR REPLACE FUNCTION can_decide_file_access_request(actor uuid, target_request uuid)
-RETURNS boolean LANGUAGE sql STABLE AS $$
-  SELECT is_researcher(actor) AND EXISTS (
-    SELECT 1 FROM file_access_requests r
-    JOIN output_files f ON f.id = r.file_id
-    WHERE r.id = target_request AND f.uploaded_by = actor);
 $$;
 
 -- Small helpers kept separate so the rules below read as one condition.
@@ -319,7 +277,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT 1 FROM output_files f JOIN research_outputs o ON o.id = f.output_id
     WHERE f.id = target_file AND f.is_available AND can_view_output(actor, o.id)
     AND (
-      ((o.owner_id = actor OR (f.visibility = 'FPTU_COMMUNITY' OR (f.visibility = 'RESEARCH_GROUP' AND output_file_group_member(actor, f.id))))
+      ((o.owner_id = actor OR (f.visibility = 'FPTU_COMMUNITY' OR (f.visibility = 'RESEARCH_GROUP' AND is_group_member(actor, f.access_group_id))))
         AND (o.owner_id = actor OR EXISTS (SELECT 1 FROM output_revision_files rf WHERE rf.file_id = f.id AND
           (rf.revision_id = o.current_release_id OR EXISTS (SELECT 1 FROM group_output_releases g WHERE g.output_id = o.id AND g.id = rf.revision_id)))))
       OR (f.visibility = 'PRIVATE'
