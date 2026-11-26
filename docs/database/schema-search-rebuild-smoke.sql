@@ -110,7 +110,7 @@ BEGIN
 
  -- Plant a stale row by hand, the way a broken trigger would. The row is
  -- allowed by the guard, because the draft work does exist.
- INSERT INTO search_index(entity_type,entity_id,visibility,title,doc)
+ INSERT INTO search_index(entity_type,entity_id,audience,title,doc)
  VALUES('OUTPUT',o,'FPTU_COMMUNITY','Stale Work',to_tsvector('simple','stale work'));
  SELECT count(*) INTO n FROM search_index WHERE entity_type='OUTPUT' AND entity_id=o;
  PERFORM pg_temp.assert_true(n=1,'the stale row is planted');
@@ -227,22 +227,22 @@ BEGIN
  -- The two sets must agree on every column of every row, except the
  -- identity of the row itself.
  SELECT count(*) INTO d FROM (
-   SELECT s.entity_type,s.visibility,s.access_group_id,s.title,s.body,s.authors_text,s.doc
+   SELECT s.entity_type,s.scope_type,s.scope_group_id,s.scope_project_id,s.audience,s.access_group_id,s.title,s.body,s.authors_text,s.doc
      FROM search_index s JOIN pg_temp.fixture_ids f ON f.entity_id=s.entity_id AND f.entity_type=s.entity_type
     WHERE f.prefix='trigger'
    EXCEPT
-   SELECT s.entity_type,s.visibility,s.access_group_id,s.title,s.body,s.authors_text,s.doc
+   SELECT s.entity_type,s.scope_type,s.scope_group_id,s.scope_project_id,s.audience,s.access_group_id,s.title,s.body,s.authors_text,s.doc
      FROM search_index s JOIN pg_temp.fixture_ids f ON f.entity_id=s.entity_id AND f.entity_type=s.entity_type
     WHERE f.prefix='rebuild'
  ) x;
  PERFORM pg_temp.assert_true(d=0,'the trigger index and the rebuilt index agree');
 
  SELECT count(*) INTO d FROM (
-   SELECT s.entity_type,s.visibility,s.access_group_id,s.title,s.body,s.authors_text,s.doc
+   SELECT s.entity_type,s.scope_type,s.scope_group_id,s.scope_project_id,s.audience,s.access_group_id,s.title,s.body,s.authors_text,s.doc
      FROM search_index s JOIN pg_temp.fixture_ids f ON f.entity_id=s.entity_id AND f.entity_type=s.entity_type
     WHERE f.prefix='rebuild'
    EXCEPT
-   SELECT s.entity_type,s.visibility,s.access_group_id,s.title,s.body,s.authors_text,s.doc
+   SELECT s.entity_type,s.scope_type,s.scope_group_id,s.scope_project_id,s.audience,s.access_group_id,s.title,s.body,s.authors_text,s.doc
      FROM search_index s JOIN pg_temp.fixture_ids f ON f.entity_id=s.entity_id AND f.entity_type=s.entity_type
     WHERE f.prefix='trigger'
  ) x;

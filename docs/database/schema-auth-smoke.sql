@@ -107,7 +107,7 @@ BEGIN
 
  -- ADMIN remains ordinary for resource access, even with RESEARCHER as well.
  INSERT INTO research_groups(id,code,name,lead_id) VALUES(grp,'auth-test-group','Private test group',faculty);
- INSERT INTO research_outputs(id,owner_id,created_by,visibility) VALUES(work,faculty,faculty,'PRIVATE');
+ INSERT INTO research_outputs(id,owner_id,created_by,audience) VALUES(work,faculty,faculty,'PRIVATE');
  INSERT INTO output_revisions(id,output_id,revision_no,title,created_by) VALUES(rev,work,1,'Private work',faculty);
  INSERT INTO output_files(id,output_id,uploaded_by,storage_key,file_name,mime_type,size_bytes,sha256)
  VALUES(file_id,work,faculty,'auth-test-private-file','private.pdf','application/pdf',1,repeat('a',64));

@@ -43,6 +43,23 @@ CREATE TYPE "visibility_level" AS ENUM (
   'FPTU_COMMUNITY'
 );
 
+-- The posting context of a work: PERSONAL (its author owns it), GROUP (the
+-- group owns it), PROJECT (the project owns it). It decides who may change
+-- the audience and it never changes after creation.
+CREATE TYPE "output_scope_type" AS ENUM (
+  'PERSONAL',
+  'GROUP',
+  'PROJECT'
+);
+
+-- Who may read a work. CONTAINER resolves to the group, or to the parent
+-- group of a project. PRIVATE is the owner-only draft state.
+CREATE TYPE "output_audience" AS ENUM (
+  'PRIVATE',
+  'CONTAINER',
+  'FPTU_COMMUNITY'
+);
+
 CREATE TYPE "data_provenance_type" AS ENUM (
   'PAPER',
   'AI_TRACE',
@@ -513,6 +530,7 @@ CREATE TABLE "research_groups" (
   "description" text,
   "is_active" boolean NOT NULL DEFAULT true,
   "archived_at" timestamptz,
+  "visibility" output_audience NOT NULL DEFAULT 'CONTAINER',
   "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
@@ -543,7 +561,10 @@ CREATE TABLE "research_outputs" (
   "created_by" uuid,
   "sharing_status" output_sharing_status NOT NULL DEFAULT 'DRAFT',
   "current_release_id" uuid,
-  "visibility" visibility_level NOT NULL DEFAULT 'PRIVATE',
+  "scope_type" output_scope_type NOT NULL DEFAULT 'PERSONAL',
+  "scope_group_id" uuid,
+  "scope_project_id" uuid,
+  "audience" output_audience NOT NULL DEFAULT 'PRIVATE',
   "access_group_id" uuid,
   "provenance_tag" data_provenance_type NOT NULL DEFAULT 'PAPER',
   "import_state" output_import_state NOT NULL DEFAULT 'NONE',
@@ -556,7 +577,9 @@ CREATE TABLE "research_outputs" (
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_shared_output" CHECK (sharing_status <> 'SHARED' OR (owner_id IS NOT NULL AND current_release_id IS NOT NULL AND first_shared_at IS NOT NULL)),
   CONSTRAINT "ck_output_archive" CHECK ((sharing_status = 'ARCHIVED') = (archived_at IS NOT NULL)),
-  CONSTRAINT "ck_output_access_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
+  CONSTRAINT "ck_output_access_scope" CHECK (scope_type <> 'GROUP' OR access_group_id IS NULL OR access_group_id = scope_group_id),
+  CONSTRAINT "ck_output_scope" CHECK ((scope_type = 'PERSONAL' AND scope_group_id IS NULL AND scope_project_id IS NULL) OR (scope_type = 'GROUP' AND scope_group_id IS NOT NULL AND scope_project_id IS NULL) OR (scope_type = 'PROJECT' AND scope_project_id IS NOT NULL)),
+  CONSTRAINT "ck_output_audience_scope" CHECK (scope_type <> 'PERSONAL' OR audience <> 'CONTAINER'),
   CONSTRAINT "ck_output_import_owner" CHECK (import_state <> 'ACCEPTED' OR owner_id IS NOT NULL),
   CONSTRAINT "ck_output_create_request" CHECK ((create_idempotency_key IS NULL AND create_request_hash IS NULL) OR (created_by IS NOT NULL AND create_idempotency_key IS NOT NULL AND create_request_hash IS NOT NULL))
 );
@@ -931,7 +954,10 @@ CREATE TABLE "search_index" (
   "entity_id" uuid NOT NULL,
   "revision_id" uuid,
   "owner_id" uuid,
-  "visibility" visibility_level NOT NULL,
+  "scope_type" output_scope_type NOT NULL DEFAULT 'PERSONAL',
+  "scope_group_id" uuid,
+  "scope_project_id" uuid,
+  "audience" output_audience NOT NULL DEFAULT 'FPTU_COMMUNITY',
   "access_group_id" uuid,
   "title" text NOT NULL,
   "body" text,
@@ -939,7 +965,7 @@ CREATE TABLE "search_index" (
   "doc" tsvector NOT NULL,
   "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   CONSTRAINT "ck_search_index_entity_type" CHECK (entity_type IN ('OUTPUT','RESEARCHER','GROUP','OPPORTUNITY')),
-  CONSTRAINT "ck_search_index_scope" CHECK ((visibility = 'RESEARCH_GROUP' AND access_group_id IS NOT NULL) OR (visibility = 'FPTU_COMMUNITY') OR (visibility = 'PRIVATE' AND access_group_id IS NULL)),
+  CONSTRAINT "ck_search_index_scope" CHECK (entity_type <> 'OUTPUT' OR (scope_type <> 'GROUP' OR access_group_id IS NULL OR access_group_id = scope_group_id)),
   PRIMARY KEY ("entity_type", "entity_id")
 );
 
@@ -1148,11 +1174,23 @@ COMMENT ON TABLE "research_groups" IS 'Every active researcher, including a gran
 
 COMMENT ON COLUMN "research_groups"."lead_id" IS 'Single authority for group leadership; LEAD is not duplicated in group_members.role.';
 
+COMMENT ON COLUMN "research_groups"."visibility" IS 'The default audience of the new posts of a group. CONTAINER keeps them for the members, FPTU_COMMUNITY opens them to the whole community. A post keeps the audience it was created with, so changing this affects new posts only.';
+
+COMMENT ON COLUMN "research_outputs"."scope_type" IS 'The posting context of the work: PERSONAL (its author owns it), GROUP (the group owns it), PROJECT (the project owns it). It decides who may change the audience and it never changes after creation, because moving a work to another container would silently change who may edit it.';
+
+COMMENT ON COLUMN "research_outputs"."scope_group_id" IS 'The group the work was posted in. For a GROUP scope it is the group itself; for a PROJECT scope it is the parent group, when the project has one. A project post is readable by the whole group, so the group leads manage it too.';
+
+COMMENT ON COLUMN "research_outputs"."scope_project_id" IS 'The project the work was posted in. Set only for a PROJECT scope.';
+
+COMMENT ON COLUMN "research_outputs"."audience" IS 'Who may read the work. CONTAINER resolves to the group, or to the parent group of a project. The group default is snapshotted here when the work is created, and a post keeps the audience it was created with.';
+
+COMMENT ON COLUMN "research_outputs"."access_group_id" IS 'The group whose banner the work carries. Display information only: it grants no authority over the work.';
+
 COMMENT ON COLUMN "group_members"."archived_at" IS 'Removed memberships are retained; only unarchived rows grant access.';
 
 COMMENT ON COLUMN "group_directions"."archived_at" IS 'UI deletion archives the direction and preserves project references.';
 
-COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. Current visibility applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
+COMMENT ON TABLE "research_outputs" IS 'One work regardless of authors/groups. DRAFT/SHARED/ARCHIVED describe internal sharing, not journal publication. Owner plus effective researcher access is required to edit/release. The scope (scope_type, scope_group_id, scope_project_id) says where the work was posted and who owns it; the audience says who may read it. Current audience applies to ALL versions and linked groups; a group link never widens access. Discovery uses released_output_versions, not drafts.';
 
 COMMENT ON COLUMN "research_outputs"."doi" IS 'SQL normalizes DOI names and decodes doi.org resolver paths. Article creation reports a conflicting DOI. OpenAlex ingest can reuse the existing work for an authorship claim.';
 
@@ -1210,13 +1248,13 @@ COMMENT ON COLUMN "research_seminars"."organizer_id" IS 'Always a user; group af
 
 COMMENT ON TABLE "digest_preferences" IS 'Researcher opt-in only. Weekly MVP; no daily/monthly selector. Worker skips empty periods and rechecks role, account status, opt-out and visibility immediately before delivery.';
 
-COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. visibility/access_group_id are copied here so access filtering needs no join back to the source table. The document contains the author names, so a change to output_authors has to rebuild it (trigger sync_search_index_authors); deleting a researcher profile removes its index row even when the account is retained (trigger sync_search_index_profile_del). visible_search_index applies the same active-account requirement as can_view_output, so an unknown, NULL or inactive actor sees nothing.';
+COMMENT ON TABLE "search_index" IS 'Search index for the Search screen, covering four entity types: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. A plain table, not a materialized view, so a publish is visible immediately instead of waiting for a refresh schedule. Triggers maintain it: sync_search_index upserts on the source rows, sync_search_index_delete removes the row when the source is deleted, guard_search_index_entity checks the polymorphic entity reference (entity_id has no foreign key because it points at four different tables). Only the current released revision of a SHARED output is indexed; an accepted but unpublished work stays out of Search and remains visible only in the owner profile. scope_type/scope_group_id/scope_project_id/audience are copied here so access filtering needs no join back to the source table. The document contains the author names, so a change to output_authors has to rebuild it (trigger sync_search_index_authors); deleting a researcher profile removes its index row even when the account is retained (trigger sync_search_index_profile_del). visible_search_index applies the same active-account requirement as can_view_output, so an unknown, NULL or inactive actor sees nothing.';
 
 COMMENT ON COLUMN "search_index"."entity_type" IS 'Which tab the row belongs to: OUTPUT, RESEARCHER, GROUP, OPPORTUNITY. Constrained by the search_entity_type enum. Researcher, group and opportunity have no visibility column of their own - their access is derived from state (confirmed profile, active group, OPEN opportunity).';
 
 COMMENT ON COLUMN "search_index"."entity_id" IS 'Primary key of the source row, together with entity_type. Polymorphic, so it carries no foreign key; guard_search_index_entity verifies it and sync_search_index_delete cleans it up.';
 
-COMMENT ON COLUMN "search_index"."access_group_id" IS 'The group that scopes the row, used only when visibility is RESEARCH_GROUP. An opportunity is a public posting, so its index row is always FPTU_COMMUNITY and this column stays NULL for it; a group publishes an opportunity to attract people from outside the group.';
+COMMENT ON COLUMN "search_index"."access_group_id" IS 'The group whose banner the row carries. Display information only: it grants no authority over the work. An opportunity is a public posting, so its index row is always FPTU_COMMUNITY and this column stays NULL for it.';
 
 COMMENT ON COLUMN "search_index"."authors_text" IS 'Author names joined for searching. Primary source is output_authors.author_name_string ordered by author_order; authors_snapshot is the fallback because it is free-form JSON with no guaranteed schema.';
 
@@ -1279,6 +1317,10 @@ ALTER TABLE "research_outputs" ADD FOREIGN KEY ("created_by") REFERENCES "users"
 ALTER TABLE "research_outputs" ADD FOREIGN KEY ("owner_id") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "research_outputs" ADD FOREIGN KEY ("access_group_id") REFERENCES "research_groups" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "research_outputs" ADD FOREIGN KEY ("scope_group_id") REFERENCES "research_groups" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "research_outputs" ADD FOREIGN KEY ("scope_project_id") REFERENCES "research_projects" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "resource_handovers" ADD FOREIGN KEY ("output_id") REFERENCES "research_outputs" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
@@ -1480,10 +1522,11 @@ CREATE INDEX idx_unrevoked_sessions_user ON user_sessions(user_id) WHERE revoked
 CREATE INDEX idx_handover_output_history ON resource_handovers(output_id, performed_at) WHERE output_id IS NOT NULL;
 CREATE INDEX idx_handover_group_history ON resource_handovers(group_id, performed_at) WHERE group_id IS NOT NULL;
 CREATE INDEX idx_revision_fts ON output_revisions USING gin(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(abstract,''))) WHERE released_at IS NOT NULL;
-CREATE INDEX idx_output_visibility_lookup ON research_outputs(visibility, sharing_status) WHERE sharing_status = 'SHARED';
+CREATE INDEX idx_output_audience_lookup ON research_outputs(audience, sharing_status) WHERE sharing_status = 'SHARED';
+CREATE INDEX idx_output_scope_lookup ON research_outputs(scope_type, scope_group_id, scope_project_id);
 CREATE INDEX idx_search_index_doc ON search_index USING gin(doc);
 CREATE INDEX idx_search_index_title_trgm ON search_index USING gin(title gin_trgm_ops);
-CREATE INDEX idx_search_index_scope ON search_index(visibility, access_group_id);
+CREATE INDEX idx_search_index_scope ON search_index(audience, scope_type, scope_group_id, scope_project_id);
 CREATE INDEX idx_search_index_type ON search_index(entity_type);
 
 CREATE VIEW effective_user_access AS
@@ -1540,18 +1583,144 @@ $$;
 CREATE FUNCTION can_manage_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs WHERE id=target AND owner_id=actor);
 $$;
--- Who may change the visibility of a work. The owner always may. The lead
--- of the affiliated group may too, so a group keeps control of works that
--- carry its banner even when they are public. When the work has no
--- affiliation only the owner may change it.
+-- The container of a work, resolved once and used by every policy below.
+--
+-- A group scope points at the group. A project scope points at the project,
+-- and at its parent group when it has one: a project post is readable by
+-- the whole group, so the group's leads manage it too.
+CREATE FUNCTION output_scope_group(target uuid) RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT CASE o.scope_type
+    WHEN 'GROUP' THEN o.scope_group_id
+    WHEN 'PROJECT' THEN o.scope_group_id
+    ELSE NULL END
+  FROM research_outputs o WHERE o.id=target;
+$$;
+-- The audience of a work: who may read it, besides the FPTU community.
+--
+-- A group post is readable by the members of that group. A project post is
+-- readable by the members of the project's parent group, or by the project
+-- members when the project stands alone. The project lead always reads it
+-- too: they own the project, and a lead who cannot read what their own
+-- project produced is not a lead.
+CREATE FUNCTION output_scope_audience(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM research_outputs o
+    WHERE o.id=target
+      AND (
+        (o.scope_type='GROUP' AND is_group_member(actor, o.scope_group_id))
+        OR (o.scope_type='PROJECT' AND (
+          EXISTS (SELECT 1 FROM research_projects p
+            WHERE p.id=o.scope_project_id AND p.lead_id=actor)
+          OR (o.scope_group_id IS NOT NULL AND is_group_member(actor, o.scope_group_id))
+          OR (o.scope_group_id IS NULL AND EXISTS (
+            SELECT 1 FROM project_members pm
+              WHERE pm.project_id=o.scope_project_id AND pm.user_id=actor)
+          )
+        ))
+      ));
+$$;
+-- The container managers of a work: whoever may change its audience.
+--
+-- A personal post is managed by its owner. A group post is managed by the
+-- group's leads. A project post is managed by the project's lead and by the
+-- parent group's leads.
+--
+-- The affiliation plays no part here. A group lead has no say over a work
+-- that merely carries their banner.
+CREATE FUNCTION can_manage_output_content(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT is_researcher(actor) AND EXISTS (
+    SELECT 1 FROM research_outputs o
+    WHERE o.id=target
+      AND (
+        (o.scope_type='PERSONAL' AND o.owner_id=actor)
+        OR (o.scope_type='GROUP' AND o.scope_group_id IS NOT NULL
+            AND can_manage_group(actor, o.scope_group_id))
+        OR (o.scope_type='PROJECT' AND o.scope_project_id IS NOT NULL AND (
+          EXISTS (SELECT 1 FROM research_projects p
+            WHERE p.id=o.scope_project_id AND p.lead_id=actor AND p.archived_at IS NULL)
+          OR (o.scope_group_id IS NOT NULL AND can_manage_group(actor, o.scope_group_id))
+        ))
+      ));
+$$;
+-- The file uploader manages the access to their own file.
+--
+-- File access is about the research, not about the group's narrative, so the
+-- researcher who uploaded a PDF decides who may read it - even inside a group
+-- or a project. This is the one deliberate exception to "the container owns
+-- the post".
+CREATE FUNCTION can_manage_output_file(actor uuid, target_file uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT is_researcher(actor) AND EXISTS (
+    SELECT 1 FROM output_files f JOIN research_outputs o ON o.id=f.output_id
+    WHERE f.id=target_file
+      AND (f.uploaded_by=actor OR can_manage_output_content(actor, o.id)));
+$$;
+-- The group a file is restricted to.
+--
+-- The file names a group of its own, but that group only counts when it is
+-- the container of the work the file belongs to. A file of a personal post
+-- cannot borrow a group's audience, and a file of a project post cannot
+-- borrow an unrelated group: the file is never wider than its post.
+CREATE FUNCTION output_file_group_member(actor uuid, target_file uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM output_files f
+    JOIN research_outputs o ON o.id = f.output_id
+    WHERE f.id = target_file
+      AND f.access_group_id IS NOT NULL
+      AND f.access_group_id = o.scope_group_id
+      AND is_group_member(actor, f.access_group_id));
+$$;
+-- The default audience of a group: the audience its new posts inherit.
+--
+-- A post snapshots the default when it is created, so changing the default
+-- affects new posts only. A post that already exists keeps the audience it
+-- was created with, and no post ever changes audience behind the back of
+-- the people who can read it.
+CREATE FUNCTION group_default_audience(target_group uuid) RETURNS output_audience LANGUAGE sql STABLE AS $$
+  SELECT coalesce((SELECT g.visibility FROM research_groups g WHERE g.id=target_group), 'CONTAINER'::output_audience);
+$$;
+-- Who may change the visibility of a work. The authority follows the scope.
 CREATE FUNCTION can_change_output_visibility(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
- SELECT is_researcher(actor) AND EXISTS (SELECT 1 FROM research_outputs o WHERE o.id=target
- AND (o.owner_id=actor OR (o.access_group_id IS NOT NULL AND can_manage_group(actor,o.access_group_id))));
+  SELECT can_manage_output_content(actor, target);
+$$;
+-- Small helpers kept separate so the rules below read as one condition.
+CREATE FUNCTION output_is_personal(target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM research_outputs o WHERE o.id=target AND o.scope_type='PERSONAL');
+$$;
+CREATE FUNCTION output_owner_is_actor(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM research_outputs o WHERE o.id=target AND o.owner_id=actor);
+$$;
+-- The audiences a work may take, given its scope.
+--
+-- A personal post has two choices: PRIVATE (the owner-only draft) and
+-- FPTU_COMMUNITY (the whole community). A container post has two as well:
+-- CONTAINER (the narrow audience of the group or the project) and
+-- FPTU_COMMUNITY. There is never a third layer.
+CREATE FUNCTION allowed_output_audiences(target uuid) RETURNS output_audience[] LANGUAGE sql STABLE AS $$
+  SELECT CASE WHEN output_is_personal(target)
+    THEN ARRAY['PRIVATE'::output_audience, 'FPTU_COMMUNITY'::output_audience]
+    ELSE ARRAY['CONTAINER'::output_audience, 'FPTU_COMMUNITY'::output_audience] END;
+$$;
+-- Whether an actor may set a work to an audience.
+--
+-- The container leads set the audience of a post: they decide whether it
+-- reaches the community or stays with the container. The poster never does,
+-- not even for their own post inside a group - the group owns that post.
+--
+-- A personal post is the exception: its author is the owner of the post, so
+-- the author sets its audience, freely.
+CREATE FUNCTION can_set_output_audience(actor uuid, target uuid, wanted output_audience) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT is_researcher(actor) AND wanted = ANY (allowed_output_audiences(target))
+    AND (
+      CASE WHEN output_is_personal(target)
+        THEN output_owner_is_actor(actor, target)
+        ELSE can_manage_output_content(actor, target)
+      END
+    );
 $$;
 CREATE FUNCTION can_view_output(actor uuid, target uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT EXISTS (SELECT 1 FROM research_outputs o JOIN users u ON u.id=actor AND u.is_active
  WHERE o.id=target AND (o.owner_id=actor OR (o.sharing_status='SHARED' AND
- (o.visibility='FPTU_COMMUNITY' OR (o.visibility='RESEARCH_GROUP' AND is_group_member(actor,o.access_group_id))))));
+ (o.audience='FPTU_COMMUNITY' OR (o.audience='CONTAINER' AND output_scope_audience(actor, o.id))))));
 $$;
 -- A candidate is a work pulled from OpenAlex that nobody owns yet. It has no
 -- owner, so can_view_output cannot reach it: that predicate only opens for the
@@ -1917,8 +2086,23 @@ BEGIN
 END $$;
 CREATE TRIGGER a_guard_output_release BEFORE INSERT OR UPDATE ON research_outputs FOR EACH ROW EXECUTE FUNCTION guard_output_release();
 
+-- The scope of a work is immutable. Moving a work to another container would
+-- silently change who may edit it and who may read it, so the scope is fixed
+-- at creation. The audience is the part that changes, and only the container
+-- leads may change it.
+CREATE FUNCTION guard_output_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='UPDATE' AND
+   (NEW.scope_type, NEW.scope_group_id, NEW.scope_project_id)
+   IS DISTINCT FROM (OLD.scope_type, OLD.scope_group_id, OLD.scope_project_id) THEN
+   RAISE EXCEPTION 'Output scope is immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER a_guard_output_scope BEFORE UPDATE ON research_outputs FOR EACH ROW EXECUTE FUNCTION guard_output_scope();
+
 CREATE VIEW released_output_versions AS
- SELECT o.id AS output_id,o.owner_id,o.doi,o.visibility,o.access_group_id,o.first_shared_at,
+ SELECT o.id AS output_id,o.owner_id,o.doi,o.scope_type,o.scope_group_id,o.scope_project_id,o.audience,o.access_group_id,o.first_shared_at,
  r.id AS revision_id,r.revision_no,r.title,r.abstract,r.venue,r.publisher,r.publication_year,r.publication_status,
  r.output_type,r.external_url,r.authors_snapshot,r.released_at
  FROM research_outputs o JOIN output_revisions r ON (r.output_id,r.id)=(o.id,o.current_release_id)
@@ -1940,7 +2124,7 @@ $$;
 -- A candidate is not a working copy: nobody owns it yet, and it is read
 -- through the candidate review functions instead.
 CREATE VIEW owner_output_versions AS
- SELECT o.id AS output_id,o.owner_id,o.doi,o.visibility,o.access_group_id,o.first_shared_at,o.import_state,
+ SELECT o.id AS output_id,o.owner_id,o.doi,o.scope_type,o.scope_group_id,o.scope_project_id,o.audience,o.access_group_id,o.first_shared_at,o.import_state,
  r.id AS revision_id,r.revision_no,r.title,r.abstract,r.venue,r.publisher,r.publication_year,r.publication_status,
  r.output_type,r.external_url,r.authors_snapshot,r.released_at
  FROM research_outputs o
@@ -1954,11 +2138,13 @@ CREATE FUNCTION visible_group_output_releases(actor uuid,target_group uuid) RETU
  SELECT r.* FROM group_output_releases r WHERE r.group_id=target_group AND can_view_output(actor,r.output_id);
 $$;
 -- Search index permission filter. Mirrors can_view_output exactly: the owner
--- always sees the record, FPTU_COMMUNITY is visible to everyone, RESEARCH_GROUP
--- is visible to the members of access_group_id. The owner case matters - a
--- PRIVATE-visibility work stays findable by its owner in search.
--- The four entity types carry the same visibility triple, so one filter covers
--- all of them.
+-- always sees the record, FPTU_COMMUNITY is visible to everyone, and
+-- CONTAINER resolves to the scope audience of the work - the group, or the
+-- parent group of a project.
+-- The owner case matters - a PRIVATE-audience work stays findable by its
+-- owner in search.
+-- The non-output rows (researcher, group, opportunity) are not scoped work:
+-- they carry no audience of their own and their access is derived from state.
 -- The active-user requirement of can_view_output applies to every branch here:
 -- an unknown, NULL or inactive actor sees nothing at all, and an inactive
 -- owner does not reach their own private records either.
@@ -1966,8 +2152,20 @@ CREATE FUNCTION visible_search_index(actor uuid) RETURNS SETOF search_index LANG
  SELECT s.* FROM search_index s
  JOIN users u ON u.id=actor AND u.is_active
  WHERE s.owner_id = actor
-    OR s.visibility = 'FPTU_COMMUNITY'
-    OR (s.visibility = 'RESEARCH_GROUP' AND is_group_member(actor, s.access_group_id));
+    OR s.entity_type <> 'OUTPUT'
+    OR s.audience = 'FPTU_COMMUNITY'
+    OR (s.audience = 'CONTAINER' AND (
+         (s.scope_type='GROUP' AND is_group_member(actor, s.scope_group_id))
+         OR (s.scope_type='PROJECT' AND (
+           EXISTS (SELECT 1 FROM research_projects p
+             WHERE p.id=s.scope_project_id AND p.lead_id=actor)
+           OR (s.scope_group_id IS NOT NULL AND is_group_member(actor, s.scope_group_id))
+           OR (s.scope_group_id IS NULL AND EXISTS (
+             SELECT 1 FROM project_members pm
+               WHERE pm.project_id=s.scope_project_id AND pm.user_id=actor)
+           )
+         ))
+       ));
 $$;
 -- RES-176: Private-file access requests and grants.
 CREATE TYPE file_access_request_status AS ENUM (
@@ -2064,6 +2262,18 @@ CREATE TABLE file_access_grants (
 
 COMMENT ON TABLE file_access_grants IS 'Access to one exact Private file, issued by approving a request. Revocation is final; a new request issues a new grant.';
 
+-- Who may answer a private-file access request.
+--
+-- The uploader alone answers. The container leads own the narrative of the
+-- group or the project, but they did not produce the file and they cannot
+-- vouch for it, so they never decide who may read it.
+CREATE FUNCTION can_decide_file_access_request(actor uuid, target_request uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT is_researcher(actor) AND EXISTS (
+    SELECT 1 FROM file_access_requests r
+    JOIN output_files f ON f.id = r.file_id
+    WHERE r.id = target_request AND f.uploaded_by = actor);
+$$;
+
 CREATE UNIQUE INDEX uq_file_access_grant_active
   ON file_access_grants(file_id, grantee_id) WHERE revoked_at IS NULL;
 CREATE INDEX idx_file_access_grants_grantee ON file_access_grants(grantee_id);
@@ -2107,7 +2317,7 @@ CREATE FUNCTION can_view_output_file(actor uuid, target_file uuid) RETURNS boole
  SELECT EXISTS (SELECT 1 FROM output_files f JOIN research_outputs o ON o.id=f.output_id
  WHERE f.id=target_file AND f.is_available AND can_view_output(actor,o.id)
  AND (
-   ((o.owner_id=actor OR (f.visibility='FPTU_COMMUNITY' OR (f.visibility='RESEARCH_GROUP' AND is_group_member(actor,f.access_group_id))))
+   ((o.owner_id=actor OR (f.visibility='FPTU_COMMUNITY' OR (f.visibility='RESEARCH_GROUP' AND output_file_group_member(actor, f.id))))
     AND (o.owner_id=actor OR EXISTS (SELECT 1 FROM output_revision_files rf WHERE rf.file_id=f.id AND
      (rf.revision_id=o.current_release_id OR EXISTS (SELECT 1 FROM group_output_releases g WHERE g.output_id=o.id AND g.id=rf.revision_id)))))
    OR (f.visibility='PRIVATE'
@@ -2481,12 +2691,14 @@ BEGIN
        FROM output_authors a WHERE a.output_id=o.id),
     coalesce((SELECT string_agg(x->>'name', ' ') FROM jsonb_array_elements(r.authors_snapshot) x
        WHERE x ? 'name'), ''));
-  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
-  VALUES ('OUTPUT',o.id,r.id,o.owner_id,o.visibility,o.access_group_id,
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,scope_type,scope_group_id,scope_project_id,audience,access_group_id,title,body,authors_text,doc)
+  VALUES ('OUTPUT',o.id,r.id,o.owner_id,o.scope_type,o.scope_group_id,o.scope_project_id,o.audience,o.access_group_id,
           r.title, coalesce(r.abstract,''), authors,
           to_tsvector('simple', coalesce(r.title,'') || ' ' || coalesce(r.abstract,'') || ' ' || authors))
   ON CONFLICT (entity_type,entity_id) DO UPDATE SET
-    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id,
+    scope_type=EXCLUDED.scope_type, scope_group_id=EXCLUDED.scope_group_id,
+    scope_project_id=EXCLUDED.scope_project_id, audience=EXCLUDED.audience,
     access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
     authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
 END $$;
@@ -2518,12 +2730,14 @@ BEGIN
     RETURN;
   END IF;
   etitle:=btrim(regexp_replace(coalesce(nullif(btrim(u.academic_title),''),'')||' '||u.full_name,'[[:space:]]+',' ','g'));
-  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
-  VALUES ('RESEARCHER',u.id,NULL,u.id,'FPTU_COMMUNITY',NULL,
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,scope_type,scope_group_id,scope_project_id,audience,access_group_id,title,body,authors_text,doc)
+  VALUES ('RESEARCHER',u.id,NULL,u.id,'PERSONAL',NULL,NULL,'FPTU_COMMUNITY',NULL,
           etitle, coalesce(p.bio,''), u.full_name,
           to_tsvector('simple', coalesce(etitle,'')||' '||coalesce(p.bio,'')||' '||coalesce(u.full_name,'')))
   ON CONFLICT (entity_type,entity_id) DO UPDATE SET
-    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id,
+    scope_type=EXCLUDED.scope_type, scope_group_id=EXCLUDED.scope_group_id,
+    scope_project_id=EXCLUDED.scope_project_id, audience=EXCLUDED.audience,
     access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
     authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
 END $$;
@@ -2546,12 +2760,14 @@ BEGIN
   END IF;
   etitle:=g.name; ebody:=coalesce(g.description,'');
   eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=g.lead_id),'');
-  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
-  VALUES ('GROUP',g.id,NULL,g.lead_id,'FPTU_COMMUNITY',NULL,
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,scope_type,scope_group_id,scope_project_id,audience,access_group_id,title,body,authors_text,doc)
+  VALUES ('GROUP',g.id,NULL,g.lead_id,'PERSONAL',NULL,NULL,'FPTU_COMMUNITY',NULL,
           etitle, ebody, eauthors,
           to_tsvector('simple', coalesce(etitle,'')||' '||coalesce(ebody,'')||' '||coalesce(eauthors,'')))
   ON CONFLICT (entity_type,entity_id) DO UPDATE SET
-    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id,
+    scope_type=EXCLUDED.scope_type, scope_group_id=EXCLUDED.scope_group_id,
+    scope_project_id=EXCLUDED.scope_project_id, audience=EXCLUDED.audience,
     access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
     authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
 END $$;
@@ -2559,7 +2775,7 @@ END $$;
 CREATE FUNCTION sync_opportunity_search_index(target uuid) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   op research_opportunities%ROWTYPE;
-  evis visibility_level;
+  eaud output_audience;
   egroup uuid;
   etitle text;
   ebody text;
@@ -2579,15 +2795,17 @@ BEGIN
   -- record does not narrow who may read it: a group-scoped opportunity is
   -- as public as a personal one. The scope still lives on the row, but it
   -- describes who published it, not who may see it.
-  evis:='FPTU_COMMUNITY'; egroup:=NULL;
+  eaud:='FPTU_COMMUNITY'; egroup:=NULL;
   etitle:=op.title; ebody:=coalesce(op.description,'');
   eauthors:=coalesce((SELECT usr.full_name FROM users usr WHERE usr.id=op.creator_id),'');
-  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,visibility,access_group_id,title,body,authors_text,doc)
-  VALUES ('OPPORTUNITY',op.id,NULL,op.creator_id,evis,egroup,
+  INSERT INTO search_index(entity_type,entity_id,revision_id,owner_id,scope_type,scope_group_id,scope_project_id,audience,access_group_id,title,body,authors_text,doc)
+  VALUES ('OPPORTUNITY',op.id,NULL,op.creator_id,'PERSONAL',NULL,NULL,eaud,egroup,
           etitle, ebody, eauthors,
           to_tsvector('simple', coalesce(etitle,'')||' '||coalesce(ebody,'')||' '||coalesce(eauthors,'')))
   ON CONFLICT (entity_type,entity_id) DO UPDATE SET
-    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id, visibility=EXCLUDED.visibility,
+    revision_id=EXCLUDED.revision_id, owner_id=EXCLUDED.owner_id,
+    scope_type=EXCLUDED.scope_type, scope_group_id=EXCLUDED.scope_group_id,
+    scope_project_id=EXCLUDED.scope_project_id, audience=EXCLUDED.audience,
     access_group_id=EXCLUDED.access_group_id, title=EXCLUDED.title, body=EXCLUDED.body,
     authors_text=EXCLUDED.authors_text, doc=EXCLUDED.doc, updated_at=clock_timestamp();
 END $$;
