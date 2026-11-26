@@ -8,11 +8,13 @@ import { ChatModule } from './modules/chat/chat.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { DiscoveryModule } from './modules/discovery/discovery.module.js';
+import { FileAccessModule } from './modules/file-access/file-access.module.js';
 import { FollowModule } from './modules/follow/follow.module.js';
 import { GroupsModule } from './modules/groups/groups.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
+import { ExportsModule } from './modules/exports/exports.module.js';
 import { OpenAlexModule } from './modules/openalex/openalex.module.js';
 import { OpportunitiesModule } from './modules/opportunities/opportunities.module.js';
 import { OutputsModule } from './modules/outputs/outputs.module.js';
@@ -67,11 +69,13 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     NotificationsModule,
     DemoModule,
     DiscoveryModule,
+    FileAccessModule,
     FollowModule,
     GroupsModule,
     HealthModule,
     IdentityModule,
     JobsModule,
+    ExportsModule,
     OpenAlexModule,
     OpportunitiesModule,
     OutputsModule,

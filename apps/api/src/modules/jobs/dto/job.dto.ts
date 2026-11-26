@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DIGEST_MAX_ATTEMPTS } from '@researchos/queue';
 
 export class JobDto {
@@ -25,4 +25,10 @@ export class JobDto {
 
   @ApiProperty({ description: 'Owner-scoped URL to poll for this job.' })
   statusUrl!: string;
+
+  @ApiPropertyOptional({
+    enum: [1, 2],
+    description: 'Available for completed LLKH exports.',
+  })
+  exportLevel?: number;
 }

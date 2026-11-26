@@ -716,24 +716,53 @@ export class OutputsService {
     if (!exists.current_release_id || exists.owner_id === callerId)
       return output;
 
-    const [pdf] = await this.prisma.$queryRaw<{ restricted: boolean }[]>`
-      SELECT EXISTS (
-        SELECT 1
-        FROM research_outputs o
-        JOIN output_revision_files rf
-          ON rf.output_id = o.id AND rf.revision_id = o.current_release_id
-        JOIN output_files f ON f.id = rf.file_id AND f.output_id = o.id
-        WHERE o.id = ${outputId}::uuid
-          AND o.current_release_id = ${exists.current_release_id}::uuid
-          AND o.sharing_status = 'SHARED'
-          AND can_view_output(${callerId}::uuid, o.id)
-          AND lower(f.mime_type) = 'application/pdf'
-          AND f.visibility = 'PRIVATE'
-          AND f.is_available
-          AND NOT can_view_output_file(${callerId}::uuid, f.id)
-      ) AS restricted
+    // Private files of the current release the caller may ask for (RES-176),
+    // with the caller's latest request for each.
+    const restricted = await this.prisma.$queryRaw<
+      {
+        id: string;
+        file_name: string;
+        mime_type: string;
+        size_bytes: bigint;
+        request_id: string | null;
+        request_status: string | null;
+      }[]
+    >`
+      SELECT f.id, f.file_name, f.mime_type, f.size_bytes,
+             r.id AS request_id, r.status::text AS request_status
+      FROM research_outputs o
+      JOIN output_revision_files rf
+        ON rf.output_id = o.id AND rf.revision_id = o.current_release_id
+      JOIN output_files f ON f.id = rf.file_id AND f.output_id = o.id
+      LEFT JOIN LATERAL (
+        SELECT id, status FROM file_access_requests
+        WHERE file_id = f.id AND requester_id = ${callerId}::uuid
+        ORDER BY created_at DESC, id DESC LIMIT 1
+      ) r ON true
+      WHERE o.id = ${outputId}::uuid
+        AND o.current_release_id = ${exists.current_release_id}::uuid
+        AND o.sharing_status = 'SHARED'
+        AND can_view_output(${callerId}::uuid, o.id)
+        AND f.visibility = 'PRIVATE'
+        AND f.is_available
+        AND NOT can_view_output_file(${callerId}::uuid, f.id)
+      ORDER BY f.uploaded_at, f.id
     `;
-    return { ...output, hasRestrictedPdf: pdf?.restricted ?? false };
+    return {
+      ...output,
+      hasRestrictedPdf: restricted.some(
+        (file) => file.mime_type.toLowerCase() === 'application/pdf',
+      ),
+      requestableFiles: restricted.map((file) => ({
+        id: file.id,
+        fileName: file.file_name,
+        mimeType: file.mime_type,
+        sizeBytes: Number(file.size_bytes),
+        myRequest: file.request_id
+          ? { id: file.request_id, status: file.request_status! }
+          : null,
+      })),
+    };
   }
 
   /**
@@ -1122,10 +1151,28 @@ export class OutputsService {
     return this.prisma.$transaction(async (tx) => {
       const release = await this.lockArticleRelease(tx, outputId, callerId);
       this.assertCurrentArticlePdf(release, fileId.toLowerCase());
+      const [previous] = await tx.$queryRaw<{ visibility: string }[]>`
+        SELECT visibility::text AS visibility FROM output_files
+        WHERE id = ${fileId}::uuid FOR UPDATE
+      `;
       const file = await tx.output_files.update({
         where: { id: fileId },
         data: { visibility: dto.fileVisibility, access_group_id: null },
       });
+      if (
+        previous?.visibility === 'PRIVATE' &&
+        dto.fileVisibility !== 'PRIVATE'
+      ) {
+        // Access granted while the file was Private must not come back if
+        // the owner makes it Private again later.
+        await this.closeFileAccess(tx, {
+          fileId: file.id,
+          outputId: release.output_id,
+          callerId,
+          reason: 'FILE_NOT_PRIVATE',
+          action: 'output_file.left_private',
+        });
+      }
       return this.mapToFileResponse({
         ...file,
         is_current_release_attachment: true,
@@ -1245,6 +1292,56 @@ export class OutputsService {
     }
   }
 
+  /**
+   * Ends file access requests and grants for a file that can no longer be
+   * requested (RES-176): pending requests are cancelled, active grants are
+   * revoked, and one audit entry records the change even when nothing was
+   * pending. Runs inside the caller's transaction, after the Article lock.
+   */
+  private async closeFileAccess(
+    tx: Prisma.TransactionClient,
+    {
+      fileId,
+      outputId,
+      callerId,
+      reason,
+      action,
+    }: {
+      fileId: string;
+      outputId: string;
+      callerId: string;
+      reason: 'FILE_UNAVAILABLE' | 'FILE_NOT_PRIVATE';
+      action: 'output_file.unavailable' | 'output_file.left_private';
+    },
+  ): Promise<void> {
+    const cancelled = await tx.$queryRaw<{ id: string }[]>`
+      UPDATE file_access_requests
+      SET status = 'CANCELLED', cancel_reason = ${reason},
+          decided_by = ${callerId}::uuid, decided_at = clock_timestamp()
+      WHERE file_id = ${fileId}::uuid AND status = 'PENDING'
+      RETURNING id
+    `;
+    const revoked = await tx.$queryRaw<{ id: string }[]>`
+      UPDATE file_access_grants
+      SET revoked_by = ${callerId}::uuid, revoked_at = clock_timestamp()
+      WHERE file_id = ${fileId}::uuid AND revoked_at IS NULL
+      RETURNING id
+    `;
+    await tx.auditLog.create({
+      data: {
+        actorId: callerId,
+        action,
+        entity: 'output_file',
+        entityId: fileId,
+        payload: {
+          outputId,
+          cancelledRequestIds: cancelled.map(({ id }) => id),
+          revokedGrantIds: revoked.map(({ id }) => id),
+        },
+      },
+    });
+  }
+
   private async copyArticleRevision(
     tx: Prisma.TransactionClient,
     release: ArticleRelease,
@@ -1352,10 +1449,20 @@ export class OutputsService {
     if (removedFileId) {
       // Old revision links remain intact. The shared download policy checks
       // file availability, including when a group points to an older release.
-      await tx.output_files.update({
-        where: { id: removedFileId },
-        data: { is_available: false },
-      });
+      const [file] = await tx.$queryRaw<{ id: string }[]>`
+        UPDATE output_files SET is_available = false
+        WHERE id = ${removedFileId}::uuid AND is_available
+        RETURNING id
+      `;
+      if (file) {
+        await this.closeFileAccess(tx, {
+          fileId: removedFileId,
+          outputId: release.output_id,
+          callerId,
+          reason: 'FILE_UNAVAILABLE',
+          action: 'output_file.unavailable',
+        });
+      }
     }
     return revision.id;
   }

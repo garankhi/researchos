@@ -16,6 +16,7 @@ import type { OutputResponseDtoSharingStatus } from './outputResponseDtoSharingS
 import type { OutputResponseDtoVisibility } from './outputResponseDtoVisibility';
 import type { OutputRevisionResponseDto } from './outputRevisionResponseDto';
 import type { OutputTopicResponseDto } from './outputTopicResponseDto';
+import type { RequestableFileDto } from './requestableFileDto';
 
 export interface OutputResponseDto {
   /** Unique identifier of the research output. */
@@ -64,4 +65,6 @@ export interface OutputResponseDto {
   downloadablePdf?: DownloadablePdfDto;
   /** On the detail view, whether the current release has a private PDF unavailable to the caller. */
   hasRestrictedPdf?: boolean;
+  /** On the detail view, Private files of the current release the caller cannot download yet and may request. */
+  requestableFiles?: RequestableFileDto[];
 }

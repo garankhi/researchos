@@ -396,7 +396,24 @@ describe('OutputsController & OutputsService', () => {
       );
       prismaMock.$queryRaw
         .mockResolvedValueOnce([{ allowed: true }])
-        .mockResolvedValueOnce([{ restricted: true }]);
+        .mockResolvedValueOnce([
+          {
+            id: 'f1',
+            file_name: 'paper.pdf',
+            mime_type: 'Application/PDF',
+            size_bytes: 42n,
+            request_id: 'r1',
+            request_status: 'PENDING',
+          },
+          {
+            id: 'f2',
+            file_name: 'data.zip',
+            mime_type: 'application/zip',
+            size_bytes: 7n,
+            request_id: null,
+            request_status: null,
+          },
+        ]);
       prismaMock.output_revisions.findUnique.mockResolvedValue(
         mockPinnedRevision,
       );
@@ -410,9 +427,25 @@ describe('OutputsController & OutputsService', () => {
       expect(result.currentRevision?.title).toBe('Pinned Research Publication');
       expect(result.topics).toHaveLength(1);
       expect(result.hasRestrictedPdf).toBe(true);
-      expect(prismaMock.$queryRaw.mock.calls[1][0].join('')).toContain(
-        "lower(f.mime_type) = 'application/pdf'",
-      );
+      expect(result.requestableFiles).toEqual([
+        {
+          id: 'f1',
+          fileName: 'paper.pdf',
+          mimeType: 'Application/PDF',
+          sizeBytes: 42,
+          myRequest: { id: 'r1', status: 'PENDING' },
+        },
+        {
+          id: 'f2',
+          fileName: 'data.zip',
+          mimeType: 'application/zip',
+          sizeBytes: 7,
+          myRequest: null,
+        },
+      ]);
+      const sql = prismaMock.$queryRaw.mock.calls[1][0].join('');
+      expect(sql).toContain("f.visibility = 'PRIVATE'");
+      expect(sql).toContain('NOT can_view_output_file(');
     });
 
     it('resolves owner working copy draft revision when owner views their own unpublished DRAFT output', async () => {
