@@ -14,9 +14,7 @@ docs/res/*
 !docs/res/RES-159-group-hub-page.md
 !docs/database/
 !docs/database/*.md
-!docs/database/*.dbml
 !docs/database/*.sql
-!docs/database/*.ps1
 !docs/database/*.py
 !docs/database/*.cjs
 

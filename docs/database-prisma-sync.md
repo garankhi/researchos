@@ -318,8 +318,8 @@ tìm revision theo `(output_id, revision_no)` rồi tạo hoặc cập nhật tr
 
 ## Quy trình tổng quát cho lần đồng bộ tiếp theo
 
-1. **Chốt bản SQL nghiệp vụ.** Kiểm tra file sinh ra từ DBML cùng
-   `postgres-features.sql`. Giữ trigger, function, view, CHECK và index đặc
+1. **Chốt bản SQL nghiệp vụ.** Sửa trực tiếp `docs/database/ResearchOS.sql` —
+   đây là nguồn sự thật duy nhất. Giữ trigger, function, view, CHECK và index đặc
    thù; không chỉ lấy SQL export từ sơ đồ. Đối chiếu tên bảng/enum với
    migration hiện có, giữ `audit_logs` nếu vẫn dùng.
 2. **Thêm migration mới.** Không sửa hoặc xóa migration init đã áp dụng.
@@ -345,7 +345,8 @@ tìm revision theo `(output_id, revision_no)` rồi tạo hoặc cập nhật tr
    thay thế migration.
 
 Sau khi đồng bộ, migration là nguồn triển khai cho máy mới/server;
-`schema.prisma` là model dùng sinh client; DBML là tài liệu thiết kế.
+`schema.prisma` là model dùng sinh client; `ResearchOS.sql` là nguồn sự thật
+của schema và tài liệu thiết kế.
 Khi đổi nghiệp vụ, cập nhật các phần tương ứng trong cùng thay đổi.
 
 Prisma chỉ introspect được một phần cấu trúc PostgreSQL; các trigger,

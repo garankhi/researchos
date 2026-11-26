@@ -1,5 +1,5 @@
--- Additive migration; source definitions are in ResearchOS.dbml and
--- postgres-features.sql. No existing domain data is rewritten.
+-- Additive migration; the source definitions are in docs/database/ResearchOS.sql.
+-- No existing domain data is rewritten.
 CREATE TABLE background_jobs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE NO ACTION,
