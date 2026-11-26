@@ -152,6 +152,8 @@ export const CompleteFlow: Story = {
           <ArticleCreationBasics
             reader={reader}
             accounts={[]}
+            scope={{ scopeType: 'PERSONAL' }}
+            onScopeChange={() => {}}
             onContinue={(values) => {
               setDraft(values);
               setStep('details');

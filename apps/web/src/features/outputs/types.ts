@@ -58,10 +58,15 @@ export interface OutputDetail {
   doi: string | null;
   ownerId: string | null;
   sharingStatus: OutputResponseDto['sharingStatus'];
-  visibility: OutputResponseDto['visibility'];
+  /** Where the work was posted. Fixed at creation. */
+  scopeType: OutputResponseDto['scopeType'];
+  /** Who may read the work. */
+  audience: OutputResponseDto['audience'];
   accessGroupId: string | null;
   firstSharedAt: string | null;
   hasRestrictedPdf: boolean;
+  /** Whether the signed-in viewer may change the audience. */
+  canChangeVisibility: boolean;
   revision: OutputRevisionSummary | null;
   authors: OutputAuthor[];
   topics: OutputTopic[];
@@ -105,10 +110,12 @@ export function mapOutputDetail(dto: OutputResponseDto): OutputDetail {
     doi: asString(dto.doi),
     ownerId: asString(dto.ownerId),
     sharingStatus: dto.sharingStatus,
-    visibility: dto.visibility,
+    scopeType: dto.scopeType,
+    audience: dto.audience,
     accessGroupId: asString(dto.accessGroupId),
     firstSharedAt: asString(dto.firstSharedAt),
     hasRestrictedPdf: dto.hasRestrictedPdf === true,
+    canChangeVisibility: dto.canChangeVisibility === true,
     revision: rev
       ? {
           id: rev.id,

@@ -36,6 +36,10 @@ import {
 import { ArticleIllustration } from './article-illustration';
 import { ArticlePdfSummary, ArticlePdfUpload } from './article-pdf-field';
 import { ArticlePublicationDate } from './article-publication-date';
+import {
+  OutputScopePicker,
+  type OutputScopeSelection,
+} from './output-scope-picker';
 
 export type ArticleDraft = ArticleBasics & {
   uploadId?: string;
@@ -50,6 +54,8 @@ type Props = {
   accountsFailed?: boolean;
   onSuggestionTitleChange?: (title: string) => void;
   onSuggestedAbstractChange?: (abstract: string | undefined) => void;
+  scope: OutputScopeSelection;
+  onScopeChange: (scope: OutputScopeSelection) => void;
   onContinue: (draft: ArticleDraft) => void;
 };
 
@@ -61,6 +67,8 @@ export function ArticleCreationBasics({
   accountsFailed,
   onSuggestionTitleChange,
   onSuggestedAbstractChange,
+  scope,
+  onScopeChange,
   onContinue,
 }: Props) {
   const t = useTranslations('articleBasics');
@@ -200,6 +208,12 @@ export function ArticleCreationBasics({
                       </Flex>
                       <ArticlePdfSummary file={pdf.file} phase={pdf.phase} />
                     </Stack>
+                    <Box>
+                      <OutputScopePicker
+                        value={scope}
+                        onChange={onScopeChange}
+                      />
+                    </Box>
                     <FormTextarea
                       control={form.control}
                       name="title"

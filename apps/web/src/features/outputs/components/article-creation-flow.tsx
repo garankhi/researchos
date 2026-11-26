@@ -17,6 +17,7 @@ import {
   type ArticleDetails,
 } from './article-creation-details';
 import { ArticleCreationSuccess } from './article-creation-success';
+import { type OutputScopeSelection } from './output-scope-picker';
 
 type Success = {
   outputId: string;
@@ -29,6 +30,9 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
   const tErrors = useTranslations('errors');
   const [step, setStep] = useState<'basics' | 'details' | 'success'>('basics');
   const [draft, setDraft] = useState<Omit<ArticleDraft, 'suggestedAbstract'>>();
+  const [scope, setScope] = useState<OutputScopeSelection>({
+    scopeType: 'PERSONAL',
+  });
   const [abstract, setAbstract] = useState<string>();
   const [editedAbstract, setEditedAbstract] = useState<string>();
   const [suggestionTitle, setSuggestionTitle] = useState('');
@@ -66,7 +70,19 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
     if (!draft) return;
     setSubmitError(undefined);
     try {
-      const article = await create({ ...draft, ...details });
+      const article = await create({
+        ...draft,
+        ...details,
+        // The scope travels with the Article: it names the container that
+        // owns the post and so decides who may change its audience later.
+        scope: {
+          scopeType: scope.scopeType,
+          ...(scope.scopeGroupId && { scopeGroupId: scope.scopeGroupId }),
+          ...(scope.scopeProjectId && {
+            scopeProjectId: scope.scopeProjectId,
+          }),
+        },
+      });
       if (!article) return;
       setResult({
         outputId: article.outputId,
@@ -115,6 +131,8 @@ export function ArticleCreationFlow({ userId }: { userId: string }) {
               accountsFailed={people.isFailed}
               onSuggestionTitleChange={setSuggestionTitle}
               onSuggestedAbstractChange={setAbstract}
+              scope={scope}
+              onScopeChange={setScope}
               onContinue={({ suggestedAbstract, ...values }) => {
                 setDraft(values);
                 setAbstract(suggestedAbstract);

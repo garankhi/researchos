@@ -5,15 +5,9 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateOutputVisibilityDtoAccessGroupId } from './updateOutputVisibilityDtoAccessGroupId';
-import type { UpdateOutputVisibilityDtoVisibility } from './updateOutputVisibilityDtoVisibility';
+import type { UpdateOutputVisibilityDtoAudience } from './updateOutputVisibilityDtoAudience';
 
 export interface UpdateOutputVisibilityDto {
-  /** Who may see the work. FPTU_COMMUNITY opens it to the whole FPTU community even when the work carries a group affiliation; RESEARCH_GROUP restricts it to the members of the access group. */
-  visibility: UpdateOutputVisibilityDtoVisibility;
-  /**
-   * The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and rejected when visibility is PRIVATE. Send null to clear the affiliation; omit it to keep the stored one. The group must be one the caller is a member of.
-   * @nullable
-   */
-  accessGroupId?: UpdateOutputVisibilityDtoAccessGroupId;
+  /** Who may see the work. PRIVATE is the owner-only draft and is only offered for a personal work. CONTAINER restricts it to the members of the group or the project and is only offered for a container work. FPTU_COMMUNITY opens it to every signed-in researcher. */
+  audience: UpdateOutputVisibilityDtoAudience;
 }

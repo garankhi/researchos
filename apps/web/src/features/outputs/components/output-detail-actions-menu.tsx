@@ -15,13 +15,12 @@ import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { ErrorState } from '@/components/ui/feedback';
 import { apiErrorCode } from '@/lib/api-error';
+import type { UpdateOutputVisibilityDtoAudience } from '@/lib/api/models/updateOutputVisibilityDtoAudience';
 import { resolveErrorCode } from '@/utils/error-messages';
 import type { OutputCapability } from '@/utils/output-capability';
 import { useOutputVisibility } from '../hooks/use-output-visibility';
 import type { OutputDetail } from '../types';
 import { EditPublishedArticle } from './edit-published-article';
-
-type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
 
 /**
  * Action menu on the output detail page.
@@ -29,12 +28,13 @@ type VisibilityChoice = 'FPTU_COMMUNITY' | 'RESEARCH_GROUP';
  * The menu is the work's operation container, so it stays mounted — more
  * operations will live here. Each entry carries its own permission: the
  * Visibility entry is disabled when the viewer may not change the
- * visibility, and says why, rather than opening an editable dialog that
+ * audience, and says why, rather than opening an editable dialog that
  * would fail on save with a 403.
  *
- * The affiliation itself is left untouched: the request omits
- * `accessGroupId`, so the backend keeps the stored group. A work with no
- * stored group cannot become group-only, so that option stays disabled.
+ * The choices offered are the ones the scope of the work allows: a
+ * personal work is either private to its owner or open to the community,
+ * a work of a group or a project is either open to its container or to
+ * the community.
  */
 export function OutputDetailActionsMenu({
   output,
@@ -54,14 +54,11 @@ export function OutputDetailActionsMenu({
   const [editing, setEditing] = useState<
     (OutputDetail & { revision: NonNullable<OutputDetail['revision']> }) | null
   >(null);
-  const [selection, setSelection] = useState<VisibilityChoice>(
-    output.visibility === 'RESEARCH_GROUP'
-      ? 'RESEARCH_GROUP'
-      : 'FPTU_COMMUNITY',
+  const [selection, setSelection] = useState<UpdateOutputVisibilityDtoAudience>(
+    output.audience,
   );
   const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const hasGroup = Boolean(output.accessGroupId);
   const isShared = output.sharingStatus === 'SHARED';
   const canChangeVisibility = isShared && capability.canChangeVisibility;
   const revision = output.revision;
@@ -73,23 +70,19 @@ export function OutputDetailActionsMenu({
 
   const openDialog = () => {
     if (!canChangeVisibility) return;
-    setSelection(
-      output.visibility === 'RESEARCH_GROUP'
-        ? 'RESEARCH_GROUP'
-        : 'FPTU_COMMUNITY',
-    );
+    setSelection(output.audience);
     setInlineError(null);
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (selection === output.visibility || isPending) {
+    if (selection === output.audience || isPending) {
       setDialogOpen(false);
       return;
     }
     setInlineError(null);
     try {
-      await updateVisibility(output.id, { visibility: selection });
+      await updateVisibility(output.id, { audience: selection });
       showSnackbar({
         message: t('detail.visibilityUpdated'),
         severity: 'success',
@@ -106,6 +99,23 @@ export function OutputDetailActionsMenu({
       );
     }
   };
+
+  const renderAudienceOption = (
+    value: UpdateOutputVisibilityDtoAudience,
+    labelKey: string,
+    descKey: string,
+  ) => (
+    <RadioGroup.Item value={value}>
+      <RadioGroup.ItemHiddenInput />
+      <RadioGroup.ItemIndicator />
+      <Stack gap="0">
+        <RadioGroup.ItemText>{t(labelKey)}</RadioGroup.ItemText>
+        <Text textStyle="sm" color="fg.muted">
+          {t(descKey)}
+        </Text>
+      </Stack>
+    </RadioGroup.Item>
+  );
 
   return (
     <>
@@ -176,37 +186,28 @@ export function OutputDetailActionsMenu({
             <RadioGroup.Root
               value={selection}
               onValueChange={(details) =>
-                setSelection(details.value as VisibilityChoice)
+                setSelection(details.value as UpdateOutputVisibilityDtoAudience)
               }
             >
               <Stack gap="3">
-                <RadioGroup.Item value="FPTU_COMMUNITY">
-                  <RadioGroup.ItemHiddenInput />
-                  <RadioGroup.ItemIndicator />
-                  <Stack gap="0">
-                    <RadioGroup.ItemText>
-                      {t('detail.visibilityPublicOption')}
-                    </RadioGroup.ItemText>
-                    <Text textStyle="sm" color="fg.muted">
-                      {t('detail.visibilityPublicDesc')}
-                    </Text>
-                  </Stack>
-                </RadioGroup.Item>
-
-                <RadioGroup.Item value="RESEARCH_GROUP" disabled={!hasGroup}>
-                  <RadioGroup.ItemHiddenInput />
-                  <RadioGroup.ItemIndicator />
-                  <Stack gap="0">
-                    <RadioGroup.ItemText>
-                      {t('detail.visibilityGroupOption')}
-                    </RadioGroup.ItemText>
-                    <Text textStyle="sm" color="fg.muted">
-                      {hasGroup
-                        ? t('detail.visibilityGroupDesc')
-                        : t('detail.visibilityNoGroupHint')}
-                    </Text>
-                  </Stack>
-                </RadioGroup.Item>
+                {capability.allowedAudiences.includes('PRIVATE') &&
+                  renderAudienceOption(
+                    'PRIVATE',
+                    'detail.visibilityPrivateOption',
+                    'detail.visibilityPrivateDesc',
+                  )}
+                {capability.allowedAudiences.includes('CONTAINER') &&
+                  renderAudienceOption(
+                    'CONTAINER',
+                    'detail.visibilityContainerOption',
+                    'detail.visibilityContainerDesc',
+                  )}
+                {capability.allowedAudiences.includes('FPTU_COMMUNITY') &&
+                  renderAudienceOption(
+                    'FPTU_COMMUNITY',
+                    'detail.visibilityPublicOption',
+                    'detail.visibilityPublicDesc',
+                  )}
               </Stack>
             </RadioGroup.Root>
           </>
@@ -214,7 +215,7 @@ export function OutputDetailActionsMenu({
         confirmLabel={tCommon('save')}
         colorPalette="blue"
         isConfirming={isPending}
-        isConfirmDisabled={selection === output.visibility}
+        isConfirmDisabled={selection === output.audience}
         onConfirm={() => void handleSave()}
       />
     </>

@@ -22,7 +22,8 @@ function item(
     entityId,
     revisionId: null,
     ownerId: null,
-    visibility: 'FPTU_COMMUNITY',
+    scopeType: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     accessGroupId: null,
     title,
     // The generated type is wider than the wire: the API sends a string

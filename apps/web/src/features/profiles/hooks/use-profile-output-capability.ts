@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuthControllerMe, useGroupsControllerFindOne } from '@/lib/api';
+import { useAuthControllerMe } from '@/lib/api';
 import {
   resolveOutputCapability,
   type OutputCapability,
@@ -14,10 +14,11 @@ import type { OutputResponseDto } from '../types';
  * detail page uses the same one, and a rule duplicated across two
  * features is a rule that will drift.
  *
- * The affiliated group's lead may also change the visibility of a work
- * carrying its banner, so the group is fetched to learn who that is. The
- * request is disabled for a work with no affiliation, which is the common
- * case.
+ * Whether the viewer may change the audience comes from the server. The
+ * scope of the work decides it: the owner of a personal work, the leads
+ * of the group of a group work, or the project lead and the parent group
+ * leads of a project work. The poster of a container work may not,
+ * because the container owns the post.
  */
 export function useProfileOutputCapability({
   output,
@@ -28,22 +29,13 @@ export function useProfileOutputCapability({
     query: { retry: false },
   });
 
-  const groupId =
-    typeof output.accessGroupId === 'string' ? output.accessGroupId : null;
-
-  const groupQuery = useGroupsControllerFindOne(groupId ?? '', {
-    query: {
-      enabled: Boolean(groupId),
-      staleTime: 60 * 1000,
-    },
-  });
-
   return resolveOutputCapability({
     userId: meQuery.data?.id ?? null,
     ownerId: typeof output.ownerId === 'string' ? output.ownerId : null,
     authorUserIds: (output.authors ?? [])
       .map((author) => author.userId)
       .filter((id) => typeof id === 'string') as string[],
-    groupLeadId: groupQuery.data?.leadId ?? null,
+    scopeType: output.scopeType,
+    canChangeVisibility: output.canChangeVisibility,
   });
 }

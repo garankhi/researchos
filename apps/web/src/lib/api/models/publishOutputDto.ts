@@ -5,11 +5,11 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
-import type { PublishOutputDtoVisibility } from './publishOutputDtoVisibility';
+import type { PublishOutputDtoAudience } from './publishOutputDtoAudience';
 
 export interface PublishOutputDto {
-  /** Who may see the published work. FPTU_COMMUNITY opens it to the whole FPTU community; RESEARCH_GROUP opens it to the members of the access group. */
-  visibility: PublishOutputDtoVisibility;
-  /** The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and must be a group the caller is a member of. */
+  /** Who may see the published work. CONTAINER opens it to the members of the group or the project, and is only valid for a container work. FPTU_COMMUNITY opens it to the whole FPTU community. */
+  audience: PublishOutputDtoAudience;
+  /** The affiliated research group whose banner the work carries. Display information only: it grants no authority over the work. Must be a group the caller is a member of. */
   accessGroupId?: string;
 }

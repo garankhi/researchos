@@ -13,6 +13,10 @@ import {
  * profile page needs it too, and a rule duplicated across two features is
  * a rule that will drift. This hook only supplies the session.
  *
+ * Whether the viewer may change the audience comes from the server: the
+ * authority follows the scope of the work, so the backend settles it and
+ * reports it on the work.
+ *
  * The `GET /me` request is deduplicated by TanStack Query, so asking here
  * costs nothing extra on a page the header already checked. The hook reads
  * the raw generated payload: the domain mapping lives in the identity
@@ -21,13 +25,16 @@ import {
 export function useOutputCapability({
   ownerId,
   authorUserIds,
-  groupLeadId,
+  scopeType,
+  canChangeVisibility,
 }: {
   ownerId?: string | null;
   /** The user ids of the linked authors of the work. */
   authorUserIds?: string[];
-  /** The lead of the affiliated group, when the work has one. */
-  groupLeadId?: string | null;
+  /** Where the work was posted. */
+  scopeType?: 'PERSONAL' | 'GROUP' | 'PROJECT';
+  /** The server's answer: may this viewer change the audience? */
+  canChangeVisibility?: boolean;
 }): OutputCapability {
   const query = useAuthControllerMe({
     query: { retry: false },
@@ -37,6 +44,7 @@ export function useOutputCapability({
     userId: query.data?.id ?? null,
     ownerId,
     authorUserIds,
-    groupLeadId,
+    scopeType,
+    canChangeVisibility,
   });
 }

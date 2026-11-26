@@ -8,10 +8,13 @@
 import type { CreateArticleAuthorDto } from './createArticleAuthorDto';
 import type { CreateArticleDtoFileVisibility } from './createArticleDtoFileVisibility';
 import type { CreateArticleDtoOutputType } from './createArticleDtoOutputType';
+import type { OutputScopeDto } from './outputScopeDto';
 
 export interface CreateArticleDto {
   /** Output type for the Article creation flow. */
   outputType?: CreateArticleDtoOutputType;
+  /** Where the Article is posted. Defaults to a personal post. Posting inside a group or a project hands the post to that container: the poster keeps the right to edit the content, but the container leads decide who may read it. The scope is fixed at creation. */
+  scope?: OutputScopeDto;
   /**
    * Article title.
    * @maxLength 500
