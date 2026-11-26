@@ -360,6 +360,47 @@ describe('OutputsController & OutputsService', () => {
         JSON.stringify(prismaMock.tx.$queryRaw.mock.calls[0][0]),
       ).not.toContain('output_authors');
     });
+
+    it('filters a group feed by the scope, not by the affiliation banner', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 0n }])
+        .mockResolvedValueOnce([]);
+
+      const { controller } = await setupController(prismaMock);
+      await controller.findAll(callerId, {
+        page: 1,
+        limit: 20,
+        groupId,
+      } as ListOutputsQueryDto);
+
+      const sql = JSON.stringify(prismaMock.tx.$queryRaw.mock.calls[0][0]);
+      // A group's feed lists the works whose scope names that group, plus
+      // the ones the group explicitly accepted.
+      expect(sql).toContain('o.scope_group_id');
+      // The affiliation banner is not ownership: a personal work that
+      // merely carries the banner was never posted into the group, and it
+      // must not appear in the group's feed.
+      expect(sql).not.toContain('o.access_group_id');
+    });
+
+    it('keeps the accepted-links branch of the group feed', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 0n }])
+        .mockResolvedValueOnce([]);
+
+      const { controller } = await setupController(prismaMock);
+      await controller.findAll(callerId, {
+        page: 1,
+        limit: 20,
+        groupId,
+      } as ListOutputsQueryDto);
+
+      const sql = JSON.stringify(prismaMock.tx.$queryRaw.mock.calls[0][0]);
+      expect(sql).toContain('group_output_links gol');
+      expect(sql).toContain("gol.status = 'ACCEPTED'");
+    });
   });
 
   describe('findOne', () => {
