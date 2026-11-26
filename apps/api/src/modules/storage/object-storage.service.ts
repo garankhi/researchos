@@ -18,13 +18,18 @@ const pdfVerificationTimeoutMs = 45_000;
 @Injectable()
 export class ObjectStorageService {
   private readonly logger = new Logger(ObjectStorageService.name);
-  private storage?: StorageAdapter;
+  private storage?: ReturnType<typeof createS3Storage>;
 
-  get adapter(): StorageAdapter {
+  get adapter(): ReturnType<typeof createS3Storage> {
     return (this.storage ??= createS3Storage());
   }
 
-  async run<T>(operation: (storage: StorageAdapter) => Promise<T>): Promise<T> {
+  async run<T>(
+    operation: (
+      storage: StorageAdapter &
+        Pick<ReturnType<typeof createS3Storage>, 'createDownloadUrl'>,
+    ) => Promise<T>,
+  ): Promise<T> {
     try {
       return await operation(this.adapter);
     } catch (error) {

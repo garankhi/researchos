@@ -15,6 +15,7 @@ import {
   DIGEST_SEND_JOB,
   DURABLE_PROBE_JOB,
   JOB_ATTEMPTS,
+  LLKH_EXPORT_JOB,
   RESEARCH_UPDATES_QUEUE,
   NOTIFICATION_QUEUE,
   isBackgroundJobPayload,
@@ -23,6 +24,7 @@ import {
 import { Job, UnrecoverableError } from 'bullmq';
 import { expireOpportunityBatch } from '../modules/jobs/opportunity-expiry.service.js';
 import { researchUpdateScope } from '../modules/jobs/research-update-scope.js';
+import { handleLlkhExport } from '../modules/exports/llkh-export.handler.js';
 import { fanOutNotification } from '../modules/notifications/notification-fanout.js';
 
 type BackgroundJobOutcome =
@@ -42,6 +44,7 @@ const backgroundJobHandlers = new Map<string, BackgroundJobHandler>([
   [DURABLE_PROBE_JOB, runDiagnosticProbe],
   [OPPORTUNITY_EXPIRY_JOB, runOpportunityExpiry],
   [RESEARCH_UPDATE_JOB, publishResearchUpdate],
+  [LLKH_EXPORT_JOB, ({ tx, job }) => handleLlkhExport(tx, job)],
   [
     NOTIFICATION_FANOUT_JOB,
     ({ tx, job }) => fanOutNotification(tx, job.payload),
@@ -206,59 +209,66 @@ export class BackgroundJobRunner {
     if (!isBackgroundJobPayload(job.data)) {
       throw new UnrecoverableError('Invalid background job reference');
     }
-    const completed = await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ id: string }[]>`
+    const completed = await this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM background_jobs WHERE id = ${job.data.jobId}::uuid FOR UPDATE
       `;
-      if (!rows.length) return null;
-      const stored = await tx.background_jobs.findUniqueOrThrow({
-        where: { id: job.data.jobId },
-      });
-      // A duplicate, stale generation, or redelivery after Redis retention is
-      // harmless even if BullMQ no longer remembers the original transport ID.
-      if (
-        stored.queue_prefix !== scope ||
-        stored.generation !== job.data.generation ||
-        stored.status !== 'PENDING'
-      )
-        return null;
-      // An old digest wake-up may still be on this queue during deployment.
-      // Its durable outbox entry will be dispatched to the digest queue.
-      if (stored.kind === DIGEST_SEND_JOB) return null;
+        if (!rows.length) return null;
+        const stored = await tx.background_jobs.findUniqueOrThrow({
+          where: { id: job.data.jobId },
+        });
+        // A duplicate, stale generation, or redelivery after Redis retention is
+        // harmless even if BullMQ no longer remembers the original transport ID.
+        if (
+          stored.queue_prefix !== scope ||
+          stored.generation !== job.data.generation ||
+          stored.status !== 'PENDING'
+        )
+          return null;
+        // An old digest wake-up may still be on this queue during deployment.
+        // Its durable outbox entry will be dispatched to the digest queue.
+        if (stored.kind === DIGEST_SEND_JOB) return null;
 
-      const attempts = Math.min(
-        Math.max(stored.attempts, job.attemptsMade) + 1,
-        JOB_ATTEMPTS,
-      );
-      const handler = backgroundJobHandlers.get(stored.kind);
-      // DB-only handlers write via tx to commit their side effects with completion.
-      // Return expected errors before writing, or throw to roll back partial writes.
-      const outcome = handler
-        ? await handler({ job: stored, attempts, tx })
-        : unsupportedJob();
-      const error = 'error' in outcome ? outcome.error : null;
-      const terminal =
-        error instanceof UnrecoverableError ||
-        (error !== null && attempts >= JOB_ATTEMPTS);
-      await tx.background_jobs.update({
-        where: { id: stored.id },
-        data: {
-          attempts,
-          updated_at: new Date(),
-          status: terminal ? 'FAILED' : error ? 'PENDING' : 'COMPLETED',
-          error_code: terminal ? 'job_failed' : null,
-          ...('result' in outcome ? { result: outcome.result } : {}),
-          ...(terminal
-            ? {
-                outbox: {
-                  create: { generation: stored.generation, destination: 'DLQ' },
-                },
-              }
-            : {}),
-        },
-      });
-      return { error, outcome, attempts, terminal, kind: stored.kind };
-    });
+        const attempts = Math.min(
+          Math.max(stored.attempts, job.attemptsMade) + 1,
+          JOB_ATTEMPTS,
+        );
+        const handler = backgroundJobHandlers.get(stored.kind);
+        // DB-only handlers write via tx to commit their side effects with completion.
+        // Return expected errors before writing, or throw to roll back partial writes.
+        const outcome = handler
+          ? await handler({ job: stored, attempts, tx })
+          : unsupportedJob();
+        const error = 'error' in outcome ? outcome.error : null;
+        const terminal =
+          error instanceof UnrecoverableError ||
+          (error !== null && attempts >= JOB_ATTEMPTS);
+        await tx.background_jobs.update({
+          where: { id: stored.id },
+          data: {
+            attempts,
+            updated_at: new Date(),
+            status: terminal ? 'FAILED' : error ? 'PENDING' : 'COMPLETED',
+            error_code: terminal ? 'job_failed' : null,
+            ...('result' in outcome ? { result: outcome.result } : {}),
+            ...(terminal
+              ? {
+                  outbox: {
+                    create: {
+                      generation: stored.generation,
+                      destination: 'DLQ',
+                    },
+                  },
+                }
+              : {}),
+          },
+        });
+        return { error, outcome, attempts, terminal, kind: stored.kind };
+      },
+      { timeout: 120_000 },
+    );
+
     if (completed?.kind === OPPORTUNITY_EXPIRY_JOB) {
       if ('result' in completed.outcome) {
         this.logger.log({

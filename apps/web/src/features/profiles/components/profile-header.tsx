@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl';
 import { FieldError } from '@/components/ui/feedback';
 import { useRouter } from '@/i18n/navigation';
 import { FollowButton } from '@/features/follow';
+import { ExportLlkhModal } from '@/features/exports';
 import { useProfileSocial } from '../hooks/use-profile-social';
 import type {
   ProfileResponseDto,
@@ -191,17 +192,22 @@ export function ProfileHeader({
         </Stack>
       </Flex>
 
-      {isOwner && onEdit ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onEdit}
-          flexShrink={0}
-          alignSelf={{ base: 'stretch', sm: 'flex-start' }}
-        >
-          <Pencil />
-          {t('editProfile')}
-        </Button>
+      {isOwner ? (
+        <Flex gap="2" wrap="wrap" justify={{ base: 'center', sm: 'flex-end' }}>
+          <ExportLlkhModal />
+          {onEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEdit}
+              flexShrink={0}
+              alignSelf={{ base: 'stretch', sm: 'flex-start' }}
+            >
+              <Pencil />
+              {t('editProfile')}
+            </Button>
+          )}
+        </Flex>
       ) : social.canInteract ? (
         <Stack
           gap="1.5"

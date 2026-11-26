@@ -6144,6 +6144,160 @@
         ]
       }
     },
+    "/exports/llkh": {
+      "post": {
+        "operationId": "LlkhExportsController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": false,
+            "in": "header",
+            "description": "Reuses the same job for repeated requests with the same format.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLlkhDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The export job was durably accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlkhAcceptedDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid format or idempotency key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The idempotency key was previously used with a different format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Queues a scientific CV export for the current user",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/exports/download/{jobId}": {
+      "get": {
+        "operationId": "LlkhExportsController_download",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "description": "Durable ID of the submitted export job.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file is ready to download.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlkhDownloadDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The job belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The export job could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The export job has no completed file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Signs a download URL for a completed scientific CV export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/external/openalex/works": {
       "get": {
         "operationId": "OpenAlexCandidatesController_findAll",
@@ -13069,6 +13223,14 @@
           "statusUrl": {
             "type": "string",
             "description": "Owner-scoped URL to poll for this job."
+          },
+          "exportLevel": {
+            "type": "number",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "Available for completed LLKH exports."
           }
         },
         "required": [
@@ -13076,6 +13238,64 @@
           "status",
           "attempts",
           "statusUrl"
+        ]
+      },
+      "CreateLlkhDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "xlsx"
+            ],
+            "default": "docx",
+            "description": "File format for the scientific CV."
+          }
+        }
+      },
+      "LlkhAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Durable export job ID to poll."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current state of the durable export job."
+          }
+        },
+        "required": [
+          "jobId",
+          "status"
+        ]
+      },
+      "LlkhDownloadDto": {
+        "type": "object",
+        "properties": {
+          "downloadUrl": {
+            "type": "string",
+            "description": "Signed storage URL that expires in 15 minutes."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Suggested filename for the download."
+          },
+          "exportLevel": {
+            "type": "number",
+            "enum": [
+              1,
+              2
+            ],
+            "description": "1 for the fallback summary and 2 for the formatted CV."
+          }
+        },
+        "required": [
+          "downloadUrl",
+          "fileName",
+          "exportLevel"
         ]
       },
       "CandidateWorkDto": {
@@ -16968,6 +17188,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/JobDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "LlkhAcceptedDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/LlkhAcceptedDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "LlkhDownloadDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/LlkhDownloadDto"
           },
           "message": {
             "type": "string",

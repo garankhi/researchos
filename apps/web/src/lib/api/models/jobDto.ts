@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { JobDtoExportLevel } from './jobDtoExportLevel';
 import type { JobDtoStatus } from './jobDtoStatus';
 
 export interface JobDto {
@@ -20,4 +21,6 @@ export interface JobDto {
   attempts: number;
   /** Owner-scoped URL to poll for this job. */
   statusUrl: string;
+  /** Available for completed LLKH exports. */
+  exportLevel?: JobDtoExportLevel;
 }

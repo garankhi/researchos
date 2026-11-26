@@ -3,6 +3,7 @@ import { BackgroundJobsService, PrismaService } from '@researchos/database';
 import {
   DIGEST_SEND_JOB,
   DURABLE_PROBE_JOB,
+  LLKH_EXPORT_JOB,
   TOPIC_SUGGESTION_JOB,
   digestDeliveryId,
 } from '@researchos/queue';
@@ -39,6 +40,7 @@ export class JobStatusService {
     payload: unknown;
     status: string;
     attempts: number;
+    result: unknown;
   }): Promise<JobDto> {
     const deliveryId =
       job.kind === DIGEST_SEND_JOB ? digestDeliveryId(job.payload) : undefined;
@@ -57,11 +59,16 @@ export class JobStatusService {
             select: { job_id: true },
           })
         : null;
+    const exportLevel =
+      job.kind === LLKH_EXPORT_JOB && job.status === 'COMPLETED'
+        ? (job.result as { exportLevel?: unknown } | null)?.exportLevel
+        : undefined;
     return {
       id: job.id,
       status: expiredSuggestion ? 'COMPLETED' : job.status,
       attempts: delivery?.attempts ?? job.attempts,
       statusUrl: `/jobs/${job.id}`,
+      ...(exportLevel === 1 || exportLevel === 2 ? { exportLevel } : {}),
     };
   }
 }
