@@ -80,7 +80,7 @@ BEGIN
  PERFORM pg_temp.assert_true(NOT is_researcher(s),'student revoke');
  RAISE NOTICE 'PASS taxonomy hierarchy, LOCAL/imported names and upserts, interest sources, student capability';
 
- INSERT INTO research_outputs(id,owner_id,created_by,visibility) VALUES(work,a,a,'FPTU_COMMUNITY'),(otherwork,b,b,'PRIVATE');
+ INSERT INTO research_outputs(id,owner_id,created_by,audience) VALUES(work,a,a,'FPTU_COMMUNITY'),(otherwork,b,b,'PRIVATE');
  INSERT INTO output_revisions(id,output_id,revision_no,title,created_by) VALUES(r1,work,1,'Released title',a);
  INSERT INTO output_topics(output_id,revision_id,topic_id,added_by) VALUES(work,r1,topic,a);
  INSERT INTO output_files(id,output_id,uploaded_by,storage_key,file_name,mime_type,size_bytes,sha256,visibility) VALUES
@@ -116,9 +116,9 @@ BEGIN
  UPDATE group_output_links SET requested_revision_id=r2,requested_at=clock_timestamp(),status='PENDING',decided_by=NULL,decided_at=NULL WHERE output_id=work AND group_id=g1;
  UPDATE group_output_links SET status='REJECTED',decided_by=b,decided_at=clock_timestamp() WHERE output_id=work AND group_id=g1;
  PERFORM pg_temp.assert_true((SELECT id=r1 FROM group_output_releases WHERE output_id=work AND group_id=g1),'rejected update preserves old accepted release');
- UPDATE research_outputs SET visibility='PRIVATE' WHERE id=work;
+ UPDATE research_outputs SET audience='PRIVATE' WHERE id=work;
  PERFORM pg_temp.assert_true(NOT EXISTS(SELECT 1 FROM visible_group_output_releases(b,g1)) AND NOT can_view_output_file(b,file2),'group leader cannot bypass private output');
- UPDATE research_outputs SET visibility='FPTU_COMMUNITY' WHERE id=work;
+ UPDATE research_outputs SET audience='FPTU_COMMUNITY' WHERE id=work;
  UPDATE group_output_links SET status='REMOVED',decided_by=b,decided_at=CURRENT_TIMESTAMP,removed_by=b,removed_at=CURRENT_TIMESTAMP,accepted_revision_id=NULL,accepted_by=NULL,accepted_at=NULL WHERE output_id=work AND group_id=g1;
  PERFORM pg_temp.assert_true(EXISTS(SELECT 1 FROM released_output_versions WHERE output_id=work) AND (SELECT count(*)=1 FROM group_output_releases WHERE output_id=work),'unlink one preserves other group/personal');
  UPDATE research_outputs SET sharing_status='ARCHIVED',archived_at=clock_timestamp() WHERE id=work;

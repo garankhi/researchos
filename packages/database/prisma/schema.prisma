@@ -746,6 +746,7 @@ model research_groups {
   description              String?
   is_active                Boolean                    @default(true)
   archived_at              DateTime?                  @db.Timestamptz(6)
+  visibility               output_audience            @default(CONTAINER)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
   achievement_posts        achievement_posts[]
@@ -763,6 +764,7 @@ model research_groups {
   research_seminars        research_seminars[]
   research_updates         research_updates[]
   resource_handovers       resource_handovers[]
+  research_outputs_scope   research_outputs[]         @relation("research_outputs_scope_group_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -832,7 +834,10 @@ model research_outputs {
   created_by                                                                String?                    @db.Uuid
   sharing_status                                                            output_sharing_status      @default(DRAFT)
   current_release_id                                                        String?                    @db.Uuid
-  visibility                                                                visibility_level           @default(PRIVATE)
+  scope_type                                                                output_scope_type          @default(PERSONAL)
+  scope_group_id                                                            String?                    @db.Uuid
+  scope_project_id                                                          String?                    @db.Uuid
+  audience                                                                  output_audience            @default(PRIVATE)
   access_group_id                                                           String?                    @db.Uuid
   provenance_tag                                                            data_provenance_type       @default(PAPER)
   import_state                                                              output_import_state        @default(NONE)
@@ -853,6 +858,8 @@ model research_outputs {
   pending_research_updates                                                  pending_research_updates[]
   publication_claims                                                        publication_claims[]
   research_groups                                                           research_groups?           @relation(fields: [access_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_groups_research_outputs_scope_group_id                           research_groups?           @relation("research_outputs_scope_group_id", fields: [scope_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  research_projects_research_outputs_scope_project_id                       research_projects?         @relation("research_outputs_scope_project_id", fields: [scope_project_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   users_research_outputs_created_byTousers                                  users?                     @relation("research_outputs_created_byTousers", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction)
   output_revisions_research_outputs_id_current_release_idTooutput_revisions output_revisions?          @relation("research_outputs_id_current_release_idTooutput_revisions", fields: [id, current_release_id], references: [output_id, id], onUpdate: NoAction)
   users_research_outputs_owner_idTousers                                    users?                     @relation("research_outputs_owner_idTousers", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
@@ -860,7 +867,8 @@ model research_outputs {
   resource_handovers                                                        resource_handovers[]
 
   @@unique([created_by, create_idempotency_key], map: "uq_output_creator_create_key")
-  @@index([visibility, sharing_status], map: "idx_output_visibility_lookup", where: raw("(sharing_status = 'SHARED'::output_sharing_status)"))
+  @@index([audience, sharing_status], map: "idx_output_audience_lookup", where: raw("(sharing_status = 'SHARED'::output_sharing_status)"))
+  @@index([scope_type, scope_group_id, scope_project_id], map: "idx_output_scope_lookup")
   @@index([owner_id])
 }
 
@@ -891,6 +899,7 @@ model research_projects {
   users                  users                    @relation(fields: [lead_id], references: [id], onUpdate: NoAction)
   research_records       research_records[]
   research_updates       research_updates[]
+  research_outputs_scope research_outputs[]       @relation("research_outputs_scope_project_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1121,7 +1130,10 @@ model search_index {
   entity_id        String                  @db.Uuid
   revision_id      String?                 @db.Uuid
   owner_id         String?                 @db.Uuid
-  visibility       visibility_level
+  scope_type       output_scope_type       @default(PERSONAL)
+  scope_group_id   String?                 @db.Uuid
+  scope_project_id String?                 @db.Uuid
+  audience         output_audience         @default(FPTU_COMMUNITY)
   access_group_id  String?                 @db.Uuid
   title            String
   body             String?
@@ -1133,7 +1145,7 @@ model search_index {
 
   @@id([entity_type, entity_id])
   @@index([doc], map: "idx_search_index_doc", type: Gin)
-  @@index([visibility, access_group_id], map: "idx_search_index_scope")
+  @@index([audience, scope_type, scope_group_id, scope_project_id], map: "idx_search_index_scope")
   @@index([title(ops: raw("gin_trgm_ops"))], map: "idx_search_index_title_trgm", type: Gin)
   @@index([entity_type], map: "idx_search_index_type")
 }
@@ -1497,6 +1509,22 @@ enum output_sharing_status {
   DRAFT
   SHARED
   ARCHIVED
+}
+
+/// The posting context of a work. Fixed at creation, because it decides who
+/// owns the post and who may change its audience.
+enum output_scope_type {
+  PERSONAL
+  GROUP
+  PROJECT
+}
+
+/// Who may read a work. PRIVATE is the owner alone, CONTAINER is the group
+/// or project audience, FPTU_COMMUNITY is every signed-in researcher.
+enum output_audience {
+  PRIVATE
+  CONTAINER
+  FPTU_COMMUNITY
 }
 
 enum post_type {
