@@ -17,6 +17,7 @@ import { UserCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import type { OpenAlexAuthorCandidateDto } from '@/lib/api/models';
+import type { OnboardingDraftOpenAlexAuthor } from '../../../store/onboarding-draft-store';
 import { OnboardingAuthorDetail } from './onboarding-author-detail';
 
 /**
@@ -35,8 +36,18 @@ export interface OnboardingAuthorStepProps {
   onRetry: () => void;
   /** The author the researcher confirmed, from the draft. */
   confirmedAuthorId: string | null;
-  /** Confirms an author, or unconfirms it when it is the current one. */
-  onConfirm: (shortId: string, orcid: string | null) => void;
+  /**
+   * Confirms an author, or unconfirms it when it is the current one.
+   *
+   * The candidate rides along so the profile step can prefill from the
+   * OpenAlex record the researcher just confirmed, without fetching it
+   * a second time.
+   */
+  onConfirm: (
+    shortId: string,
+    orcid: string | null,
+    author: OnboardingDraftOpenAlexAuthor | null,
+  ) => void;
   /** Skips the step: no author is confirmed. */
   onSkip: () => void;
 }
@@ -104,10 +115,16 @@ export function OnboardingAuthorStep({
     setActionError(null);
     /*
      * The ORCID comes from the list the step already loaded, so
-     * confirming an author costs no extra request.
+     * confirming an author costs no extra request. The same goes for
+     * the record itself: it travels to the draft so the profile step
+     * can prefill from it without asking OpenAlex again.
      */
     const chosen = authors.find((author) => author.shortId === selectedAuthor);
-    onConfirm(selectedAuthor, chosen?.orcid ?? null);
+    onConfirm(
+      selectedAuthor,
+      chosen?.orcid ?? null,
+      chosen ? toDraftAuthor(chosen) : null,
+    );
   };
 
   const handleSkip = () => {
@@ -271,4 +288,40 @@ export function OnboardingAuthorStep({
       ) : null}
     </Stack>
   );
+}
+
+/**
+ * The candidate, in the shape the draft keeps it.
+ *
+ * The draft is persisted to `localStorage`, so it holds a plain object
+ * rather than the generated DTO — the API's shape is not the draft's,
+ * and the two are free to drift apart.
+ */
+function toDraftAuthor(
+  author: OpenAlexAuthorCandidateDto,
+): OnboardingDraftOpenAlexAuthor {
+  return {
+    displayName: author.displayName,
+    orcid: author.orcid,
+    nameVariants: author.nameVariants,
+    topics: author.topics.map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      count: topic.count,
+    })),
+    affiliations: author.affiliationHistory.map((affiliation) => ({
+      institutionId: affiliation.institutionId,
+      name: affiliation.name,
+      countryCode: affiliation.countryCode,
+      yearStart: affiliation.yearStart,
+      yearEnd: affiliation.yearEnd,
+    })),
+    counts: {
+      worksCount: author.counts.worksCount,
+      citedByCount: author.counts.citedByCount,
+      hIndex: author.counts.hIndex,
+      i10Index: author.counts.i10Index,
+      twoYearMeanCitedness: author.counts.twoYearMeanCitedness,
+    },
+  };
 }

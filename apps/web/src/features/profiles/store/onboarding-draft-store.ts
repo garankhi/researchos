@@ -73,6 +73,18 @@ export interface OnboardingDraftState {
    */
   openAlexOrcid: string | null;
   /**
+   * The OpenAlex record of the confirmed author, or null.
+   *
+   * The profile step prefills from it — the display name, the byline
+   * spellings, the topics, the affiliations — so the researcher starts
+   * from what OpenAlex holds and corrects it rather than typing it all.
+   *
+   * It is a snapshot of what the author step showed, kept in the draft
+   * because the author step is not re-fetched when the researcher comes
+   * back to the profile step.
+   */
+  openAlexAuthor: OnboardingDraftOpenAlexAuthor | null;
+  /**
    * The profile values the researcher typed.
    *
    * They are kept as the step left them, so a researcher who goes back
@@ -131,6 +143,41 @@ export interface OnboardingDraftWorkDecision {
 }
 
 /**
+ * The OpenAlex record of the confirmed author.
+ *
+ * The subset of the author candidate the profile step needs to prefill
+ * the form. It is stored as a plain object rather than the generated
+ * DTO, because the draft is persisted to `localStorage` and the DTO is
+ * the API's shape, not the draft's.
+ */
+export interface OnboardingDraftOpenAlexAuthor {
+  /** The OpenAlex display name of the author. */
+  displayName: string;
+  /** The ORCID OpenAlex reports for the author, if any. */
+  orcid: string | null;
+  /** The byline spellings OpenAlex has observed. */
+  nameVariants: string[];
+  /** The topics OpenAlex assigned to the author. */
+  topics: Array<{ id: string; name: string; count: number | null }>;
+  /** The affiliations of the author, with the years they held. */
+  affiliations: Array<{
+    institutionId: string;
+    name: string;
+    countryCode: string | null;
+    yearStart: number | null;
+    yearEnd: number | null;
+  }>;
+  /** The citation metrics OpenAlex reports for the author. */
+  counts: {
+    worksCount: number | null;
+    citedByCount: number | null;
+    hIndex: number | null;
+    i10Index: number | null;
+    twoYearMeanCitedness: number | null;
+  };
+}
+
+/**
  * The actions the draft offers.
  */
 export interface OnboardingDraftActions {
@@ -139,7 +186,11 @@ export interface OnboardingDraftActions {
   /** Removes a topic from the draft set. */
   removeTopic: (topicId: string) => void;
   /** Confirms an OpenAlex author. */
-  confirmAuthor: (authorId: string, orcid: string | null) => void;
+  confirmAuthor: (
+    authorId: string,
+    orcid: string | null,
+    author?: OnboardingDraftOpenAlexAuthor | null,
+  ) => void;
   /** Unconfirms the author — the researcher went back and changed their mind. */
   clearAuthor: () => void;
   /** Records the profile values. */
@@ -168,6 +219,7 @@ const emptyDraft: OnboardingDraftState = {
   topicNames: {},
   confirmedAuthorId: null,
   openAlexOrcid: null,
+  openAlexAuthor: null,
   profileValues: null,
   workDecisions: {},
   step: 'interests',
@@ -210,7 +262,7 @@ export function createOnboardingDraftStore(userId: string | undefined) {
             };
           }),
 
-        confirmAuthor: (authorId, orcid) =>
+        confirmAuthor: (authorId, orcid, author) =>
           set((state) => {
             /*
              * A different author means a different bibliography, so the
@@ -223,6 +275,7 @@ export function createOnboardingDraftStore(userId: string | undefined) {
             return {
               confirmedAuthorId: authorId,
               openAlexOrcid: orcid,
+              openAlexAuthor: author ?? null,
               workDecisions: authorChanged ? {} : state.workDecisions,
             };
           }),
@@ -231,6 +284,7 @@ export function createOnboardingDraftStore(userId: string | undefined) {
           set({
             confirmedAuthorId: null,
             openAlexOrcid: null,
+            openAlexAuthor: null,
             workDecisions: {},
           }),
 
@@ -268,6 +322,7 @@ export function createOnboardingDraftStore(userId: string | undefined) {
           topicNames: state.topicNames,
           confirmedAuthorId: state.confirmedAuthorId,
           openAlexOrcid: state.openAlexOrcid,
+          openAlexAuthor: state.openAlexAuthor,
           profileValues: state.profileValues,
           workDecisions: state.workDecisions,
           step: state.step,

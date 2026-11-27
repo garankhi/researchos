@@ -23,6 +23,7 @@ import {
 } from '../../hooks/use-onboarding';
 import {
   createOnboardingDraftStore,
+  type OnboardingDraftOpenAlexAuthor,
   type OnboardingDraftProfileValues,
 } from '../../store/onboarding-draft-store';import { OnboardingAuthorStep } from './steps/onboarding-author-step';
 import { OnboardingInterestsStep } from './steps/onboarding-interests-step';
@@ -146,12 +147,19 @@ export function OnboardingFlow({
    */
   const topicNames = draft((state) => state.topicNames);
   const draftProfileValues = draft((state) => state.profileValues);
+  /*
+   * The OpenAlex record of the confirmed author. The profile step
+   * prefills from it, so the researcher starts from what OpenAlex holds
+   * and corrects it rather than typing everything.
+   */
+  const openAlexAuthor = draft((state) => state.openAlexAuthor);
 
   const handleConfirmAuthor = (
     shortId: string,
     orcid: string | null,
+    author: OnboardingDraftOpenAlexAuthor | null,
   ) => {
-    draft.getState().confirmAuthor(shortId, orcid);
+    draft.getState().confirmAuthor(shortId, orcid, author);
     setStep('profile');
   };
 
@@ -262,6 +270,7 @@ export function OnboardingFlow({
             profile={profileQuery.profile ?? null}
             prefillFromOpenAlex={onboarding.confirmedAuthorId !== null}
             openAlexOrcid={onboarding.openAlexOrcid}
+            openAlexAuthor={openAlexAuthor}
             confirmedAuthorId={onboarding.confirmedAuthorId}
             draftValues={draftProfileValues}
             onSave={handleSaveProfile}
