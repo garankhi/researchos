@@ -412,7 +412,9 @@ describe('OpenAlexLookupService', () => {
         [
           makeWork('W-mine'),
           makeWork('W-theirs', {
-            authors: [makeAuthorEntry(1, 'P Angel', ['Assam Agricultural University'])],
+            authors: [
+              makeAuthorEntry(1, 'P Angel', ['Assam Agricultural University']),
+            ],
           }),
         ],
       ],

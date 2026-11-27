@@ -478,11 +478,10 @@ function OnboardingProfileForm({
  * The record holds three different kinds of thing, and reading them as
  * one block is what made it feel like a wall:
  *
- * - **The identity** — the name and the metrics. This is who OpenAlex
- *   thinks the researcher is.
- * - **The career** — the affiliation timeline, the byline spellings
- *   and the topics. This is what the researcher worked on, and it is
- *   the part they may correct.
+ * - **The identity** — the name, the metrics, the byline spellings and
+ *   the topics. This is who OpenAlex thinks the researcher is.
+ * - **The career** — the affiliation timeline. This is what the
+ *   researcher worked on, and it is the part they may correct.
  * - **The person's own fields** — the name, the department, the ORCID,
  *   the biography. These are the platform's, not OpenAlex's.
  *
@@ -582,22 +581,6 @@ function OnAlexPrefillPanel({
               </Flex>
             </Box>
           ) : null}
-        </Stack>
-      </Box>
-
-      {/*
-       * The career card. The timeline is editable and sits at the top,
-       * because it is the one thing the researcher corrects; the
-       * spellings and the topics follow it as read-only reference.
-       */}
-      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
-        <Stack gap="4">
-          <OnboardingAffiliationTimeline
-            key={confirmedAuthorId ?? 'no-author'}
-            affiliations={author.affiliations}
-            values={affiliationValues}
-            onChange={onAffiliationChange}
-          />
 
           {author.nameVariants.length > 0 ? (
             <Box>
@@ -630,6 +613,24 @@ function OnAlexPrefillPanel({
               </Flex>
             </Box>
           ) : null}
+        </Stack>
+      </Box>
+
+      {/*
+       * The career card. The timeline is editable and it is the only
+       * thing in it: where the researcher was and until when is their
+       * own career, and OpenAlex regularly gets it wrong — it reports
+       * the institution of the latest *authorship*, which for a
+       * researcher who has moved is the one they left.
+       */}
+      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
+        <Stack gap="4">
+          <OnboardingAffiliationTimeline
+            key={confirmedAuthorId ?? 'no-author'}
+            affiliations={author.affiliations}
+            values={affiliationValues}
+            onChange={onAffiliationChange}
+          />
         </Stack>
       </Box>
     </Stack>

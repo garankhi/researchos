@@ -292,6 +292,7 @@ export * from './paginatedTopicsResponseDtoEnvelope';
 export * from './paginatedUsersResponseDto';
 export * from './paginatedUsersResponseDtoEnvelope';
 export * from './paginationMetaDto';
+export * from './profileCitationMetricsDto';
 export * from './profileInterestResponseDto';
 export * from './profileInterestResponseDtoProvenanceTag';
 export * from './profileInterestResponseDtoSourceType';

@@ -77,7 +77,11 @@ export class OpenAlexPullService {
       return {
         mode: 'NAME',
         authors: result.authors.map((entry) =>
-          toAuthorCandidate(entry.author, entry.affiliationMatch, entry.recentWorks),
+          toAuthorCandidate(
+            entry.author,
+            entry.affiliationMatch,
+            entry.recentWorks,
+          ),
         ),
       };
     }
@@ -117,7 +121,8 @@ export class OpenAlexPullService {
     authorId?: string,
   ): Promise<DecidedWorksPullResult> {
     const identity = await this.resolveIdentity(userId);
-    const author = shortAuthorId(authorId) ?? shortAuthorId(identity.openAlexAuthorId);
+    const author =
+      shortAuthorId(authorId) ?? shortAuthorId(identity.openAlexAuthorId);
 
     const wanted = new Set<string>();
     for (const raw of workIds) {

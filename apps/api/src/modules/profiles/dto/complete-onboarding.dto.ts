@@ -77,10 +77,7 @@ export class CompleteOnboardingDto extends UpdateProfileAccountDto {
   })
   @IsOptional()
   @IsString({ message: 'google_scholar_url_invalid' })
-  @IsUrl(
-    { require_protocol: true },
-    { message: 'google_scholar_url_invalid' },
-  )
+  @IsUrl({ require_protocol: true }, { message: 'google_scholar_url_invalid' })
   @MaxLength(500, { message: 'google_scholar_url_too_long' })
   googleScholarUrl?: string;
 

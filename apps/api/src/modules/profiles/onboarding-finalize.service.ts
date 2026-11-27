@@ -12,6 +12,7 @@ import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
 import type { FinalizeOnboardingDto } from './dto/finalize-onboarding.dto.js';
 import type { OnboardingAffiliationDto } from './dto/onboarding-affiliation.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
+import { mapCitationMetrics } from './profile-citation-metrics.js';
 
 /**
  * The finalize half of the onboarding.
@@ -420,9 +421,7 @@ export class OnboardingFinalizeService {
       select: { id: true, topic_id: true, status: true },
     });
 
-    const storedByTopic = new Map(
-      stored.map((row) => [row.topic_id, row]),
-    );
+    const storedByTopic = new Map(stored.map((row) => [row.topic_id, row]));
     const wanted = new Set(topicIds);
 
     // The topics that gained an interest.
@@ -545,9 +544,8 @@ export class OnboardingFinalizeService {
       academicDegree: user.academic_degree,
       userType: user.user_type,
       bio: profile?.bio ?? null,
-      availabilityStatus:
-        (profile?.availability_status ??
-          AvailabilityStatusEnum.NOT_AVAILABLE) as AvailabilityStatusEnum,
+      availabilityStatus: (profile?.availability_status ??
+        AvailabilityStatusEnum.NOT_AVAILABLE) as AvailabilityStatusEnum,
       orcidId: profile?.orcid_id ?? null,
       googleScholarUrl: profile?.google_scholar_url ?? null,
       scopusAuthorId: profile?.scopus_author_id ?? null,
@@ -556,6 +554,7 @@ export class OnboardingFinalizeService {
       papersReviewedAt: profile?.papers_reviewed_at?.toISOString() ?? null,
       onboardingCompletedAt:
         profile?.onboarding_completed_at?.toISOString() ?? null,
+      citationMetrics: mapCitationMetrics(profile),
     };
   }
 }

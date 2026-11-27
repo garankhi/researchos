@@ -48,21 +48,6 @@ const authorDetail: SkeletonResult = {
 };
 
 /**
- * The visibility picker of the works step.
- */
-const worksVisibility: SkeletonResult = {
-  name: 'onboarding-works-visibility',
-  viewportWidth: 768,
-  width: 420,
-  height: 92,
-  bones: [
-    [0, 0, 34, 14, 0],
-    [0, 28, 100, 16, 0],
-    [0, 52, 74, 12, 0],
-  ],
-};
-
-/**
  * One work card: the type badge, the title, the venue, the byline, a
  * few lines of abstract and the row of links.
  */
@@ -135,16 +120,12 @@ export function OnboardingAuthorStepSkeleton() {
 /**
  * The skeleton of the works step.
  *
- * It shows the visibility picker and a few work cards, because those
- * are the two things the step is made of.
+ * It shows a few work cards, because those are what the step is made
+ * of.
  */
 export function OnboardingWorksStepSkeleton() {
   return (
     <Stack gap="3">
-      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
-        <DelayedSkeleton layout={worksVisibility} />
-      </Box>
-
       {[1, 2, 3].map((card) => (
         <Box key={card} bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
           <DelayedSkeleton layout={workCard} announce={card === 1} />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Badge,
   Box,
@@ -15,6 +16,7 @@ import {
 import { BookOpen, Check, ExternalLink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { doiUrl } from '@/lib/doi-url';
 import type { OnboardingWorkPreview } from '../../../hooks/use-onboarding';
 import type { OnboardingDraftWorkDecision } from '../../../store/onboarding-draft-store';
@@ -42,10 +44,6 @@ export interface OnboardingWorksStepProps {
   ) => void;
   /** Withdraws a decision. */
   onUndecide: (workId: string) => void;
-  /** The visibility an accepted work is published with. */
-  visibility: 'PRIVATE' | 'FPTU_COMMUNITY';
-  /** Changes the visibility an accepted work is published with. */
-  onVisibilityChange: (visibility: 'PRIVATE' | 'FPTU_COMMUNITY') => void;
 }
 
 /**
@@ -54,6 +52,20 @@ export interface OnboardingWorksStepProps {
  * The step is **optional**. It shows the works OpenAlex holds for the
  * confirmed author, live, and the researcher accepts each one — privately
  * or for the FPTU community — or rejects it.
+ *
+ * ## Why the visibility is asked per work
+ *
+ * The visibility is not one answer for the whole step. A researcher
+ * publishing a paper they wrote with a colleague from another
+ * institution may want it in the community, while a preprint they have
+ * not finished may stay private. A single switch in the step header
+ * would force one decision onto works that do not want it, and the
+ * researcher would have to change the switch back and forth for each
+ * work.
+ *
+ * So accepting opens a dialog that asks about that one work, exactly
+ * like the accept flow of the profile's OpenAlex tab. A rejection needs
+ * no dialog — it asks nothing about the work.
  *
  * ## Why nothing is written here
  *
@@ -76,12 +88,39 @@ export function OnboardingWorksStep({
   decisions,
   onDecide,
   onUndecide,
-  visibility,
-  onVisibilityChange,
 }: OnboardingWorksStepProps) {
   const t = useTranslations('onboarding');
 
   const decidedCount = Object.keys(decisions).length;
+
+  /*
+   * The work being accepted, or null when no dialog is open.
+   *
+   * The dialog asks one question — who may see this work — and the
+   * answer belongs to that work alone.
+   */
+  const [acceptingWork, setAcceptingWork] =
+    useState<OnboardingWorkPreview | null>(null);
+  const [visibility, setVisibility] = useState<'PRIVATE' | 'FPTU_COMMUNITY'>(
+    'PRIVATE',
+  );
+
+  const openAccept = (work: OnboardingWorkPreview) => {
+    /*
+     * The dialog opens on the private default, because it is the choice
+     * that reveals nothing: the researcher has to widen it on purpose.
+     */
+    setVisibility('PRIVATE');
+    setAcceptingWork(work);
+  };
+
+  const confirmAccept = () => {
+    if (!acceptingWork) {
+      return;
+    }
+    onDecide(acceptingWork.workId, true, visibility);
+    setAcceptingWork(null);
+  };
 
   return (
     <Stack gap="5">
@@ -92,45 +131,6 @@ export function OnboardingWorksStep({
         <Text textStyle="sm" color="fg.muted" mt="2">
           {t('worksStep.description')}
         </Text>
-      </Box>
-
-      <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
-        <Text textStyle="sm" fontWeight="bold" mb="3">
-          {t('worksStep.visibilityLabel')}
-        </Text>
-        <RadioGroup.Root
-          value={visibility}
-          onValueChange={(details) =>
-            onVisibilityChange(details.value as 'PRIVATE' | 'FPTU_COMMUNITY')
-          }
-        >
-          <Stack gap="3">
-            <RadioGroup.Item value="PRIVATE">
-              <RadioGroup.ItemHiddenInput />
-              <RadioGroup.ItemIndicator />
-              <Box>
-                <Text textStyle="sm" fontWeight="bold">
-                  {t('worksStep.visibilityPrivate')}
-                </Text>
-                <Text textStyle="sm" color="fg.muted">
-                  {t('worksStep.visibilityPrivateHint')}
-                </Text>
-              </Box>
-            </RadioGroup.Item>
-            <RadioGroup.Item value="FPTU_COMMUNITY">
-              <RadioGroup.ItemHiddenInput />
-              <RadioGroup.ItemIndicator />
-              <Box>
-                <Text textStyle="sm" fontWeight="bold">
-                  {t('worksStep.visibilityPublic')}
-                </Text>
-                <Text textStyle="sm" color="fg.muted">
-                  {t('worksStep.visibilityPublicHint')}
-                </Text>
-              </Box>
-            </RadioGroup.Item>
-          </Stack>
-        </RadioGroup.Root>
       </Box>
 
       {decidedCount > 0 ? (
@@ -146,10 +146,9 @@ export function OnboardingWorksStep({
       {isLoading ? (
         /*
          * The preview is still coming. The step shows the shape of what
-         * is arriving — the visibility picker and the work cards — so
-         * the layout does not jump when the works land, and so the
-         * researcher sees the pull running rather than reading a line of
-         * text and guessing.
+         * is arriving — the work cards — so the layout does not jump
+         * when the works land, and so the researcher sees the pull
+         * running rather than reading a line of text and guessing.
          */
         <OnboardingWorksStepSkeleton />
       ) : null}
@@ -306,7 +305,7 @@ export function OnboardingWorksStep({
                     <Button
                       variant="outline"
                       size="xs"
-                      onClick={() => onDecide(work.workId, false, visibility)}
+                      onClick={() => onDecide(work.workId, false, 'PRIVATE')}
                       disabled={isRejected}
                     >
                       <X />
@@ -314,7 +313,7 @@ export function OnboardingWorksStep({
                     </Button>
                     <Button
                       size="xs"
-                      onClick={() => onDecide(work.workId, true, visibility)}
+                      onClick={() => openAccept(work)}
                       disabled={isAccepted}
                     >
                       <Check />
@@ -327,6 +326,66 @@ export function OnboardingWorksStep({
           );
         })}
       </Stack>
+
+      {/*
+       * The accept dialog.
+       *
+       * It asks the one question the decision leaves open: who may see
+       * this work. The work is named in the body, so the researcher
+       * knows which one they are answering for.
+       */}
+      {acceptingWork ? (
+        <ConfirmationModal
+          open
+          onClose={() => setAcceptingWork(null)}
+          title={t('worksStep.acceptTitle')}
+          description={t('worksStep.acceptDescription')}
+          body={
+            <Stack gap="4">
+              <Text textStyle="sm" fontWeight="bold">
+                {t('worksStep.acceptingWork', { title: acceptingWork.title })}
+              </Text>
+
+              <RadioGroup.Root
+                value={visibility}
+                onValueChange={(details) =>
+                  setVisibility(details.value as 'PRIVATE' | 'FPTU_COMMUNITY')
+                }
+              >
+                <Stack gap="3">
+                  <RadioGroup.Item value="PRIVATE">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <Box>
+                      <Text textStyle="sm" fontWeight="bold">
+                        {t('worksStep.visibilityPrivate')}
+                      </Text>
+                      <Text textStyle="sm" color="fg.muted">
+                        {t('worksStep.visibilityPrivateHint')}
+                      </Text>
+                    </Box>
+                  </RadioGroup.Item>
+                  <RadioGroup.Item value="FPTU_COMMUNITY">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <Box>
+                      <Text textStyle="sm" fontWeight="bold">
+                        {t('worksStep.visibilityPublic')}
+                      </Text>
+                      <Text textStyle="sm" color="fg.muted">
+                        {t('worksStep.visibilityPublicHint')}
+                      </Text>
+                    </Box>
+                  </RadioGroup.Item>
+                </Stack>
+              </RadioGroup.Root>
+            </Stack>
+          }
+          confirmLabel={t('worksStep.confirmAccept')}
+          onConfirm={confirmAccept}
+          colorPalette="blue"
+        />
+      ) : null}
     </Stack>
   );
 }

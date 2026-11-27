@@ -1,7 +1,11 @@
 'use client';
 
 import { AccessFeedback } from '@/components/ui/access-feedback';
-import { RequireAuth, RequireOnboarding, useCurrentUser } from '@/features/identity';
+import {
+  RequireAuth,
+  RequireOnboarding,
+  useCurrentUser,
+} from '@/features/identity';
 import { ArticleCreationFlow } from '@/features/outputs';
 
 export default function NewArticlePage() {

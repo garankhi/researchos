@@ -185,8 +185,7 @@ export function useOnboarding({
     { authorId: confirmedAuthorId ?? undefined },
     {
       query: {
-        enabled:
-          enabled && (step === 'works' || confirmedAuthorId !== null),
+        enabled: enabled && (step === 'works' || confirmedAuthorId !== null),
         staleTime: 5 * 60 * 1000,
       },
     },
@@ -209,7 +208,10 @@ export function useOnboarding({
             queryKey: getProfilesControllerGetMyProfileQueryKey(),
           }),
           queryClient.invalidateQueries({
-            queryKey: getOpenAlexControllerFindAllQueryKey({ page: 1, limit: 20 }),
+            queryKey: getOpenAlexControllerFindAllQueryKey({
+              page: 1,
+              limit: 20,
+            }),
           }),
         ]);
       },
@@ -248,8 +250,7 @@ export function useOnboarding({
     confirmedAuthorId,
     openAlexOrcid,
     works,
-    isLoadingWorks:
-      worksQuery.isPending && worksQuery.fetchStatus !== 'idle',
+    isLoadingWorks: worksQuery.isPending && worksQuery.fetchStatus !== 'idle',
     isFailedWorks: worksQuery.isError,
     refetchWorks: () => {
       void worksQuery.refetch();
@@ -287,9 +288,7 @@ export function useOnboarding({
           ...(affiliations !== null ? { affiliations } : {}),
           ...(profile
             ? {
-                ...(profile.fullName
-                  ? { fullName: profile.fullName }
-                  : {}),
+                ...(profile.fullName ? { fullName: profile.fullName } : {}),
                 ...(profile.departmentUnit
                   ? { departmentUnit: profile.departmentUnit }
                   : {}),

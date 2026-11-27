@@ -217,7 +217,16 @@ export class OpenAlexAuthorRecordService {
   /** The platform's vocabulary for an institution type. */
   private institutionType(
     affiliation: OpenAlexAffiliation,
-  ): 'EDUCATION' | 'COMPANY' | 'HEALTHCARE' | 'NONPROFIT' | 'GOVERNMENT' | 'FACILITY' | 'ARCHIVE' | 'OTHER' | null {
+  ):
+    | 'EDUCATION'
+    | 'COMPANY'
+    | 'HEALTHCARE'
+    | 'NONPROFIT'
+    | 'GOVERNMENT'
+    | 'FACILITY'
+    | 'ARCHIVE'
+    | 'OTHER'
+    | null {
     const raw = affiliation.institutionType?.trim().toLowerCase();
     if (!raw) {
       return null;

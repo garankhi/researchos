@@ -146,9 +146,7 @@ export function OnboardingAuthorDetail({
               <Metric
                 label={t('works')}
                 value={
-                  counts.worksCount !== null
-                    ? String(counts.worksCount)
-                    : null
+                  counts.worksCount !== null ? String(counts.worksCount) : null
                 }
               />
               <Metric
@@ -165,7 +163,9 @@ export function OnboardingAuthorDetail({
               />
               <Metric
                 label={t('i10Index')}
-                value={counts.i10Index !== null ? String(counts.i10Index) : null}
+                value={
+                  counts.i10Index !== null ? String(counts.i10Index) : null
+                }
               />
               <Metric
                 label={t('twoYearCitedness')}
@@ -221,7 +221,10 @@ export function OnboardingAuthorDetail({
                 <Flex key={affiliation.institutionId} gap="2" align="baseline">
                   <Text textStyle="sm">{affiliation.name}</Text>
                   <Text textStyle="xs" color="fg.muted">
-                    {affiliationYear(affiliation.yearStart, affiliation.yearEnd)}
+                    {affiliationYear(
+                      affiliation.yearStart,
+                      affiliation.yearEnd,
+                    )}
                   </Text>
                 </Flex>
               ))}
@@ -274,13 +277,7 @@ export function OnboardingAuthorDetail({
  * zero: "no h-index" and "an h-index of zero" are different facts, and
  * the second is a claim the platform cannot make.
  */
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}) {
+function Metric({ label, value }: { label: string; value: string | null }) {
   if (value === null) {
     return null;
   }

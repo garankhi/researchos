@@ -8,6 +8,7 @@ import type { ProfileInterestResponseDto } from './dto/profile-interest-response
 import type { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { mapCitationMetrics } from './profile-citation-metrics.js';
 
 /**
  * The account row, with its optional profile attached.
@@ -386,7 +387,9 @@ export class ProfilesService {
    * object means the payload carried no account field, and the caller
    * skips the `users` write entirely.
    */
-  private accountData(dto: UpdateProfileDto | CompleteOnboardingDto): Prisma.usersUpdateInput {
+  private accountData(
+    dto: UpdateProfileDto | CompleteOnboardingDto,
+  ): Prisma.usersUpdateInput {
     const data: Prisma.usersUpdateInput = {};
     if (dto.fullName !== undefined) {
       data.full_name = dto.fullName;
@@ -472,6 +475,7 @@ export class ProfilesService {
       papersReviewedAt: profile?.papers_reviewed_at?.toISOString() ?? null,
       onboardingCompletedAt:
         profile?.onboarding_completed_at?.toISOString() ?? null,
+      citationMetrics: mapCitationMetrics(profile),
     };
   }
 }

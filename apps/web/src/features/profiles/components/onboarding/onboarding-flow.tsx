@@ -107,15 +107,6 @@ export function OnboardingFlow({
   const profileFormRef = useRef<OnboardingProfileFormHandle | null>(null);
 
   /*
-   * The visibility an accepted work is published with. It is a single
-   * choice for the whole step — a researcher publishes their accepted
-   * works the same way, or the visibility picker is noise.
-   */
-  const [visibility, setVisibility] = useState<'PRIVATE' | 'FPTU_COMMUNITY'>(
-    'PRIVATE',
-  );
-
-  /*
    * The draft is namespaced per researcher, so two accounts in the same
    * browser keep two drafts and neither sees the other's.
    */
@@ -350,9 +341,31 @@ export function OnboardingFlow({
      * The header is full bleed so it reads as one band across the
      * viewport, while the content inside it stays at the same width as
      * the profile page.
+     *
+     * The band is pinned to the top of the viewport and the content
+     * scrolls beneath it: the step buttons are how the researcher moves
+     * between steps, and they must stay reachable no matter how long
+     * the work of the current step is.
      */
-    <Box as="main" flex="1" bg="home.background" minH="100dvh">
-      <Box bg="bg.panel" borderBottomWidth="1px" borderColor="border">
+    <Box
+      as="main"
+      flex="1"
+      bg="home.background"
+      minH="100dvh"
+      /*
+       * The fixed navigation bar covers the bottom of the canvas, so
+       * the content stops above it rather than under it.
+       */
+      pb="20"
+    >
+      <Box
+        position="sticky"
+        top="0"
+        zIndex="sticky"
+        bg="bg.panel"
+        borderBottomWidth="1px"
+        borderColor="border"
+      >
         <Container
           maxW="64rem"
           px={{ base: '4', md: '6' }}
@@ -503,54 +516,74 @@ export function OnboardingFlow({
                   draft.getState().decideWork(workId, accepted, visibility)
                 }
                 onUndecide={(workId) => draft.getState().undecideWork(workId)}
-                visibility={visibility}
-                onVisibilityChange={setVisibility}
               />
             ) : null}
-
-            {/*
-             * The footer. Every step has the same two buttons: Back on the
-             * left, and Skip and Next on the right.
-             *
-             * The Skip button sits immediately left of Next, because the
-             * two are alternatives — skip the step, or complete it and move
-             * on — and the researcher should read them as a pair rather
-             * than hunt for a third button inside the step itself.
-             */}
-            <Flex justify="space-between" gap="3" flexWrap="wrap">
-              <Button
-                variant="outline"
-                onClick={goBack}
-                disabled={stepIndex === 0}
-              >
-                <ArrowLeft />
-                {tCommon('back')}
-              </Button>
-
-              <Flex gap="3">
-                {canSkip ? (
-                  <Button variant="outline" onClick={handleSkip}>
-                    {t('skip')}
-                  </Button>
-                ) : null}
-
-                {isLastStep ? (
-                  <Button
-                    onClick={() => void handleFinish()}
-                    loading={onboarding.isFinalizing}
-                  >
-                    <Check />
-                    {t('finish')}
-                  </Button>
-                ) : (
-                  <Button onClick={handleNext} disabled={!canAdvance}>
-                    {tCommon('next')}
-                    <ArrowRight />
-                  </Button>
-                )}
-              </Flex>
-            </Flex>
           </Stack>
+        </Container>
+      </Box>
+
+      {/*
+       * The navigation bar.
+       *
+       * Every step has the same three buttons: Back on the left, and
+       * Skip and Next on the right. The Skip button sits immediately
+       * left of Next, because the two are alternatives — skip the step,
+       * or complete it and move on — and the researcher should read them
+       * as a pair rather than hunt for a third button inside the step
+       * itself.
+       *
+       * The bar is fixed to the bottom of the viewport: the way forward
+       * is the one thing the researcher must never have to scroll for,
+       * and a step whose content runs long would otherwise hide it.
+       */}
+      <Box
+        position="fixed"
+        insetInline="0"
+        bottom="0"
+        zIndex="sticky"
+        bg="bg.panel"
+        borderTopWidth="1px"
+        borderColor="border"
+        pb="env(safe-area-inset-bottom)"
+      >
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          py={{ base: '3', md: '4' }}
+        >
+          <Flex justify="space-between" gap="3" flexWrap="wrap">
+            <Button
+              variant="outline"
+              onClick={goBack}
+              disabled={stepIndex === 0}
+            >
+              <ArrowLeft />
+              {tCommon('back')}
+            </Button>
+
+            <Flex gap="3">
+              {canSkip ? (
+                <Button variant="outline" onClick={handleSkip}>
+                  {t('skip')}
+                </Button>
+              ) : null}
+
+              {isLastStep ? (
+                <Button
+                  onClick={() => void handleFinish()}
+                  loading={onboarding.isFinalizing}
+                >
+                  <Check />
+                  {t('finish')}
+                </Button>
+              ) : (
+                <Button onClick={handleNext} disabled={!canAdvance}>
+                  {tCommon('next')}
+                  <ArrowRight />
+                </Button>
+              )}
+            </Flex>
+          </Flex>
         </Container>
       </Box>
 

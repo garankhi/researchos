@@ -22,11 +22,7 @@ function makeRecord(
     displayName: 'Nguyen Hoang Khoi Tran',
     orcid: 'https://orcid.org/0000-0001-7323-9213',
     observedOrcids: ['https://orcid.org/0000-0001-7323-9213'],
-    names: [
-      'Nguyen Hoang Khoi Tran',
-      'N. H. Tran',
-      'Tran, Nguyen H',
-    ],
+    names: ['Nguyen Hoang Khoi Tran', 'N. H. Tran', 'Tran, Nguyen H'],
     affiliations: [
       {
         institutionId: 'I109689652',
@@ -202,9 +198,7 @@ describe('OpenAlexAuthorRecordService', () => {
     const create = tx.researcher_affiliations.create as ReturnType<
       typeof vi.fn
     >;
-    const primary = create.mock.calls.filter(
-      (call) => call[0].data.is_primary,
-    );
+    const primary = create.mock.calls.filter((call) => call[0].data.is_primary);
     expect(primary).toHaveLength(1);
     expect(primary[0][0].data.institution_id).toBe('I109689652');
   });
@@ -225,9 +219,7 @@ describe('OpenAlexAuthorRecordService', () => {
     const create = tx.researcher_affiliations.create as ReturnType<
       typeof vi.fn
     >;
-    const ids = create.mock.calls.map(
-      (call) => call[0].data.institution_id,
-    );
+    const ids = create.mock.calls.map((call) => call[0].data.institution_id);
     expect(ids).not.toContain('I129604602');
   });
 
@@ -269,9 +261,7 @@ describe('OpenAlexAuthorRecordService', () => {
     const create = tx.researcher_affiliations.create as ReturnType<
       typeof vi.fn
     >;
-    const primary = create.mock.calls.filter(
-      (call) => call[0].data.is_primary,
-    );
+    const primary = create.mock.calls.filter((call) => call[0].data.is_primary);
     expect(primary).toHaveLength(1);
     expect(primary[0][0].data.institution_id).toBe('I109689652');
   });
@@ -329,7 +319,7 @@ describe('OpenAlexAuthorRecordService', () => {
 
     expect(client.getAuthorRecord).toHaveBeenCalledWith('A5027558961');
     expect(
-      (tx.researcher_profiles.upsert as ReturnType<typeof vi.fn>),
+      tx.researcher_profiles.upsert as ReturnType<typeof vi.fn>,
     ).toHaveBeenCalledOnce();
   });
 
@@ -349,10 +339,7 @@ describe('OpenAlexAuthorRecordService', () => {
       new Error('network down'),
     );
 
-    const result = await service.trySyncAuthorRecord(
-      USER_ID,
-      'A5027558961',
-    );
+    const result = await service.trySyncAuthorRecord(USER_ID, 'A5027558961');
 
     expect(result).toBeNull();
   });
@@ -361,10 +348,7 @@ describe('OpenAlexAuthorRecordService', () => {
     const tx = makeTx();
     const { service, client } = makeService(tx);
     vi.mocked(client.getAuthorRecord).mockRejectedValue(
-      new CodedHttpException(
-        domainErrorCodes.openalex.authorNotFound,
-        404,
-      ),
+      new CodedHttpException(domainErrorCodes.openalex.authorNotFound, 404),
     );
 
     await expect(

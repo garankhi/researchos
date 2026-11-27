@@ -196,6 +196,44 @@ describe('ProfilesController', () => {
       );
     });
 
+    it('carries the OpenAlex citation metrics when the profile has them', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockUser,
+        researcher_profiles: {
+          ...unconfirmedProfile,
+          user_id: callerId,
+          openalex_works_count: 47,
+          openalex_cited_by_count: 1712,
+          openalex_h_index: 19,
+          openalex_i10_index: 23,
+        },
+      });
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getMyProfile(callerId);
+
+      expect(result.citationMetrics).toEqual({
+        worksCount: 47,
+        citedByCount: 1712,
+        hIndex: 19,
+        i10Index: 23,
+      });
+    });
+
+    it('leaves the citation metrics out when OpenAlex has none', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockUser,
+        researcher_profiles: { ...unconfirmedProfile, user_id: callerId },
+      });
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getMyProfile(callerId);
+
+      expect(result.citationMetrics).toBeNull();
+    });
+
     it('throws 404 when the account does not exist', async () => {
       const prismaMock = createPrismaMock();
       prismaMock.users.findUnique.mockResolvedValue(null);
@@ -430,9 +468,7 @@ describe('ProfilesController', () => {
         ...mockConfirmedUser,
         researcher_profiles: completedProfile,
       });
-      prismaMock.researcher_profiles.upsert.mockResolvedValue(
-        completedProfile,
-      );
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
 
       const controller = await setupController(prismaMock);
       const result = await controller.completeOnboarding(callerId, {
@@ -461,9 +497,7 @@ describe('ProfilesController', () => {
         ...mockConfirmedUser,
         researcher_profiles: completedProfile,
       });
-      prismaMock.researcher_profiles.upsert.mockResolvedValue(
-        completedProfile,
-      );
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
 
       const controller = await setupController(prismaMock);
       await controller.completeOnboarding(callerId, {
@@ -527,9 +561,7 @@ describe('ProfilesController', () => {
         ...mockUserWithoutProfile,
         researcher_profiles: completedProfile,
       });
-      prismaMock.researcher_profiles.upsert.mockResolvedValue(
-        completedProfile,
-      );
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
 
       const controller = await setupController(prismaMock);
       await controller.completeOnboarding(callerId, { bio: 'A first bio.' });

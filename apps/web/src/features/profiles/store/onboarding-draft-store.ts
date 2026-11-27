@@ -124,11 +124,7 @@ export interface OnboardingDraftState {
 }
 
 /** The steps of the onboarding, in order. */
-export type OnboardingDraftStep =
-  | 'interests'
-  | 'author'
-  | 'profile'
-  | 'works';
+export type OnboardingDraftStep = 'interests' | 'author' | 'profile' | 'works';
 
 /**
  * The profile values the profile step collects.
@@ -339,9 +335,7 @@ export function createOnboardingDraftStore(userId: string | undefined) {
           openAlexAuthor: author ?? null,
           workDecisions: authorChanged ? {} : state.workDecisions,
           profileValues: authorChanged ? null : state.profileValues,
-          affiliationValues: authorChanged
-            ? null
-            : state.affiliationValues,
+          affiliationValues: authorChanged ? null : state.affiliationValues,
         };
       }),
 

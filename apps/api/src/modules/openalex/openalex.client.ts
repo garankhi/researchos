@@ -439,8 +439,7 @@ export function toAuthorRecord(raw: RawAuthor): OpenAlexAuthorRecord {
   return {
     id,
     shortId: shortId(id) ?? id,
-    displayName:
-      typeof raw.display_name === 'string' ? raw.display_name : '',
+    displayName: typeof raw.display_name === 'string' ? raw.display_name : '',
     orcid: typeof raw.orcid === 'string' ? raw.orcid : null,
     observedOrcids: observed,
     names: toAuthorNames(raw),

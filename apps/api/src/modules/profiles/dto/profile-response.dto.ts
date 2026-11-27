@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AvailabilityStatusEnum } from './availability-status.enum.js';
+import { ProfileCitationMetricsDto } from './profile-citation-metrics.dto.js';
 
 /**
  * Representation of a researcher profile.
@@ -124,4 +125,12 @@ export class ProfileResponseDto {
     nullable: true,
   })
   onboardingCompletedAt: string | null;
+
+  @ApiProperty({
+    description:
+      'The citation metrics OpenAlex holds for the researcher. Null when the researcher has not confirmed their OpenAlex author yet, or when OpenAlex reports no metric.',
+    type: ProfileCitationMetricsDto,
+    nullable: true,
+  })
+  citationMetrics: ProfileCitationMetricsDto | null;
 }

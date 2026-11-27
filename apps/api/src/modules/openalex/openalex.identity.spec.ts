@@ -86,9 +86,9 @@ describe('namesMatch', () => {
 
 describe('affiliationMatchesFpt', () => {
   it('matches a raw affiliation that carries the institution name', () => {
-    expect(
-      affiliationMatchesFpt(['FPT University, Can Tho, Viet Nam']),
-    ).toBe(true);
+    expect(affiliationMatchesFpt(['FPT University, Can Tho, Viet Nam'])).toBe(
+      true,
+    );
   });
 
   it('rejects another institution', () => {
@@ -316,7 +316,13 @@ describe('resolveSnapshotOrder', () => {
     // An entry with no affiliation cannot be told apart from the
     // bylines that share the ORCID, so it does not qualify.
     const order = resolveSnapshotOrder(
-      [{ name: 'P Angel', order: 1, orcid: 'https://orcid.org/0000-0002-1825-0097' }],
+      [
+        {
+          name: 'P Angel',
+          order: 1,
+          orcid: 'https://orcid.org/0000-0002-1825-0097',
+        },
+      ],
       { ...identity, openAlexAuthorId: null },
     );
     expect(order).toBeNull();
@@ -352,10 +358,11 @@ describe('resolveSnapshotOrder', () => {
   });
 
   it('falls back to the name, and accepts a snapshot with no affiliation', () => {
-    const order = resolveSnapshotOrder(
-      [{ name: 'Nguyen Van An', order: 3 }],
-      { ...identity, openAlexAuthorId: null, orcid: null },
-    );
+    const order = resolveSnapshotOrder([{ name: 'Nguyen Van An', order: 3 }], {
+      ...identity,
+      openAlexAuthorId: null,
+      orcid: null,
+    });
     expect(order).toBe(3);
   });
 

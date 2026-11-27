@@ -114,6 +114,20 @@ export function ProfileSidebar({
     profile.orcidId || profile.googleScholarUrl || profile.scopusAuthorId,
   );
 
+  /*
+   * The citation metrics are only shown when OpenAlex has actually
+   * recorded them. A metric that is null is left out rather than shown
+   * as a zero: "no h-index" and "an h-index of zero" are different
+   * facts, and the second is a claim the platform cannot make.
+   */
+  const citationMetrics = profile.citationMetrics ?? null;
+  const hasCitationMetrics =
+    citationMetrics !== null &&
+    (citationMetrics.worksCount !== null ||
+      citationMetrics.citedByCount !== null ||
+      citationMetrics.hIndex !== null ||
+      citationMetrics.i10Index !== null);
+
   return (
     <Stack as="aside" gap="4" minW="0">
       {/* 1. Academic Stats Summary */}
@@ -155,6 +169,32 @@ export function ProfileSidebar({
             </Text>
           </Box>
         </SimpleGrid>
+
+        {hasCitationMetrics && citationMetrics ? (
+          <Box mt="4" pt="3.5" borderTopWidth="1px">
+            <Text textStyle="xs" fontWeight="bold" color="fg.muted" mb="2">
+              {t('overview.citationMetricsTitle')}
+            </Text>
+            <SimpleGrid columns={2} gap="3">
+              <CitationMetric
+                label={t('overview.citationWorks')}
+                value={citationMetrics.worksCount}
+              />
+              <CitationMetric
+                label={t('overview.citationCitations')}
+                value={citationMetrics.citedByCount}
+              />
+              <CitationMetric
+                label={t('overview.citationHIndex')}
+                value={citationMetrics.hIndex}
+              />
+              <CitationMetric
+                label={t('overview.citationI10Index')}
+                value={citationMetrics.i10Index}
+              />
+            </SimpleGrid>
+          </Box>
+        ) : null}
 
         {isOwner && pendingOpenAlexCount > 0 ? (
           <Flex
@@ -458,5 +498,34 @@ export function ProfileSidebar({
         </Box>
       ) : null}
     </Stack>
+  );
+}
+
+/**
+ * One citation metric of the researcher.
+ *
+ * A metric OpenAlex reports as null is left out rather than shown as a
+ * zero: "no h-index" and "an h-index of zero" are different facts, and
+ * the second is a claim the platform cannot make.
+ */
+function CitationMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | null;
+}) {
+  if (value === null) {
+    return null;
+  }
+  return (
+    <Box>
+      <Text fontSize="lg" fontWeight="bold" lineHeight="1.2">
+        {value.toLocaleString()}
+      </Text>
+      <Text textStyle="xs" color="fg.muted">
+        {label}
+      </Text>
+    </Box>
   );
 }

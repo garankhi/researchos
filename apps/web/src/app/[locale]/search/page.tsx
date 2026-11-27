@@ -3,7 +3,11 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SearchPage } from '@/features/discovery';
-import { RequireAuth, RequireOnboarding, useCurrentUser } from '@/features/identity';
+import {
+  RequireAuth,
+  RequireOnboarding,
+  useCurrentUser,
+} from '@/features/identity';
 import Loading from '../loading';
 
 function SearchScreen() {

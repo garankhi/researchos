@@ -5,6 +5,7 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { ProfileCitationMetricsDto } from './profileCitationMetricsDto';
 import type { ProfileResponseDtoAvailabilityStatus } from './profileResponseDtoAvailabilityStatus';
 
 export interface ProfileResponseDto {
@@ -70,4 +71,9 @@ export interface ProfileResponseDto {
    * @nullable
    */
   onboardingCompletedAt: string | null;
+  /**
+   * The citation metrics OpenAlex holds for the researcher. Null when the researcher has not confirmed their OpenAlex author yet, or when OpenAlex reports no metric.
+   * @nullable
+   */
+  citationMetrics: ProfileCitationMetricsDto | null;
 }

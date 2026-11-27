@@ -16513,6 +16513,41 @@
           "meta"
         ]
       },
+      "ProfileCitationMetricsDto": {
+        "type": "object",
+        "properties": {
+          "worksCount": {
+            "type": "integer",
+            "description": "Total works OpenAlex attributes to the researcher.",
+            "example": 47,
+            "nullable": true
+          },
+          "citedByCount": {
+            "type": "integer",
+            "description": "Total citations to those works.",
+            "example": 1712,
+            "nullable": true
+          },
+          "hIndex": {
+            "type": "integer",
+            "description": "The h-index of the researcher.",
+            "example": 19,
+            "nullable": true
+          },
+          "i10Index": {
+            "type": "integer",
+            "description": "The number of works with at least ten citations.",
+            "example": 23,
+            "nullable": true
+          }
+        },
+        "required": [
+          "worksCount",
+          "citedByCount",
+          "hIndex",
+          "i10Index"
+        ]
+      },
       "ProfileResponseDto": {
         "type": "object",
         "properties": {
@@ -16612,6 +16647,16 @@
             "description": "Timestamp when onboarding flow was completed.",
             "example": "2026-11-06T11:00:00.000Z",
             "nullable": true
+          },
+          "citationMetrics": {
+            "description": "The citation metrics OpenAlex holds for the researcher. Null when the researcher has not confirmed their OpenAlex author yet, or when OpenAlex reports no metric.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfileCitationMetricsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -16630,7 +16675,8 @@
           "avatarStorageKey",
           "profileConfirmedAt",
           "papersReviewedAt",
-          "onboardingCompletedAt"
+          "onboardingCompletedAt",
+          "citationMetrics"
         ]
       },
       "ProfilePreviewResponseDto": {

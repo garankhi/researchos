@@ -154,7 +154,9 @@ describe('OpenAlexCandidatesService', () => {
       suggestionRows: [{ id: OUT_1, doi: '10.1234/one' }],
       total: 1n,
       revisions: [makeRevision(OUT_1)],
-      externalIds: [{ output_id: OUT_1, external_id: 'https://openalex.org/W1' }],
+      externalIds: [
+        { output_id: OUT_1, external_id: 'https://openalex.org/W1' },
+      ],
       claims: [
         {
           output_id: OUT_1,
@@ -177,7 +179,8 @@ describe('OpenAlexCandidatesService', () => {
     expect(suggestionSql(tx)).toContain('visible_rejected_candidates');
   });
 
-  it('counts the remaining candidates without the full list', async () => {    const { service, prisma } = makeService({ countTotal: 3n });
+  it('counts the remaining candidates without the full list', async () => {
+    const { service, prisma } = makeService({ countTotal: 3n });
 
     const result = await service.count(USER_ID);
 
@@ -438,7 +441,8 @@ describe('OpenAlexCandidatesService decisions', () => {
     );
   });
 
-  it('accepts by matching the profile ORCID against the draft snapshot', async () => {    const { service, tx } = makeDecisionService({
+  it('accepts by matching the profile ORCID against the draft snapshot', async () => {
+    const { service, tx } = makeDecisionService({
       output: CANDIDATE,
       claim: { author_id: null, status: 'SUGGESTED' },
       linkedAuthor: null,

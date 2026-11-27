@@ -50,13 +50,7 @@ export function RequireOnboarding({ children }: { children: ReactNode }) {
     }
 
     router.replace('/profile/onboarding');
-  }, [
-    isChecking,
-    isFailed,
-    user,
-    isOnboardingRoute,
-    router,
-  ]);
+  }, [isChecking, isFailed, user, isOnboardingRoute, router]);
 
   return <>{children}</>;
 }

@@ -116,9 +116,7 @@ describe('OnboardingFinalizeService', () => {
       const prismaMock = createPrismaMock();
       const { service } = setupService(prismaMock);
 
-      await expect(
-        service.finalize(userId, { topicIds: [] }),
-      ).rejects.toThrow(
+      await expect(service.finalize(userId, { topicIds: [] })).rejects.toThrow(
         expect.objectContaining({
           status: HttpStatus.BAD_REQUEST,
           code: domainErrorCodes.profiles.onboardingRequiresInterest,
@@ -304,7 +302,8 @@ describe('OnboardingFinalizeService', () => {
           }),
         }),
       );
-    });  });
+    });
+  });
 
   describe('the works', () => {
     it('pulls only the works the researcher decided on', async () => {
@@ -767,9 +766,9 @@ describe('OnboardingFinalizeService', () => {
         affiliations: [],
       });
 
-      expect(prismaMock.researcher_affiliations.deleteMany).toHaveBeenCalledWith(
-        { where: { user_id: userId } },
-      );
+      expect(
+        prismaMock.researcher_affiliations.deleteMany,
+      ).toHaveBeenCalledWith({ where: { user_id: userId } });
       expect(prismaMock.researcher_affiliations.create).not.toHaveBeenCalled();
       expect(rows).toHaveLength(0);
     });

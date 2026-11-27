@@ -150,9 +150,7 @@ export function namesMatch(
   if (shorter.length !== 1) {
     return false;
   }
-  return (
-    longer[0] === shorter[0] || longer[longer.length - 1] === shorter[0]
-  );
+  return longer[0] === shorter[0] || longer[longer.length - 1] === shorter[0];
 }
 
 /** Whether two token lists carry the same tokens, order aside. */
