@@ -830,6 +830,12 @@
   "notifications": {
     "title": "Notifications",
     "bell": "Notifications ({count} unread)",
+    "seeAll": "See all notifications",
+    "unread": "Unread",
+    "chatUnread": "Messages ({count} unread)",
+    "newChat": "You have a new message.",
+    "newNotification": "You have a new notification.",
+    "close": "Close",
     "preferences": "Preferences",
     "readAll": "Mark all as read",
     "actionFailed": "Could not complete the action. Try again.",
