@@ -303,7 +303,7 @@
   },
   "onboarding": {
     "title": "Chào mừng bạn đến với ResearchOS",
-    "description": "Bốn bước ngắn để thiết lập hồ sơ researcher của bạn. Chỉ bước đầu là bắt buộc — các bước còn lại bạn có thể bỏ qua và quay lại sau.",
+    "description": "Bốn bước ngắn để thiết lập hồ sơ researcher của bạn. Chỉ bước đầu là bắt buộc — chưa có gì được lưu cho đến khi bạn nhấn Hoàn tất, nên bạn có thể quay lại và thay đổi bất cứ điều gì.",
     "steps": {
       "interests": {
         "label": "Lĩnh vực nghiên cứu",
@@ -321,22 +321,21 @@
     },
     "interestsStep": {
       "title": "Bạn nghiên cứu về lĩnh vực nào?",
-      "description": "Hãy chọn ít nhất một lĩnh vực nghiên cứu. Đây là bước bắt buộc duy nhất, và cũng là điều nền tảng dùng để hiển thị cho bạn những nội dung phù hợp.",
+      "description": "Hãy chọn ít nhất một lĩnh vực nghiên cứu. Đây là bước bắt buộc duy nhất, và đó là thứ nền tảng dùng để hiển thị cho bạn những nội dung liên quan. Hãy tìm kiếm trong danh mục hoặc duyệt danh sách — bạn có thể bỏ chọn trước khi hoàn tất.",
       "selected": "{count, plural, =0 {Chưa chọn lĩnh vực nào} =1 {Đã chọn 1 lĩnh vực} other {Đã chọn # lĩnh vực}}",
-      "add": "Thêm lĩnh vực",
-      "addAnother": "Thêm lĩnh vực khác",
       "searchPlaceholder": "Tìm một chủ đề nghiên cứu",
-      "searching": "Đang tìm chủ đề…",
+      "searching": "Đang tải lĩnh vực…",
       "searchFailed": "Không thể tải danh sách chủ đề nghiên cứu.",
+      "topicGroup": "Chủ đề nghiên cứu",
       "noTopicsTitle": "Không tìm thấy chủ đề",
       "noTopicsMessage": "Hãy thử một từ khác. Các chủ đề đến từ cây phân cấp nghiên cứu của FPTU.",
       "emptyTitle": "Chưa chọn lĩnh vực nghiên cứu",
       "emptyMessage": "Tìm một chủ đề ở trên và chọn những chủ đề mô tả nghiên cứu của bạn.",
-      "declareFailed": "Không thể lưu lĩnh vực. Hãy thử lại."
+      "remove": "Bỏ lĩnh vực này"
     },
     "authorStep": {
       "title": "Tìm tác giả của bạn",
-      "description": "Chúng tôi đã tìm trên OpenAlex theo tên của bạn tại FPT University. Hãy xác nhận tác giả đúng là bạn, hoặc bỏ qua — bạn vẫn có thể nhập tác phẩm sau.",
+      "description": "Chúng tôi đã tìm hồ sơ OpenAlex theo tên của bạn tại FPT University. Hãy xác nhận hồ sơ là của bạn, hoặc bỏ qua bước này — bạn vẫn có thể nhập tác phẩm sau. Lựa chọn của bạn được lưu khi bạn hoàn tất.",
       "loading": "Đang tìm trên OpenAlex…",
       "emptyTitle": "Không tìm thấy tác giả phù hợp",
       "emptyMessage": "OpenAlex không có tác giả nào tại FPT University khớp với tên của bạn. Bạn có thể bỏ qua bước này và tìm lại sau.",
@@ -346,12 +345,13 @@
       "confirm": "Đây là tôi",
       "skip": "Bỏ qua",
       "continue": "Tiếp tục mà không xác nhận",
-      "pulled": "Đã tải công bố của bạn từ OpenAlex.",
-      "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau."
+      "pulled": "Hồ sơ OpenAlex của bạn đã được xác nhận.",
+      "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau.",
+      "clear": "Bỏ xác nhận hồ sơ này"
     },
     "profileStep": {
       "title": "Thông tin researcher của bạn",
-      "description": "Điền những gì bạn muốn công bố trên hồ sơ. Bạn có thể để trống tất cả và hoàn thiện sau.",
+      "description": "Điền những gì bạn muốn công bố trên hồ sơ. Bạn có thể để trống tất cả và hoàn thiện sau. Chưa có gì được lưu cho đến khi bạn hoàn tất.",
       "descriptionPrefilled": "Chúng tôi đã điền từ tác giả OpenAlex mà bạn xác nhận. Hãy kiểm tra và sửa nếu có chỗ sai.",
       "prefillTitle": "Điền từ OpenAlex",
       "prefillAuthor": "Tác giả OpenAlex {authorId}",
@@ -365,14 +365,14 @@
       "googleScholarUrl": "Hồ sơ Google Scholar",
       "scopusAuthorId": "Mã tác giả Scopus",
       "bio": "Tiểu sử",
-      "saved": "Đã lưu hồ sơ của bạn.",
+      "saved": "Thông tin của bạn đã được giữ lại. Nó sẽ được lưu khi bạn hoàn tất.",
       "failed": "Không thể lưu hồ sơ. Hãy thử lại.",
       "save": "Lưu thông tin của tôi",
       "skip": "Bỏ qua"
     },
     "worksStep": {
       "title": "Nhập tác phẩm của bạn",
-      "description": "Các bài báo này đến từ OpenAlex. Hãy xác nhận những bài của bạn, hoặc từ chối — bài bị từ chối vẫn ở trong hồ sơ để bạn xác nhận lại sau.",
+      "description": "Các tác phẩm này đến từ OpenAlex. Hãy chấp nhận những tác phẩm là của bạn, hoặc từ chối chúng. Chỉ những tác phẩm bạn quyết định mới được nhập, vào lúc bạn hoàn tất.",
       "loading": "Đang tải tác phẩm…",
       "emptyTitle": "Không có bài báo nào",
       "emptyMessage": "Hiện OpenAlex chưa có bài báo nào cho bạn. Bạn có thể tải bài mới bất cứ lúc nào.",
@@ -383,11 +383,13 @@
       "visibilityPublicHint": "Mọi researcher FPTU đã đăng nhập đều nhìn thấy ngay khi bạn xác nhận.",
       "accept": "Xác nhận",
       "reject": "Từ chối",
-      "accepted": "Đã xác nhận và thêm bài báo vào danh sách công bố của bạn.",
-      "rejected": "Đã từ chối bài báo ứng viên.",
+      "accepted": "Đã chấp nhận",
+      "rejected": "Đã từ chối",
       "fetchMore": "Tải thêm từ OpenAlex",
       "finish": "Hoàn tất",
-      "failed": "Đã xảy ra lỗi. Hãy thử lại."
+      "failed": "Đã xảy ra lỗi. Hãy thử lại.",
+      "undo": "Hoàn tác",
+      "decidedCount": "{count, plural, =0 {Chưa quyết định tác phẩm nào} other {Đã quyết định # tác phẩm}}"
     },
     "finish": "Hoàn tất thiết lập",
     "finished": "Hồ sơ của bạn đã sẵn sàng. Chào mừng bạn đến với ResearchOS.",
@@ -943,7 +945,10 @@
         "project_not_found": "Không tìm thấy dự án nghiên cứu.",
         "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này.",
         "onboarding_requires_interest": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập.",
-        "orcid_already_claimed": "ORCID này đã thuộc về một hồ sơ researcher khác."
+        "orcid_already_claimed": "ORCID này đã thuộc về một hồ sơ researcher khác.",
+        "interest_topic_not_found": "Một trong các lĩnh vực nghiên cứu đã chọn không còn tồn tại.",
+        "interest_topic_inactive": "Một trong các lĩnh vực nghiên cứu đã chọn không còn khả dụng.",
+        "interests_required": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập."
       }
     }
   },

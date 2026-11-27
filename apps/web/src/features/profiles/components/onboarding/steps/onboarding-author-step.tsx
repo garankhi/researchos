@@ -28,14 +28,14 @@ export interface OnboardingAuthorStepProps {
   isLoading: boolean;
   /** Whether the list failed to load. */
   isFailed: boolean;
-  /** Whether a pull is in flight. */
-  isPulling: boolean;
   /** Retries the author search. */
   onRetry: () => void;
-  /** Confirms an author and pulls the works it holds. */
-  onConfirm: (shortId: string) => Promise<void>;
-  /** Pulls the works without confirming an author. */
-  onSkip: () => Promise<void>;
+  /** The author the researcher confirmed, from the draft. */
+  confirmedAuthorId: string | null;
+  /** Confirms an author, or unconfirms it when it is the current one. */
+  onConfirm: (shortId: string, orcid: string | null) => void;
+  /** Skips the step: no author is confirmed. */
+  onSkip: () => void;
 }
 
 /**
@@ -55,41 +55,47 @@ export interface OnboardingAuthorStepProps {
  * profiles, so a name can resolve to an author whose works belong to
  * several people — and the affiliation is what tells the researcher
  * which one is theirs.
+ *
+ * ## Why the choice is reversible
+ *
+ * The step is a draft, so confirming an author writes nothing yet. The
+ * researcher may pick a different one, or unconfirm the current one, and
+ * the works preview follows the change. That is why the step shows the
+ * current choice and lets the researcher take it back.
  */
 export function OnboardingAuthorStep({
   authors,
   mode,
   isLoading,
   isFailed,
-  isPulling,
   onRetry,
+  confirmedAuthorId,
   onConfirm,
   onSkip,
 }: OnboardingAuthorStepProps) {
   const t = useTranslations('onboarding');
 
-  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(
+    confirmedAuthorId,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (!selectedAuthor) {
       return;
     }
     setActionError(null);
-    try {
-      await onConfirm(selectedAuthor);
-    } catch {
-      setActionError(t('authorStep.failed'));
-    }
+    /*
+     * The ORCID comes from the list the step already loaded, so
+     * confirming an author costs no extra request.
+     */
+    const chosen = authors.find((author) => author.shortId === selectedAuthor);
+    onConfirm(selectedAuthor, chosen?.orcid ?? null);
   };
 
-  const handleSkip = async () => {
+  const handleSkip = () => {
     setActionError(null);
-    try {
-      await onSkip();
-    } catch {
-      setActionError(t('authorStep.failed'));
-    }
+    onSkip();
   };
 
   return (
@@ -168,14 +174,10 @@ export function OnboardingAuthorStep({
           </RadioGroup.Root>
 
           <Flex mt="6" gap="3" justify="flex-end" flexWrap="wrap">
-            <Button variant="outline" onClick={() => void handleSkip()}>
-              {t('authorStep.skip')}
+            <Button variant="outline" onClick={handleSkip}>
+              {confirmedAuthorId ? t('authorStep.clear') : t('authorStep.skip')}
             </Button>
-            <Button
-              onClick={() => void handleConfirm()}
-              disabled={!selectedAuthor}
-              loading={isPulling}
-            >
+            <Button onClick={handleConfirm} disabled={!selectedAuthor}>
               <UserCheck />
               {t('authorStep.confirm')}
             </Button>
@@ -185,9 +187,7 @@ export function OnboardingAuthorStep({
 
       {authors.length === 0 && !isLoading && !isFailed ? (
         <Flex justify="flex-end">
-          <Button onClick={() => void handleSkip()} loading={isPulling}>
-            {t('authorStep.continue')}
-          </Button>
+          <Button onClick={handleSkip}>{t('authorStep.continue')}</Button>
         </Flex>
       ) : null}
 

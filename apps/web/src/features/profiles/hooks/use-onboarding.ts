@@ -1,21 +1,21 @@
 'use client';
 
+import { useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getAuthControllerMeQueryKey,
-  getInterestsControllerListQueryKey,
   getOpenAlexControllerFindAllQueryKey,
-  getProfilesControllerGetInterestsByUserIdQueryKey,
   getProfilesControllerGetMyProfileQueryKey,
-  useInterestsControllerCreate,
   useOpenAlexControllerFindAuthors,
-  useOpenAlexControllerPullWorks,
-  useProfilesControllerCompleteOnboarding,
-  useProfilesControllerGetInterestsByUserId,
+  useOpenAlexControllerFindAvailableWorks,
+  useProfilesControllerFinalizeOnboarding,
   useTaxonomyControllerFindAllTopics,
 } from '@/lib/api';
 import type { OpenAlexAuthorCandidateDto } from '@/lib/api/models';
-import { useOpenAlexCandidates } from './use-openalex-candidates';
+import type {
+  OnboardingDraftStore,
+  OnboardingDraftWorkDecision,
+} from '../store/onboarding-draft-store';
 
 /**
  * The steps of the onboarding, in order.
@@ -45,18 +45,28 @@ export const OPTIONAL_ONBOARDING_STEPS: OnboardingStep[] = [
 ];
 
 /**
- * The research interests the researcher already declared.
+ * One work the researcher is deciding on.
  *
- * The shape carries the topic name and its taxonomy path, so the step
- * can show what was picked rather than a list of UUIDs.
+ * The preview carries the OpenAlex id, and the decision is keyed by it —
+ * the platform's candidate row does not exist yet.
  */
-export interface OnboardingInterest {
-  /** The topic id. */
-  topicId: string;
-  /** The topic name. */
-  topicName: string;
-  /** The field › subfield path of the topic. */
-  topicPath: string;
+export interface OnboardingWorkPreview {
+  /** The OpenAlex work id, in the short form. */
+  workId: string;
+  /** The canonical OpenAlex id. */
+  canonicalId: string;
+  /** The work title. */
+  title: string;
+  /** The normalised DOI, when the work has one. */
+  doi: string | null;
+  /** The publication year, when OpenAlex reports one. */
+  publicationYear: number | null;
+  /** The platform output-type vocabulary. */
+  outputType: string;
+  /** The venue, when OpenAlex reports one. */
+  venue: string | null;
+  /** Whether the work was resolved through a confirmed identifier. */
+  confirmed: boolean;
 }
 
 /**
@@ -69,8 +79,8 @@ export interface OnboardingInterest {
 export interface OnboardingState {
   /** The steps the researcher can visit, in order. */
   steps: OnboardingStep[];
-  /** The research interests the researcher already declared. */
-  interests: OnboardingInterest[];
+  /** The topic ids the researcher picked, in the draft. */
+  topicIds: string[];
   /** The OpenAlex author candidates found for the researcher. */
   authors: OpenAlexAuthorCandidateDto[];
   /** How the author list was produced: AUTHOR_ID, ORCID or NAME. */
@@ -81,70 +91,37 @@ export interface OnboardingState {
   isFailedAuthors: boolean;
   /** Retries the author search. */
   refetchAuthors: () => void;
-  /** Whether a pull is in flight. */
-  isPulling: boolean;
-  /** Whether the interest list is still loading. */
-  isLoadingInterests: boolean;
-  /** Declares a research interest. */
-  declareInterest: (topicId: string) => Promise<void>;
-  /** Whether a declaration is in flight. */
-  isDeclaringInterest: boolean;
-  /** The candidates the pull produced, for the works step. */
-  candidates: ReturnType<typeof useOpenAlexCandidates>['candidates'];
-  /** Whether the candidate list is still loading. */
-  isLoadingCandidates: boolean;
-  /** Whether the candidate list failed to load. */
-  isFailedCandidates: boolean;
-  /** Retries the candidate list. */
-  refetchCandidates: () => void;
-  /** Accepts a candidate work. */
-  acceptWork: ReturnType<typeof useOpenAlexCandidates>['acceptWork'];
-  /** Rejects a candidate work. */
-  rejectWork: ReturnType<typeof useOpenAlexCandidates>['rejectWork'];
-  /** Whether an accept or a reject is in flight. */
-  isDeciding: boolean;
-  /**
-   * Confirms an OpenAlex author and pulls the works it holds.
-   *
-   * The pull records the confirmed author on the profile, so every later
-   * pull resolves through it instead of the name fallback.
-   */
-  confirmAuthor: (shortId: string) => Promise<void>;
-  /** Pulls the works without confirming an author. */
-  pullWithoutAuthor: () => Promise<void>;
-  /** Finishes the onboarding: writes the profile and marks it complete. */
-  completeOnboarding: (payload: OnboardingProfilePayload) => Promise<void>;
-  /** Whether the completion is in flight. */
-  isCompleting: boolean;
-}
-
-/**
- * The profile information the onboarding's profile step collects.
- *
- * The fields land on two tables: the account fields on `users`, the
- * profile fields on `researcher_profiles`. The ORCID is here rather than
- * in the ordinary profile update, because the onboarding is the one
- * moment where it is a first claim.
- */
-export interface OnboardingProfilePayload {
-  fullName?: string;
-  departmentUnit?: string;
-  academicTitle?: string | null;
-  academicDegree?: string | null;
-  orcidId?: string | null;
-  bio?: string;
-  availabilityStatus?:
-    | 'OPEN_FOR_COLLABORATION'
-    | 'SEEKING_GROUP'
-    | 'MENTORING_ONLY'
-    | 'LIMITED_AVAILABILITY'
-    | 'NOT_AVAILABLE';
-  googleScholarUrl?: string;
-  scopusAuthorId?: string;
+  /** The confirmed OpenAlex author, from the draft. */
+  confirmedAuthorId: string | null;
+  /** The ORCID OpenAlex reports for the confirmed author. */
+  openAlexOrcid: string | null;
+  /** The works OpenAlex holds for the confirmed author. */
+  works: OnboardingWorkPreview[];
+  /** Whether the works preview is still loading. */
+  isLoadingWorks: boolean;
+  /** Whether the works preview failed to load. */
+  isFailedWorks: boolean;
+  /** Retries the works preview. */
+  refetchWorks: () => void;
+  /** The decisions the researcher made on the works. */
+  workDecisions: Record<string, OnboardingDraftWorkDecision>;
+  /** Finishes the onboarding: writes the whole draft in one call. */
+  finalizeOnboarding: () => Promise<void>;
+  /** Whether the finalize is in flight. */
+  isFinalizing: boolean;
 }
 
 /**
  * The onboarding's data layer.
+ *
+ * ## Why nothing is written until the end
+ *
+ * The wizard is a draft. The researcher picks interests, confirms an
+ * author, fills in their information and decides on their works — and
+ * none of it reaches the database until they press **Finish**. The
+ * draft lives in the store; this hook reads it and owns the two reads
+ * that need the network (the author list and the works preview) plus
+ * the single write that ends the flow.
  *
  * ## Why the author list is only loaded on the author step
  *
@@ -152,37 +129,32 @@ export interface OnboardingProfilePayload {
  * never opens the author step should not pay for it. The query is
  * therefore enabled per step rather than on mount.
  *
- * ## Why the interests are read through the profile route
+ * ## Why the works preview is live rather than stored
  *
- * The interest step is the mandatory one, and the researcher may already
- * have declared interests before the onboarding. The profile route
- * returns the caller's own interests **with the topic name and its
- * taxonomy path**, which is what the step has to show — the plain
- * interests route carries only the topic id.
+ * OpenAlex is the authority on what exists. A list cached in the draft
+ * would go stale while the researcher is deciding, and the decision
+ * would be applied to a work that no longer looks the same. The preview
+ * is read live, and the decisions are keyed by the OpenAlex id — so a
+ * change in the list does not lose what the researcher decided.
  */
 export function useOnboarding({
   step,
-  userId,
+  draft,
   enabled = true,
 }: {
   /** The step the flow is currently on. */
   step: OnboardingStep;
-  /** The signed-in researcher. */
-  userId?: string;
+  /** The draft store. */
+  draft: OnboardingDraftStore;
   /** Whether the flow is active at all. */
   enabled?: boolean;
-} = { step: 'interests' }): OnboardingState {
+}): OnboardingState {
   const queryClient = useQueryClient();
 
-  const interestsQuery = useProfilesControllerGetInterestsByUserId(
-    userId ?? '',
-    {
-      query: {
-        enabled: enabled && Boolean(userId) && step === 'interests',
-        staleTime: 30 * 1000,
-      },
-    },
-  );
+  const topicIds = useOnboardingTopicIds(draft);
+  const confirmedAuthorId = useOnboardingConfirmedAuthorId(draft);
+  const openAlexOrcid = useOnboardingOpenAlexOrcid(draft);
+  const workDecisions = useOnboardingWorkDecisions(draft);
 
   const authorsQuery = useOpenAlexControllerFindAuthors({
     query: {
@@ -191,35 +163,30 @@ export function useOnboarding({
     },
   });
 
-  const createInterestMutation = useInterestsControllerCreate({
-    mutation: {
-      onSuccess: async () => {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: getInterestsControllerListQueryKey(),
-          }),
-          userId
-            ? queryClient.invalidateQueries({
-                queryKey:
-                  getProfilesControllerGetInterestsByUserIdQueryKey(userId),
-              })
-            : Promise.resolve(),
-        ]);
+  /*
+   * The works preview follows the confirmed author. It runs as soon as
+   * there is an author, not only on the works step, so the preview is
+   * already there when the researcher arrives — and so a researcher who
+   * goes back to the author step and picks somebody else sees the list
+   * change underneath them.
+   *
+   * Without a confirmed author the query still runs on the works step,
+   * and the server resolves the researcher through the name fallback.
+   * That is the path a researcher who skipped the author step takes,
+   * and it is the same preview the platform has always shown.
+   */
+  const worksQuery = useOpenAlexControllerFindAvailableWorks(
+    { authorId: confirmedAuthorId ?? undefined },
+    {
+      query: {
+        enabled:
+          enabled && (step === 'works' || confirmedAuthorId !== null),
+        staleTime: 5 * 60 * 1000,
       },
     },
-  });
+  );
 
-  const pullMutation = useOpenAlexControllerPullWorks({
-    mutation: {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({
-          queryKey: getOpenAlexControllerFindAllQueryKey({ page: 1, limit: 20 }),
-        });
-      },
-    },
-  });
-
-  const completeMutation = useProfilesControllerCompleteOnboarding({
+  const finalizeMutation = useProfilesControllerFinalizeOnboarding({
     mutation: {
       onSuccess: async () => {
         /*
@@ -235,31 +202,32 @@ export function useOnboarding({
           queryClient.invalidateQueries({
             queryKey: getProfilesControllerGetMyProfileQueryKey(),
           }),
+          queryClient.invalidateQueries({
+            queryKey: getOpenAlexControllerFindAllQueryKey({ page: 1, limit: 20 }),
+          }),
         ]);
       },
     },
   });
 
-  const candidates = useOpenAlexCandidates({
-    enabled: enabled && step === 'works',
-  });
-
-  const interests: OnboardingInterest[] = (
-    interestsQuery.data ?? []
-  )
-    .filter((interest) => interest.status === 'ACTIVE')
-    .map((interest) => {
-      const { field, subfield, topic } = interest.topicPath;
-      return {
-        topicId: interest.topicId,
-        topicName: topic?.name ?? '',
-        topicPath: [field?.name, subfield?.name].filter(Boolean).join(' › '),
-      };
-    });
+  const works: OnboardingWorkPreview[] = useMemo(
+    () =>
+      (worksQuery.data ?? []).map((work) => ({
+        workId: work.shortId,
+        canonicalId: work.workId,
+        title: work.title,
+        doi: work.doi,
+        publicationYear: work.publicationYear,
+        outputType: work.outputType,
+        venue: work.venue,
+        confirmed: work.confirmed,
+      })),
+    [worksQuery.data],
+  );
 
   return {
     steps: ONBOARDING_STEPS,
-    interests,
+    topicIds,
     authors: authorsQuery.data?.authors ?? [],
     authorMode: authorsQuery.data?.mode ?? null,
     isLoadingAuthors:
@@ -268,58 +236,120 @@ export function useOnboarding({
     refetchAuthors: () => {
       void authorsQuery.refetch();
     },
-    isPulling: pullMutation.isPending,
-    isLoadingInterests:
-      interestsQuery.isPending && interestsQuery.fetchStatus !== 'idle',
-    declareInterest: async (topicId: string) => {
-      await createInterestMutation.mutateAsync({ data: { topicId } });
+    confirmedAuthorId,
+    openAlexOrcid,
+    works,
+    isLoadingWorks:
+      worksQuery.isPending && worksQuery.fetchStatus !== 'idle',
+    isFailedWorks: worksQuery.isError,
+    refetchWorks: () => {
+      void worksQuery.refetch();
     },
-    isDeclaringInterest: createInterestMutation.isPending,
-    candidates: candidates.candidates,
-    isLoadingCandidates: candidates.isLoading,
-    isFailedCandidates: candidates.isFailed,
-    refetchCandidates: () => {
-      candidates.refetch();
+    workDecisions,
+    finalizeOnboarding: async () => {
+      const state = draft.getState();
+      const profile = state.profileValues;
+
+      await finalizeMutation.mutateAsync({
+        data: {
+          topicIds: state.topicIds,
+          ...(state.confirmedAuthorId
+            ? { openAlexAuthorId: state.confirmedAuthorId }
+            : {}),
+          ...(profile
+            ? {
+                ...(profile.fullName
+                  ? { fullName: profile.fullName }
+                  : {}),
+                ...(profile.departmentUnit
+                  ? { departmentUnit: profile.departmentUnit }
+                  : {}),
+                ...(profile.academicTitle !== undefined
+                  ? { academicTitle: profile.academicTitle }
+                  : {}),
+                ...(profile.academicDegree !== undefined
+                  ? { academicDegree: profile.academicDegree }
+                  : {}),
+                ...(profile.orcidId ? { orcidId: profile.orcidId } : {}),
+                ...(profile.bio ? { bio: profile.bio } : {}),
+                ...(profile.availabilityStatus
+                  ? {
+                      availabilityStatus: profile.availabilityStatus,
+                    }
+                  : {}),
+                ...(profile.googleScholarUrl
+                  ? { googleScholarUrl: profile.googleScholarUrl }
+                  : {}),
+                ...(profile.scopusAuthorId
+                  ? { scopusAuthorId: profile.scopusAuthorId }
+                  : {}),
+              }
+            : {}),
+          works: Object.entries(state.workDecisions).map(
+            ([workId, decision]) => ({
+              workId,
+              accepted: decision.accepted,
+              visibility: decision.visibility,
+            }),
+          ),
+        },
+      });
     },
-    acceptWork: candidates.acceptWork,
-    rejectWork: candidates.rejectWork,
-    isDeciding: candidates.isAccepting || candidates.isRejecting,
-    confirmAuthor: async (shortId: string) => {
-      await pullMutation.mutateAsync({ data: { openAlexAuthorId: shortId } });
-    },
-    pullWithoutAuthor: async () => {
-      await pullMutation.mutateAsync({ data: {} });
-    },
-    completeOnboarding: async (payload: OnboardingProfilePayload) => {
-      await completeMutation.mutateAsync({ data: payload });
-    },
-    isCompleting: completeMutation.isPending,
+    isFinalizing: finalizeMutation.isPending,
   };
+}
+
+/**
+ * The topic ids in the draft.
+ *
+ * A selector rather than a direct read, so a component that only cares
+ * about the topics does not re-render when the author changes.
+ */
+export function useOnboardingTopicIds(draft: OnboardingDraftStore): string[] {
+  return draft((state) => state.topicIds);
+}
+
+/** The confirmed OpenAlex author in the draft. */
+export function useOnboardingConfirmedAuthorId(
+  draft: OnboardingDraftStore,
+): string | null {
+  return draft((state) => state.confirmedAuthorId);
+}
+
+/** The ORCID of the confirmed author in the draft. */
+export function useOnboardingOpenAlexOrcid(
+  draft: OnboardingDraftStore,
+): string | null {
+  return draft((state) => state.openAlexOrcid);
+}
+
+/** The decisions on the works in the draft. */
+export function useOnboardingWorkDecisions(
+  draft: OnboardingDraftStore,
+): Record<string, OnboardingDraftWorkDecision> {
+  return draft((state) => state.workDecisions);
 }
 
 /**
  * The research topics the interest step offers.
  *
  * The taxonomy is a public reference tree, so the topics are fetched
- * without a session. The search is the researcher's own typing, so the
- * query only runs once there is something to search for — the empty
- * result of the first page would be a list of everything, which is not
- * what a picker wants.
+ * without a session.
+ *
+ * ## Why the list loads without a search
+ *
+ * The picker opens with the first page of the active taxonomy already
+ * in it. A researcher who knows what they want searches for it; a
+ * researcher who does not browse the list the way every other picker
+ * works. Making the list appear only after a keystroke would hide the
+ * taxonomy behind the search box for no gain — the page is paginated,
+ * so it is never the whole tree.
  */
-export function useInterestTopics({
-  search,
-  enabled = true,
-}: {
-  /** The researcher's search text. */
-  search: string;
-  /** Whether the picker is open at all. */
-  enabled?: boolean;
-}) {
+export function useInterestTopics({ search }: { search: string }) {
   const query = useTaxonomyControllerFindAllTopics(
     { search: search.trim() || undefined, limit: 20, isActive: true },
     {
       query: {
-        enabled: enabled && search.trim() !== '',
         staleTime: 60 * 1000,
       },
     },
@@ -331,4 +361,19 @@ export function useInterestTopics({
     isFailed: query.isError,
     refetch: () => query.refetch(),
   };
+}
+
+/**
+ * Clears the draft once the onboarding is written.
+ *
+ * The draft is the researcher's own scratch space; once the answers are
+ * stored, keeping it would let a later session start from a stale copy
+ * of the interests.
+ */
+export function useClearOnboardingDraft(draft: OnboardingDraftStore): void {
+  const reset = draft((state) => state.reset);
+
+  useEffect(() => {
+    return () => reset();
+  }, [reset]);
 }

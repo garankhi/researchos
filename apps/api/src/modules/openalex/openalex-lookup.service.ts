@@ -6,8 +6,10 @@ import {
   affiliationMatchesFpt,
   filterWorksByAuthorship,
   filterWorksByIdentity,
+  shortAuthorId,
   type ResearcherIdentity,
 } from './openalex.identity.js';
+import { OpenAlexWorksCache } from './openalex-works-cache.js';
 import type {
   OpenAlexAuthor,
   OpenAlexWork,
@@ -76,6 +78,7 @@ export class OpenAlexLookupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly client: OpenAlexClient,
+    private readonly cache: OpenAlexWorksCache,
   ) {}
 
   /**
@@ -221,6 +224,70 @@ export class OpenAlexLookupService {
     affiliation: string = FPT_UNIVERSITY.name,
   ): Promise<OpenAlexWork[]> {
     return this.listAllWorksByName(authorName, affiliation);
+  }
+
+  /**
+   * The full works of an author, served from the cache when possible.
+   *
+   * ## Why the cache sits here and not in the pull
+   *
+   * The wizard shows the works OpenAlex holds for the researcher, and
+   * the finalize call pulls the ones they decided on. Both need the same
+   * paged listing, and the listing is the expensive part — it walks
+   * every page of the author's bibliography. Caching it here means the
+   * two calls share one fetch.
+   *
+   * ## What is cached
+   *
+   * The **raw** paged listing, before the identity filter. The filter
+   * narrows the list to the works the researcher themselves are on, and
+   * the filter's input — the identity — is not known at fetch time: the
+   * researcher may confirm their ORCID in the profile step *after* the
+   * preview was fetched. Caching the raw list and filtering afterwards
+   * keeps both correct.
+   *
+   * The cache key is the author id, so a researcher who goes back to the
+   * author step and picks somebody else gets a different entry, and one
+   * who re-picks the same author hits the entry that is already there.
+   */
+  async listWorksForAuthorCached(
+    authorId: string,
+    options: { identity?: ResearcherIdentity } = {},
+  ): Promise<OpenAlexWork[]> {
+    const short = shortAuthorId(authorId);
+    if (short === null) {
+      return this.listAllWorksWithFallback(
+        authorId,
+        undefined,
+        undefined,
+        options.identity,
+      );
+    }
+
+    const cached = await this.cache.get(short);
+    const raw = cached ?? (await this.listAllWorks(short));
+    if (cached === null) {
+      await this.cache.set(short, raw);
+    }
+
+    if (!options.identity) {
+      return raw;
+    }
+    return filterWorksByIdentity(raw, options.identity);
+  }
+
+  /**
+   * Drops the cached work list of an author.
+   *
+   * Called once the wizard is done with it, so a later pull starts from
+   * fresh works rather than the list the researcher saw days ago.
+   */
+  async dropCachedWorks(authorId: string): Promise<void> {
+    const short = shortAuthorId(authorId);
+    if (short === null) {
+      return;
+    }
+    await this.cache.drop(short);
   }
 
   /**

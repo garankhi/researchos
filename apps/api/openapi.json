@@ -9977,6 +9977,84 @@
         ]
       }
     },
+    "/profiles/me/onboarding/finalize": {
+      "post": {
+        "description": "Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, and the decisions on the works. The interests are reconciled to the set the researcher ended up with, and only the decided works are pulled.",
+        "operationId": "ProfilesController_finalizeOnboarding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeOnboardingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The onboarding completed. The returned profile carries the new onboardingCompletedAt timestamp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The caller declared no research interest, which is the one mandatory step of the onboarding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The ORCID is already claimed by another researcher profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Finalize the onboarding of the current user",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
     "/interests": {
       "get": {
         "operationId": "InterestsController_list",
@@ -16523,6 +16601,123 @@
             "example": "57193294821"
           }
         }
+      },
+      "OnboardingWorkDecisionDto": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string",
+            "description": "The OpenAlex work id, short or canonical form, e.g. W2741809807.",
+            "example": "W2741809807",
+            "maxLength": 60
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether the researcher accepted the work.",
+            "example": true
+          },
+          "visibility": {
+            "type": "string",
+            "description": "The visibility an accepted work is published with. Omitted means the private working copy.",
+            "enum": [
+              "PRIVATE",
+              "FPTU_COMMUNITY"
+            ],
+            "example": "PRIVATE"
+          }
+        },
+        "required": [
+          "workId",
+          "accepted"
+        ]
+      },
+      "FinalizeOnboardingDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher. Required to be non-blank when sent.",
+            "example": "PGS. TS. Nguyễn Văn A",
+            "maxLength": 255
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit. Required to be non-blank when sent.",
+            "example": "Software Engineering",
+            "maxLength": 255
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title; null clears the stored title.",
+            "example": "PGS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree; null clears the stored degree.",
+            "example": "TS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "topicIds": {
+            "description": "The topics the researcher declared as their research interests, by topic id. At least one is required.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openAlexAuthorId": {
+            "type": "string",
+            "description": "The OpenAlex author the researcher confirmed, in short or canonical form. Omitted means the researcher skipped the author step.",
+            "example": "A5023888391",
+            "maxLength": 60
+          },
+          "orcidId": {
+            "type": "string",
+            "description": "ORCID of the researcher, in the bare 16-digit form with the dashes.",
+            "example": "0000-0002-1825-0097",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Researcher specializing in distributed software architecture."
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example"
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821"
+          },
+          "works": {
+            "description": "The works the researcher decided on. Omitted means the researcher decided on none.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingWorkDecisionDto"
+            }
+          }
+        },
+        "required": [
+          "topicIds"
+        ]
       },
       "InterestResponseDto": {
         "type": "object",

@@ -5,6 +5,7 @@ import { OpenAlexController } from './openalex.controller.js';
 import { OpenAlexIngestService } from './openalex-ingest.service.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
 import { OpenAlexPullService } from './openalex-pull.service.js';
+import { OpenAlexWorksCache } from './openalex-works-cache.js';
 import { OpenAlexClient } from './openalex.client.js';
 
 /**
@@ -24,6 +25,7 @@ import { OpenAlexClient } from './openalex.client.js';
     OpenAlexIngestService,
     OpenAlexCandidatesService,
     OpenAlexPullService,
+    OpenAlexWorksCache,
   ],
   exports: [
     OpenAlexClient,
@@ -31,6 +33,7 @@ import { OpenAlexClient } from './openalex.client.js';
     OpenAlexIngestService,
     OpenAlexCandidatesService,
     OpenAlexPullService,
+    OpenAlexWorksCache,
   ],
 })
 export class OpenAlexModule {}

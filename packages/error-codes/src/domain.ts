@@ -170,6 +170,11 @@ export const domainErrorCodes = {
     onboardingRequiresInterest: 'onboarding_requires_interest',
     orcidAlreadyClaimed: 'orcid_already_claimed',
   },
+  interests: {
+    topicNotFound: 'interest_topic_not_found',
+    topicInactive: 'interest_topic_inactive',
+    interestsRequired: 'interests_required',
+  },
   provenance: {
     fieldLocked: 'provenance_field_locked',
     humanSourceNotAllowed: 'provenance_human_source_not_allowed',

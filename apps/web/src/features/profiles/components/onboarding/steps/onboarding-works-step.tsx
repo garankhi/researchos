@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Badge,
   Box,
@@ -11,108 +10,74 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { Check, Download, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
-import type { CandidateWorkDto } from '../../../types';
+import type { OnboardingWorkPreview } from '../../../hooks/use-onboarding';
+import type { OnboardingDraftWorkDecision } from '../../../store/onboarding-draft-store';
 
 /**
  * The props of the works step.
  */
 export interface OnboardingWorksStepProps {
-  /** The candidates the pull produced. */
-  candidates: CandidateWorkDto[];
-  /** Whether the candidate list is still loading. */
+  /** The works OpenAlex holds for the confirmed author. */
+  works: OnboardingWorkPreview[];
+  /** Whether the preview is still loading. */
   isLoading: boolean;
-  /** Whether the candidate list failed to load. */
+  /** Whether the preview failed to load. */
   isFailed: boolean;
-  /** Whether a pull is in flight. */
-  isPulling: boolean;
-  /** Whether an accept or a reject is in flight. */
-  isDeciding: boolean;
-  /** Retries the candidate list. */
+  /** Retries the preview. */
   onRetry: () => void;
-  /** Fetches more works from OpenAlex. */
-  onFetchMore: () => Promise<void>;
-  /** Accepts a candidate. */
-  onAccept: (
-    work: CandidateWorkDto,
+  /** The decisions the researcher made, by OpenAlex work id. */
+  decisions: Record<string, OnboardingDraftWorkDecision>;
+  /** Records a decision on a work. */
+  onDecide: (
+    workId: string,
+    accepted: boolean,
     visibility: 'PRIVATE' | 'FPTU_COMMUNITY',
-  ) => Promise<void>;
-  /** Rejects a candidate. */
-  onReject: (work: CandidateWorkDto) => Promise<void>;
+  ) => void;
+  /** Withdraws a decision. */
+  onUndecide: (workId: string) => void;
+  /** The visibility an accepted work is published with. */
+  visibility: 'PRIVATE' | 'FPTU_COMMUNITY';
+  /** Changes the visibility an accepted work is published with. */
+  onVisibilityChange: (visibility: 'PRIVATE' | 'FPTU_COMMUNITY') => void;
 }
 
 /**
  * The fourth step of the onboarding: the candidate works.
  *
- * The step is **optional**. The pull wrote the works as candidates, and
- * the researcher accepts each one — privately or for the FPTU
- * community — or rejects it.
+ * The step is **optional**. It shows the works OpenAlex holds for the
+ * confirmed author, live, and the researcher accepts each one — privately
+ * or for the FPTU community — or rejects it.
  *
- * A rejected work is never deleted: it stays in the profile as a
- * candidate the researcher can accept later. The step says so, because
- * a researcher who rejects a work by mistake would otherwise think the
- * work is gone.
+ * ## Why nothing is written here
+ *
+ * The step is a draft, so a decision is a local choice. The work is
+ * pulled and the decision applied only at the end, and only for the
+ * works the researcher actually decided on. A work they left alone is
+ * never pulled — the platform does not fill their queue with works they
+ * did not ask for.
+ *
+ * ## Why the decisions survive a change of author
+ *
+ * They do not: picking a different author in step 2 drops the
+ * decisions, because they were decisions about somebody else's works.
  */
 export function OnboardingWorksStep({
-  candidates,
+  works,
   isLoading,
   isFailed,
-  isPulling,
-  isDeciding,
   onRetry,
-  onFetchMore,
-  onAccept,
-  onReject,
+  decisions,
+  onDecide,
+  onUndecide,
+  visibility,
+  onVisibilityChange,
 }: OnboardingWorksStepProps) {
   const t = useTranslations('onboarding');
 
-  const [operatingId, setOperatingId] = useState<string | null>(null);
-  const [operationType, setOperationType] = useState<
-    'accept' | 'reject' | null
-  >(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<'PRIVATE' | 'FPTU_COMMUNITY'>(
-    'PRIVATE',
-  );
-
-  const handleAccept = async (work: CandidateWorkDto) => {
-    setActionError(null);
-    try {
-      setOperatingId(work.id);
-      setOperationType('accept');
-      await onAccept(work, visibility);
-    } catch {
-      setActionError(t('worksStep.failed'));
-    } finally {
-      setOperatingId(null);
-      setOperationType(null);
-    }
-  };
-
-  const handleReject = async (work: CandidateWorkDto) => {
-    setActionError(null);
-    try {
-      setOperatingId(work.id);
-      setOperationType('reject');
-      await onReject(work);
-    } catch {
-      setActionError(t('worksStep.failed'));
-    } finally {
-      setOperatingId(null);
-      setOperationType(null);
-    }
-  };
-
-  const handleFetchMore = async () => {
-    setActionError(null);
-    try {
-      await onFetchMore();
-    } catch {
-      setActionError(t('worksStep.failed'));
-    }
-  };
+  const decidedCount = Object.keys(decisions).length;
 
   return (
     <Stack gap="5">
@@ -132,7 +97,9 @@ export function OnboardingWorksStep({
         <RadioGroup.Root
           value={visibility}
           onValueChange={(details) =>
-            setVisibility(details.value as 'PRIVATE' | 'FPTU_COMMUNITY')
+            onVisibilityChange(
+              details.value as 'PRIVATE' | 'FPTU_COMMUNITY',
+            )
           }
         >
           <Stack gap="3">
@@ -164,8 +131,10 @@ export function OnboardingWorksStep({
         </RadioGroup.Root>
       </Box>
 
-      {actionError ? (
-        <ErrorState title={t('worksStep.failed')} message={actionError} />
+      {decidedCount > 0 ? (
+        <Text textStyle="sm" color="fg.muted">
+          {t('worksStep.decidedCount', { count: decidedCount })}
+        </Text>
       ) : null}
 
       {isFailed ? (
@@ -178,7 +147,7 @@ export function OnboardingWorksStep({
         </Text>
       ) : null}
 
-      {!isLoading && !isFailed && candidates.length === 0 ? (
+      {!isLoading && !isFailed && works.length === 0 ? (
         <EmptyState
           title={t('worksStep.emptyTitle')}
           message={t('worksStep.emptyMessage')}
@@ -186,19 +155,25 @@ export function OnboardingWorksStep({
       ) : null}
 
       <Stack gap="3">
-        {candidates.map((work) => {
-          const isCurrentOperating = operatingId === work.id;
-          const isAccepting =
-            isCurrentOperating && operationType === 'accept';
-          const isRejecting =
-            isCurrentOperating && operationType === 'reject';
+        {works.map((work) => {
+          const decision = decisions[work.workId];
+          const isAccepted = decision?.accepted === true;
+          const isRejected = decision?.accepted === false;
 
           return (
             <Box
-              key={work.id}
+              key={work.workId}
               bg="bg.panel"
               boxShadow="xs"
               p={{ base: '4', md: '5' }}
+              borderLeftWidth="3px"
+              borderLeftColor={
+                isAccepted
+                  ? 'border.emphasized'
+                  : isRejected
+                    ? 'border.muted'
+                    : 'transparent'
+              }
             >
               <Stack gap="2">
                 <Flex gap="2" align="center" flexWrap="wrap">
@@ -209,6 +184,16 @@ export function OnboardingWorksStep({
                     <Text textStyle="sm" color="fg.muted">
                       {work.publicationYear}
                     </Text>
+                  ) : null}
+                  {isAccepted ? (
+                    <Badge colorPalette="green" size="sm">
+                      {t('worksStep.accepted')}
+                    </Badge>
+                  ) : null}
+                  {isRejected ? (
+                    <Badge colorPalette="gray" size="sm">
+                      {t('worksStep.rejected')}
+                    </Badge>
                   ) : null}
                 </Flex>
 
@@ -223,21 +208,29 @@ export function OnboardingWorksStep({
                 ) : null}
 
                 <Flex gap="2" justify="flex-end" pt="1">
+                  {decision ? (
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => onUndecide(work.workId)}
+                    >
+                      <X />
+                      {t('worksStep.undo')}
+                    </Button>
+                  ) : null}
                   <Button
                     variant="outline"
                     size="xs"
-                    onClick={() => void handleReject(work)}
-                    disabled={isCurrentOperating || isDeciding}
-                    loading={isRejecting}
+                    onClick={() => onDecide(work.workId, false, visibility)}
+                    disabled={isRejected}
                   >
                     <X />
                     {t('worksStep.reject')}
                   </Button>
                   <Button
                     size="xs"
-                    onClick={() => void handleAccept(work)}
-                    disabled={isCurrentOperating || isDeciding}
-                    loading={isAccepting}
+                    onClick={() => onDecide(work.workId, true, visibility)}
+                    disabled={isAccepted}
                   >
                     <Check />
                     {t('worksStep.accept')}
@@ -248,17 +241,6 @@ export function OnboardingWorksStep({
           );
         })}
       </Stack>
-
-      <Flex justify="flex-end">
-        <Button
-          variant="outline"
-          onClick={() => void handleFetchMore()}
-          loading={isPulling}
-        >
-          <Download />
-          {t('worksStep.fetchMore')}
-        </Button>
-      </Flex>
     </Stack>
   );
 }

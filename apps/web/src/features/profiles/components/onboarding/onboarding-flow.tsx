@@ -21,8 +21,10 @@ import {
   useOnboarding,
   type OnboardingStep,
 } from '../../hooks/use-onboarding';
-import type { OnboardingProfileValues } from '../../schemas/onboarding-profile.schema';
-import { OnboardingAuthorStep } from './steps/onboarding-author-step';
+import {
+  createOnboardingDraftStore,
+  type OnboardingDraftProfileValues,
+} from '../../store/onboarding-draft-store';import { OnboardingAuthorStep } from './steps/onboarding-author-step';
 import { OnboardingInterestsStep } from './steps/onboarding-interests-step';
 import { OnboardingProfileStep } from './steps/onboarding-profile-step';
 import { OnboardingWorksStep } from './steps/onboarding-works-step';
@@ -43,20 +45,25 @@ import { OnboardingWorksStep } from './steps/onboarding-works-step';
  * 4. **The candidate works.** Optional. The researcher accepts the
  *    works that are theirs, or rejects them.
  *
+ * ## Why the whole flow is a draft
+ *
+ * Nothing is written until the researcher presses **Finish**. Every
+ * answer — the interests, the author, the profile, the decisions on the
+ * works — travels together in one call, and the server writes them in
+ * one go.
+ *
+ * The alternative would be to write each answer as it is given. That
+ * leaves the platform holding a half-finished researcher: an interest
+ * with no profile, a profile with no works, a work the researcher is
+ * about to reject. It also makes every choice irreversible, because the
+ * researcher cannot take back a topic they picked by mistake.
+ *
  * ## Why the steps share one screen
  *
  * A researcher who wants to change the interest they picked in step 1
  * while looking at the works in step 4 should not have to go back
  * through the whole flow to do it — so the step buttons stay visible,
  * and the mandatory rule is the only thing that stops the flow.
- *
- * ## Why the completion is written twice
- *
- * The profile step writes the profile, and the last step writes the
- * completion flag. The write is idempotent — it sets the same fields
- * and the same timestamp — so a researcher who saves the profile and
- * then leaves without finishing still has their information stored, and
- * the gate sends them back to the last step rather than to the start.
  */
 export function OnboardingFlow({
   onFinish,
@@ -70,10 +77,24 @@ export function OnboardingFlow({
   const user = useCurrentUser();
 
   const [step, setStep] = useState<OnboardingStep>('interests');
-  const [confirmedAuthorId, setConfirmedAuthorId] = useState<string | null>(
-    null,
+
+  /*
+   * The visibility an accepted work is published with. It is a single
+   * choice for the whole step — a researcher publishes their accepted
+   * works the same way, or the visibility picker is noise.
+   */
+  const [visibility, setVisibility] = useState<
+    'PRIVATE' | 'FPTU_COMMUNITY'
+  >('PRIVATE');
+
+  /*
+   * The draft is namespaced per researcher, so two accounts in the same
+   * browser keep two drafts and neither sees the other's.
+   */
+  const draft = useMemo(
+    () => createOnboardingDraftStore(user?.id),
+    [user?.id],
   );
-  const [openAlexOrcid, setOpenAlexOrcid] = useState<string | null>(null);
 
   const profileQuery = useProfile({
     userId: user?.id,
@@ -82,7 +103,7 @@ export function OnboardingFlow({
 
   const onboarding = useOnboarding({
     step,
-    userId: user?.id,
+    draft,
   });
 
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
@@ -92,7 +113,7 @@ export function OnboardingFlow({
    * least one interest — the button is disabled and the server refuses
    * the completion, so the two rules cannot drift apart.
    */
-  const hasMandatoryInterest = onboarding.interests.length > 0;
+  const hasMandatoryInterest = onboarding.topicIds.length > 0;
 
   const canAdvance = useMemo(
     () => (step === 'interests' ? hasMandatoryInterest : true),
@@ -118,51 +139,41 @@ export function OnboardingFlow({
     }
   };
 
-  const handleConfirmAuthor = async (shortId: string) => {
-    await onboarding.confirmAuthor(shortId);
-    setConfirmedAuthorId(shortId);
+  /*
+   * The topic names the badges show. They are read from the draft,
+   * because the draft carries the name alongside the id — the id is what
+   * the finalize call needs, and the name is what the researcher reads.
+   */
+  const topicNames = draft((state) => state.topicNames);
+  const draftProfileValues = draft((state) => state.profileValues);
 
-    /*
-     * The ORCID OpenAlex reports for the confirmed author prefills the
-     * profile step. It is read from the author list the step already
-     * loaded, so it costs no extra request.
-     */
-    const confirmed = onboarding.authors.find(
-      (author) => author.shortId === shortId,
-    );
-    setOpenAlexOrcid(confirmed?.orcid ?? null);
-
-    showSnackbar({ message: t('authorStep.pulled'), severity: 'success' });
+  const handleConfirmAuthor = (
+    shortId: string,
+    orcid: string | null,
+  ) => {
+    draft.getState().confirmAuthor(shortId, orcid);
     setStep('profile');
   };
 
-  const handleSkipAuthor = async () => {
-    await onboarding.pullWithoutAuthor();
-    showSnackbar({ message: t('authorStep.pulled'), severity: 'success' });
+  const handleSkipAuthor = () => {
+    draft.getState().clearAuthor();
     setStep('profile');
   };
 
-  const handleSaveProfile = async (values: OnboardingProfileValues) => {
-    await onboarding.completeOnboarding({
-      fullName: values.fullName,
-      departmentUnit: values.departmentUnit,
-      academicTitle: values.academicTitle,
-      academicDegree: values.academicDegree,
-      orcidId: values.orcidId,
-      bio: values.bio ?? undefined,
-      availabilityStatus: values.availabilityStatus,
-      googleScholarUrl: values.googleScholarUrl ?? undefined,
-      scopusAuthorId: values.scopusAuthorId ?? undefined,
-    });
+  const handleSaveProfile = (values: OnboardingDraftProfileValues) => {
+    draft.getState().setProfileValues(values);
     showSnackbar({ message: t('profileStep.saved'), severity: 'success' });
     setStep('works');
   };
 
   const handleFinish = async () => {
     try {
-      // The completion is the last write: the interest rule is enforced
-      // there, so the flow cannot end without it.
-      await onboarding.completeOnboarding({});
+      /*
+       * The finalize is the last write: the interest rule is enforced
+       * there, so the flow cannot end without it.
+       */
+      await onboarding.finalizeOnboarding();
+      draft.getState().reset();
       showSnackbar({ message: t('finished'), severity: 'success' });
       onFinish?.();
     } catch {
@@ -194,14 +205,22 @@ export function OnboardingFlow({
         </Progress.Root>
 
         <Flex gap="2" flexWrap="wrap" role="tablist" aria-label={t('title')}>
-          {ONBOARDING_STEPS.map((candidate, index) => (
+          {ONBOARDING_STEPS.map((candidate) => (
             <Button
               key={candidate}
               role="tab"
               size="xs"
               variant={candidate === step ? 'solid' : 'ghost'}
               aria-selected={candidate === step}
-              disabled={index > stepIndex + 1}
+              /*
+               * The mandatory rule stops the flow at step 1. Without it
+               * the researcher could click straight past the interests
+               * step — the Next button was disabled, but the tab was
+               * not.
+               */
+              disabled={
+                !hasMandatoryInterest && candidate !== 'interests'
+              }
               onClick={() => setStep(candidate)}
             >
               {t(`steps.${candidate}.label`)}
@@ -216,10 +235,12 @@ export function OnboardingFlow({
 
         {step === 'interests' ? (
           <OnboardingInterestsStep
-            interests={onboarding.interests}
-            onDeclare={onboarding.declareInterest}
-            isDeclaring={onboarding.isDeclaringInterest}
-            isLoading={onboarding.isLoadingInterests}
+            topicIds={onboarding.topicIds}
+            topicNames={topicNames}
+            onAdd={(topicId, topicName) =>
+              draft.getState().addTopic(topicId, topicName)
+            }
+            onRemove={(topicId) => draft.getState().removeTopic(topicId)}
           />
         ) : null}
 
@@ -229,8 +250,8 @@ export function OnboardingFlow({
             mode={onboarding.authorMode}
             isLoading={onboarding.isLoadingAuthors}
             isFailed={onboarding.isFailedAuthors}
-            isPulling={onboarding.isPulling}
             onRetry={onboarding.refetchAuthors}
+            confirmedAuthorId={onboarding.confirmedAuthorId}
             onConfirm={handleConfirmAuthor}
             onSkip={handleSkipAuthor}
           />
@@ -239,10 +260,10 @@ export function OnboardingFlow({
         {step === 'profile' ? (
           <OnboardingProfileStep
             profile={profileQuery.profile ?? null}
-            prefillFromOpenAlex={confirmedAuthorId !== null}
-            openAlexOrcid={openAlexOrcid}
-            confirmedAuthorId={confirmedAuthorId}
-            isSaving={onboarding.isCompleting}
+            prefillFromOpenAlex={onboarding.confirmedAuthorId !== null}
+            openAlexOrcid={onboarding.openAlexOrcid}
+            confirmedAuthorId={onboarding.confirmedAuthorId}
+            draftValues={draftProfileValues}
             onSave={handleSaveProfile}
             onSkip={goNext}
           />
@@ -250,19 +271,17 @@ export function OnboardingFlow({
 
         {step === 'works' ? (
           <OnboardingWorksStep
-            candidates={onboarding.candidates}
-            isLoading={onboarding.isLoadingCandidates}
-            isFailed={onboarding.isFailedCandidates}
-            isPulling={onboarding.isPulling}
-            isDeciding={onboarding.isDeciding}
-            onRetry={onboarding.refetchCandidates}
-            onFetchMore={() => onboarding.pullWithoutAuthor()}
-            onAccept={async (work, visibility) => {
-              await onboarding.acceptWork(work.id, { visibility });
-            }}
-            onReject={async (work) => {
-              await onboarding.rejectWork(work.id);
-            }}
+            works={onboarding.works}
+            isLoading={onboarding.isLoadingWorks}
+            isFailed={onboarding.isFailedWorks}
+            onRetry={onboarding.refetchWorks}
+            decisions={onboarding.workDecisions}
+            onDecide={(workId, accepted, visibility) =>
+              draft.getState().decideWork(workId, accepted, visibility)
+            }
+            onUndecide={(workId) => draft.getState().undecideWork(workId)}
+            visibility={visibility}
+            onVisibilityChange={setVisibility}
           />
         ) : null}
 
@@ -276,7 +295,7 @@ export function OnboardingFlow({
             {isLastStep ? (
               <Button
                 onClick={() => void handleFinish()}
-                loading={onboarding.isCompleting}
+                loading={onboarding.isFinalizing}
               >
                 <Check />
                 {t('finish')}

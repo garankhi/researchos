@@ -10,6 +10,7 @@ import {
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -20,10 +21,12 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto.js';
+import { FinalizeOnboardingDto } from './dto/finalize-onboarding.dto.js';
 import { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import { ProfileResponseDto } from './dto/profile-response.dto.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { OnboardingFinalizeService } from './onboarding-finalize.service.js';
 import { ProfilesService } from './profiles.service.js';
 
 /**
@@ -40,7 +43,10 @@ import { ProfilesService } from './profiles.service.js';
 })
 @Controller('profiles')
 export class ProfilesController {
-  constructor(private readonly profilesService: ProfilesService) {}
+  constructor(
+    private readonly profilesService: ProfilesService,
+    private readonly onboardingFinalize: OnboardingFinalizeService,
+  ) {}
 
   @ApiOperation({
     summary: 'Get current user profile',
@@ -189,5 +195,34 @@ export class ProfilesController {
     @Body() dto: CompleteOnboardingDto,
   ): Promise<ProfileResponseDto> {
     return this.profilesService.completeOnboarding(userId, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Finalize the onboarding of the current user',
+    description:
+      'Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, and the decisions on the works. The interests are reconciled to the set the researcher ended up with, and only the decided works are pulled.',
+  })
+  @ApiOkResponse({
+    description:
+      'The onboarding completed. The returned profile carries the new onboardingCompletedAt timestamp.',
+    type: ProfileResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'The caller declared no research interest, which is the one mandatory step of the onboarding.',
+  })
+  @ApiConflictResponse({
+    description:
+      'The ORCID is already claimed by another researcher profile.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested researcher profile was not found.',
+  })
+  @Post('me/onboarding/finalize')
+  async finalizeOnboarding(
+    @CurrentUserId() userId: string,
+    @Body() dto: FinalizeOnboardingDto,
+  ): Promise<ProfileResponseDto> {
+    return this.onboardingFinalize.finalize(userId, dto);
   }
 }

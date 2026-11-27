@@ -24,6 +24,7 @@ import type {
 import type {
   ApiErrorResponseDto,
   CompleteOnboardingDto,
+  FinalizeOnboardingDto,
   ProfilePreviewResponseDtoEnvelope,
   ProfileResponseDtoEnvelope,
   ProfilesControllerGetInterestsByUserIdEnvelope,
@@ -923,6 +924,107 @@ export const useProfilesControllerCompleteOnboarding = <
 > => {
   return useMutation(
     getProfilesControllerCompleteOnboardingMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, and the decisions on the works. The interests are reconciled to the set the researcher ended up with, and only the decided works are pulled.
+ * @summary Finalize the onboarding of the current user
+ */
+export const profilesControllerFinalizeOnboarding = (
+  finalizeOnboardingDto: FinalizeOnboardingDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfileResponseDtoEnvelope>(
+    {
+      url: `/profiles/me/onboarding/finalize`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: finalizeOnboardingDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProfilesControllerFinalizeOnboardingMutationKey = () =>
+  ['profilesControllerFinalizeOnboarding'] as const;
+
+export const getProfilesControllerFinalizeOnboardingMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+    TError,
+    ProfilesControllerFinalizeOnboardingMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+  TError,
+  ProfilesControllerFinalizeOnboardingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getProfilesControllerFinalizeOnboardingMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+    ProfilesControllerFinalizeOnboardingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return profilesControllerFinalizeOnboarding(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProfilesControllerFinalizeOnboardingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>
+>;
+export type ProfilesControllerFinalizeOnboardingMutationBody =
+  FinalizeOnboardingDto;
+export type ProfilesControllerFinalizeOnboardingMutationError =
+  ApiErrorResponseDto;
+export type ProfilesControllerFinalizeOnboardingMutationVariables = {
+  data: FinalizeOnboardingDto;
+};
+
+/**
+ * @summary Finalize the onboarding of the current user
+ */
+export const useProfilesControllerFinalizeOnboarding = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+      TError,
+      ProfilesControllerFinalizeOnboardingMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+  TError,
+  ProfilesControllerFinalizeOnboardingMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getProfilesControllerFinalizeOnboardingMutationOptions(options),
     queryClient,
   );
 };

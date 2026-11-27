@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Badge,
   Box,
-  Button,
+  Combobox,
+  createListCollection,
   Flex,
   Heading,
-  Input,
+  IconButton,
+  Portal,
   Stack,
   Text,
+  Wrap,
 } from '@chakra-ui/react';
-import { Plus, Search } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useInterestTopics } from '../../../hooks/use-onboarding';
 import type { OnboardingStepProps } from './onboarding-types';
 
@@ -28,28 +30,97 @@ import type { OnboardingStepProps } from './onboarding-types';
  * The step therefore refuses to move on while the interest list is
  * empty, and the server refuses it too: the rule lives on both sides,
  * because the screen is a convenience and the server is the boundary.
+ *
+ * ## Why a combobox
+ *
+ * The taxonomy is long, and the researcher knows roughly what they are
+ * looking for. A combobox gives them the type-to-filter they need and
+ * the keyboard navigation they expect, and its popup floats over the
+ * content rather than pushing the layout around — the panel that shows
+ * their picks must not move while they are picking.
+ *
+ * ## Why the selection is multiple
+ *
+ * A researcher usually works across a few areas, and picking them one
+ * at a time — reopening the list, adding, closing — is friction for
+ * no benefit. The combobox is therefore multi-select: the list stays
+ * open, the picked topics stay in it and carry a check, and the
+ * researcher keeps going until they have what they need.
+ *
+ * The collection loads asynchronously as the researcher types, so the
+ * list always reflects the search and never the whole taxonomy.
+ *
+ * ## Why the choices are reversible
+ *
+ * The step is a draft, so nothing here is stored until the researcher
+ * finishes the onboarding. That makes every choice reversible: a topic
+ * that was picked by mistake can be taken back, and the flow does not
+ * need a "are you sure?" for a change it can undo by pressing Finish
+ * again.
  */
 export function OnboardingInterestsStep({
-  interests,
-  onDeclare,
-  isDeclaring,
+  topicIds,
+  topicNames,
+  onAdd,
+  onRemove,
 }: OnboardingStepProps) {
   const t = useTranslations('onboarding');
-  const tCommon = useTranslations('common');
 
   const [search, setSearch] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
-  const topics = useInterestTopics({ search, enabled: adding });
+  const topics = useInterestTopics({ search });
 
-  const handleDeclare = async (topicId: string) => {
-    setActionError(null);
-    try {
-      await onDeclare(topicId);
-      setSearch('');
-    } catch {
-      setActionError(t('interestsStep.declareFailed'));
+  /*
+   * The picked topics are merged into the collection so the combobox
+   * can resolve the labels of the current selection — a picked topic
+   * that is not in the current search result still has to be shown as
+   * selected, and its name has to survive in the input.
+   */
+  const items = useMemo(() => {
+    const merged = new Map<string, { id: string; name: string }>();
+    for (const topic of topics.topics) {
+      merged.set(topic.id, { id: topic.id, name: topic.name });
+    }
+    for (const topicId of topicIds) {
+      if (!merged.has(topicId)) {
+        merged.set(topicId, {
+          id: topicId,
+          name: topicNames[topicId] ?? topicId,
+        });
+      }
+    }
+    return [...merged.values()];
+  }, [topics.topics, topicIds, topicNames]);
+
+  const collection = useMemo(
+    () =>
+      createListCollection({
+        items,
+        itemToString: (topic) => topic.name,
+        itemToValue: (topic) => topic.id,
+      }),
+    [items],
+  );
+
+  /*
+   * The combobox owns the selection while the researcher is inside the
+   * list; the draft store owns it afterwards. The diff is what turns
+   * one combobox event into the store's "add" and "remove" actions.
+   */
+  const handleValueChange = (value: string[]) => {
+    const selected = new Set(value);
+    for (const topicId of topicIds) {
+      if (!selected.has(topicId)) {
+        onRemove(topicId);
+      }
+    }
+    for (const topicId of value) {
+      if (!topicIds.includes(topicId)) {
+        const topic = items.find((candidate) => candidate.id === topicId);
+        if (topic) {
+          onAdd(topic.id, topic.name);
+        }
+      }
     }
   };
 
@@ -64,117 +135,108 @@ export function OnboardingInterestsStep({
         </Text>
       </Box>
 
-      {actionError ? (
-        <ErrorState
-          title={t('interestsStep.declareFailed')}
-          message={actionError}
-        />
-      ) : null}
-
       <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
         <Flex gap="2" align="center" flexWrap="wrap">
           <Heading as="h3" size="sm" fontWeight="bold">
-            {t('interestsStep.selected', { count: interests.length })}
+            {t('interestsStep.selected', { count: topicIds.length })}
           </Heading>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => setAdding((open) => !open)}
-            ml="auto"
-          >
-            {adding ? <Search /> : <Plus />}
-            {adding ? tCommon('close') : t('interestsStep.add')}
-          </Button>
         </Flex>
 
-        {adding ? (
-          <Box mt="4">
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t('interestsStep.searchPlaceholder')}
-              aria-label={t('interestsStep.searchPlaceholder')}
-            />
-
-            {topics.isLoading ? (
-              <Text textStyle="sm" color="fg.muted" mt="3">
-                {t('interestsStep.searching')}
-              </Text>
-            ) : null}
-
-            {topics.isFailed ? (
-              <Box mt="3">
-                <ErrorState
-                  title={t('interestsStep.searchFailed')}
-                  onRetry={() => void topics.refetch()}
-                />
-              </Box>
-            ) : null}
-
-            {!topics.isLoading &&
-            !topics.isFailed &&
-            topics.topics.length === 0 ? (
-              <Box mt="3">
-                <EmptyState
-                  title={t('interestsStep.noTopicsTitle')}
-                  message={t('interestsStep.noTopicsMessage')}
-                />
-              </Box>
-            ) : null}
-
-            {topics.topics.length > 0 ? (
-              <Stack
-                gap="0"
-                mt="3"
-                maxH="64"
-                overflowY="auto"
-                borderWidth="1px"
-                borderColor="border"
-              >
-                {topics.topics.map((topic) => {
-                  const isSelected = interests.some(
-                    (interest) => interest.topicId === topic.id,
-                  );
-                  return (
-                    <Button
-                      key={topic.id}
-                      variant={isSelected ? 'solid' : 'ghost'}
-                      layerStyle={isSelected ? undefined : 'interactiveRow'}
-                      justifyContent="flex-start"
-                      disabled={isSelected || isDeclaring}
-                      onClick={() => void handleDeclare(topic.id)}
-                    >
-                      {topic.name}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            ) : null}
-          </Box>
-        ) : null}
-
-        {interests.length === 0 ? (
-          <Box mt="4">
-            <EmptyState
-              title={t('interestsStep.emptyTitle')}
-              message={t('interestsStep.emptyMessage')}
-            />
-          </Box>
-        ) : (
-          <Stack gap="2" mt="4">
-            {interests.map((interest) => (
-              <Flex key={interest.topicId} gap="2" align="baseline" wrap="wrap">
-                <Badge colorPalette="green" size="sm" variant="surface">
-                  {interest.topicName}
+        <Combobox.Root
+          multiple
+          collection={collection}
+          variant="subtle"
+          openOnClick
+          loading={topics.isLoading}
+          value={topicIds}
+          inputValue={search}
+          onInputValueChange={({ inputValue }) => setSearch(inputValue)}
+          onValueChange={({ value }) => handleValueChange(value)}
+        >
+          {/*
+           * The picked topics are shown as chips above the input, the
+           * way a multi-select is expected to show them: the researcher
+           * sees the whole selection at a glance, and can take a pick
+           * back without opening the list.
+           */}
+          {topicIds.length > 0 && (
+            <Wrap gap="2" mt="3">
+              {topicIds.map((topicId) => (
+                <Badge
+                  key={topicId}
+                  colorPalette="green"
+                  size="sm"
+                  variant="surface"
+                  display="inline-flex"
+                  alignItems="center"
+                  gap="1"
+                >
+                  {topicNames[topicId] ?? topicId}
+                  <IconButton
+                    aria-label={t('interestsStep.remove')}
+                    variant="ghost"
+                    size="2xs"
+                    onClick={() => onRemove(topicId)}
+                  >
+                    <X />
+                  </IconButton>
                 </Badge>
-                {interest.topicPath ? (
-                  <Text textStyle="xs" color="fg.muted">
-                    {interest.topicPath}
-                  </Text>
-                ) : null}
-              </Flex>
-            ))}
-          </Stack>
+              ))}
+            </Wrap>
+          )}
+
+          <Combobox.Label srOnly>
+            {t('interestsStep.searchPlaceholder')}
+          </Combobox.Label>
+          <Combobox.Control>
+            <Combobox.Input
+              placeholder={t('interestsStep.searchPlaceholder')}
+            />
+            <Combobox.IndicatorGroup>
+              <Combobox.Trigger />
+            </Combobox.IndicatorGroup>
+          </Combobox.Control>
+
+          {/*
+           * The list lives in a portal so the floating popup is not
+           * clipped by the panel it is anchored to.
+           */}
+          <Portal>
+            <Combobox.Positioner>
+              <Combobox.Content maxH="60" boxShadow="overlayPanel">
+                <Combobox.ItemGroup>
+                  <Combobox.ItemGroupLabel>
+                    {t('interestsStep.topicGroup')}
+                  </Combobox.ItemGroupLabel>
+                  {collection.items.map((topic) => (
+                    <Combobox.Item
+                      key={topic.id}
+                      item={topic}
+                      layerStyle="interactiveRow"
+                    >
+                      <Combobox.ItemIndicator>
+                        <Check />
+                      </Combobox.ItemIndicator>
+                      <Combobox.ItemText>{topic.name}</Combobox.ItemText>
+                    </Combobox.Item>
+                  ))}
+                  <Combobox.Empty>
+                    {topics.isFailed
+                      ? t('interestsStep.searchFailed')
+                      : t('interestsStep.noTopicsMessage')}
+                  </Combobox.Empty>
+                </Combobox.ItemGroup>
+              </Combobox.Content>
+            </Combobox.Positioner>
+          </Portal>
+        </Combobox.Root>
+
+        {topicIds.length === 0 && (
+          <Box mt="4">
+            <Text textStyle="sm" color="fg.muted">
+              {t('interestsStep.emptyMessage')}
+            </Text>
+          </Box>
         )}
       </Box>
     </Stack>

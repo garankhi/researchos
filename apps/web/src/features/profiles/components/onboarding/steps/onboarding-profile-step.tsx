@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Box, Button, Flex, Heading, Stack, Text } from '@chakra-ui/react';
@@ -13,6 +13,7 @@ import {
 } from '../../../schemas/onboarding-profile.schema';
 import { availabilityStatusValues } from '../../../schemas/profile-form.schema';
 import type { ProfileResponseDto } from '../../../types';
+import type { OnboardingDraftProfileValues } from '../../../store/onboarding-draft-store';
 
 /**
  * The props of the profile step.
@@ -26,11 +27,16 @@ export interface OnboardingProfileStepProps {
   openAlexOrcid: string | null;
   /** The OpenAlex author id the researcher confirmed, if any. */
   confirmedAuthorId: string | null;
-  /** Whether the profile write is in flight. */
-  isSaving: boolean;
-  /** Writes the profile. */
-  onSave: (values: OnboardingProfileValues) => Promise<void>;
-  /** Leaves the step without writing anything. */
+  /**
+   * The values the researcher already entered in the draft.
+   *
+   * They are prefilled into the form, so a researcher who goes back to
+   * the step finds their own text rather than the prefilled one.
+   */
+  draftValues: OnboardingDraftProfileValues | null;
+  /** Records the values in the draft. */
+  onSave: (values: OnboardingDraftProfileValues) => void;
+  /** Leaves the step without recording anything. */
   onSkip: () => void;
 }
 
@@ -72,7 +78,7 @@ export function OnboardingProfileStep({
   prefillFromOpenAlex,
   openAlexOrcid,
   confirmedAuthorId,
-  isSaving,
+  draftValues,
   onSave,
   onSkip,
 }: OnboardingProfileStepProps) {
@@ -81,32 +87,55 @@ export function OnboardingProfileStep({
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  /*
+   * The draft wins over the prefilled values: a researcher who typed
+   * something and came back finds their own text, not the one OpenAlex
+   * suggested.
+   */
   const defaults: OnboardingProfileValues = {
-    fullName: profile?.fullName ?? '',
-    departmentUnit: profile?.departmentUnit ?? '',
-    academicTitle: profile?.academicTitle ?? '',
-    academicDegree: profile?.academicDegree ?? '',
-    orcidId: bareOrcid(
-      prefillFromOpenAlex ? openAlexOrcid : profile?.orcidId,
-    ),
-    bio: profile?.bio ?? '',
-    availabilityStatus: profile?.availabilityStatus ?? 'NOT_AVAILABLE',
-    googleScholarUrl: profile?.googleScholarUrl ?? '',
-    scopusAuthorId: profile?.scopusAuthorId ?? '',
+    fullName: draftValues?.fullName ?? profile?.fullName ?? '',
+    departmentUnit:
+      draftValues?.departmentUnit ?? profile?.departmentUnit ?? '',
+    academicTitle: draftValues?.academicTitle ?? profile?.academicTitle ?? '',
+    academicDegree:
+      draftValues?.academicDegree ?? profile?.academicDegree ?? '',
+    orcidId:
+      draftValues?.orcidId ??
+      bareOrcid(
+        prefillFromOpenAlex ? openAlexOrcid : profile?.orcidId,
+      ),
+    bio: draftValues?.bio ?? profile?.bio ?? '',
+    availabilityStatus:
+      draftValues?.availabilityStatus ??
+      profile?.availabilityStatus ??
+      'NOT_AVAILABLE',    googleScholarUrl:
+      draftValues?.googleScholarUrl ?? profile?.googleScholarUrl ?? '',
+    scopusAuthorId: draftValues?.scopusAuthorId ?? profile?.scopusAuthorId ?? '',
   };
 
-  const { control, handleSubmit } = useForm<OnboardingProfileValues>({
+  const { control, handleSubmit, reset } = useForm<OnboardingProfileValues>({
     resolver: zodResolver(onboardingProfileSchema),
     defaultValues: defaults,
   });
 
-  const submit = handleSubmit(async (values) => {
+  /*
+   * The form is re-seeded when the draft changes, so the values the
+   * researcher typed in a previous visit to the step are what they see.
+   */
+  useEffect(() => {
+    reset(defaults);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    draftValues,
+    profile?.fullName,
+    profile?.departmentUnit,
+    profile?.orcidId,
+    openAlexOrcid,
+  ]);
+
+  const submit = handleSubmit((values) => {
     setSubmitError(null);
-    try {
-      await onSave(values);
-    } catch {
-      setSubmitError(t('profileStep.failed'));
-    }
+    onSave(values as OnboardingDraftProfileValues);
   });
 
   return (
@@ -215,9 +244,7 @@ export function OnboardingProfileStep({
               <Button type="button" variant="outline" onClick={onSkip}>
                 {t('profileStep.skip')}
               </Button>
-              <Button type="submit" loading={isSaving}>
-                {t('profileStep.save')}
-              </Button>
+              <Button type="submit">{t('profileStep.save')}</Button>
             </Flex>
           </Stack>
         </form>

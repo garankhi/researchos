@@ -11,8 +11,27 @@ import { PullOpenAlexWorksDto } from './dto/pull-openalex-works.dto.js';
 import { PullOpenAlexWorksResultDto } from './dto/pull-openalex-works-result.dto.js';
 import { OpenAlexIngestService } from './openalex-ingest.service.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
+import { OpenAlexClient } from './openalex.client.js';
 import { shortAuthorId, type ResearcherIdentity } from './openalex.identity.js';
 import type { OpenAlexAuthor, OpenAlexWork } from './openalex.types.js';
+
+/**
+ * The outcome of pulling only the works the researcher decided on.
+ *
+ * The output ids are what the decisions are applied to: the decisions
+ * travel as OpenAlex work ids, and the accept and the reject need the
+ * platform's candidate id.
+ */
+export interface DecidedWorksPullResult {
+  /** How the researcher was resolved: the confirmed author, or the name. */
+  mode: 'AUTHOR_ID' | 'ORCID' | 'NAME';
+  /** The OpenAlex author the works were pulled for, when there was one. */
+  authorId: string | null;
+  /** The platform candidate id of every pulled work, by OpenAlex id. */
+  outputIds: Map<string, string>;
+  /** The OpenAlex ids that could not be pulled, and were skipped. */
+  skipped: string[];
+}
 
 /**
  * The pull routes of the OpenAlex module.
@@ -35,6 +54,7 @@ export class OpenAlexPullService {
     private readonly prisma: PrismaService,
     private readonly lookup: OpenAlexLookupService,
     private readonly ingest: OpenAlexIngestService,
+    private readonly client: OpenAlexClient,
   ) {}
 
   /**
@@ -64,6 +84,94 @@ export class OpenAlexPullService {
   }
 
   /**
+   * Pulls only the works the researcher decided on.
+   *
+   * ## Why this exists beside `pull`
+   *
+   * `pull` imports everything OpenAlex holds for the researcher. That is
+   * the right behaviour for the "fetch more works" button, where the
+   * point is to populate the review queue. It is the wrong behaviour for
+   * the onboarding, where the researcher has already looked at the list
+   * and picked the ones that are theirs — importing the rest would
+   * leave candidates they never asked for sitting in their queue.
+   *
+   * ## How the works are found
+   *
+   * The wizard showed the works from the cached listing, so the same
+   * listing is consulted first and only the works that are actually
+   * missing are fetched from OpenAlex. A work the researcher saw but
+   * that OpenAlex no longer returns is skipped rather than failing the
+   * whole finalize.
+   *
+   * The works that are fetched individually are the ones the researcher
+   * decided on but the cached listing did not carry — the preview is a
+   * snapshot, and OpenAlex may have changed since.
+   */
+  async pullDecidedWorks(
+    userId: string,
+    workIds: string[],
+    authorId?: string,
+  ): Promise<DecidedWorksPullResult> {
+    const identity = await this.resolveIdentity(userId);
+    const author = shortAuthorId(authorId) ?? shortAuthorId(identity.openAlexAuthorId);
+
+    const wanted = new Set<string>();
+    for (const raw of workIds) {
+      const short = shortAuthorId(raw);
+      if (short !== null) {
+        wanted.add(short);
+      }
+    }
+
+    const result: DecidedWorksPullResult = {
+      mode: author ? 'AUTHOR_ID' : 'NAME',
+      authorId: author,
+      outputIds: new Map<string, string>(),
+      skipped: [],
+    };
+    if (wanted.size === 0) {
+      return result;
+    }
+
+    // The cached listing is the work the wizard showed. Whatever it
+    // carries is used as is; the rest is fetched one by one.
+    const cached = author
+      ? await this.lookup.listWorksForAuthorCached(author)
+      : [];
+    const fromCache = new Map<string, OpenAlexWork>();
+    for (const work of cached) {
+      const key = work.shortId || work.id;
+      if (wanted.has(key)) {
+        fromCache.set(key, work);
+      }
+    }
+
+    const missing = [...wanted].filter((key) => !fromCache.has(key));
+
+    for (const work of fromCache.values()) {
+      const ingested = await this.ingest.upsertWork(userId, work);
+      result.outputIds.set(work.shortId || work.id, ingested.outputId);
+    }
+
+    for (const key of missing) {
+      let work: OpenAlexWork;
+      try {
+        work = await this.client.getWork(key);
+      } catch {
+        // OpenAlex no longer has this work, or it was never there. The
+        // researcher's decision on it cannot be applied, so it is
+        // skipped — one stale entry must not fail the whole finalize.
+        result.skipped.push(key);
+        continue;
+      }
+      const ingested = await this.ingest.upsertWork(userId, work);
+      result.outputIds.set(work.shortId || work.id, ingested.outputId);
+    }
+
+    return result;
+  }
+
+  /**
    * The works OpenAlex holds for the researcher, before the pull.
    *
    * The author id may be given explicitly — that is the onboarding
@@ -77,24 +185,26 @@ export class OpenAlexPullService {
   ): Promise<OpenAlexWorkPreviewDto[]> {
     const picked = shortAuthorId(authorId);
     if (picked !== null) {
-      const works = await this.lookup.findWorksForAuthor(picked);
-      return works.map(toWorkPreview);
+      // The cached path: the finalize call reads the same listing, so
+      // OpenAlex is asked for the bibliography once, not twice.
+      const works = await this.lookup.listWorksForAuthorCached(picked);
+      return works.map(toPreviewFromWork);
     }
 
     const identity = await this.resolveIdentity(userId);
     if (identity.openAlexAuthorId) {
-      const works = await this.lookup.findWorksForAuthor(
+      const works = await this.lookup.listWorksForAuthorCached(
         identity.openAlexAuthorId,
       );
-      return works.map(toWorkPreview);
+      return works.map(toPreviewFromWork);
     }
     if (identity.orcid) {
       const author = await this.lookup.findCandidates(userId);
       if (author.mode === 'ORCID') {
-        const works = await this.lookup.findWorksForAuthor(
+        const works = await this.lookup.listWorksForAuthorCached(
           author.author.shortId || author.author.id,
         );
-        return works.map(toWorkPreview);
+        return works.map(toPreviewFromWork);
       }
     }
     const works = await this.lookup.findWorksByAuthorName(identity.name);
@@ -179,7 +289,7 @@ export class OpenAlexPullService {
     works: OpenAlexWork[];
   }> {
     if (identity.openAlexAuthorId) {
-      const works = await this.lookup.listWorksForAuthor(
+      const works = await this.lookup.listWorksForAuthorCached(
         identity.openAlexAuthorId,
         { identity },
       );
@@ -195,7 +305,7 @@ export class OpenAlexPullService {
       // takes over. `findCandidates` already falls through to it.
       const author = await this.lookup.findCandidates(userId);
       if (author.mode === 'ORCID') {
-        const works = await this.lookup.listWorksForAuthor(
+        const works = await this.lookup.listWorksForAuthorCached(
           author.author.shortId || author.author.id,
           { identity },
         );
@@ -277,5 +387,26 @@ function toWorkPreview(work: {
     outputType: work.outputType,
     venue: work.venue,
     confirmed: work.confirmed,
+  };
+}
+
+/**
+ * The preview of a raw OpenAlex work.
+ *
+ * The cached path hands over the raw works rather than their previews,
+ * so they are shaped here. `confirmed` is true because a work that came
+ * out of an author listing was resolved through that author — the
+ * researcher's own confirmed identifier, not a name guess.
+ */
+function toPreviewFromWork(work: OpenAlexWork): OpenAlexWorkPreviewDto {
+  return {
+    workId: work.id,
+    shortId: work.shortId,
+    title: work.title,
+    doi: work.doi,
+    publicationYear: work.publicationYear,
+    outputType: work.outputType,
+    venue: work.venue,
+    confirmed: true,
   };
 }

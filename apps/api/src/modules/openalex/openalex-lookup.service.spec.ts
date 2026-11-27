@@ -5,6 +5,7 @@ import { PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
+import { OpenAlexWorksCache } from './openalex-works-cache.js';
 import { OpenAlexClient } from './openalex.client.js';
 import type {
   OpenAlexAuthor,
@@ -125,7 +126,21 @@ function makeService(deps: {
   );
   vi.spyOn(client, 'searchAuthors').mockResolvedValue(deps.searched ?? []);
 
-  return { service: new OpenAlexLookupService(prisma, client), client };
+  /*
+   * The cache is a no-op here: the tests are about the lookup's own
+   * behaviour, and a cache that never holds anything keeps the fetch
+   * path under test.
+   */
+  const cache = {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => undefined),
+    drop: vi.fn(async () => undefined),
+  } as unknown as OpenAlexWorksCache;
+
+  return {
+    service: new OpenAlexLookupService(prisma, client, cache),
+    client,
+  };
 }
 
 function profileWith(

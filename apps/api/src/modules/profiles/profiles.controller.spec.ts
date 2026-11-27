@@ -4,8 +4,11 @@ import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { describe, expect, it, vi } from 'vitest';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
+import { OnboardingFinalizeService } from './onboarding-finalize.service.js';
 import { ProfilesController } from './profiles.controller.js';
 import { ProfilesService } from './profiles.service.js';
+import { OpenAlexCandidatesService } from '../openalex/openalex-candidates.service.js';
+import { OpenAlexPullService } from '../openalex/openalex-pull.service.js';
 
 describe('ProfilesController', () => {
   const callerId = 'u0000000-0000-0000-0000-000000000001';
@@ -125,7 +128,16 @@ describe('ProfilesController', () => {
       controllers: [ProfilesController],
       providers: [
         ProfilesService,
+        OnboardingFinalizeService,
         { provide: PrismaService, useValue: prismaMock },
+        {
+          provide: OpenAlexPullService,
+          useValue: { pullDecidedWorks: vi.fn() },
+        },
+        {
+          provide: OpenAlexCandidatesService,
+          useValue: { accept: vi.fn(), reject: vi.fn() },
+        },
       ],
     }).compile();
 
