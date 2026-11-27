@@ -59,6 +59,32 @@ export class OpenAlexWorkPreviewDto {
 
   @ApiProperty({
     description:
+      'Abstract of the work, or null when OpenAlex reports none. OpenAlex stores abstracts as an inverted index, so this is the reconstructed text.',
+    type: String,
+    nullable: true,
+    example: 'This study examines collaborative reading strategies…',
+  })
+  abstract: string | null;
+
+  @ApiProperty({
+    description:
+      'Author display names of the work, in byline order. Empty when OpenAlex reports no authorship.',
+    type: [String],
+    example: ['Nguyen Van An', 'Tran Thi B'],
+  })
+  authors: string[];
+
+  @ApiProperty({
+    description:
+      'Landing page URL of the work, or null when OpenAlex provides none.',
+    type: String,
+    nullable: true,
+    example: 'https://doi.org/10.1234/example',
+  })
+  url: string | null;
+
+  @ApiProperty({
+    description:
       'Whether the work was resolved through a confirmed identifier. A name-only result is never confirmed.',
     example: false,
   })

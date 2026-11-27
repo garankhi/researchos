@@ -14346,6 +14346,29 @@
             "nullable": true,
             "example": "Journal of Applied Research"
           },
+          "abstract": {
+            "type": "string",
+            "description": "Abstract of the work, or null when OpenAlex reports none. OpenAlex stores abstracts as an inverted index, so this is the reconstructed text.",
+            "nullable": true,
+            "example": "This study examines collaborative reading strategies…"
+          },
+          "authors": {
+            "description": "Author display names of the work, in byline order. Empty when OpenAlex reports no authorship.",
+            "example": [
+              "Nguyen Van An",
+              "Tran Thi B"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "description": "Landing page URL of the work, or null when OpenAlex provides none.",
+            "nullable": true,
+            "example": "https://doi.org/10.1234/example"
+          },
           "confirmed": {
             "type": "boolean",
             "description": "Whether the work was resolved through a confirmed identifier. A name-only result is never confirmed.",
@@ -14360,6 +14383,9 @@
           "publicationYear",
           "outputType",
           "venue",
+          "abstract",
+          "authors",
+          "url",
           "confirmed"
         ]
       },

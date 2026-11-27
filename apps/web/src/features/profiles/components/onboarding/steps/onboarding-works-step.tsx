@@ -6,15 +6,19 @@ import {
   Button,
   Flex,
   Heading,
+  Icon,
+  Link,
   RadioGroup,
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { Check, X } from 'lucide-react';
+import { BookOpen, Check, ExternalLink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
+import { doiUrl } from '@/lib/doi-url';
 import type { OnboardingWorkPreview } from '../../../hooks/use-onboarding';
 import type { OnboardingDraftWorkDecision } from '../../../store/onboarding-draft-store';
+import { OnboardingWorksStepSkeleton } from './onboarding-step-skeletons';
 
 /**
  * The props of the works step.
@@ -97,9 +101,7 @@ export function OnboardingWorksStep({
         <RadioGroup.Root
           value={visibility}
           onValueChange={(details) =>
-            onVisibilityChange(
-              details.value as 'PRIVATE' | 'FPTU_COMMUNITY',
-            )
+            onVisibilityChange(details.value as 'PRIVATE' | 'FPTU_COMMUNITY')
           }
         >
           <Stack gap="3">
@@ -142,9 +144,14 @@ export function OnboardingWorksStep({
       ) : null}
 
       {isLoading ? (
-        <Text textStyle="sm" color="fg.muted">
-          {t('worksStep.loading')}
-        </Text>
+        /*
+         * The preview is still coming. The step shows the shape of what
+         * is arriving — the visibility picker and the work cards — so
+         * the layout does not jump when the works land, and so the
+         * researcher sees the pull running rather than reading a line of
+         * text and guessing.
+         */
+        <OnboardingWorksStepSkeleton />
       ) : null}
 
       {!isLoading && !isFailed && works.length === 0 ? (
@@ -159,6 +166,7 @@ export function OnboardingWorksStep({
           const decision = decisions[work.workId];
           const isAccepted = decision?.accepted === true;
           const isRejected = decision?.accepted === false;
+          const authorsStr = work.authors.join(', ');
 
           return (
             <Box
@@ -175,7 +183,18 @@ export function OnboardingWorksStep({
                     : 'transparent'
               }
             >
-              <Stack gap="2">
+              {/*
+               * The card carries the same evidence the profile's OpenAlex
+               * tab shows: the type and the year, the title, the venue,
+               * the byline, the abstract, and the links out to the DOI
+               * and to OpenAlex.
+               *
+               * It has to. The researcher is being asked to say whether a
+               * paper is theirs, and they can only answer that from the
+               * paper — a title and a year is not enough to recognise a
+               * paper whose author list they half remember.
+               */}
+              <Stack gap="2.5">
                 <Flex gap="2" align="center" flexWrap="wrap">
                   {work.outputType ? (
                     <Badge colorPalette="blue">{work.outputType}</Badge>
@@ -197,44 +216,111 @@ export function OnboardingWorksStep({
                   ) : null}
                 </Flex>
 
-                <Heading as="h3" size="sm" fontWeight="bold" lineHeight="1.35">
+                <Heading as="h3" size="md" fontWeight="bold" lineHeight="1.35">
                   {work.title}
                 </Heading>
 
                 {work.venue ? (
-                  <Text textStyle="sm" color="fg.muted" fontStyle="italic">
-                    {work.venue}
+                  <Flex align="center" gap="2" textStyle="sm" color="fg.muted">
+                    <Icon
+                      as={BookOpen}
+                      boxSize="4"
+                      flexShrink={0}
+                      aria-hidden
+                    />
+                    <Text fontStyle="italic">{work.venue}</Text>
+                  </Flex>
+                ) : null}
+
+                {authorsStr ? (
+                  <Text textStyle="sm" color="fg.muted">
+                    {authorsStr}
                   </Text>
                 ) : null}
 
-                <Flex gap="2" justify="flex-end" pt="1">
-                  {decision ? (
+                {work.abstract ? (
+                  <Text
+                    textStyle="sm"
+                    color="fg.muted"
+                    lineClamp={3}
+                    lineHeight="1.55"
+                  >
+                    {work.abstract}
+                  </Text>
+                ) : null}
+
+                <Flex
+                  pt="2"
+                  gap="3"
+                  align="center"
+                  justify="space-between"
+                  flexWrap="wrap"
+                >
+                  <Flex gap="3" align="center" wrap="wrap">
+                    {work.doi ? (
+                      <Link
+                        href={doiUrl(work.doi)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        display="inline-flex"
+                        alignItems="center"
+                        gap="1"
+                        textStyle="xs"
+                        color="fg.muted"
+                        layerStyle="researchTextLink"
+                      >
+                        {`DOI: ${work.doi}`}
+                        <Icon as={ExternalLink} boxSize="3" aria-hidden />
+                      </Link>
+                    ) : null}
+
+                    {work.canonicalId ? (
+                      <Link
+                        href={work.canonicalId}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        display="inline-flex"
+                        alignItems="center"
+                        gap="1"
+                        textStyle="xs"
+                        color="fg.muted"
+                        layerStyle="researchTextLink"
+                      >
+                        OpenAlex
+                        <Icon as={ExternalLink} boxSize="3" aria-hidden />
+                      </Link>
+                    ) : null}
+                  </Flex>
+
+                  <Flex gap="2">
+                    {decision ? (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => onUndecide(work.workId)}
+                      >
+                        <X />
+                        {t('worksStep.undo')}
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       size="xs"
-                      onClick={() => onUndecide(work.workId)}
+                      onClick={() => onDecide(work.workId, false, visibility)}
+                      disabled={isRejected}
                     >
                       <X />
-                      {t('worksStep.undo')}
+                      {t('worksStep.reject')}
                     </Button>
-                  ) : null}
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => onDecide(work.workId, false, visibility)}
-                    disabled={isRejected}
-                  >
-                    <X />
-                    {t('worksStep.reject')}
-                  </Button>
-                  <Button
-                    size="xs"
-                    onClick={() => onDecide(work.workId, true, visibility)}
-                    disabled={isAccepted}
-                  >
-                    <Check />
-                    {t('worksStep.accept')}
-                  </Button>
+                    <Button
+                      size="xs"
+                      onClick={() => onDecide(work.workId, true, visibility)}
+                      disabled={isAccepted}
+                    >
+                      <Check />
+                      {t('worksStep.accept')}
+                    </Button>
+                  </Flex>
                 </Flex>
               </Stack>
             </Box>

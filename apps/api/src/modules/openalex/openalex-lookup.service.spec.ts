@@ -357,6 +357,51 @@ describe('OpenAlexLookupService', () => {
     expect(works[0]).toMatchObject({ shortId: 'W9', confirmed: false });
   });
 
+  it('carries the evidence a researcher needs to recognise a work', async () => {
+    // The abstract, the byline and the landing page are what the
+    // onboarding step shows on the work card, and what the researcher
+    // reads to decide whether a paper is theirs. A preview without them
+    // shows a title and a year, which is not enough to recognise a paper.
+    const { service } = makeService({
+      profile: profileWith(null),
+      pages: [
+        [
+          makeWork('W-evidence', {
+            abstract: 'An abstract of the work.',
+            url: 'https://example.org/the-work',
+            authors: [
+              makeAuthorEntry(1, 'Nguyen Van An'),
+              makeAuthorEntry(2, 'Tran Thi B'),
+            ],
+          }),
+        ],
+      ],
+    });
+
+    const works = await service.findWorksForAuthor('https://openalex.org/A2');
+
+    expect(works[0]).toMatchObject({
+      abstract: 'An abstract of the work.',
+      url: 'https://example.org/the-work',
+      authors: ['Nguyen Van An', 'Tran Thi B'],
+    });
+  });
+
+  it('reports a work with no abstract and no url as null rather than undefined', async () => {
+    // The wire format says `null` for an absent abstract and an absent
+    // url, and `undefined` would drop the key entirely — the generated
+    // client would then carry a field the server never sends.
+    const { service } = makeService({
+      profile: profileWith(null),
+      pages: [[makeWork('W-bare')]],
+    });
+
+    const works = await service.findWorksForAuthor('https://openalex.org/A2');
+
+    expect(works[0].abstract).toBeNull();
+    expect(works[0].url).toBeNull();
+  });
+
   it('drops a work whose byline sits at another institution', async () => {
     // The author id resolves the *work*, but the byline still has to be
     // at FPT University. A work the researcher only co-authored is

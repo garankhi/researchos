@@ -17,6 +17,7 @@ import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import type { OpenAlexAuthorCandidateDto } from '@/lib/api/models';
 import type { OnboardingDraftOpenAlexAuthor } from '../../../store/onboarding-draft-store';
 import { OnboardingAuthorDetail } from './onboarding-author-detail';
+import { OnboardingAuthorStepSkeleton } from './onboarding-step-skeletons';
 
 /**
  * The props of the author step.
@@ -153,9 +154,14 @@ export function OnboardingAuthorStep({
       ) : null}
 
       {isLoading ? (
-        <Text textStyle="sm" color="fg.muted">
-          {t('authorStep.loading')}
-        </Text>
+        /*
+         * The candidates are still coming. The step shows the shape of
+         * what is arriving — the list on the left and the evidence panel
+         * on the right — so the layout does not jump when the answers
+         * land, and so the researcher sees that the search is running
+         * rather than reading a line of text and guessing.
+         */
+        <OnboardingAuthorStepSkeleton />
       ) : null}
 
       {!isLoading && !isFailed && authors.length === 0 ? (
@@ -177,7 +183,10 @@ export function OnboardingAuthorStep({
          * goes under the list, and it follows the selection there too.
          */
         <Grid
-          templateColumns={{ base: '1fr', lg: 'minmax(0, 4.75fr) minmax(0, 6.25fr)' }}
+          templateColumns={{
+            base: '1fr',
+            lg: 'minmax(0, 4.75fr) minmax(0, 6.25fr)',
+          }}
           gap="4"
           alignItems="start"
         >
@@ -211,10 +220,7 @@ export function OnboardingAuthorStep({
             >
               <Stack gap="4">
                 {authors.map((author) => (
-                  <RadioGroup.Item
-                    key={author.shortId}
-                    value={author.shortId}
-                  >
+                  <RadioGroup.Item key={author.shortId} value={author.shortId}>
                     <RadioGroup.ItemHiddenInput />
                     <RadioGroup.ItemIndicator />
                     <Box>

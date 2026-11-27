@@ -336,7 +336,6 @@
     "authorStep": {
       "title": "Let us find your publications",
       "description": "We searched OpenAlex for your name at FPT University. Confirm the author that is yours, or skip this step — you can still import your works later. Your choice is saved when you finish.",
-      "loading": "Searching OpenAlex…",
       "emptyTitle": "No matching author found",
       "emptyMessage": "OpenAlex has no author at FPT University that matches your name. You can skip this step and search again later.",
       "affiliationMatch": "FPT University",
@@ -408,13 +407,11 @@
       "identityCard": "Your identity",
       "publicationsCard": "Your publications and availability",
       "biographyCard": "Your biography",
-      "saved": "Your information was kept. It is saved when you finish.",
       "failed": "Could not save your profile. Try again."
     },
     "worksStep": {
       "title": "Import your publications",
       "description": "These works come from OpenAlex. Accept the ones that are yours, or reject them. Only the works you decide on are imported, when you finish.",
-      "loading": "Loading your works…",
       "emptyTitle": "No works found",
       "emptyMessage": "OpenAlex has no works for you at the moment. You can fetch new ones whenever you like.",
       "visibilityLabel": "Who may see the works you accept?",

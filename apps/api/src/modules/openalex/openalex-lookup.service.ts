@@ -42,6 +42,12 @@ export interface CandidateWorkPreview {
   outputType: string;
   /** Venue or null. */
   venue: string | null;
+  /** Reconstructed abstract, or null when OpenAlex has no inverted index. */
+  abstract: string | null;
+  /** Author display names, in byline order. */
+  authors: string[];
+  /** Landing page URL, or null. */
+  url: string | null;
   /** True only when resolved through a confirmed identifier. */
   confirmed: boolean;
 }
@@ -530,6 +536,9 @@ function toPreview(
     publicationYear: work.publicationYear,
     outputType: work.outputType,
     venue: work.venue,
+    abstract: work.abstract,
+    authors: work.authors.map((author) => author.name),
+    url: work.url,
     confirmed,
   };
 }

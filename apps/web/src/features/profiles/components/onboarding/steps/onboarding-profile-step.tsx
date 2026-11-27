@@ -3,14 +3,7 @@
 import { useImperativeHandle, useMemo, useState, type Ref } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Badge,
-  Box,
-  Flex,
-  Heading,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Stack, Text } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { FormSelect, FormTextarea, FormTextField } from '@/components/ui/form';
 import { ErrorState } from '@/components/ui/feedback';
@@ -26,6 +19,7 @@ import type {
   OnboardingDraftProfileValues,
 } from '../../../store/onboarding-draft-store';
 import { OnboardingAffiliationTimeline } from './onboarding-affiliation-timeline';
+import { OnboardingProfileStepSkeleton } from './onboarding-step-skeletons';
 
 /**
  * The props of the profile step.
@@ -33,6 +27,15 @@ import { OnboardingAffiliationTimeline } from './onboarding-affiliation-timeline
 export interface OnboardingProfileStepProps {
   /** The researcher's current profile, read from the API. */
   profile: ProfileResponseDto | null;
+  /**
+   * Whether the profile is still being read.
+   *
+   * The form is prefilled from the profile, so it cannot be shown until
+   * the profile has arrived — an empty form would be prefilled a moment
+   * later, and the researcher would watch their own text move. The step
+   * shows the shape of the form instead.
+   */
+  isLoading?: boolean;
   /**
    * Whether the form was prefilled from OpenAlex.
    *
@@ -140,6 +143,7 @@ export interface OnboardingProfileFormHandle {
  */
 export function OnboardingProfileStep({
   profile,
+  isLoading = false,
   prefillFromOpenAlex,
   openAlexOrcid,
   openAlexAuthor,
@@ -243,12 +247,23 @@ export function OnboardingProfileStep({
         />
       ) : null}
 
-      <OnboardingProfileForm
-        key={formKey}
-        defaults={defaults}
-        formRef={formRef}
-        onSave={onSave}
-      />
+      {isLoading ? (
+        /*
+         * The profile is still being read, and the form is prefilled
+         * from it. Showing the form now would show it empty, and the
+         * researcher's own text would move a moment later when the
+         * prefill arrives — so the step shows the cards of the form
+         * instead, and the fields fill in once the profile does.
+         */
+        <OnboardingProfileStepSkeleton />
+      ) : (
+        <OnboardingProfileForm
+          key={formKey}
+          defaults={defaults}
+          formRef={formRef}
+          onSave={onSave}
+        />
+      )}
     </Stack>
   );
 }
@@ -556,9 +571,7 @@ function OnAlexPrefillPanel({
                 />
                 <Metric
                   label={t('hIndex')}
-                  value={
-                    counts.hIndex !== null ? String(counts.hIndex) : null
-                  }
+                  value={counts.hIndex !== null ? String(counts.hIndex) : null}
                 />
                 <Metric
                   label={t('i10Index')}
@@ -593,11 +606,7 @@ function OnAlexPrefillPanel({
               </Text>
               <Flex gap="2" flexWrap="wrap">
                 {author.nameVariants.map((variant) => (
-                  <Badge
-                    key={variant}
-                    colorPalette="purple"
-                    variant="surface"
-                  >
+                  <Badge key={variant} colorPalette="purple" variant="surface">
                     {variant}
                   </Badge>
                 ))}
@@ -612,11 +621,7 @@ function OnAlexPrefillPanel({
               </Text>
               <Flex gap="2" flexWrap="wrap">
                 {author.topics.slice(0, 8).map((topic) => (
-                  <Badge
-                    key={topic.id}
-                    colorPalette="blue"
-                    variant="surface"
-                  >
+                  <Badge key={topic.id} colorPalette="blue" variant="surface">
                     {topic.count !== null
                       ? `${topic.name} (${topic.count})`
                       : topic.name}
@@ -638,13 +643,7 @@ function OnAlexPrefillPanel({
  * zero: "no h-index" and "an h-index of zero" are different facts, and
  * the second is a claim the platform cannot make.
  */
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}) {
+function Metric({ label, value }: { label: string; value: string | null }) {
   if (value === null) {
     return null;
   }

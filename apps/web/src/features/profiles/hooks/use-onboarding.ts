@@ -65,6 +65,12 @@ export interface OnboardingWorkPreview {
   outputType: string;
   /** The venue, when OpenAlex reports one. */
   venue: string | null;
+  /** The abstract, when OpenAlex reports one. */
+  abstract: string | null;
+  /** The byline, in order. */
+  authors: string[];
+  /** The landing page, when OpenAlex reports one. */
+  url: string | null;
   /** Whether the work was resolved through a confirmed identifier. */
   confirmed: boolean;
 }
@@ -220,6 +226,9 @@ export function useOnboarding({
         publicationYear: work.publicationYear,
         outputType: work.outputType,
         venue: work.venue,
+        abstract: work.abstract,
+        authors: work.authors,
+        url: work.url,
         confirmed: work.confirmed,
       })),
     [worksQuery.data],

@@ -30,6 +30,18 @@ export interface OpenAlexWorkPreviewDto {
    * @nullable
    */
   venue: string | null;
+  /**
+   * Abstract of the work, or null when OpenAlex reports none. OpenAlex stores abstracts as an inverted index, so this is the reconstructed text.
+   * @nullable
+   */
+  abstract: string | null;
+  /** Author display names of the work, in byline order. Empty when OpenAlex reports no authorship. */
+  authors: string[];
+  /**
+   * Landing page URL of the work, or null when OpenAlex provides none.
+   * @nullable
+   */
+  url: string | null;
   /** Whether the work was resolved through a confirmed identifier. A name-only result is never confirmed. */
   confirmed: boolean;
 }

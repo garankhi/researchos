@@ -422,6 +422,9 @@ function toWorkPreview(work: {
   publicationYear: number | null;
   outputType: string;
   venue: string | null;
+  abstract: string | null;
+  authors: string[];
+  url: string | null;
   confirmed: boolean;
 }): OpenAlexWorkPreviewDto {
   return {
@@ -432,6 +435,9 @@ function toWorkPreview(work: {
     publicationYear: work.publicationYear,
     outputType: work.outputType,
     venue: work.venue,
+    abstract: work.abstract,
+    authors: work.authors,
+    url: work.url,
     confirmed: work.confirmed,
   };
 }
@@ -453,6 +459,9 @@ function toPreviewFromWork(work: OpenAlexWork): OpenAlexWorkPreviewDto {
     publicationYear: work.publicationYear,
     outputType: work.outputType,
     venue: work.venue,
+    abstract: work.abstract,
+    authors: work.authors.map((author) => author.name),
+    url: work.url,
     confirmed: true,
   };
 }

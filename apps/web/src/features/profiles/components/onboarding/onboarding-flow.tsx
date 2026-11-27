@@ -95,9 +95,7 @@ export function OnboardingFlow({
    * candidate and the Skip button leaves the step without one. The step
    * only shows the choice.
    */
-  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(
-    null,
-  );
+  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
 
   /*
    * The profile form's handle.
@@ -113,18 +111,15 @@ export function OnboardingFlow({
    * choice for the whole step — a researcher publishes their accepted
    * works the same way, or the visibility picker is noise.
    */
-  const [visibility, setVisibility] = useState<
-    'PRIVATE' | 'FPTU_COMMUNITY'
-  >('PRIVATE');
+  const [visibility, setVisibility] = useState<'PRIVATE' | 'FPTU_COMMUNITY'>(
+    'PRIVATE',
+  );
 
   /*
    * The draft is namespaced per researcher, so two accounts in the same
    * browser keep two drafts and neither sees the other's.
    */
-  const draft = useMemo(
-    () => createOnboardingDraftStore(user?.id),
-    [user?.id],
-  );
+  const draft = useMemo(() => createOnboardingDraftStore(user?.id), [user?.id]);
 
   const profileQuery = useProfile({
     userId: user?.id,
@@ -313,9 +308,17 @@ export function OnboardingFlow({
     isActive: hasUnsavedWork && !isFinalized,
   });
 
+  /*
+   * The profile values are recorded in the draft and the step moves on.
+   *
+   * There is no confirmation snackbar here: nothing was written. The
+   * draft is a scratch space until the researcher presses Finish, and
+   * the step change already says the answers were kept — a toast that
+   * says "your information was kept" while nothing was saved only
+   * invites the reader to wonder what "saved" meant.
+   */
   const handleSaveProfile = (values: OnboardingDraftProfileValues) => {
     draft.getState().setProfileValues(values);
-    showSnackbar({ message: t('profileStep.saved'), severity: 'success' });
     setStep('works');
   };
 
@@ -338,159 +341,218 @@ export function OnboardingFlow({
   };
 
   return (
-    <Container maxW={{ base: '48rem', lg: '68rem' }} py={{ base: '6', md: '10' }}>
-      <Stack gap="6">
-        <Box>
-          <Heading as="h1" size="lg" fontWeight="bold">
-            {t('title')}
-          </Heading>
-          <Text textStyle="sm" color="fg.muted" mt="2">
-            {t('description')}
-          </Text>
-        </Box>
-
-        <Progress.Root
-          value={(stepIndex / (ONBOARDING_STEPS.length - 1)) * 100}
-          size="sm"
+    /*
+     * The screen is split the way the profile page is split: a white
+     * header band that holds the framing — the welcome, the progress
+     * bar and the step buttons — and a grey canvas below that holds
+     * the work of the current step.
+     *
+     * The header is full bleed so it reads as one band across the
+     * viewport, while the content inside it stays at the same width as
+     * the profile page.
+     */
+    <Box as="main" flex="1" bg="home.background" minH="100dvh">
+      <Box bg="bg.panel" borderBottomWidth="1px" borderColor="border">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          pt={{ base: '5', md: '8' }}
+          pb={{ base: '4', md: '6' }}
         >
-          <Progress.Track>
-            <Progress.Range />
-          </Progress.Track>
-        </Progress.Root>
+          <Stack gap="6">
+            <Box>
+              <Heading as="h1" size="lg" fontWeight="bold">
+                {t('title')}
+              </Heading>
+              <Text textStyle="sm" color="fg.muted" mt="2">
+                {t('description')}
+              </Text>
+            </Box>
 
-        <Flex gap="2" flexWrap="wrap" role="tablist" aria-label={t('title')}>
-          {ONBOARDING_STEPS.map((candidate) => (
-            <Button
-              key={candidate}
-              role="tab"
-              size="xs"
-              variant={candidate === step ? 'solid' : 'ghost'}
-              aria-selected={candidate === step}
-              /*
-               * The mandatory rule stops the flow at step 1. Without it
-               * the researcher could click straight past the interests
-               * step — the Next button was disabled, but the tab was
-               * not.
-               */
-              disabled={
-                !hasMandatoryInterest && candidate !== 'interests'
-              }
-              onClick={() => setStep(candidate)}
+            {/*
+             * The progress bar.
+             *
+             * The palette is set explicitly: the body carries `gray`, so
+             * the bar would otherwise be a grey line in a screen that is
+             * otherwise blue. It is the one thing that says how far along
+             * the researcher is, and it reads as progress rather than as a
+             * divider.
+             */}
+            <Progress.Root
+              value={(stepIndex / (ONBOARDING_STEPS.length - 1)) * 100}
+              size="sm"
+              colorPalette="blue"
             >
-              {t(`steps.${candidate}.label`)}
-              {candidate === 'interests' ? (
-                <Text textStyle="xs" ms="1">
-                  {t('steps.interests.mandatory')}
-                </Text>
-              ) : null}
-            </Button>
-          ))}
-        </Flex>
+              <Progress.Track>
+                <Progress.Range />
+              </Progress.Track>
+            </Progress.Root>
 
-        {step === 'interests' ? (
-          <OnboardingInterestsStep
-            topicIds={onboarding.topicIds}
-            topicNames={topicNames}
-            onAdd={(topicId, topicName) =>
-              draft.getState().addTopic(topicId, topicName)
-            }
-            onRemove={(topicId) => draft.getState().removeTopic(topicId)}
-          />
-        ) : null}
+            <Flex
+              gap="2"
+              flexWrap="wrap"
+              role="tablist"
+              aria-label={t('title')}
+            >
+              {ONBOARDING_STEPS.map((candidate) => (
+                <Button
+                  key={candidate}
+                  role="tab"
+                  size="xs"
+                  variant={candidate === step ? 'solid' : 'ghost'}
+                  aria-selected={candidate === step}
+                  /*
+                   * The mandatory rule stops the flow at step 1. Without it
+                   * the researcher could click straight past the interests
+                   * step — the Next button was disabled, but the tab was
+                   * not.
+                   */
+                  disabled={!hasMandatoryInterest && candidate !== 'interests'}
+                  onClick={() => setStep(candidate)}
+                >
+                  {t(`steps.${candidate}.label`)}
+                  {candidate === 'interests' ? (
+                    <Text textStyle="xs" ms="1">
+                      {t('steps.interests.mandatory')}
+                    </Text>
+                  ) : null}
+                </Button>
+              ))}
+            </Flex>
+          </Stack>
+        </Container>
+      </Box>
 
-        {step === 'author' ? (
-          <OnboardingAuthorStep
-            authors={onboarding.authors}
-            mode={onboarding.authorMode}
-            isLoading={onboarding.isLoadingAuthors}
-            isFailed={onboarding.isFailedAuthors}
-            onRetry={onboarding.refetchAuthors}
-            confirmedAuthorId={onboarding.confirmedAuthorId}
-            selectedAuthorId={selectedAuthorId}
-            onSelect={setSelectedAuthorId}
-          />
-        ) : null}
-
-        {step === 'profile' ? (
-          <OnboardingProfileStep
-            profile={profileQuery.profile ?? null}
-            /*
-             * The flag says whether the form was prefilled from OpenAlex,
-             * and only the record can do that. A confirmed author id on
-             * its own is not enough: a researcher who reaches this step
-             * through the step tabs never triggered the author step's
-             * confirm, so the record was never fetched and nothing was
-             * prefilled — the flag must not claim otherwise.
-             */
-            prefillFromOpenAlex={openAlexAuthor !== null}
-            openAlexOrcid={onboarding.openAlexOrcid}
-            openAlexAuthor={openAlexAuthor}
-            confirmedAuthorId={onboarding.confirmedAuthorId}
-            draftValues={draftProfileValues}
-            affiliationValues={draftAffiliationValues}
-            onAffiliationChange={(values) =>
-              draft.getState().setAffiliationValues(values)
-            }
-            onSave={handleSaveProfile}
-            formRef={profileFormRef}
-          />
-        ) : null}
-
-        {step === 'works' ? (
-          <OnboardingWorksStep
-            works={onboarding.works}
-            isLoading={onboarding.isLoadingWorks}
-            isFailed={onboarding.isFailedWorks}
-            onRetry={onboarding.refetchWorks}
-            decisions={onboarding.workDecisions}
-            onDecide={(workId, accepted, visibility) =>
-              draft.getState().decideWork(workId, accepted, visibility)
-            }
-            onUndecide={(workId) => draft.getState().undecideWork(workId)}
-            visibility={visibility}
-            onVisibilityChange={setVisibility}
-          />
-        ) : null}
-
-        {/*
-         * The footer. Every step has the same two buttons: Back on the
-         * left, and Skip and Next on the right.
-         *
-         * The Skip button sits immediately left of Next, because the
-         * two are alternatives — skip the step, or complete it and move
-         * on — and the researcher should read them as a pair rather
-         * than hunt for a third button inside the step itself.
-         */}
-        <Flex justify="space-between" gap="3" flexWrap="wrap">
-          <Button variant="outline" onClick={goBack} disabled={stepIndex === 0}>
-            <ArrowLeft />
-            {tCommon('back')}
-          </Button>
-
-          <Flex gap="3">
-            {canSkip ? (
-              <Button variant="outline" onClick={handleSkip}>
-                {t('skip')}
-              </Button>
+      {/*
+       * The body of the flow. It sits on the grey canvas — the same
+       * grey the profile page uses for its workspace — so the white
+       * header above reads as a separate band rather than as a
+       * continuation of the same sheet.
+       */}
+      <Box bg="home.background" flex="1">
+        <Container
+          maxW="64rem"
+          px={{ base: '4', md: '6' }}
+          py={{ base: '4', lg: '6' }}
+        >
+          <Stack gap="6">
+            {step === 'interests' ? (
+              <OnboardingInterestsStep
+                topicIds={onboarding.topicIds}
+                topicNames={topicNames}
+                onAdd={(topicId, topicName) =>
+                  draft.getState().addTopic(topicId, topicName)
+                }
+                onRemove={(topicId) => draft.getState().removeTopic(topicId)}
+              />
             ) : null}
 
-            {isLastStep ? (
+            {step === 'author' ? (
+              <OnboardingAuthorStep
+                authors={onboarding.authors}
+                mode={onboarding.authorMode}
+                isLoading={onboarding.isLoadingAuthors}
+                isFailed={onboarding.isFailedAuthors}
+                onRetry={onboarding.refetchAuthors}
+                confirmedAuthorId={onboarding.confirmedAuthorId}
+                selectedAuthorId={selectedAuthorId}
+                onSelect={setSelectedAuthorId}
+              />
+            ) : null}
+
+            {step === 'profile' ? (
+              <OnboardingProfileStep
+                profile={profileQuery.profile ?? null}
+                /*
+                 * The profile is still coming. The step shows the cards
+                 * of the form rather than an empty page, so the
+                 * researcher sees the fields arriving instead of a
+                 * blank screen that fills in later.
+                 */
+                isLoading={profileQuery.isLoading}
+                /*
+                 * The flag says whether the form was prefilled from OpenAlex,
+                 * and only the record can do that. A confirmed author id on
+                 * its own is not enough: a researcher who reaches this step
+                 * through the step tabs never triggered the author step's
+                 * confirm, so the record was never fetched and nothing was
+                 * prefilled — the flag must not claim otherwise.
+                 */
+                prefillFromOpenAlex={openAlexAuthor !== null}
+                openAlexOrcid={onboarding.openAlexOrcid}
+                openAlexAuthor={openAlexAuthor}
+                confirmedAuthorId={onboarding.confirmedAuthorId}
+                draftValues={draftProfileValues}
+                affiliationValues={draftAffiliationValues}
+                onAffiliationChange={(values) =>
+                  draft.getState().setAffiliationValues(values)
+                }
+                onSave={handleSaveProfile}
+                formRef={profileFormRef}
+              />
+            ) : null}
+
+            {step === 'works' ? (
+              <OnboardingWorksStep
+                works={onboarding.works}
+                isLoading={onboarding.isLoadingWorks}
+                isFailed={onboarding.isFailedWorks}
+                onRetry={onboarding.refetchWorks}
+                decisions={onboarding.workDecisions}
+                onDecide={(workId, accepted, visibility) =>
+                  draft.getState().decideWork(workId, accepted, visibility)
+                }
+                onUndecide={(workId) => draft.getState().undecideWork(workId)}
+                visibility={visibility}
+                onVisibilityChange={setVisibility}
+              />
+            ) : null}
+
+            {/*
+             * The footer. Every step has the same two buttons: Back on the
+             * left, and Skip and Next on the right.
+             *
+             * The Skip button sits immediately left of Next, because the
+             * two are alternatives — skip the step, or complete it and move
+             * on — and the researcher should read them as a pair rather
+             * than hunt for a third button inside the step itself.
+             */}
+            <Flex justify="space-between" gap="3" flexWrap="wrap">
               <Button
-                onClick={() => void handleFinish()}
-                loading={onboarding.isFinalizing}
+                variant="outline"
+                onClick={goBack}
+                disabled={stepIndex === 0}
               >
-                <Check />
-                {t('finish')}
+                <ArrowLeft />
+                {tCommon('back')}
               </Button>
-            ) : (
-              <Button onClick={handleNext} disabled={!canAdvance}>
-                {tCommon('next')}
-                <ArrowRight />
-              </Button>
-            )}
-          </Flex>
-        </Flex>
-      </Stack>
+
+              <Flex gap="3">
+                {canSkip ? (
+                  <Button variant="outline" onClick={handleSkip}>
+                    {t('skip')}
+                  </Button>
+                ) : null}
+
+                {isLastStep ? (
+                  <Button
+                    onClick={() => void handleFinish()}
+                    loading={onboarding.isFinalizing}
+                  >
+                    <Check />
+                    {t('finish')}
+                  </Button>
+                ) : (
+                  <Button onClick={handleNext} disabled={!canAdvance}>
+                    {tCommon('next')}
+                    <ArrowRight />
+                  </Button>
+                )}
+              </Flex>
+            </Flex>
+          </Stack>
+        </Container>
+      </Box>
 
       {/*
        * The leave guard's confirmation. It replaces the browser's own
@@ -508,6 +570,6 @@ export function OnboardingFlow({
         colorPalette="orange"
         role="alertdialog"
       />
-    </Container>
+    </Box>
   );
 }
