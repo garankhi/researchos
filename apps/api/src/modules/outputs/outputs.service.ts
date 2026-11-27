@@ -520,8 +520,16 @@ export class OutputsService {
     }
 
     if (query.groupId) {
+      // A group's feed lists the works that group owns - the works whose
+      // scope names it - and the works it has explicitly accepted.
+      //
+      // The affiliation banner is not ownership. A personal work that
+      // merely carries a group's banner was never posted into that group,
+      // and a group does not speak for it: the filter used to match the
+      // banner, which put every banner-carrying personal work into the
+      // group's feed, where every member could read it.
       conditions.push(
-        Prisma.sql`(o.access_group_id = ${query.groupId}::uuid OR EXISTS (
+        Prisma.sql`(o.scope_group_id = ${query.groupId}::uuid OR EXISTS (
           SELECT 1 FROM group_output_links gol
           WHERE gol.output_id = o.id AND gol.group_id = ${query.groupId}::uuid AND gol.status = 'ACCEPTED'
         ))`,

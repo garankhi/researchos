@@ -41,9 +41,10 @@ DECLARE
  grp_project uuid=gen_random_uuid(); standalone_project uuid=gen_random_uuid();
  personal_work uuid=gen_random_uuid(); group_work uuid=gen_random_uuid();
  grp_project_work uuid=gen_random_uuid(); standalone_work uuid=gen_random_uuid();
- banner_work uuid=gen_random_uuid();
+ banner_work uuid=gen_random_uuid(); feed_banner_work uuid=gen_random_uuid();
  rev_personal uuid=gen_random_uuid(); rev_group uuid=gen_random_uuid();
  rev_grp_project uuid=gen_random_uuid(); rev_standalone uuid=gen_random_uuid();
+ rev_feed_banner uuid=gen_random_uuid();
 BEGIN
  INSERT INTO users(id,user_type,email,full_name,department_unit) VALUES
  (author,'FACULTY','scope-author@test.invalid','Author','FPTU'),
@@ -263,6 +264,58 @@ BEGIN
    EXISTS(SELECT 1 FROM visible_search_index(project_member) WHERE entity_type='OUTPUT' AND entity_id=standalone_work)
    AND NOT EXISTS(SELECT 1 FROM visible_search_index(group_member) WHERE entity_type='OUTPUT' AND entity_id=standalone_work),
    'the search index follows the standalone project membership');
+
+ -- ---------------------------------------------------------------------
+ -- A container's feed lists the works it owns, and only those.
+ --
+ -- The affiliation banner is display information: it may name a group
+ -- without the group owning the work. So it must not decide membership of
+ -- the group's feed. The feed is the query the API runs for a group, so
+ -- a work that leaks in here is readable by every member of that group.
+ -- ---------------------------------------------------------------------
+ -- A personal work that merely carries the banner, published to the
+ -- community so that anybody could read it.
+ INSERT INTO research_outputs(id,owner_id,created_by,scope_type,scope_group_id,audience,access_group_id)
+ VALUES(feed_banner_work,author,author,'PERSONAL',NULL,'FPTU_COMMUNITY',grp);
+ INSERT INTO output_revisions(id,output_id,revision_no,title,created_by)
+ VALUES(rev_feed_banner,feed_banner_work,1,'Personal work with a banner',author);
+ UPDATE output_revisions SET released_by=author,released_at=clock_timestamp() WHERE id=rev_feed_banner;
+ UPDATE research_outputs SET sharing_status='SHARED',current_release_id=rev_feed_banner,first_shared_at=clock_timestamp() WHERE id=feed_banner_work;
+
+ -- The feed of a group: the works whose scope names it, plus the ones the
+ -- group explicitly accepted.
+ PERFORM pg_temp.scope_assert(
+   NOT EXISTS (
+     SELECT 1 FROM research_outputs o
+     WHERE can_view_output(group_member,o.id)
+       AND (o.scope_group_id=grp OR EXISTS (
+         SELECT 1 FROM group_output_links gol
+         WHERE gol.output_id=o.id AND gol.group_id=grp AND gol.status='ACCEPTED'
+       ))
+       AND o.id=feed_banner_work
+   ),
+   'a personal work that merely carries the banner is not in the group feed');
+ -- The work the group owns is in its feed.
+ PERFORM pg_temp.scope_assert(
+   EXISTS (
+     SELECT 1 FROM research_outputs o
+     WHERE can_view_output(group_member,o.id)
+       AND (o.scope_group_id=grp OR EXISTS (
+         SELECT 1 FROM group_output_links gol
+         WHERE gol.output_id=o.id AND gol.group_id=grp AND gol.status='ACCEPTED'
+       ))
+       AND o.id=group_work
+   ),
+   'the work a group owns is in the group feed');
+ -- A standalone project work names no group, so it cannot appear in any
+ -- group's feed.
+ PERFORM pg_temp.scope_assert(
+   (SELECT scope_group_id IS NULL AND scope_project_id=standalone_project FROM research_outputs WHERE id=standalone_work)
+   AND NOT EXISTS (
+     SELECT 1 FROM research_outputs o
+     WHERE o.scope_type='PROJECT' AND o.scope_group_id IS NOT NULL AND o.scope_project_id=standalone_project
+   ),
+   'a standalone project work names no group at all');
 
  -- ---------------------------------------------------------------------
  -- An inactive account loses every access, even the owner's own.
