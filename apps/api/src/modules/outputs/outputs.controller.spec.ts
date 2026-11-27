@@ -2,8 +2,10 @@ import { BadRequestException, HttpStatus } from '@nestjs/common';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { Test } from '@nestjs/testing';
 import {
+  OutputAudience,
   OutputFileVisibility,
   OutputImportState,
+  OutputScopeType,
   OutputSharingStatus,
   PrismaService,
   PublicationStatusEnum,
@@ -30,7 +32,10 @@ describe('OutputsController & OutputsService', () => {
     created_by: otherUserId,
     sharing_status: OutputSharingStatus.SHARED,
     current_release_id: pinnedRevId,
-    visibility: OutputFileVisibility.FPTU_COMMUNITY,
+    scope_type: OutputScopeType.PERSONAL,
+    scope_group_id: null,
+    scope_project_id: null,
+    audience: OutputAudience.FPTU_COMMUNITY,
     access_group_id: null,
     provenance_tag: 'PAPER',
     import_state: OutputImportState.ACCEPTED,
@@ -395,7 +400,8 @@ describe('OutputsController & OutputsService', () => {
         mockSharedOutput,
       );
       prismaMock.$queryRaw
-        .mockResolvedValueOnce([{ allowed: true }])
+        .mockResolvedValueOnce([{ allowed: true }]) // can_view_output
+        .mockResolvedValueOnce([{ allowed: false }]) // can_change_output_visibility
         .mockResolvedValueOnce([
           {
             id: 'f1',
@@ -443,7 +449,7 @@ describe('OutputsController & OutputsService', () => {
           myRequest: null,
         },
       ]);
-      const sql = prismaMock.$queryRaw.mock.calls[1][0].join('');
+      const sql = prismaMock.$queryRaw.mock.calls[2][0].join('');
       expect(sql).toContain("f.visibility = 'PRIVATE'");
       expect(sql).toContain('NOT can_view_output_file(');
     });

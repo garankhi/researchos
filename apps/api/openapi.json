@@ -8851,7 +8851,7 @@
     },
     "/outputs/{outputId}/publish": {
       "post": {
-        "description": "Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the visibility the caller chose. The work becomes searchable, discoverable, and linkable into a group. This is the single visibility action, whether the draft came from an OpenAlex pull or from a work created inside the platform.",
+        "description": "Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the audience the caller chose. The audience follows the scope of the work: a personal work reaches the community, a container work reaches its group or project. The work becomes searchable, discoverable, and linkable into a group. This is the single publish action, whether the draft came from an OpenAlex pull or from a work created inside the platform.",
         "operationId": "OutputsController_publish",
         "parameters": [
           {
@@ -8877,7 +8877,7 @@
         },
         "responses": {
           "200": {
-            "description": "The published work, now shared under the requested visibility.",
+            "description": "The published work, now shared under the requested audience.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8887,7 +8887,7 @@
             }
           },
           "400": {
-            "description": "Invalid UUID format for outputId, an unsupported visibility, or a visibility that does not match the access group.",
+            "description": "Invalid UUID format for outputId, an unsupported audience, or an access group the caller is not a member of.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9039,7 +9039,7 @@
     },
     "/outputs/{outputId}/visibility": {
       "patch": {
-        "description": "Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.",
+        "description": "Changes the audience of an already shared work. The authority follows the scope of the work: the owner of a personal work, the leads of the group of a group work, or the project lead and the parent group leads of a project work. The poster of a container work may not, because the container owns the post.",
         "operationId": "OutputsController_updateVisibility",
         "parameters": [
           {
@@ -9065,7 +9065,7 @@
         },
         "responses": {
           "200": {
-            "description": "The work with its updated visibility.",
+            "description": "The work with its updated audience.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9075,7 +9075,7 @@
             }
           },
           "400": {
-            "description": "Invalid UUID format for outputId, an unsupported visibility, or a group the caller is not a member of.",
+            "description": "Invalid UUID format for outputId, or an audience the scope of the work does not allow.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9095,7 +9095,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an active researcher, or is neither the owner nor the lead of the affiliated group.",
+            "description": "Caller is not an active researcher, or does not manage the container of the work.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9115,7 +9115,7 @@
             }
           },
           "409": {
-            "description": "The work is not published, so its visibility cannot change.",
+            "description": "The work is not published, so its audience cannot change.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9133,6 +9133,212 @@
         "summary": "Changes who may see a shared work",
         "tags": [
           "outputs"
+        ]
+      }
+    },
+    "/research-projects": {
+      "get": {
+        "description": "Returns a paginated list of the projects the caller can reach: the ones they lead, the ones they are a member of, and the ones belonging to a group they are in. A project is a container of its own — the project lead and the leads of the parent group decide who may read the works posted into it.",
+        "operationId": "ProjectsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search string matching the project title or code.",
+            "schema": {
+              "example": "federated",
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "required": false,
+            "in": "query",
+            "description": "Filter projects that belong to a specific research group (UUID).",
+            "schema": {
+              "format": "uuid",
+              "example": "55555555-5555-4555-8555-555555555555",
+              "type": "string"
+            }
+          },
+          {
+            "name": "relation",
+            "required": false,
+            "in": "query",
+            "description": "Filter by the caller's relationship to the project: LEAD (the caller leads it) or MEMBER (the caller is a project member).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LEAD",
+                "MEMBER"
+              ]
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter by archive state. Archived projects are excluded unless the caller leads one of them.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of reachable research projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResearchProjectsResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List the research projects the caller may post into",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/research-projects/{projectId}": {
+      "get": {
+        "description": "Returns a single research project the caller may post into. Returns 404 when the project does not exist and 403 when the caller cannot reach it.",
+        "operationId": "ProjectsController_findOne",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research project (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research project retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchProjectResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided projectId is not a valid UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not allowed to view this research project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The research project was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get details of a research project",
+        "tags": [
+          "projects"
         ]
       }
     },
@@ -11995,19 +12201,29 @@
             "nullable": true,
             "example": "33333333-3333-4333-8333-333333333333"
           },
-          "visibility": {
+          "scopeType": {
             "type": "string",
-            "description": "Visibility scope of the indexed record (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).",
+            "description": "Where an indexed work was posted: PERSONAL (its author owns it), GROUP (the group owns it) or PROJECT (the project owns it). PERSONAL for the other entity types, which carry no scope of their own.",
+            "enum": [
+              "PERSONAL",
+              "GROUP",
+              "PROJECT"
+            ],
+            "example": "PERSONAL"
+          },
+          "audience": {
+            "type": "string",
+            "description": "Who may read an indexed work: PRIVATE (the owner alone), CONTAINER (the narrow audience of the group or the project) or FPTU_COMMUNITY (every signed-in researcher).",
             "enum": [
               "PRIVATE",
-              "RESEARCH_GROUP",
+              "CONTAINER",
               "FPTU_COMMUNITY"
             ],
             "example": "FPTU_COMMUNITY"
           },
           "accessGroupId": {
             "type": "object",
-            "description": "Research group UUID scoping access when `visibility` is `RESEARCH_GROUP`; `null` otherwise.",
+            "description": "Research group UUID scoping access when the work is scoped to a group or to a project inside one; `null` otherwise.",
             "format": "uuid",
             "nullable": true,
             "example": null
@@ -12065,7 +12281,8 @@
           "entityId",
           "revisionId",
           "ownerId",
-          "visibility",
+          "scopeType",
+          "audience",
           "accessGroupId",
           "title",
           "body",
@@ -14177,6 +14394,36 @@
           "decision"
         ]
       },
+      "OutputScopeDto": {
+        "type": "object",
+        "properties": {
+          "scopeType": {
+            "type": "string",
+            "description": "The posting context of the work: PERSONAL (its author owns it), GROUP (the group owns it) or PROJECT (the project owns it).",
+            "enum": [
+              "PERSONAL",
+              "GROUP",
+              "PROJECT"
+            ],
+            "example": "PERSONAL"
+          },
+          "scopeGroupId": {
+            "type": "string",
+            "description": "The group the work is posted in. Required for a GROUP scope. For a PROJECT scope it is the parent group, when the project has one; omit it for a standalone project.",
+            "format": "uuid",
+            "example": "55555555-5555-4555-8555-555555555555"
+          },
+          "scopeProjectId": {
+            "type": "string",
+            "description": "The project the work is posted in. Required for a PROJECT scope.",
+            "format": "uuid",
+            "example": "66666666-6666-4666-8666-666666666666"
+          }
+        },
+        "required": [
+          "scopeType"
+        ]
+      },
       "CreateArticleAuthorDto": {
         "type": "object",
         "properties": {
@@ -14207,6 +14454,14 @@
             ],
             "default": "ARTICLE",
             "description": "Output type for the Article creation flow."
+          },
+          "scope": {
+            "description": "Where the Article is posted. Defaults to a personal post. Posting inside a group or a project hands the post to that container: the poster keeps the right to edit the content, but the container leads decide who may read it. The scope is fixed at creation.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputScopeDto"
+              }
+            ]
           },
           "title": {
             "type": "string",
@@ -14648,19 +14903,48 @@
             ],
             "example": "SHARED"
           },
-          "visibility": {
+          "scopeType": {
             "type": "string",
-            "description": "Visibility scope (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).",
+            "description": "Where the work was posted: PERSONAL (its author owns it), GROUP (the group owns it) or PROJECT (the project owns it). Fixed at creation.",
+            "enum": [
+              "PERSONAL",
+              "GROUP",
+              "PROJECT"
+            ],
+            "example": "PERSONAL"
+          },
+          "scopeGroupId": {
+            "type": "object",
+            "description": "The group the work was posted in. For a GROUP scope it is the group itself; for a PROJECT scope it is the parent group, when the project has one. Null for a personal work.",
+            "format": "uuid",
+            "nullable": true,
+            "example": null
+          },
+          "scopeProjectId": {
+            "type": "object",
+            "description": "The project the work was posted in. Set only for a PROJECT scope.",
+            "format": "uuid",
+            "nullable": true,
+            "example": null
+          },
+          "audience": {
+            "type": "string",
+            "description": "Who may read the work: PRIVATE (the owner alone), CONTAINER (the narrow audience of the group or project) or FPTU_COMMUNITY (every signed-in researcher).",
             "enum": [
               "PRIVATE",
-              "RESEARCH_GROUP",
+              "CONTAINER",
               "FPTU_COMMUNITY"
             ],
             "example": "FPTU_COMMUNITY"
           },
+          "canChangeVisibility": {
+            "type": "boolean",
+            "description": "Whether the caller may change the audience of this work. The owner may for a personal work; the group leads may for a group work; the project lead and the parent group leads may for a project work. The poster of a container work may not: the container owns the post.",
+            "example": false
+          },
           "accessGroupId": {
             "type": "object",
-            "description": "Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.",
+            "description": "Affiliated research group whose banner the work carries. Display information only: it grants no authority over the work.",
             "format": "uuid",
             "nullable": true,
             "example": null
@@ -14738,7 +15022,11 @@
           "doi",
           "ownerId",
           "sharingStatus",
-          "visibility",
+          "scopeType",
+          "scopeGroupId",
+          "scopeProjectId",
+          "audience",
+          "canChangeVisibility",
           "accessGroupId",
           "importState",
           "currentReleaseId",
@@ -15145,48 +15433,141 @@
       "PublishOutputDto": {
         "type": "object",
         "properties": {
-          "visibility": {
+          "audience": {
             "type": "string",
-            "description": "Who may see the published work. FPTU_COMMUNITY opens it to the whole FPTU community; RESEARCH_GROUP opens it to the members of the access group.",
+            "description": "Who may see the published work. CONTAINER opens it to the members of the group or the project, and is only valid for a container work. FPTU_COMMUNITY opens it to the whole FPTU community.",
             "enum": [
-              "FPTU_COMMUNITY",
-              "RESEARCH_GROUP"
+              "CONTAINER",
+              "FPTU_COMMUNITY"
             ],
             "example": "FPTU_COMMUNITY"
           },
           "accessGroupId": {
             "type": "string",
-            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and must be a group the caller is a member of.",
+            "description": "The affiliated research group whose banner the work carries. Display information only: it grants no authority over the work. Must be a group the caller is a member of.",
             "format": "uuid",
             "example": "55555555-5555-4555-8555-555555555555"
           }
         },
         "required": [
-          "visibility"
+          "audience"
         ]
       },
       "UpdateOutputVisibilityDto": {
         "type": "object",
         "properties": {
-          "visibility": {
+          "audience": {
             "type": "string",
-            "description": "Who may see the work. FPTU_COMMUNITY opens it to the whole FPTU community even when the work carries a group affiliation; RESEARCH_GROUP restricts it to the members of the access group.",
+            "description": "Who may see the work. PRIVATE is the owner-only draft and is only offered for a personal work. CONTAINER restricts it to the members of the group or the project and is only offered for a container work. FPTU_COMMUNITY opens it to every signed-in researcher.",
             "enum": [
-              "FPTU_COMMUNITY",
-              "RESEARCH_GROUP"
+              "PRIVATE",
+              "CONTAINER",
+              "FPTU_COMMUNITY"
             ],
             "example": "FPTU_COMMUNITY"
-          },
-          "accessGroupId": {
-            "type": "object",
-            "description": "The affiliated research group whose banner the work carries. Required when visibility is RESEARCH_GROUP; optional when visibility is FPTU_COMMUNITY and rejected when visibility is PRIVATE. Send null to clear the affiliation; omit it to keep the stored one. The group must be one the caller is a member of.",
-            "format": "uuid",
-            "nullable": true,
-            "example": "55555555-5555-4555-8555-555555555555"
           }
         },
         "required": [
-          "visibility"
+          "audience"
+        ]
+      },
+      "ResearchProjectResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the research project.",
+            "format": "uuid",
+            "example": "66666666-6666-4666-8666-666666666666"
+          },
+          "code": {
+            "type": "string",
+            "description": "Project code, when the project has one.",
+            "nullable": true,
+            "example": "AI-2026-01"
+          },
+          "title": {
+            "type": "string",
+            "description": "Project title.",
+            "example": "Federated learning for clinical imaging"
+          },
+          "projectType": {
+            "type": "string",
+            "description": "Kind of project.",
+            "enum": [
+              "UNIVERSITY_GRANT",
+              "MINISTRY_GRANT",
+              "STATE_GRANT",
+              "INDUSTRY_LAB",
+              "INTERNATIONAL_JOINT",
+              "COLLABORATIVE_RESEARCH"
+            ],
+            "example": "COLLABORATIVE_RESEARCH"
+          },
+          "groupId": {
+            "type": "object",
+            "description": "The group the project belongs to. Null for a standalone project.",
+            "format": "uuid",
+            "nullable": true,
+            "example": "55555555-5555-4555-8555-555555555555"
+          },
+          "leadId": {
+            "type": "string",
+            "description": "The user who leads the project.",
+            "format": "uuid",
+            "example": "22222222-2222-4222-8222-222222222222"
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status of the project.",
+            "enum": [
+              "PROPOSAL_DRAFT",
+              "APPROVED",
+              "IN_PROGRESS",
+              "ON_HOLD",
+              "COMPLETED",
+              "PUBLISHED_DELIVERED",
+              "CANCELLED"
+            ],
+            "example": "IN_PROGRESS"
+          },
+          "isCallerLead": {
+            "type": "boolean",
+            "description": "Whether the caller leads the project. A project lead manages the audience of the works posted into the project."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "title",
+          "projectType",
+          "groupId",
+          "leadId",
+          "status"
+        ]
+      },
+      "PaginatedResearchProjectsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "List of research projects on this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResearchProjectResponseDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
         ]
       },
       "ProfileResponseDto": {
@@ -17674,6 +18055,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/OutputFileResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PaginatedResearchProjectsResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PaginatedResearchProjectsResponseDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "ResearchProjectResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResearchProjectResponseDto"
           },
           "message": {
             "type": "string",

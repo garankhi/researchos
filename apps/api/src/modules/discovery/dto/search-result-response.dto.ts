@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { OutputFileVisibility, SearchEntityType } from '@researchos/database';
+import {
+  OutputAudience,
+  OutputScopeType,
+  SearchEntityType,
+} from '@researchos/database';
 import { PaginatedResultDto } from '../../../common/dto/pagination.dto.js';
 
 /**
@@ -61,15 +65,29 @@ export class SearchResultItemDto {
 
   @ApiProperty({
     description:
-      'Visibility scope of the indexed record (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`).',
-    enum: OutputFileVisibility,
-    example: OutputFileVisibility.FPTU_COMMUNITY,
+      'Where an indexed work was posted: PERSONAL (its author owns it), ' +
+      'GROUP (the group owns it) or PROJECT (the project owns it). ' +
+      'PERSONAL for the other entity types, which carry no scope of ' +
+      'their own.',
+    enum: OutputScopeType,
+    example: OutputScopeType.PERSONAL,
   })
-  visibility: OutputFileVisibility;
+  scopeType: OutputScopeType;
 
   @ApiProperty({
     description:
-      'Research group UUID scoping access when `visibility` is `RESEARCH_GROUP`; `null` otherwise.',
+      'Who may read an indexed work: PRIVATE (the owner alone), CONTAINER ' +
+      '(the narrow audience of the group or the project) or FPTU_COMMUNITY ' +
+      '(every signed-in researcher).',
+    enum: OutputAudience,
+    example: OutputAudience.FPTU_COMMUNITY,
+  })
+  audience: OutputAudience;
+
+  @ApiProperty({
+    description:
+      'Research group UUID scoping access when the work is scoped to a ' +
+      'group or to a project inside one; `null` otherwise.',
     format: 'uuid',
     nullable: true,
     example: null,
