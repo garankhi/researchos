@@ -347,7 +347,23 @@
       "continue": "Continue without confirming",
       "pulled": "Your OpenAlex profile was confirmed.",
       "failed": "Could not reach OpenAlex. Try again in a moment.",
-      "clear": "Unconfirm this profile"
+      "clear": "Unconfirm this profile",
+      "detail": {
+        "empty": "Pick a profile on the left to see its full record — the metrics, the byline spellings, the topics, the affiliations and the recent works.",
+        "affiliationMatch": "FPT University",
+        "openAlexProfile": "OpenAlex profile",
+        "orcid": "ORCID",
+        "metrics": "Citation metrics",
+        "works": "Works",
+        "citations": "Citations",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "twoYearCitedness": "2-year impact",
+        "nameVariants": "Also published as",
+        "topics": "Research topics",
+        "affiliations": "Affiliations",
+        "recentWorks": "Recent works"
+      }
     },
     "profileStep": {
       "title": "Your researcher information",

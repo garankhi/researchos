@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@researchos/database';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { FPT_UNIVERSITY, OpenAlexClient } from './openalex.client.js';
@@ -12,6 +12,7 @@ import {
 import { OpenAlexWorksCache } from './openalex-works-cache.js';
 import type {
   OpenAlexAuthor,
+  OpenAlexAuthorRecentWork,
   OpenAlexWork,
   OpenAlexWorksPage,
 } from './openalex.types.js';
@@ -56,6 +57,8 @@ export interface CandidateAuthorPreview {
   author: OpenAlexAuthor;
   /** Whether the author's affiliation is FPT University. */
   affiliationMatch: boolean;
+  /** The author's most recent works, newest first. */
+  recentWorks: OpenAlexAuthorRecentWork[];
 }
 
 /**
@@ -75,6 +78,8 @@ export type LookupMode = 'AUTHOR_ID' | 'ORCID' | 'NAME';
  */
 @Injectable()
 export class OpenAlexLookupService {
+  private readonly logger = new Logger(OpenAlexLookupService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly client: OpenAlexClient,
@@ -150,11 +155,59 @@ export class OpenAlexLookupService {
     });
     return {
       mode: 'NAME',
-      authors: authors.map((author) => ({
-        author,
-        affiliationMatch: matchesAffiliation(author),
-      })),
+      authors: await this.withRecentWorks(
+        authors.map((author) => ({
+          author,
+          affiliationMatch: matchesAffiliation(author),
+          recentWorks: [],
+        })),
+      ),
     };
+  }
+
+  /**
+   * Attaches the recent works to a list of candidates.
+   *
+   * ## Why the works come with the list
+   *
+   * The name alone cannot identify a researcher: a Vietnamese name is
+   * shared by many people, and OpenAlex merges profiles that carry the
+   * same byline. The works are the part the researcher recognises — "I
+   * wrote that paper" — so they are fetched once, with the list, and
+   * not when the researcher clicks a candidate.
+   *
+   * ## Why one call covers the whole list
+   *
+   * The listing is filtered over every candidate id at once. A request
+   * per candidate would cost one round trip per row and the researcher
+   * cannot tell which row they are looking at until the request comes
+   * back.
+   *
+   * A failure is not fatal: the candidates are still worth showing
+   * without their works, and the researcher can still confirm one.
+   */
+  private async withRecentWorks(
+    candidates: CandidateAuthorPreview[],
+  ): Promise<CandidateAuthorPreview[]> {
+    if (candidates.length === 0) {
+      return candidates;
+    }
+    try {
+      const buckets = await this.client.getRecentWorksByAuthors(
+        candidates.map((entry) => entry.author.shortId || entry.author.id),
+      );
+      return candidates.map((entry) => ({
+        ...entry,
+        recentWorks: buckets.get(entry.author.shortId) ?? [],
+      }));
+    } catch (error) {
+      this.logger.warn(
+        `Could not fetch the recent works of the author candidates: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return candidates.map((entry) => ({ ...entry, recentWorks: [] }));
+    }
   }
 
   /**

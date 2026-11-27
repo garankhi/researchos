@@ -9,6 +9,7 @@ import { OpenAlexWorksCache } from './openalex-works-cache.js';
 import { OpenAlexClient } from './openalex.client.js';
 import type {
   OpenAlexAuthor,
+  OpenAlexAuthorRecentWork,
   OpenAlexWork,
   OpenAlexWorkAuthor,
 } from './openalex.types.js';
@@ -68,6 +69,17 @@ function makeAuthor(overrides: Partial<OpenAlexAuthor> = {}): OpenAlexAuthor {
     orcid: null,
     worksCount: null,
     affiliations: [],
+    counts: {
+      worksCount: null,
+      citedByCount: null,
+      hIndex: null,
+      i10Index: null,
+      twoYearMeanCitedness: null,
+    },
+    nameVariants: [],
+    observedOrcids: [],
+    topics: [],
+    affiliationHistory: [],
     ...overrides,
   };
 }
@@ -79,6 +91,7 @@ function makeService(deps: {
   pages?: OpenAlexWork[][];
   searched?: OpenAlexAuthor[];
   namePages?: OpenAlexWork[][];
+  recentWorks?: Map<string, OpenAlexAuthorRecentWork[]>;
 }): { service: OpenAlexLookupService; client: OpenAlexClient } {
   const prisma = {
     researcher_profiles: {
@@ -125,6 +138,15 @@ function makeService(deps: {
     },
   );
   vi.spyOn(client, 'searchAuthors').mockResolvedValue(deps.searched ?? []);
+
+  /*
+   * The recent works come with the candidate list, so the call is
+   * stubbed here: the tests are about the lookup's own behaviour, and
+   * an unstubbed call would reach the network.
+   */
+  vi.spyOn(client, 'getRecentWorksByAuthors').mockResolvedValue(
+    deps.recentWorks ?? new Map(),
+  );
 
   /*
    * The cache is a no-op here: the tests are about the lookup's own
@@ -215,6 +237,59 @@ describe('OpenAlexLookupService', () => {
     expect(result.mode).toBe('NAME');
     if (result.mode === 'NAME') {
       expect(result.authors).toHaveLength(1);
+    }
+  });
+
+  it('attaches the recent works to the name candidates', async () => {
+    // The works are the evidence the researcher recognises their own
+    // papers by, so they travel with the candidate list.
+    const work: OpenAlexAuthorRecentWork = {
+      workId: 'https://openalex.org/W1',
+      shortId: 'W1',
+      title: 'A paper the researcher wrote',
+      publicationYear: 2026,
+      venue: 'Symmetry',
+      affiliation: 'FPT University',
+      authorIds: ['A1'],
+    };
+    const { service, client } = makeService({
+      profile: profileWith(null, 'Nguyen Van An'),
+      searched: [makeAuthor({ shortId: 'A1' })],
+      recentWorks: new Map([['A1', [work]]]),
+    });
+
+    const result = await service.findCandidates(USER_ID);
+
+    expect(result.mode).toBe('NAME');
+    if (result.mode === 'NAME') {
+      expect(result.authors[0].recentWorks).toHaveLength(1);
+      expect(result.authors[0].recentWorks[0]).toMatchObject({
+        shortId: 'W1',
+        title: 'A paper the researcher wrote',
+      });
+    }
+    // One call covers every candidate, whatever the list holds.
+    expect(client.getRecentWorksByAuthors).toHaveBeenCalledTimes(1);
+    expect(client.getRecentWorksByAuthors).toHaveBeenCalledWith(['A1']);
+  });
+
+  it('keeps the candidates when the recent works cannot be fetched', async () => {
+    // The works are an aid to recognition, not the point of the step:
+    // a failure there must not cost the researcher their choices.
+    const { service, client } = makeService({
+      profile: profileWith(null, 'Nguyen Van An'),
+      searched: [makeAuthor({ shortId: 'A1' })],
+    });
+    vi.mocked(client.getRecentWorksByAuthors).mockRejectedValue(
+      new Error('OpenAlex is unreachable'),
+    );
+
+    const result = await service.findCandidates(USER_ID);
+
+    expect(result.mode).toBe('NAME');
+    if (result.mode === 'NAME') {
+      expect(result.authors).toHaveLength(1);
+      expect(result.authors[0].recentWorks).toEqual([]);
     }
   });
 

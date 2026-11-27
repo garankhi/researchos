@@ -5,6 +5,10 @@
  * ResearchOS backend API
  * OpenAPI spec version: 0.0.1
  */
+import type { OpenAlexAffiliationDto } from './openAlexAffiliationDto';
+import type { OpenAlexAuthorCountsDto } from './openAlexAuthorCountsDto';
+import type { OpenAlexAuthorRecentWorkDto } from './openAlexAuthorRecentWorkDto';
+import type { OpenAlexAuthorTopicDto } from './openAlexAuthorTopicDto';
 
 export interface OpenAlexAuthorCandidateDto {
   /** Canonical OpenAlex id of the author, e.g. https://openalex.org/A5023888391. */
@@ -27,4 +31,16 @@ export interface OpenAlexAuthorCandidateDto {
   affiliations: string[];
   /** Whether the author is affiliated with FPT University, the one affiliation in scope. */
   affiliationMatch: boolean;
+  /** The citation metrics OpenAlex reports for the author. The fastest cue for telling two namesakes apart. */
+  counts: OpenAlexAuthorCountsDto;
+  /** The byline spellings OpenAlex has observed for the author, apart from the display name. A researcher who published under a different spelling recognises it immediately. */
+  nameVariants: string[];
+  /** Every ORCID seen across the author’s workships, apart from the canonical one. */
+  observedOrcids: string[];
+  /** The topics OpenAlex assigned to the author, most prolific first. The research area is what tells a namesake in another field apart. */
+  topics: OpenAlexAuthorTopicDto[];
+  /** The affiliations of the author with the years they held, newest last. */
+  affiliationHistory: OpenAlexAffiliationDto[];
+  /** The most recent works OpenAlex records for the author, newest first. The panel shows these so the researcher can recognise their own papers. */
+  recentWorks: OpenAlexAuthorRecentWorkDto[];
 }

@@ -1,20 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Box,
   Button,
   Flex,
+  Grid,
   Heading,
   RadioGroup,
   Stack,
   Text,
+  useBreakpointValue,
 } from '@chakra-ui/react';
 import { UserCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import type { OpenAlexAuthorCandidateDto } from '@/lib/api/models';
+import { OnboardingAuthorDetail } from './onboarding-author-detail';
 
 /**
  * The props of the author step.
@@ -80,6 +83,20 @@ export function OnboardingAuthorStep({
   );
   const [actionError, setActionError] = useState<string | null>(null);
 
+  /*
+   * The candidate the detail panel describes. It is the selected one,
+   * and the confirmed one when nothing is selected yet — a researcher
+   * who comes back to the step sees the profile they confirmed, not an
+   * empty panel.
+   */
+  const selectedCandidate = useMemo(() => {
+    const wanted = selectedAuthor ?? confirmedAuthorId;
+    if (wanted === null) {
+      return null;
+    }
+    return authors.find((author) => author.shortId === wanted) ?? null;
+  }, [authors, selectedAuthor, confirmedAuthorId]);
+
   const handleConfirm = () => {
     if (!selectedAuthor) {
       return;
@@ -97,6 +114,36 @@ export function OnboardingAuthorStep({
     setActionError(null);
     onSkip();
   };
+
+  /*
+   * The panel is capped at the height of the list beside it, so the two
+   * columns end where the list ends and the panel scrolls inside that
+   * height. The height is measured rather than fixed, because the list
+   * grows with the number of candidates.
+   *
+   * The measurement is skipped on a narrow screen: there the panel sits
+   * under the list and is free to be as tall as it needs.
+   */
+  const isWide = useBreakpointValue({ base: false, lg: true });
+
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [listHeight, setListHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isWide) {
+      setListHeight(null);
+      return;
+    }
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+    const measure = () => setListHeight(element.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isWide, authors.length]);
 
   return (
     <Stack gap="5">
@@ -131,58 +178,84 @@ export function OnboardingAuthorStep({
       ) : null}
 
       {authors.length > 0 ? (
-        <Box bg="bg.panel" boxShadow="xs" p={{ base: '4', md: '5' }}>
-          <RadioGroup.Root
-            value={selectedAuthor}
-            onValueChange={(details) => setSelectedAuthor(details.value)}
+        /*
+         * The list stays on the left, exactly as it was: a short list of
+         * names with the affiliation and the work count. The panel on
+         * the right carries the evidence — the metrics, the byline
+         * spellings, the topics, the affiliations and the recent works
+         * — of whichever candidate is selected.
+         *
+         * The two collapse into one column on a narrow screen: the panel
+         * goes under the list, and it follows the selection there too.
+         */
+        <Grid
+          templateColumns={{ base: '1fr', lg: 'minmax(0, 4.75fr) minmax(0, 6.25fr)' }}
+          gap="4"
+          alignItems="start"
+        >
+          <Box
+            ref={listRef}
+            bg="bg.panel"
+            boxShadow="xs"
+            p={{ base: '4', md: '5' }}
           >
-            <Stack gap="4">
-              {authors.map((author) => (
-                <RadioGroup.Item
-                  key={author.shortId}
-                  value={author.shortId}
-                >
-                  <RadioGroup.ItemHiddenInput />
-                  <RadioGroup.ItemIndicator />
-                  <Box>
-                    <Text textStyle="sm" fontWeight="bold">
-                      {author.displayName}
-                    </Text>
-                    <Flex gap="2" align="center" flexWrap="wrap" mt="1">
-                      {author.affiliationMatch ? (
-                        <Badge colorPalette="green" size="sm">
-                          {t('authorStep.affiliationMatch')}
-                        </Badge>
-                      ) : null}
-                      {author.worksCount !== null ? (
-                        <Text textStyle="xs" color="fg.muted">
-                          {t('authorStep.worksCount', {
-                            count: author.worksCount,
-                          })}
-                        </Text>
-                      ) : null}
-                      {author.orcid ? (
-                        <Text textStyle="xs" color="fg.muted">
-                          {author.orcid}
-                        </Text>
-                      ) : null}
-                    </Flex>
-                  </Box>
-                </RadioGroup.Item>
-              ))}
-            </Stack>
-          </RadioGroup.Root>
+            <RadioGroup.Root
+              value={selectedAuthor}
+              onValueChange={(details) => setSelectedAuthor(details.value)}
+            >
+              <Stack gap="4">
+                {authors.map((author) => (
+                  <RadioGroup.Item
+                    key={author.shortId}
+                    value={author.shortId}
+                  >
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <Box>
+                      <Text textStyle="sm" fontWeight="bold">
+                        {author.displayName}
+                      </Text>
+                      <Flex gap="2" align="center" flexWrap="wrap" mt="1">
+                        {author.affiliationMatch ? (
+                          <Badge colorPalette="green" size="sm">
+                            {t('authorStep.affiliationMatch')}
+                          </Badge>
+                        ) : null}
+                        {author.worksCount !== null ? (
+                          <Text textStyle="xs" color="fg.muted">
+                            {t('authorStep.worksCount', {
+                              count: author.worksCount,
+                            })}
+                          </Text>
+                        ) : null}
+                        {author.orcid ? (
+                          <Text textStyle="xs" color="fg.muted">
+                            {author.orcid}
+                          </Text>
+                        ) : null}
+                      </Flex>
+                    </Box>
+                  </RadioGroup.Item>
+                ))}
+              </Stack>
+            </RadioGroup.Root>
 
-          <Flex mt="6" gap="3" justify="flex-end" flexWrap="wrap">
-            <Button variant="outline" onClick={handleSkip}>
-              {confirmedAuthorId ? t('authorStep.clear') : t('authorStep.skip')}
-            </Button>
-            <Button onClick={handleConfirm} disabled={!selectedAuthor}>
-              <UserCheck />
-              {t('authorStep.confirm')}
-            </Button>
-          </Flex>
-        </Box>
+            <Flex mt="6" gap="3" justify="flex-end" flexWrap="wrap">
+              <Button variant="outline" onClick={handleSkip}>
+                {confirmedAuthorId ? t('authorStep.clear') : t('authorStep.skip')}
+              </Button>
+              <Button onClick={handleConfirm} disabled={!selectedAuthor}>
+                <UserCheck />
+                {t('authorStep.confirm')}
+              </Button>
+            </Flex>
+          </Box>
+
+          <OnboardingAuthorDetail
+            author={selectedCandidate ?? null}
+            maxHeight={listHeight}
+          />
+        </Grid>
       ) : null}
 
       {authors.length === 0 && !isLoading && !isFailed ? (

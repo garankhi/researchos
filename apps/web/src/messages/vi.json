@@ -347,7 +347,23 @@
       "continue": "Tiếp tục mà không xác nhận",
       "pulled": "Hồ sơ OpenAlex của bạn đã được xác nhận.",
       "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau.",
-      "clear": "Bỏ xác nhận hồ sơ này"
+      "clear": "Bỏ xác nhận hồ sơ này",
+      "detail": {
+        "empty": "Chọn một hồ sơ bên trái để xem toàn bộ thông tin — chỉ số trích dẫn, các biến thể tên đã xuất bản, chủ đề nghiên cứu, tổ chức và các tác phẩm gần đây.",
+        "affiliationMatch": "FPT University",
+        "openAlexProfile": "Hồ sơ OpenAlex",
+        "orcid": "ORCID",
+        "metrics": "Chỉ số trích dẫn",
+        "works": "Tác phẩm",
+        "citations": "Lượt trích dẫn",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "twoYearCitedness": "Ảnh hưởng 2 năm",
+        "nameVariants": "Cũng xuất bản dưới tên",
+        "topics": "Chủ đề nghiên cứu",
+        "affiliations": "Tổ chức",
+        "recentWorks": "Tác phẩm gần đây"
+      }
     },
     "profileStep": {
       "title": "Thông tin researcher của bạn",

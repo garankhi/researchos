@@ -14005,6 +14005,167 @@
           "exportLevel"
         ]
       },
+      "OpenAlexAuthorCountsDto": {
+        "type": "object",
+        "properties": {
+          "worksCount": {
+            "type": "number",
+            "description": "Total works OpenAlex attributes to the author.",
+            "nullable": true,
+            "example": 42
+          },
+          "citedByCount": {
+            "type": "number",
+            "description": "Total citations to those works.",
+            "nullable": true,
+            "example": 318
+          },
+          "hIndex": {
+            "type": "number",
+            "description": "The h-index of the author.",
+            "nullable": true,
+            "example": 7
+          },
+          "i10Index": {
+            "type": "number",
+            "description": "The number of works with at least ten citations.",
+            "nullable": true,
+            "example": 4
+          },
+          "twoYearMeanCitedness": {
+            "type": "number",
+            "description": "The mean citations per work over the last two years.",
+            "nullable": true,
+            "example": 2.5
+          }
+        },
+        "required": [
+          "worksCount",
+          "citedByCount",
+          "hIndex",
+          "i10Index",
+          "twoYearMeanCitedness"
+        ]
+      },
+      "OpenAlexAuthorTopicDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The OpenAlex topic id, e.g. T11409.",
+            "example": "T11409"
+          },
+          "name": {
+            "type": "string",
+            "description": "The topic display name.",
+            "example": "Natural Language Processing Techniques"
+          },
+          "count": {
+            "type": "number",
+            "description": "How many of the author’s works sit in the topic. Null when OpenAlex reports no count.",
+            "nullable": true,
+            "example": 3
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "count"
+        ]
+      },
+      "OpenAlexAffiliationDto": {
+        "type": "object",
+        "properties": {
+          "institutionId": {
+            "type": "string",
+            "description": "The OpenAlex institution id, e.g. I109689652.",
+            "example": "I109689652"
+          },
+          "name": {
+            "type": "string",
+            "description": "The institution display name.",
+            "example": "FPT University"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "The ISO country code of the institution.",
+            "nullable": true,
+            "example": "VN"
+          },
+          "institutionType": {
+            "type": "string",
+            "description": "The kind of institution: education, company, healthcare, nonprofit, government, facility, archive or other.",
+            "nullable": true,
+            "example": "education"
+          },
+          "yearStart": {
+            "type": "number",
+            "description": "The first year the affiliation held.",
+            "nullable": true,
+            "example": 2020
+          },
+          "yearEnd": {
+            "type": "number",
+            "description": "The last year the affiliation held.",
+            "nullable": true,
+            "example": 2026
+          }
+        },
+        "required": [
+          "institutionId",
+          "name",
+          "countryCode",
+          "institutionType",
+          "yearStart",
+          "yearEnd"
+        ]
+      },
+      "OpenAlexAuthorRecentWorkDto": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string",
+            "description": "Canonical OpenAlex id of the work.",
+            "example": "https://openalex.org/W2741809807"
+          },
+          "shortId": {
+            "type": "string",
+            "description": "Short OpenAlex id of the work, e.g. W2741809807.",
+            "example": "W2741809807"
+          },
+          "title": {
+            "type": "string",
+            "description": "The work title.",
+            "example": "How Exposed Are LLM Email Agents to Indirect Prompt Injection"
+          },
+          "publicationYear": {
+            "type": "number",
+            "description": "The publication year, when OpenAlex reports one.",
+            "nullable": true,
+            "example": 2026
+          },
+          "venue": {
+            "type": "string",
+            "description": "The venue the work was published in.",
+            "nullable": true,
+            "example": "Symmetry"
+          },
+          "affiliation": {
+            "type": "string",
+            "description": "The institution recorded on the authorship of the author this work is listed under. Null when OpenAlex recorded none.",
+            "nullable": true,
+            "example": "FPT University"
+          }
+        },
+        "required": [
+          "workId",
+          "shortId",
+          "title",
+          "publicationYear",
+          "venue",
+          "affiliation"
+        ]
+      },
       "OpenAlexAuthorCandidateDto": {
         "type": "object",
         "properties": {
@@ -14046,6 +14207,53 @@
             "type": "boolean",
             "description": "Whether the author is affiliated with FPT University, the one affiliation in scope.",
             "example": true
+          },
+          "counts": {
+            "description": "The citation metrics OpenAlex reports for the author. The fastest cue for telling two namesakes apart.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OpenAlexAuthorCountsDto"
+              }
+            ]
+          },
+          "nameVariants": {
+            "description": "The byline spellings OpenAlex has observed for the author, apart from the display name. A researcher who published under a different spelling recognises it immediately.",
+            "example": [
+              "Nguyen, Hoang Khoi Tran",
+              "HOANG KHOI TRAN NGUYEN"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observedOrcids": {
+            "description": "Every ORCID seen across the author’s workships, apart from the canonical one.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "topics": {
+            "description": "The topics OpenAlex assigned to the author, most prolific first. The research area is what tells a namesake in another field apart.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexAuthorTopicDto"
+            }
+          },
+          "affiliationHistory": {
+            "description": "The affiliations of the author with the years they held, newest last.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexAffiliationDto"
+            }
+          },
+          "recentWorks": {
+            "description": "The most recent works OpenAlex records for the author, newest first. The panel shows these so the researcher can recognise their own papers.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexAuthorRecentWorkDto"
+            }
           }
         },
         "required": [
@@ -14055,7 +14263,13 @@
           "orcid",
           "worksCount",
           "affiliations",
-          "affiliationMatch"
+          "affiliationMatch",
+          "counts",
+          "nameVariants",
+          "observedOrcids",
+          "topics",
+          "affiliationHistory",
+          "recentWorks"
         ]
       },
       "OpenAlexAuthorCandidatesDto": {
@@ -16558,66 +16772,6 @@
           "hIndex",
           "i10Index",
           "twoYearMeanCitedness"
-        ]
-      },
-      "OpenAlexAffiliationDto": {
-        "type": "object",
-        "properties": {
-          "institutionId": {
-            "type": "string",
-            "description": "The OpenAlex institution id.",
-            "example": "I109689652"
-          },
-          "ror": {
-            "type": "string",
-            "description": "The ROR id of the same institution. It survives the renames and merges that break a display name.",
-            "example": "https://ror.org/03esj4g97",
-            "nullable": true
-          },
-          "name": {
-            "type": "string",
-            "description": "The institution display name.",
-            "example": "FPT University"
-          },
-          "countryCode": {
-            "type": "string",
-            "description": "The ISO country code.",
-            "example": "VN",
-            "nullable": true
-          },
-          "institutionType": {
-            "type": "string",
-            "description": "The kind of institution: EDUCATION, COMPANY, HEALTHCARE, NONPROFIT, GOVERNMENT, FACILITY, ARCHIVE or OTHER.",
-            "example": "EDUCATION",
-            "nullable": true
-          },
-          "yearStart": {
-            "type": "integer",
-            "description": "The first year the affiliation held.",
-            "example": 2023,
-            "nullable": true
-          },
-          "yearEnd": {
-            "type": "integer",
-            "description": "The last year the affiliation held.",
-            "example": 2023,
-            "nullable": true
-          },
-          "isPrimary": {
-            "type": "boolean",
-            "description": "Whether this is the affiliation the researcher is at now — the most recent one by year.",
-            "example": true
-          }
-        },
-        "required": [
-          "institutionId",
-          "ror",
-          "name",
-          "countryCode",
-          "institutionType",
-          "yearStart",
-          "yearEnd",
-          "isPrimary"
         ]
       },
       "OpenAlexAuthorRecordResponseDto": {

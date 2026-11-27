@@ -184,7 +184,7 @@ export function OnboardingFlow({
   };
 
   return (
-    <Container maxW="48rem" py={{ base: '6', md: '10' }}>
+    <Container maxW={{ base: '48rem', lg: '68rem' }} py={{ base: '6', md: '10' }}>
       <Stack gap="6">
         <Box>
           <Heading as="h1" size="lg" fontWeight="bold">

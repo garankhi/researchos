@@ -153,6 +153,142 @@ describe('OpenAlexClient', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('carries the recognition fields on a searched author', async () => {
+    // The candidate list has to carry the evidence the researcher
+    // recognises themselves by, and the search payload already holds
+    // all of it — so no extra request is spent on it.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          results: [
+            {
+              id: 'https://openalex.org/A1',
+              display_name: 'Jane Doe',
+              display_name_alternatives: ['J. Doe', 'Doe, Jane'],
+              works_count: 42,
+              cited_by_count: 318,
+              summary_stats: { h_index: 7, i10_index: 4 },
+              observed_orcids: ['https://orcid.org/0000-0002-1825-0097'],
+              topics: [{ id: 'T1', display_name: 'Topic One', count: 3 }],
+              affiliations: [
+                {
+                  institution: {
+                    id: 'https://openalex.org/I109689652',
+                    display_name: 'FPT University',
+                    country_code: 'VN',
+                    type: 'education',
+                  },
+                  years: [2020, 2026],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const [author] = await makeClient().searchAuthors('Jane Doe');
+
+    expect(author.counts).toEqual({
+      worksCount: 42,
+      citedByCount: 318,
+      hIndex: 7,
+      i10Index: 4,
+      twoYearMeanCitedness: null,
+    });
+    // The display name is shown on the card already, so it is not
+    // repeated among the variants.
+    expect(author.nameVariants).toEqual(['J. Doe', 'Doe, Jane']);
+    expect(author.observedOrcids).toEqual([
+      'https://orcid.org/0000-0002-1825-0097',
+    ]);
+    expect(author.topics[0]).toMatchObject({ name: 'Topic One', count: 3 });
+    expect(author.affiliationHistory[0]).toMatchObject({
+      institutionId: 'I109689652',
+      name: 'FPT University',
+      yearStart: 2020,
+      yearEnd: 2026,
+    });
+  });
+
+  it('buckets the recent works per author in one call', async () => {
+    // One listing covers every candidate: the works are then bucketed
+    // from the authorships the payload already carries.
+    const fetch = vi.fn(async (url: unknown) => {
+      // The filter is percent-encoded in the query string, so the pipe
+      // between the ids arrives as %7C.
+      expect(decodeURIComponent(String(url))).toContain('author.id:A1|A2');
+      return jsonResponse({
+        results: [
+          {
+            id: 'https://openalex.org/W1',
+            title: 'A paper of the first author',
+            publication_year: 2026,
+            primary_location: { source: { display_name: 'Symmetry' } },
+            authorships: [
+              {
+                author: { id: 'https://openalex.org/A1' },
+                institutions: [{ display_name: 'FPT University' }],
+              },
+            ],
+          },
+          {
+            id: 'https://openalex.org/W2',
+            title: 'A paper of the second author',
+            publication_year: 2025,
+            authorships: [
+              {
+                author: { id: 'https://openalex.org/A2' },
+                institutions: [{ display_name: 'Another University' }],
+              },
+            ],
+          },
+          {
+            id: 'https://openalex.org/W3',
+            title: 'A paper of both authors',
+            publication_year: 2024,
+            authorships: [
+              { author: { id: 'https://openalex.org/A1' } },
+              { author: { id: 'https://openalex.org/A2' } },
+            ],
+          },
+        ],
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+
+    const buckets = await makeClient().getRecentWorksByAuthors(['A1', 'A2']);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(buckets.get('A1')?.map((work) => work.shortId)).toEqual([
+      'W1',
+      'W3',
+    ]);
+    expect(buckets.get('A2')?.map((work) => work.shortId)).toEqual([
+      'W2',
+      'W3',
+    ]);
+    expect(buckets.get('A1')?.[0]).toMatchObject({
+      title: 'A paper of the first author',
+      publicationYear: 2026,
+      venue: 'Symmetry',
+      affiliation: 'FPT University',
+    });
+  });
+
+  it('returns an empty bucket for an author without works', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ results: [] })),
+    );
+
+    const buckets = await makeClient().getRecentWorksByAuthors(['A1', 'A2']);
+
+    expect(buckets.get('A1')).toEqual([]);
+    expect(buckets.get('A2')).toEqual([]);
+  });
+
   it('shapes the full author record', async () => {
     vi.stubGlobal(
       'fetch',

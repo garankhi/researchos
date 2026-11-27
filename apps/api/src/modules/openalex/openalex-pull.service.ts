@@ -13,7 +13,11 @@ import { OpenAlexIngestService } from './openalex-ingest.service.js';
 import { OpenAlexLookupService } from './openalex-lookup.service.js';
 import { OpenAlexClient } from './openalex.client.js';
 import { shortAuthorId, type ResearcherIdentity } from './openalex.identity.js';
-import type { OpenAlexAuthor, OpenAlexWork } from './openalex.types.js';
+import type {
+  OpenAlexAuthor,
+  OpenAlexAuthorRecentWork,
+  OpenAlexWork,
+} from './openalex.types.js';
 
 /**
  * The outcome of pulling only the works the researcher decided on.
@@ -73,13 +77,13 @@ export class OpenAlexPullService {
       return {
         mode: 'NAME',
         authors: result.authors.map((entry) =>
-          toAuthorCandidate(entry.author, entry.affiliationMatch),
+          toAuthorCandidate(entry.author, entry.affiliationMatch, entry.recentWorks),
         ),
       };
     }
     return {
       mode: result.mode,
-      authors: [toAuthorCandidate(result.author, true)],
+      authors: [toAuthorCandidate(result.author, true, [])],
     };
   }
 
@@ -353,9 +357,20 @@ export class OpenAlexPullService {
   }
 }
 
+/**
+ * Maps an OpenAlex author onto the candidate the frontend renders.
+ *
+ * The candidate carries the whole recognition payload: the citation
+ * metrics, the byline spellings, the topics, the affiliation history
+ * and the recent works. A name is not an identifier in Vietnam, and the
+ * researcher is the only one who can say which of the same-named
+ * profiles is theirs — so the panel shows them everything that could
+ * tell the profiles apart.
+ */
 function toAuthorCandidate(
   author: OpenAlexAuthor,
   affiliationMatch: boolean,
+  recentWorks: OpenAlexAuthorRecentWork[],
 ): OpenAlexAuthorCandidateDto {
   return {
     id: author.id,
@@ -365,6 +380,36 @@ function toAuthorCandidate(
     worksCount: author.worksCount,
     affiliations: author.affiliations,
     affiliationMatch,
+    counts: {
+      worksCount: author.counts.worksCount,
+      citedByCount: author.counts.citedByCount,
+      hIndex: author.counts.hIndex,
+      i10Index: author.counts.i10Index,
+      twoYearMeanCitedness: author.counts.twoYearMeanCitedness,
+    },
+    nameVariants: author.nameVariants,
+    observedOrcids: author.observedOrcids,
+    topics: author.topics.map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      count: topic.count,
+    })),
+    affiliationHistory: author.affiliationHistory.map((affiliation) => ({
+      institutionId: affiliation.institutionId,
+      name: affiliation.name,
+      countryCode: affiliation.countryCode,
+      institutionType: affiliation.institutionType,
+      yearStart: affiliation.yearStart,
+      yearEnd: affiliation.yearEnd,
+    })),
+    recentWorks: recentWorks.map((work) => ({
+      workId: work.workId,
+      shortId: work.shortId,
+      title: work.title,
+      publicationYear: work.publicationYear,
+      venue: work.venue,
+      affiliation: work.affiliation,
+    })),
   };
 }
 

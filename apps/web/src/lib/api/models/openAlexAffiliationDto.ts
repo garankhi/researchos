@@ -7,22 +7,17 @@
  */
 
 export interface OpenAlexAffiliationDto {
-  /** The OpenAlex institution id. */
+  /** The OpenAlex institution id, e.g. I109689652. */
   institutionId: string;
-  /**
-   * The ROR id of the same institution. It survives the renames and merges that break a display name.
-   * @nullable
-   */
-  ror: string | null;
   /** The institution display name. */
   name: string;
   /**
-   * The ISO country code.
+   * The ISO country code of the institution.
    * @nullable
    */
   countryCode: string | null;
   /**
-   * The kind of institution: EDUCATION, COMPANY, HEALTHCARE, NONPROFIT, GOVERNMENT, FACILITY, ARCHIVE or OTHER.
+   * The kind of institution: education, company, healthcare, nonprofit, government, facility, archive or other.
    * @nullable
    */
   institutionType: string | null;
@@ -36,6 +31,4 @@ export interface OpenAlexAffiliationDto {
    * @nullable
    */
   yearEnd: number | null;
-  /** Whether this is the affiliation the researcher is at now — the most recent one by year. */
-  isPrimary: boolean;
 }

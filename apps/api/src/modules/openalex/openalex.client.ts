@@ -8,6 +8,7 @@ import type {
   OpenAlexAffiliation,
   OpenAlexAuthor,
   OpenAlexAuthorCounts,
+  OpenAlexAuthorRecentWork,
   OpenAlexAuthorRecord,
   OpenAlexAuthorTopic,
   OpenAlexWork,
@@ -730,6 +731,141 @@ export class OpenAlexClient {
   }
 
   /**
+   * Fetches the recent works of several authors in one call.
+   *
+   * `GET /works?filter=author.id:<id>|<id>|…`, newest first.
+   *
+   * ## Why one call covers several authors
+   *
+   * The author step shows a *list* of candidates and the recognition
+   * panel shows the recent works of whichever one is selected. Fetching
+   * each candidate's works separately would cost one request per
+   * candidate per selection, and OpenAlex bills by request — a
+   * researcher cycling through five candidates would pay for five
+   * listings. One filter over all the candidate ids costs a single
+   * request, and the works are then bucketed per author from the
+   * `authorships` the payload already carries.
+   *
+   * The listing is **not** scoped to FPT University. A candidate's
+   * recent works are a recognition cue, and a work published elsewhere
+   * is a cue too — it is often exactly the work that tells a namesake
+   * apart from the researcher.
+   *
+   * Only the fields the panel renders are selected, so the payload stays
+   * small: the title, the year, the venue and the authorships.
+   */
+  async getRecentWorksByAuthors(
+    authorIds: readonly string[],
+    options: { perPage?: number } = {},
+  ): Promise<Map<string, OpenAlexAuthorRecentWork[]>> {
+    const shorts = [
+      ...new Set(
+        authorIds
+          .map((id) => shortId(id))
+          .filter((id): id is string => id !== null && id !== ''),
+      ),
+    ];
+    const buckets = new Map<string, OpenAlexAuthorRecentWork[]>(
+      shorts.map((id) => [id, []]),
+    );
+    if (shorts.length === 0) {
+      return buckets;
+    }
+
+    const perPage = Math.min(Math.max(options.perPage ?? 100, 1), MAX_PER_PAGE);
+    const url = new URL(`${this.baseUrl}/works`);
+    url.searchParams.set('filter', `author.id:${shorts.join('|')}`);
+    url.searchParams.set(
+      'select',
+      'id,title,publication_year,primary_location,authorships',
+    );
+    url.searchParams.set('per-page', String(perPage));
+    url.searchParams.set('sort', 'publication_date:desc');
+
+    const body = await this.getJson<{ results?: RawWork[] }>(url);
+    const seen = new Set<string>();
+
+    for (const raw of body.results ?? []) {
+      const work = this.toRecentWork(raw);
+      if (work === null || seen.has(work.workId)) {
+        continue;
+      }
+      seen.add(work.workId);
+      for (const [authorId, works] of buckets) {
+        if (work.authorIds.includes(authorId)) {
+          works.push(work);
+        }
+      }
+    }
+    return buckets;
+  }
+
+  /**
+   * Shapes one work for the recognition panel.
+   *
+   * The affiliation is read from the authorship of the *candidate* the
+   * work is listed under, not from the first author on the paper: a
+   * paper the candidate wrote while at another institution carries that
+   * institution, and it is the very thing that tells a namesake apart.
+   */
+  private toRecentWork(raw: RawWork): OpenAlexAuthorRecentWork | null {
+    const id = typeof raw.id === 'string' ? raw.id : '';
+    if (id === '') {
+      return null;
+    }
+    const title = (
+      typeof raw.title === 'string' && raw.title.trim() !== ''
+        ? raw.title
+        : typeof raw.display_name === 'string'
+          ? raw.display_name
+          : ''
+    ).trim();
+    const venue =
+      typeof raw.primary_location?.source?.display_name === 'string'
+        ? raw.primary_location.source.display_name
+        : null;
+    const publicationYear =
+      typeof raw.publication_year === 'number' ? raw.publication_year : null;
+
+    const authorships = Array.isArray(raw.authorships)
+      ? (raw.authorships as RawAuthorship[])
+      : [];
+
+    /*
+     * The affiliation is resolved per authorship, and the *first* one
+     * that carries an institution wins. The authorship order is the
+     * byline order, so the first candidate on the paper is the one the
+     * affiliation belongs to — which is the one the panel shows.
+     */
+    const authorIds: string[] = [];
+    let affiliation: string | null = null;
+    for (const entry of authorships) {
+      const authorId =
+        typeof entry.author?.id === 'string'
+          ? (shortId(entry.author.id) ?? entry.author.id)
+          : null;
+      if (authorId === null) {
+        continue;
+      }
+      authorIds.push(authorId);
+      if (affiliation === null) {
+        const names = extractAuthorshipAffiliations(entry);
+        affiliation = names[0] ?? null;
+      }
+    }
+
+    return {
+      workId: id,
+      shortId: shortId(id) ?? id,
+      title,
+      publicationYear,
+      venue,
+      affiliation,
+      authorIds,
+    };
+  }
+
+  /**
    * Fetches one work with full metadata.
    *
    * `GET /works/<work_id>` — venue, year, abstract, authors, DOI.
@@ -753,17 +889,44 @@ export class OpenAlexClient {
     return this.toWork(body);
   }
 
+  /**
+   * Shapes an author payload into the flat lookup shape.
+   *
+   * The enriched fields — the counts, the byline spellings, the topics
+   * and the affiliation history — come from the same payload as the
+   * identity fields. OpenAlex returns the whole author record for a
+   * search result, so carrying them costs no extra request; it only
+   * costs the shaping.
+   */
   private toAuthor(raw: RawAuthor): OpenAlexAuthor {
     const id = typeof raw.id === 'string' ? raw.id : '';
     const displayName =
       typeof raw.display_name === 'string' ? raw.display_name : '';
+    const counts = toAuthorCounts(raw);
+    const names = toAuthorNames(raw);
+    const observedOrcids = Array.isArray(raw.observed_orcids)
+      ? (raw.observed_orcids as unknown[])
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => value.trim())
+          .filter((value) => value !== '')
+      : [];
     return {
       id,
       shortId: shortId(id) ?? id,
       displayName,
       orcid: typeof raw.orcid === 'string' ? raw.orcid : null,
-      worksCount: typeof raw.works_count === 'number' ? raw.works_count : null,
+      worksCount: counts.worksCount,
       affiliations: extractAffiliations(raw),
+      counts,
+      /*
+       * The canonical display name is part of the byline corpus, so it
+       * is dropped here: the variants list is what the *other* spellings
+       * are, and repeating the name the card already shows is noise.
+       */
+      nameVariants: names.filter((name) => name !== displayName),
+      observedOrcids,
+      topics: toAuthorTopics(raw),
+      affiliationHistory: toAffiliations(raw),
     };
   }
 

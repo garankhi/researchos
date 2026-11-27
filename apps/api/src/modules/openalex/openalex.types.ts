@@ -21,6 +21,63 @@ export interface OpenAlexAuthor {
   worksCount: number | null;
   /** Institution display names from the last known affiliations. */
   affiliations: string[];
+  /**
+   * The citation metrics OpenAlex reports for the author.
+   *
+   * They are the part of the record a researcher recognises fastest:
+   * an h-index of 40 and an h-index of 2 are two different people
+   * wearing the same name.
+   */
+  counts: OpenAlexAuthorCounts;
+  /**
+   * Every byline spelling OpenAlex has observed for the author.
+   *
+   * The byline is the other half of the recognition: a researcher who
+   * published as `"Nguyen, Hoang Khoi Tran"` recognises that spelling
+   * immediately, and it is also what tells two namesakes apart.
+   */
+  nameVariants: string[];
+  /** Every ORCID seen across the author's workships. */
+  observedOrcids: string[];
+  /** The topics OpenAlex assigned to the author, most prolific first. */
+  topics: OpenAlexAuthorTopic[];
+  /** The affiliations, with the years they held. */
+  affiliationHistory: OpenAlexAffiliation[];
+}
+
+/**
+ * One of an author's recent works, as the recognition panel shows it.
+ *
+ * The panel needs three things and no more: what the work is called,
+ * when it came out, and where it was published. The affiliation rides
+ * along because a work the candidate published *elsewhere* is itself a
+ * recognition cue.
+ */
+export interface OpenAlexAuthorRecentWork {
+  /** Canonical id, e.g. `https://openalex.org/W2741809807`. */
+  workId: string;
+  /** Short id, e.g. `W2741809807`. */
+  shortId: string;
+  /** Work title, trimmed; empty string when OpenAlex has none. */
+  title: string;
+  /** Publication year, or null. */
+  publicationYear: number | null;
+  /** Venue from `primary_location.source.display_name`, or null. */
+  venue: string | null;
+  /**
+   * The institution recorded on the candidate's *own* authorship.
+   *
+   * Null when OpenAlex recorded no institution for it — an unlinked
+   * authorship — which is itself worth showing rather than hiding.
+   */
+  affiliation: string | null;
+  /**
+   * The short OpenAlex author ids of every authorship on the work.
+   *
+   * The bucketing key: one listing covers several authors, and the
+   * authorship list says which of them the work belongs to.
+   */
+  authorIds: string[];
 }
 
 /** One author of a work, in platform order. */
