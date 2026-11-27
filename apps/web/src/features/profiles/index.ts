@@ -24,5 +24,6 @@ export * from './hooks/use-profile-interests';
 export * from './hooks/use-my-applications';
 export * from './hooks/use-openalex-candidates';
 export * from './hooks/use-onboarding';
+export * from './hooks/use-onboarding-leave-guard';
 export * from './schemas/profile-form.schema';
 export * from './schemas/onboarding-profile.schema';

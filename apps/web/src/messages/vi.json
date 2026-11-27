@@ -342,12 +342,7 @@
       "affiliationMatch": "FPT University",
       "worksCount": "{count, plural, =1 {1 bài báo} other {# bài báo}}",
       "alreadyLinked": "Hồ sơ của bạn đã liên kết một tác giả OpenAlex. Lần tải sau sẽ dùng tác giả đó.",
-      "confirm": "Đây là tôi",
-      "skip": "Bỏ qua",
-      "continue": "Tiếp tục mà không xác nhận",
-      "pulled": "Hồ sơ OpenAlex của bạn đã được xác nhận.",
       "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau.",
-      "clear": "Bỏ xác nhận hồ sơ này",
       "detail": {
         "empty": "Chọn một hồ sơ bên trái để xem toàn bộ thông tin — chỉ số trích dẫn, các biến thể tên đã xuất bản, chủ đề nghiên cứu, tổ chức và các tác phẩm gần đây.",
         "affiliationMatch": "FPT University",
@@ -385,6 +380,22 @@
         "topics": "Chủ đề nghiên cứu",
         "affiliations": "Tổ chức"
       },
+      "affiliations": {
+        "title": "Dòng thời gian công tác của bạn",
+        "description": "Nơi bạn đã làm việc và trong bao lâu. Hãy sửa nếu OpenAlex ghi sai — thường thì nó giữ lại tổ chức bạn đã rời đi.",
+        "empty": "Bạn chưa ghi tổ chức nào.",
+        "institution": "Tổ chức",
+        "institutionPlaceholder": "Tên tổ chức",
+        "yearFrom": "Năm bắt đầu",
+        "yearTo": "Năm kết thúc",
+        "yearFromPlaceholder": "Từ",
+        "yearToPlaceholder": "Đến",
+        "current": "Hiện tại",
+        "add": "Thêm một tổ chức",
+        "remove": "Bỏ tổ chức này",
+        "invalidSummary": "Hãy sửa các tổ chức được đánh dấu trước khi hoàn tất.",
+        "institutionIdLabel": "Mã tổ chức: {id}"
+      },
       "fullName": "Họ và tên",
       "departmentUnit": "Khoa hoặc đơn vị",
       "academicTitle": "Chức danh học thuật",
@@ -394,10 +405,11 @@
       "googleScholarUrl": "Hồ sơ Google Scholar",
       "scopusAuthorId": "Mã tác giả Scopus",
       "bio": "Tiểu sử",
+      "identityCard": "Danh tính của bạn",
+      "publicationsCard": "Tác phẩm và mức độ sẵn sàng của bạn",
+      "biographyCard": "Tiểu sử của bạn",
       "saved": "Thông tin của bạn đã được giữ lại. Nó sẽ được lưu khi bạn hoàn tất.",
-      "failed": "Không thể lưu hồ sơ. Hãy thử lại.",
-      "save": "Lưu thông tin của tôi",
-      "skip": "Bỏ qua"
+      "failed": "Không thể lưu hồ sơ. Hãy thử lại."
     },
     "worksStep": {
       "title": "Nhập tác phẩm của bạn",
@@ -422,7 +434,14 @@
     },
     "finish": "Hoàn tất thiết lập",
     "finished": "Hồ sơ của bạn đã sẵn sàng. Chào mừng bạn đến với ResearchOS.",
-    "finishFailed": "Không thể hoàn tất thiết lập. Hãy chọn ít nhất một lĩnh vực nghiên cứu rồi thử lại."
+    "finishFailed": "Không thể hoàn tất thiết lập. Hãy chọn ít nhất một lĩnh vực nghiên cứu rồi thử lại.",
+    "leaveGuard": {
+      "title": "Rời khỏi bước thiết lập?",
+      "description": "Các câu trả lời của bạn chỉ được giữ trên trang này. Nếu bạn rời đi ngay, mọi thứ bạn đã nhập sẽ mất và bạn phải bắt đầu lại từ bước đầu tiên.",
+      "confirm": "Rời đi và mất các câu trả lời",
+      "cancel": "Ở lại trang này"
+    },
+    "skip": "Bỏ qua"
   },
   "profile": {
     "llkh": {
@@ -854,7 +873,22 @@
         "google_scholar_url_invalid": "Nhập một URL hợp lệ.",
         "google_scholar_url_too_long": "Dùng tối đa 500 ký tự.",
         "scopus_author_id_invalid": "Mã tác giả Scopus phải là văn bản.",
-        "scopus_author_id_too_long": "Dùng tối đa 50 ký tự."
+        "scopus_author_id_too_long": "Dùng tối đa 50 ký tự.",
+        "affiliations_invalid": "Danh sách cơ quan phải là một danh sách.",
+        "affiliation_invalid": "Mỗi cơ quan phải là một cơ quan hợp lệ.",
+        "too_many_affiliations": "Dùng tối đa 50 cơ quan.",
+        "affiliation_institution_id_required": "Mã cơ quan là bắt buộc.",
+        "affiliation_institution_id_invalid": "Mã cơ quan phải là văn bản.",
+        "affiliation_institution_id_too_long": "Dùng tối đa 255 ký tự cho mã cơ quan.",
+        "affiliation_name_required": "Tên cơ quan là bắt buộc.",
+        "affiliation_name_invalid": "Tên cơ quan phải là văn bản.",
+        "affiliation_name_too_long": "Dùng tối đa 255 ký tự cho tên cơ quan.",
+        "affiliation_ror_invalid": "Mã ROR phải là văn bản.",
+        "affiliation_ror_too_long": "Dùng tối đa 255 ký tự cho mã ROR.",
+        "affiliation_country_code_invalid": "Mã quốc gia phải gồm hai chữ cái, ví dụ VN.",
+        "affiliation_institution_type_invalid": "Hãy chọn một loại cơ quan hợp lệ.",
+        "affiliation_year_start_invalid": "Năm bắt đầu phải là năm trong khoảng 1000 đến năm hiện tại cộng một.",
+        "affiliation_year_end_invalid": "Năm kết thúc phải là năm trong khoảng 1000 đến năm hiện tại cộng một."
       },
       "domain": {
         "follow_self": "Bạn không thể tự theo dõi mình.",
@@ -975,6 +1009,7 @@
         "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này.",
         "onboarding_requires_interest": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập.",
         "orcid_already_claimed": "ORCID này đã thuộc về một hồ sơ researcher khác.",
+        "onboarding_affiliation_years_invalid": "Một cơ quan không thể kết thúc trước khi bắt đầu.",
         "interest_topic_not_found": "Một trong các lĩnh vực nghiên cứu đã chọn không còn tồn tại.",
         "interest_topic_inactive": "Một trong các lĩnh vực nghiên cứu đã chọn không còn khả dụng.",
         "interests_required": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập."

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Box,
-  Button,
   Flex,
   Grid,
   Heading,
@@ -13,7 +12,6 @@ import {
   Text,
   useBreakpointValue,
 } from '@chakra-ui/react';
-import { UserCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import type { OpenAlexAuthorCandidateDto } from '@/lib/api/models';
@@ -37,19 +35,17 @@ export interface OnboardingAuthorStepProps {
   /** The author the researcher confirmed, from the draft. */
   confirmedAuthorId: string | null;
   /**
-   * Confirms an author, or unconfirms it when it is the current one.
+   * The candidate the researcher picked in the list.
    *
-   * The candidate rides along so the profile step can prefill from the
-   * OpenAlex record the researcher just confirmed, without fetching it
-   * a second time.
+   * The step owns the selection, because the list is what the
+   * researcher picks from — but the *decision* is the flow's: the
+   * Next button confirms the picked candidate, and the Skip button
+   * leaves the step without one. The step therefore only reports what
+   * is picked and leaves the flow to act on it.
    */
-  onConfirm: (
-    shortId: string,
-    orcid: string | null,
-    author: OnboardingDraftOpenAlexAuthor | null,
-  ) => void;
-  /** Skips the step: no author is confirmed. */
-  onSkip: () => void;
+  selectedAuthorId: string | null;
+  /** Reports the candidate the researcher picked in the list. */
+  onSelect: (shortId: string) => void;
 }
 
 /**
@@ -76,6 +72,15 @@ export interface OnboardingAuthorStepProps {
  * researcher may pick a different one, or unconfirm the current one, and
  * the works preview follows the change. That is why the step shows the
  * current choice and lets the researcher take it back.
+ *
+ * ## Why the step has no buttons of its own
+ *
+ * The flow has one Next button and one Skip button, and they mean the
+ * same thing on every step. A step that also carries a "This is me" and
+ * a "Save" button gives the researcher three ways to leave a step, and
+ * no way to tell which one they are supposed to use. So the step only
+ * shows the choice — picking a candidate — and the flow's buttons act
+ * on it.
  */
 export function OnboardingAuthorStep({
   authors,
@@ -84,15 +89,10 @@ export function OnboardingAuthorStep({
   isFailed,
   onRetry,
   confirmedAuthorId,
-  onConfirm,
-  onSkip,
+  selectedAuthorId,
+  onSelect,
 }: OnboardingAuthorStepProps) {
   const t = useTranslations('onboarding');
-
-  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(
-    confirmedAuthorId,
-  );
-  const [actionError, setActionError] = useState<string | null>(null);
 
   /*
    * The candidate the detail panel describes. It is the selected one,
@@ -101,36 +101,12 @@ export function OnboardingAuthorStep({
    * empty panel.
    */
   const selectedCandidate = useMemo(() => {
-    const wanted = selectedAuthor ?? confirmedAuthorId;
+    const wanted = selectedAuthorId ?? confirmedAuthorId;
     if (wanted === null) {
       return null;
     }
     return authors.find((author) => author.shortId === wanted) ?? null;
-  }, [authors, selectedAuthor, confirmedAuthorId]);
-
-  const handleConfirm = () => {
-    if (!selectedAuthor) {
-      return;
-    }
-    setActionError(null);
-    /*
-     * The ORCID comes from the list the step already loaded, so
-     * confirming an author costs no extra request. The same goes for
-     * the record itself: it travels to the draft so the profile step
-     * can prefill from it without asking OpenAlex again.
-     */
-    const chosen = authors.find((author) => author.shortId === selectedAuthor);
-    onConfirm(
-      selectedAuthor,
-      chosen?.orcid ?? null,
-      chosen ? toDraftAuthor(chosen) : null,
-    );
-  };
-
-  const handleSkip = () => {
-    setActionError(null);
-    onSkip();
-  };
+  }, [authors, selectedAuthorId, confirmedAuthorId]);
 
   /*
    * The panel is capped at the height of the list beside it, so the two
@@ -148,7 +124,6 @@ export function OnboardingAuthorStep({
 
   useEffect(() => {
     if (!isWide) {
-      setListHeight(null);
       return;
     }
     const element = listRef.current;
@@ -172,10 +147,6 @@ export function OnboardingAuthorStep({
           {t('authorStep.description')}
         </Text>
       </Box>
-
-      {actionError ? (
-        <ErrorState title={t('authorStep.failed')} message={actionError} />
-      ) : null}
 
       {isFailed ? (
         <ErrorState title={t('authorStep.failed')} onRetry={onRetry} />
@@ -217,8 +188,26 @@ export function OnboardingAuthorStep({
             p={{ base: '4', md: '5' }}
           >
             <RadioGroup.Root
-              value={selectedAuthor}
-              onValueChange={(details) => setSelectedAuthor(details.value)}
+              /*
+               * The confirmed author counts as picked.
+               *
+               * A researcher who comes back to the step sees the
+               * author they confirmed still ticked, so the list reads
+               * as their choice rather than as an empty list they have
+               * to pick from again.
+               */
+              value={selectedAuthorId ?? confirmedAuthorId ?? undefined}
+              onValueChange={(details) => {
+                /*
+                 * A radio group can be cleared, which arrives as a
+                 * null. That is not a choice of author — it is the
+                 * researcher un-ticking everything, which is what the
+                 * Skip button is for.
+                 */
+                if (details.value !== null) {
+                  onSelect(details.value);
+                }
+              }}
             >
               <Stack gap="4">
                 {authors.map((author) => (
@@ -256,29 +245,18 @@ export function OnboardingAuthorStep({
                 ))}
               </Stack>
             </RadioGroup.Root>
-
-            <Flex mt="6" gap="3" justify="flex-end" flexWrap="wrap">
-              <Button variant="outline" onClick={handleSkip}>
-                {confirmedAuthorId ? t('authorStep.clear') : t('authorStep.skip')}
-              </Button>
-              <Button onClick={handleConfirm} disabled={!selectedAuthor}>
-                <UserCheck />
-                {t('authorStep.confirm')}
-              </Button>
-            </Flex>
           </Box>
 
           <OnboardingAuthorDetail
             author={selectedCandidate ?? null}
-            maxHeight={listHeight}
+            /*
+             * The cap only applies on a wide screen. On a narrow one the
+             * panel sits under the list and is free to be as tall as it
+             * needs, so the measured height is not applied there.
+             */
+            maxHeight={isWide ? listHeight : null}
           />
         </Grid>
-      ) : null}
-
-      {authors.length === 0 && !isLoading && !isFailed ? (
-        <Flex justify="flex-end">
-          <Button onClick={handleSkip}>{t('authorStep.continue')}</Button>
-        </Flex>
       ) : null}
 
       {mode === 'AUTHOR_ID' || mode === 'ORCID' ? (
@@ -293,11 +271,10 @@ export function OnboardingAuthorStep({
 /**
  * The candidate, in the shape the draft keeps it.
  *
- * The draft is persisted to `localStorage`, so it holds a plain object
- * rather than the generated DTO — the API's shape is not the draft's,
- * and the two are free to drift apart.
+ * The draft holds a plain object rather than the generated DTO — the
+ * API's shape is not the draft's, and the two are free to drift apart.
  */
-function toDraftAuthor(
+export function toDraftOpenAlexAuthor(
   author: OpenAlexAuthorCandidateDto,
 ): OnboardingDraftOpenAlexAuthor {
   return {
@@ -312,7 +289,9 @@ function toDraftAuthor(
     affiliations: author.affiliationHistory.map((affiliation) => ({
       institutionId: affiliation.institutionId,
       name: affiliation.name,
+      ror: affiliation.ror,
       countryCode: affiliation.countryCode,
+      institutionType: affiliation.institutionType,
       yearStart: affiliation.yearStart,
       yearEnd: affiliation.yearEnd,
     })),

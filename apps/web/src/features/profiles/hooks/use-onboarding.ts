@@ -250,12 +250,32 @@ export function useOnboarding({
       const state = draft.getState();
       const profile = state.profileValues;
 
+      /*
+       * The affiliations travel only when the researcher edited the
+       * timeline.
+       *
+       * Omitting the field leaves the rows the OpenAlex sync wrote
+       * exactly as they are, which is what a researcher who never
+       * touched the timeline expects. Sending the OpenAlex rows back
+       * would replace the stored rows with the same rows and lose the
+       * country code and the institution type the sync had written —
+       * so "not edited" and "edited into the same shape" have to be
+       * different payloads.
+       *
+       * An empty list travels too: it is the researcher saying they
+       * have no affiliations. The server reads an empty list as a
+       * deliberate answer — the stored rows go — so the intent is
+       * stated rather than guessed at.
+       */
+      const affiliations = state.affiliationValues;
+
       await finalizeMutation.mutateAsync({
         data: {
           topicIds: state.topicIds,
           ...(state.confirmedAuthorId
             ? { openAlexAuthorId: state.confirmedAuthorId }
             : {}),
+          ...(affiliations !== null ? { affiliations } : {}),
           ...(profile
             ? {
                 ...(profile.fullName

@@ -342,12 +342,7 @@
       "affiliationMatch": "FPT University",
       "worksCount": "{count, plural, =1 {1 work} other {# works}}",
       "alreadyLinked": "Your profile already links an OpenAlex author. Pulling again will use it.",
-      "confirm": "This is me",
-      "skip": "Skip for now",
-      "continue": "Continue without confirming",
-      "pulled": "Your OpenAlex profile was confirmed.",
       "failed": "Could not reach OpenAlex. Try again in a moment.",
-      "clear": "Unconfirm this profile",
       "detail": {
         "empty": "Pick a profile on the left to see its full record — the metrics, the byline spellings, the topics, the affiliations and the recent works.",
         "affiliationMatch": "FPT University",
@@ -385,6 +380,22 @@
         "topics": "Research topics",
         "affiliations": "Affiliations"
       },
+      "affiliations": {
+        "title": "Your affiliation timeline",
+        "description": "Where you have worked and for how long. Correct anything OpenAlex got wrong — it often keeps the institution you left.",
+        "empty": "You have not listed any affiliation yet.",
+        "institution": "Institution",
+        "institutionPlaceholder": "Institution name",
+        "yearFrom": "Start year",
+        "yearTo": "End year",
+        "yearFromPlaceholder": "From",
+        "yearToPlaceholder": "To",
+        "current": "Current",
+        "add": "Add an affiliation",
+        "remove": "Remove this affiliation",
+        "invalidSummary": "Fix the highlighted affiliations before you finish.",
+        "institutionIdLabel": "Institution id: {id}"
+      },
       "fullName": "Full name",
       "departmentUnit": "Department or unit",
       "academicTitle": "Academic title",
@@ -394,10 +405,11 @@
       "googleScholarUrl": "Google Scholar profile",
       "scopusAuthorId": "Scopus author id",
       "bio": "Biography",
+      "identityCard": "Your identity",
+      "publicationsCard": "Your publications and availability",
+      "biographyCard": "Your biography",
       "saved": "Your information was kept. It is saved when you finish.",
-      "failed": "Could not save your profile. Try again.",
-      "save": "Save my information",
-      "skip": "Skip for now"
+      "failed": "Could not save your profile. Try again."
     },
     "worksStep": {
       "title": "Import your publications",
@@ -422,7 +434,14 @@
     },
     "finish": "Finish onboarding",
     "finished": "Your profile is ready. Welcome to ResearchOS.",
-    "finishFailed": "Could not finish the onboarding. Pick at least one research interest and try again."
+    "finishFailed": "Could not finish the onboarding. Pick at least one research interest and try again.",
+    "leaveGuard": {
+      "title": "Leave the onboarding?",
+      "description": "Your answers are only kept on this page. If you leave now, everything you have entered so far is lost and you start again from the first step.",
+      "confirm": "Leave and lose my answers",
+      "cancel": "Stay on this page"
+    },
+    "skip": "Skip for now"
   },
   "profile": {
     "llkh": {
@@ -854,7 +873,22 @@
         "google_scholar_url_invalid": "Enter a valid URL.",
         "google_scholar_url_too_long": "Use 500 characters or fewer.",
         "scopus_author_id_invalid": "The Scopus author id must be text.",
-        "scopus_author_id_too_long": "Use 50 characters or fewer."
+        "scopus_author_id_too_long": "Use 50 characters or fewer.",
+        "affiliations_invalid": "The affiliations must be a list.",
+        "affiliation_invalid": "Each affiliation must be a valid affiliation.",
+        "too_many_affiliations": "Use 50 affiliations or fewer.",
+        "affiliation_institution_id_required": "The institution id is required.",
+        "affiliation_institution_id_invalid": "The institution id must be text.",
+        "affiliation_institution_id_too_long": "Use 255 characters or fewer for the institution id.",
+        "affiliation_name_required": "The institution name is required.",
+        "affiliation_name_invalid": "The institution name must be text.",
+        "affiliation_name_too_long": "Use 255 characters or fewer for the institution name.",
+        "affiliation_ror_invalid": "The ROR id must be text.",
+        "affiliation_ror_too_long": "Use 255 characters or fewer for the ROR id.",
+        "affiliation_country_code_invalid": "The country code must be two letters, e.g. VN.",
+        "affiliation_institution_type_invalid": "Select a valid institution type.",
+        "affiliation_year_start_invalid": "The start year must be a year between 1000 and the current year plus one.",
+        "affiliation_year_end_invalid": "The end year must be a year between 1000 and the current year plus one."
       },
       "domain": {
         "follow_self": "You cannot follow yourself.",
@@ -975,6 +1009,7 @@
         "project_access_denied": "You do not have permission to view this research project.",
         "onboarding_requires_interest": "Pick at least one research interest before finishing the onboarding.",
         "orcid_already_claimed": "This ORCID already belongs to another researcher profile.",
+        "onboarding_affiliation_years_invalid": "An affiliation cannot end before it starts.",
         "interest_topic_not_found": "One of the selected research topics no longer exists.",
         "interest_topic_inactive": "One of the selected research topics is no longer available.",
         "interests_required": "Pick at least one research interest before finishing the onboarding."

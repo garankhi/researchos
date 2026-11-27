@@ -10017,7 +10017,7 @@
     },
     "/profiles/me/onboarding/finalize": {
       "post": {
-        "description": "Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, and the decisions on the works. The interests are reconciled to the set the researcher ended up with, and only the decided works are pulled.",
+        "description": "Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, the decisions on the works, and — when the researcher corrected it — the affiliation timeline. The interests are reconciled to the set the researcher ended up with, only the decided works are pulled, and the corrected affiliations are written after the OpenAlex sync so the researcher's version of the timeline is the one that survives.",
         "operationId": "ProfilesController_finalizeOnboarding",
         "parameters": [],
         "requestBody": {
@@ -10042,7 +10042,7 @@
             }
           },
           "400": {
-            "description": "The caller declared no research interest, which is the one mandatory step of the onboarding.",
+            "description": "The caller declared no research interest, which is the one mandatory step of the onboarding, or sent an affiliation whose end year precedes its start year.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14086,6 +14086,12 @@
             "description": "The institution display name.",
             "example": "FPT University"
           },
+          "ror": {
+            "type": "string",
+            "description": "The ROR id of the institution, when OpenAlex knows one. It is carried through so an affiliation the researcher edits keeps its identity: the id is the key the affiliation is stored under.",
+            "nullable": true,
+            "example": "https://ror.org/03esj4g97"
+          },
           "countryCode": {
             "type": "string",
             "description": "The ISO country code of the institution.",
@@ -14114,6 +14120,7 @@
         "required": [
           "institutionId",
           "name",
+          "ror",
           "countryCode",
           "institutionType",
           "yearStart",
@@ -16983,6 +16990,68 @@
           "accepted"
         ]
       },
+      "OnboardingAffiliationDto": {
+        "type": "object",
+        "properties": {
+          "institutionId": {
+            "type": "string",
+            "description": "The OpenAlex institution id, e.g. I109689652. It is the key the affiliation is stored under.",
+            "example": "I109689652",
+            "maxLength": 255
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name of the institution.",
+            "example": "FPT University",
+            "maxLength": 255
+          },
+          "ror": {
+            "type": "string",
+            "description": "The ROR id of the institution, when the researcher knows it. Null clears it.",
+            "example": "05dxps055",
+            "nullable": true,
+            "maxLength": 255
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code of the institution. Null clears it.",
+            "example": "VN",
+            "nullable": true
+          },
+          "institutionType": {
+            "type": "string",
+            "description": "The kind of institution. Null clears it.",
+            "enum": [
+              "EDUCATION",
+              "COMPANY",
+              "HEALTHCARE",
+              "NONPROFIT",
+              "GOVERNMENT",
+              "FACILITY",
+              "ARCHIVE",
+              "OTHER"
+            ],
+            "example": "EDUCATION",
+            "nullable": true
+          },
+          "yearStart": {
+            "type": "number",
+            "description": "The first year the affiliation held. Null means the start year is unknown.",
+            "example": 2020,
+            "nullable": true
+          },
+          "yearEnd": {
+            "type": "number",
+            "description": "The last year the affiliation held. Null means the affiliation is still running.",
+            "example": 2026,
+            "nullable": true
+          }
+        },
+        "required": [
+          "institutionId",
+          "name"
+        ]
+      },
       "FinalizeOnboardingDto": {
         "type": "object",
         "properties": {
@@ -17064,6 +17133,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OnboardingWorkDecisionDto"
+            }
+          },
+          "affiliations": {
+            "description": "The affiliation timeline the researcher corrected, as the set they ended up with. Omitted means the researcher did not edit the timeline, and the affiliations OpenAlex reports are kept as they are. The rows replace the stored ones — the ones that are gone are removed — and the affiliation the researcher is at now is marked as the primary one.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingAffiliationDto"
             }
           }
         },

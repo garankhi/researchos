@@ -204,6 +204,8 @@ export * from './notificationPreferencesDto';
 export * from './notificationPreferencesDtoEnvelope';
 export * from './notificationsControllerListParams';
 export * from './notificationType';
+export * from './onboardingAffiliationDto';
+export * from './onboardingAffiliationDtoInstitutionType';
 export * from './onboardingWorkDecisionDto';
 export * from './onboardingWorkDecisionDtoVisibility';
 export * from './openAlexAffiliationDto';

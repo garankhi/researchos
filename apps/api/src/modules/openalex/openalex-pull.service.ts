@@ -397,6 +397,7 @@ function toAuthorCandidate(
     affiliationHistory: author.affiliationHistory.map((affiliation) => ({
       institutionId: affiliation.institutionId,
       name: affiliation.name,
+      ror: affiliation.ror,
       countryCode: affiliation.countryCode,
       institutionType: affiliation.institutionType,
       yearStart: affiliation.yearStart,

@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { primaryAffiliationId } from '../openalex/affiliation-primary.js';
 import { OpenAlexAuthorRecordService } from '../openalex/openalex-author-record.service.js';
 import { OpenAlexCandidatesService } from '../openalex/openalex-candidates.service.js';
 import { CandidateVisibility } from '../openalex/dto/accept-candidate.dto.js';
@@ -9,6 +10,7 @@ import { OpenAlexPullService } from '../openalex/openalex-pull.service.js';
 import { shortAuthorId } from '../openalex/openalex.identity.js';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
 import type { FinalizeOnboardingDto } from './dto/finalize-onboarding.dto.js';
+import type { OnboardingAffiliationDto } from './dto/onboarding-affiliation.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
 
 /**
@@ -28,11 +30,21 @@ import type { ProfileResponseDto } from './dto/profile-response.dto.js';
  *    confirmed OpenAlex author and the completion stamp.
  * 3. The interests, reconciled to the set the researcher ended up with.
  * 4. The decided works, pulled and decided.
+ * 5. The affiliations the researcher corrected, replacing the rows the
+ *    OpenAlex sync wrote.
  *
  * The first three are one transaction: either the profile is written and
  * the onboarding is complete, or nothing happened. The works are pulled
  * outside it, because a pull reaches OpenAlex and that must not hold a
  * database transaction open.
+ *
+ * ## Why the affiliations are written last
+ *
+ * The OpenAlex sync stores the affiliations OpenAlex reports, and it
+ * does that by replacing the caller's rows. So an edit written before
+ * the sync would be wiped by it. The researcher's corrections are
+ * therefore applied *after* the sync, which makes them the last word.
+ * See `replaceAffiliations` for the details.
  *
  * ## Why a rejected interest is not deleted
  *
@@ -74,6 +86,32 @@ export class OnboardingFinalizeService {
 
     const authorId = shortAuthorId(dto.openAlexAuthorId);
 
+    /*
+     * Whether the researcher touched the timeline at all.
+     *
+     * The two cases are not the same, and conflating them loses data:
+     *
+     * - `undefined` — the field was omitted, so the researcher never
+     *   touched the timeline. Nothing is written and the rows the
+     *   OpenAlex sync wrote stay exactly as they are.
+     * - `[]` — the field was sent and it is empty, so the researcher
+     *   removed every affiliation on purpose. That is a decision, and
+     *   the stored rows must go.
+     *
+     * So the check is on presence, not on length.
+     */
+    const hasAffiliations = dto.affiliations !== undefined;
+    const affiliations = dto.affiliations ?? [];
+
+    /*
+     * The years are checked before anything is written. The order of the
+     * two years is a relation between two fields, and a relation cannot
+     * live in a class-validator decorator, so the service owns it — and
+     * it owns it *here*, before the first write, so a timeline that
+     * makes no sense does not leave a half-finished onboarding behind.
+     */
+    this.requireConsistentAffiliationYears(affiliations);
+
     await this.requireActiveTopics(topicIds);
 
     const user = await this.prisma.$transaction(async (tx) => {
@@ -108,7 +146,110 @@ export class OnboardingFinalizeService {
       await this.authorRecords.trySyncAuthorRecord(userId, authorId);
     }
 
+    /*
+     * The researcher's own affiliations are written **after** the
+     * OpenAlex sync, and that order is the whole point.
+     *
+     * The sync replaces the affiliation rows with the ones OpenAlex
+     * reports — it deletes them and re-creates them, because an
+     * affiliation OpenAlex merged away must not stay as two rows
+     * forever. So an edit written *before* the sync would be silently
+     * wiped and OpenAlex's version would come back: the researcher's
+     * correction would disappear without a trace.
+     *
+     * Writing after the sync makes the researcher's version the last
+     * word. The sync still runs, so the counts, the byline spellings
+     * and the topics are stored as usual, and OpenAlex's affiliations
+     * are the ones the researcher corrected — which is the only
+     * outcome that matches what they were shown and allowed to change.
+     *
+     * A researcher who did not edit the timeline sends no
+     * affiliations at all, and then nothing is written here: the
+     * OpenAlex rows stay exactly as they are, as before this field
+     * existed. A researcher who removed every affiliation sends an
+     * empty list, and that is a decision: the rows go.
+     */
+    if (hasAffiliations) {
+      await this.replaceAffiliations(userId, affiliations);
+    }
+
     return this.mapToResponse(user);
+  }
+
+  /**
+   * Refuses a timeline whose end year precedes its start year.
+   *
+   * The range of a single year is a property of the field, so the DTO
+   * checks it. The *order* of the two years is a relation between them,
+   * and class-validator has no clean way to express one, so the service
+   * does.
+   *
+   * The check runs before the first write, so a timeline that cannot be
+   * stored never leaves a half-written onboarding behind.
+   */
+  private requireConsistentAffiliationYears(
+    affiliations: readonly OnboardingAffiliationDto[],
+  ): void {
+    for (const affiliation of affiliations) {
+      const { yearStart, yearEnd } = affiliation;
+
+      if (yearStart === null || yearStart === undefined) {
+        continue;
+      }
+      if (yearEnd === null || yearEnd === undefined) {
+        continue;
+      }
+      if (yearEnd < yearStart) {
+        throw new CodedHttpException(
+          domainErrorCodes.profiles.onboardingAffiliationYearsInvalid,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
+  /**
+   * Replaces the caller's affiliation rows with the researcher's set.
+   *
+   * The rows are a **replacement**, like the interests: the wizard owns
+   * the whole set while it is open, so the payload states the set the
+   * researcher ended up with. An affiliation that is gone is removed,
+   * one that is there is written as it was stated.
+   *
+   * The primary affiliation is the one the researcher is at now, decided
+   * by the same rule the OpenAlex record service uses — the most recent
+   * by end year, a running affiliation beating a finished one, ties
+   * broken by the earliest start. The rule lives in one place so the two
+   * writers cannot disagree about where the researcher works. A single
+   * affiliation is trivially the primary under that rule.
+   */
+  private async replaceAffiliations(
+    userId: string,
+    affiliations: readonly OnboardingAffiliationDto[],
+  ): Promise<void> {
+    const primary = primaryAffiliationId(affiliations);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.researcher_affiliations.deleteMany({
+        where: { user_id: userId },
+      });
+
+      for (const affiliation of affiliations) {
+        await tx.researcher_affiliations.create({
+          data: {
+            user_id: userId,
+            institution_id: affiliation.institutionId,
+            ror: affiliation.ror ?? null,
+            name: affiliation.name,
+            country_code: affiliation.countryCode ?? null,
+            institution_type: affiliation.institutionType ?? null,
+            year_start: affiliation.yearStart ?? null,
+            year_end: affiliation.yearEnd ?? null,
+            is_primary: affiliation.institutionId === primary,
+          },
+        });
+      }
+    });
   }
 
   /**

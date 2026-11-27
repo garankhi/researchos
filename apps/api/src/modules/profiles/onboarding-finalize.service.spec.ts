@@ -61,6 +61,10 @@ describe('OnboardingFinalizeService', () => {
       research_topics: {
         findMany: vi.fn(),
       },
+      researcher_affiliations: {
+        deleteMany: vi.fn(),
+        create: vi.fn(),
+      },
     };
 
     return Object.assign(prismaMock, {
@@ -491,6 +495,377 @@ describe('OnboardingFinalizeService', () => {
           openAlexAuthorId: 'A5023888391',
         }),
       ).resolves.toBeDefined();
+    });
+  });
+
+  /**
+   * The affiliation timeline the researcher corrected.
+   *
+   * The affiliation rows are the one place where two writers meet: the
+   * OpenAlex sync writes them from what OpenAlex reports, and the
+   * onboarding writes them from what the researcher stated. The sync
+   * replaces the caller's rows, so the order of the two writes decides
+   * whose version survives — and the tests below pin that order down.
+   */
+  describe('the affiliations', () => {
+    /**
+     * A prisma mock whose affiliation rows are kept in an array, so a
+     * test can look at what is stored when the finalize is done rather
+     * than at which calls were made.
+     */
+    const createStatefulPrismaMock = () => {
+      const prismaMock = createPrismaMock();
+      const rows: Array<Record<string, unknown>> = [];
+
+      prismaMock.researcher_affiliations.deleteMany.mockImplementation(
+        async () => {
+          rows.length = 0;
+          return { count: 0 };
+        },
+      );
+      prismaMock.researcher_affiliations.create.mockImplementation(
+        async (args: { data: Record<string, unknown> }) => {
+          rows.push(args.data);
+          return args.data;
+        },
+      );
+
+      return { prismaMock, rows };
+    };
+
+    const seedInterests = (prismaMock: ReturnType<typeof createPrismaMock>) => {
+      prismaMock.research_topics.findMany.mockResolvedValue([
+        { id: topicId, is_active: true },
+      ]);
+      prismaMock.research_interests.findMany.mockResolvedValue([]);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(storedUser);
+    };
+
+    it('writes the affiliations the researcher sent', async () => {
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        affiliations: [
+          {
+            institutionId: 'I109689652',
+            name: 'FPT University',
+            ror: '05dxps055',
+            countryCode: 'VN',
+            institutionType: 'EDUCATION',
+            yearStart: 2020,
+            yearEnd: null,
+          },
+        ],
+      });
+
+      expect(rows).toEqual([
+        {
+          user_id: userId,
+          institution_id: 'I109689652',
+          ror: '05dxps055',
+          name: 'FPT University',
+          country_code: 'VN',
+          institution_type: 'EDUCATION',
+          year_start: 2020,
+          year_end: null,
+          is_primary: true,
+        },
+      ]);
+    });
+
+    it('replaces the rows that were there', async () => {
+      // The timeline is a full set, not a delta: the rows that are gone
+      // are removed, exactly like the interests.
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        affiliations: [
+          {
+            institutionId: 'I109689652',
+            name: 'FPT University',
+            yearStart: 2020,
+          },
+        ],
+      });
+
+      expect(
+        prismaMock.researcher_affiliations.deleteMany,
+      ).toHaveBeenCalledWith({ where: { user_id: userId } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('marks the affiliation the researcher is at now as the primary one', async () => {
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        affiliations: [
+          {
+            institutionId: 'I1',
+            name: 'Old University',
+            yearStart: 2010,
+            yearEnd: 2019,
+          },
+          {
+            institutionId: 'I2',
+            name: 'Current University',
+            yearStart: 2020,
+            yearEnd: null,
+          },
+        ],
+      });
+
+      expect(rows.map((row) => [row.institution_id, row.is_primary])).toEqual([
+        ['I1', false],
+        ['I2', true],
+      ]);
+    });
+
+    it("keeps the researcher's affiliations when the OpenAlex sync runs", async () => {
+      /*
+       * The regression this whole field exists for.
+       *
+       * The OpenAlex sync replaces the caller's affiliation rows with
+       * the ones OpenAlex reports. The mock below does exactly that, so
+       * if the researcher's affiliations were written *before* the sync,
+       * this test would see OpenAlex's rows and fail.
+       */
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      authorRecordsMock.trySyncAuthorRecord.mockImplementation(async () => {
+        // What the sync does: the caller's rows are deleted and the
+        // ones OpenAlex reports are created in their place.
+        rows.length = 0;
+        rows.push({
+          user_id: userId,
+          institution_id: 'I-OPENALEX',
+          ror: null,
+          name: 'What OpenAlex Says',
+          country_code: 'US',
+          institution_type: 'EDUCATION',
+          year_start: 2015,
+          year_end: 2020,
+          is_primary: true,
+        });
+        return null;
+      });
+
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        openAlexAuthorId: 'A5023888391',
+        affiliations: [
+          {
+            institutionId: 'I109689652',
+            name: 'FPT University',
+            yearStart: 2020,
+            yearEnd: null,
+          },
+        ],
+      });
+
+      // The researcher's row is the one that survives, not OpenAlex's.
+      expect(rows).toEqual([
+        {
+          user_id: userId,
+          institution_id: 'I109689652',
+          ror: null,
+          name: 'FPT University',
+          country_code: null,
+          institution_type: null,
+          year_start: 2020,
+          year_end: null,
+          is_primary: true,
+        },
+      ]);
+    });
+
+    it('leaves the OpenAlex rows alone when no affiliation was sent', async () => {
+      // A researcher who did not edit the timeline must not have their
+      // rows touched: the OpenAlex sync is the only writer, as before.
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      authorRecordsMock.trySyncAuthorRecord.mockImplementation(async () => {
+        rows.push({
+          user_id: userId,
+          institution_id: 'I-OPENALEX',
+          is_primary: true,
+        });
+        return null;
+      });
+
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        openAlexAuthorId: 'A5023888391',
+      });
+
+      expect(prismaMock.researcher_affiliations.create).not.toHaveBeenCalled();
+      expect(
+        prismaMock.researcher_affiliations.deleteMany,
+      ).not.toHaveBeenCalled();
+      expect(rows).toHaveLength(1);
+    });
+
+    it('removes every row when the researcher cleared the timeline', async () => {
+      /*
+       * An empty list is not the same as an omitted field: an omitted
+       * field means the researcher never touched the timeline, and an
+       * empty one means they removed every affiliation on purpose. The
+       * second is a decision, and the stored rows must go.
+       */
+      const { prismaMock, rows } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      authorRecordsMock.trySyncAuthorRecord.mockImplementation(async () => {
+        rows.push({
+          user_id: userId,
+          institution_id: 'I-OPENALEX',
+          is_primary: true,
+        });
+        return null;
+      });
+
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        openAlexAuthorId: 'A5023888391',
+        affiliations: [],
+      });
+
+      expect(prismaMock.researcher_affiliations.deleteMany).toHaveBeenCalledWith(
+        { where: { user_id: userId } },
+      );
+      expect(prismaMock.researcher_affiliations.create).not.toHaveBeenCalled();
+      expect(rows).toHaveLength(0);
+    });
+
+    it('refuses an affiliation that ends before it starts', async () => {
+      const { prismaMock } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await expect(
+        service.finalize(userId, {
+          topicIds: [topicId],
+          affiliations: [
+            {
+              institutionId: 'I109689652',
+              name: 'FPT University',
+              yearStart: 2020,
+              yearEnd: 2019,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.profiles.onboardingAffiliationYearsInvalid,
+        }),
+      );
+    });
+
+    it('writes nothing when the affiliation years are refused', async () => {
+      // The check runs before the first write, so a timeline that cannot
+      // be stored never leaves a half-written onboarding behind.
+      const { prismaMock } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await expect(
+        service.finalize(userId, {
+          topicIds: [topicId],
+          affiliations: [
+            {
+              institutionId: 'I109689652',
+              name: 'FPT University',
+              yearStart: 2020,
+              yearEnd: 2019,
+            },
+          ],
+        }),
+      ).rejects.toThrow();
+
+      expect(prismaMock.researcher_profiles.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.research_interests.create).not.toHaveBeenCalled();
+      expect(prismaMock.researcher_affiliations.create).not.toHaveBeenCalled();
+    });
+
+    it('still writes the account, the profile and the interests', async () => {
+      // The new field must not change what the rest of the finalize
+      // does.
+      const { prismaMock } = createStatefulPrismaMock();
+      seedInterests(prismaMock);
+
+      const { service } = setupService(prismaMock);
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        fullName: 'PGS. TS. Nguyễn Văn A',
+        affiliations: [
+          {
+            institutionId: 'I109689652',
+            name: 'FPT University',
+          },
+        ],
+      });
+
+      expect(prismaMock.users.update).toHaveBeenCalledWith({
+        where: { id: userId },
+        data: expect.objectContaining({
+          full_name: 'PGS. TS. Nguyễn Văn A',
+        }),
+      });
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            onboarding_completed_at: expect.any(Date),
+          }),
+        }),
+      );
+      expect(prismaMock.research_interests.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          user_id: userId,
+          topic_id: topicId,
+          status: 'ACTIVE',
+        }),
+      });
     });
   });
 });

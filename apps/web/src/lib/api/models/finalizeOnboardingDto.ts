@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { FinalizeOnboardingDtoAvailabilityStatus } from './finalizeOnboardingDtoAvailabilityStatus';
+import type { OnboardingAffiliationDto } from './onboardingAffiliationDto';
 import type { OnboardingWorkDecisionDto } from './onboardingWorkDecisionDto';
 
 export interface FinalizeOnboardingDto {
@@ -56,4 +57,6 @@ export interface FinalizeOnboardingDto {
   scopusAuthorId?: string;
   /** The works the researcher decided on. Omitted means the researcher decided on none. */
   works?: OnboardingWorkDecisionDto[];
+  /** The affiliation timeline the researcher corrected, as the set they ended up with. Omitted means the researcher did not edit the timeline, and the affiliations OpenAlex reports are kept as they are. The rows replace the stored ones — the ones that are gone are removed — and the affiliation the researcher is at now is marked as the primary one. */
+  affiliations?: OnboardingAffiliationDto[];
 }

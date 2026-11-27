@@ -12,6 +12,11 @@ export interface OpenAlexAffiliationDto {
   /** The institution display name. */
   name: string;
   /**
+   * The ROR id of the institution, when OpenAlex knows one. It is carried through so an affiliation the researcher edits keeps its identity: the id is the key the affiliation is stored under.
+   * @nullable
+   */
+  ror: string | null;
+  /**
    * The ISO country code of the institution.
    * @nullable
    */

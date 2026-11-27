@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import type { OnboardingAffiliationDto } from '@/lib/api/models';
 
 /**
  * The onboarding draft.
@@ -25,15 +25,15 @@ import { persist, createJSONStorage } from 'zustand/middleware';
  * and the works step would have to be told about an author picked two
  * steps earlier. The store is the single place the draft lives.
  *
- * ## Why it is persisted
+ * ## Why it is not persisted
  *
- * The onboarding is four steps and a form. A researcher who reloads the
- * page in the middle of it would otherwise lose everything they typed.
- * The draft is persisted to `localStorage`, which keeps it across a
- * reload without keeping it on the server.
+ * The draft lives in memory only, so it is gone on a reload and gone
+ * when the tab is closed. That is deliberate: a half-finished draft in
+ * `localStorage` is a stale record of a researcher who may never come
+ * back, and the server has no idea it exists.
  *
- * The persistence is namespaced per researcher: two accounts in the
- * same browser keep two drafts, and neither sees the other's.
+ * The consequence is that leaving the page costs the researcher their
+ * answers — so the flow warns them before they go.
  *
  * ## What is *not* in the draft
  *
@@ -89,8 +89,29 @@ export interface OnboardingDraftState {
    *
    * They are kept as the step left them, so a researcher who goes back
    * and forward finds their own text rather than the prefilled one.
+   *
+   * They belong to the author that was confirmed when they were
+   * recorded, so they are dropped when a *different* author is
+   * confirmed: the prefilled name and ORCID would otherwise belong to
+   * the previous author.
    */
   profileValues: OnboardingDraftProfileValues | null;
+  /**
+   * The affiliation timeline the researcher edited.
+   *
+   * It is `null` until the researcher touches the timeline, and that
+   * distinction matters: the finalize call sends the affiliations only
+   * when the researcher edited them, because omitting the field leaves
+   * the rows the OpenAlex sync wrote exactly as they are. A draft that
+   * merely *held* the OpenAlex rows would silently replace them with
+   * the same rows and lose the country code and the institution type
+   * the sync had written.
+   *
+   * The rows belong to the author that was confirmed when they were
+   * recorded, so they are dropped when a *different* author is
+   * confirmed, exactly like the profile values.
+   */
+  affiliationValues: OnboardingAffiliationDto[] | null;
   /**
    * The decisions on the works, by OpenAlex work id.
    *
@@ -147,8 +168,7 @@ export interface OnboardingDraftWorkDecision {
  *
  * The subset of the author candidate the profile step needs to prefill
  * the form. It is stored as a plain object rather than the generated
- * DTO, because the draft is persisted to `localStorage` and the DTO is
- * the API's shape, not the draft's.
+ * DTO, because the DTO is the API's shape, not the draft's.
  */
 export interface OnboardingDraftOpenAlexAuthor {
   /** The OpenAlex display name of the author. */
@@ -163,7 +183,24 @@ export interface OnboardingDraftOpenAlexAuthor {
   affiliations: Array<{
     institutionId: string;
     name: string;
+    /**
+     * The ROR id of the institution, when OpenAlex knows one.
+     *
+     * It is optional because the author candidate's affiliation does not
+     * carry it: the candidate is the thin read OpenAlex hands out, and
+     * the ROR id only arrives with the full author record.
+     */
+    ror?: string | null;
     countryCode: string | null;
+    /**
+     * The kind of institution, as OpenAlex words it (`education`,
+     * `company`, ...).
+     *
+     * It is the raw string rather than the platform's enum, because the
+     * record is OpenAlex's vocabulary; the profile step maps it onto
+     * the enum the API stores.
+     */
+    institutionType?: string | null;
     yearStart: number | null;
     yearEnd: number | null;
   }>;
@@ -195,6 +232,14 @@ export interface OnboardingDraftActions {
   clearAuthor: () => void;
   /** Records the profile values. */
   setProfileValues: (values: OnboardingDraftProfileValues) => void;
+  /**
+   * Records the affiliation timeline the researcher edited.
+   *
+   * The whole set is recorded, not a delta: the server replaces the
+   * rows, so the set the researcher ended up with is what has to
+   * travel.
+   */
+  setAffiliationValues: (values: OnboardingAffiliationDto[] | null) => void;
   /** Records a decision on a work. */
   decideWork: (
     workId: string,
@@ -209,11 +254,6 @@ export interface OnboardingDraftActions {
   reset: () => void;
 }
 
-/** The storage key of the persisted draft. */
-export function onboardingDraftKey(userId: string | undefined): string {
-  return `researchos:onboarding-draft:${userId ?? 'anonymous'}`;
-}
-
 const emptyDraft: OnboardingDraftState = {
   topicIds: [],
   topicNames: {},
@@ -222,6 +262,7 @@ const emptyDraft: OnboardingDraftState = {
   openAlexAuthor: null,
   profileValues: null,
   workDecisions: {},
+  affiliationValues: null,
   step: 'interests',
 };
 
@@ -229,107 +270,114 @@ const emptyDraft: OnboardingDraftState = {
  * The onboarding draft store.
  *
  * The store is created per researcher rather than as a module-level
- * singleton, because the persisted draft is namespaced per researcher
- * and a singleton would leak one researcher's draft into another's
- * session in the same browser.
+ * singleton, so two accounts in the same browser never share a draft:
+ * one researcher's answers cannot surface in another researcher's
+ * onboarding.
+ *
+ * The draft lives in memory only. It is not persisted, so a reload
+ * empties it — which is why the flow guards the page while there is
+ * something to lose.
+ *
+ * @param userId The researcher the draft belongs to. The instance is
+ * the namespace, so the id is not read here; it stays in the signature
+ * because the call site creates the store per researcher.
  */
 export function createOnboardingDraftStore(userId: string | undefined) {
-  return create<OnboardingDraftState & OnboardingDraftActions>()(
-    persist(
-      (set) => ({
-        ...emptyDraft,
+  // The instance is the namespace; the id only says which researcher
+  // this one belongs to. Referenced so the parameter is not reported as
+  // unused.
+  void userId;
 
-        addTopic: (topicId, topicName) =>
-          set((state) => {
-            if (state.topicIds.includes(topicId)) {
-              return state;
-            }
-            return {
-              topicIds: [...state.topicIds, topicId],
-              topicNames: topicName
-                ? { ...state.topicNames, [topicId]: topicName }
-                : state.topicNames,
-            };
-          }),
+  return create<OnboardingDraftState & OnboardingDraftActions>()((set) => ({
+    ...emptyDraft,
 
-        removeTopic: (topicId) =>
-          set((state) => {
-            const topicNames = { ...state.topicNames };
-            delete topicNames[topicId];
-            return {
-              topicIds: state.topicIds.filter((id) => id !== topicId),
-              topicNames,
-            };
-          }),
-
-        confirmAuthor: (authorId, orcid, author) =>
-          set((state) => {
-            /*
-             * A different author means a different bibliography, so the
-             * decisions the researcher made about the previous author's
-             * works no longer apply. They are dropped rather than
-             * carried over: accepting a work of somebody else would
-             * attach it to the wrong researcher.
-             */
-            const authorChanged = state.confirmedAuthorId !== authorId;
-            return {
-              confirmedAuthorId: authorId,
-              openAlexOrcid: orcid,
-              openAlexAuthor: author ?? null,
-              workDecisions: authorChanged ? {} : state.workDecisions,
-            };
-          }),
-
-        clearAuthor: () =>
-          set({
-            confirmedAuthorId: null,
-            openAlexOrcid: null,
-            openAlexAuthor: null,
-            workDecisions: {},
-          }),
-
-        setProfileValues: (values) => set({ profileValues: values }),
-
-        decideWork: (workId, accepted, visibility = 'PRIVATE') =>
-          set((state) => ({
-            workDecisions: {
-              ...state.workDecisions,
-              [workId]: { accepted, visibility },
-            },
-          })),
-
-        undecideWork: (workId) =>
-          set((state) => {
-            const next = { ...state.workDecisions };
-            delete next[workId];
-            return { workDecisions: next };
-          }),
-
-        setStep: (step) => set({ step }),
-
-        reset: () => set({ ...emptyDraft }),
+    addTopic: (topicId, topicName) =>
+      set((state) => {
+        if (state.topicIds.includes(topicId)) {
+          return state;
+        }
+        return {
+          topicIds: [...state.topicIds, topicId],
+          topicNames: topicName
+            ? { ...state.topicNames, [topicId]: topicName }
+            : state.topicNames,
+        };
       }),
-      {
-        name: onboardingDraftKey(userId),
-        storage: createJSONStorage(() => localStorage),
+
+    removeTopic: (topicId) =>
+      set((state) => {
+        const topicNames = { ...state.topicNames };
+        delete topicNames[topicId];
+        return {
+          topicIds: state.topicIds.filter((id) => id !== topicId),
+          topicNames,
+        };
+      }),
+
+    confirmAuthor: (authorId, orcid, author) =>
+      set((state) => {
         /*
-         * Only the answers are persisted. The step is not: a researcher
-         * who reloads lands on the first step, which is where a
-         * half-finished onboarding belongs.
+         * A different author means a different bibliography, so the
+         * decisions the researcher made about the previous author's
+         * works no longer apply. They are dropped rather than
+         * carried over: accepting a work of somebody else would
+         * attach it to the wrong researcher.
+         *
+         * The profile values are dropped for the same reason. They
+         * belong to the previous author — the name and the ORCID were
+         * prefilled from that author's OpenAlex record — so keeping
+         * them would let the old author's identity win over the record
+         * the researcher has just confirmed.
+         *
+         * So is the affiliation timeline: "where I was and until
+         * when" is the previous author's career.
          */
-        partialize: (state) => ({
-          topicIds: state.topicIds,
-          topicNames: state.topicNames,
-          confirmedAuthorId: state.confirmedAuthorId,
-          openAlexOrcid: state.openAlexOrcid,
-          openAlexAuthor: state.openAlexAuthor,
-          profileValues: state.profileValues,
-          workDecisions: state.workDecisions,
-          step: state.step,
-        }),
-      },
-    ),
-  );
+        const authorChanged = state.confirmedAuthorId !== authorId;
+        return {
+          confirmedAuthorId: authorId,
+          openAlexOrcid: orcid,
+          openAlexAuthor: author ?? null,
+          workDecisions: authorChanged ? {} : state.workDecisions,
+          profileValues: authorChanged ? null : state.profileValues,
+          affiliationValues: authorChanged
+            ? null
+            : state.affiliationValues,
+        };
+      }),
+
+    clearAuthor: () =>
+      set({
+        confirmedAuthorId: null,
+        openAlexOrcid: null,
+        openAlexAuthor: null,
+        workDecisions: {},
+        profileValues: null,
+        affiliationValues: null,
+      }),
+
+    setProfileValues: (values) => set({ profileValues: values }),
+
+    setAffiliationValues: (values) => set({ affiliationValues: values }),
+
+    decideWork: (workId, accepted, visibility = 'PRIVATE') =>
+      set((state) => ({
+        workDecisions: {
+          ...state.workDecisions,
+          [workId]: { accepted, visibility },
+        },
+      })),
+
+    undecideWork: (workId) =>
+      set((state) => {
+        const next = { ...state.workDecisions };
+        delete next[workId];
+        return { workDecisions: next };
+      }),
+
+    setStep: (step) => set({ step }),
+
+    reset: () => set({ ...emptyDraft }),
+  }));
 }
 
 /** The type of a draft store. */

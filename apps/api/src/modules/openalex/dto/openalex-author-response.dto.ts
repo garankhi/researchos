@@ -94,6 +94,15 @@ export class OpenAlexAffiliationDto {
   name: string;
 
   @ApiProperty({
+    description:
+      'The ROR id of the institution, when OpenAlex knows one. It is carried through so an affiliation the researcher edits keeps its identity: the id is the key the affiliation is stored under.',
+    type: String,
+    nullable: true,
+    example: 'https://ror.org/03esj4g97',
+  })
+  ror: string | null;
+
+  @ApiProperty({
     description: 'The ISO country code of the institution.',
     type: String,
     nullable: true,

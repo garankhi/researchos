@@ -241,7 +241,7 @@ export class ProfilesController {
   @ApiOperation({
     summary: 'Finalize the onboarding of the current user',
     description:
-      'Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, and the decisions on the works. The interests are reconciled to the set the researcher ended up with, and only the decided works are pulled.',
+      'Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, the decisions on the works, and — when the researcher corrected it — the affiliation timeline. The interests are reconciled to the set the researcher ended up with, only the decided works are pulled, and the corrected affiliations are written after the OpenAlex sync so the researcher\'s version of the timeline is the one that survives.',
   })
   @ApiOkResponse({
     description:
@@ -250,7 +250,7 @@ export class ProfilesController {
   })
   @ApiBadRequestResponse({
     description:
-      'The caller declared no research interest, which is the one mandatory step of the onboarding.',
+      'The caller declared no research interest, which is the one mandatory step of the onboarding, or sent an affiliation whose end year precedes its start year.',
   })
   @ApiConflictResponse({
     description:

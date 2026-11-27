@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { primaryAffiliationId } from './affiliation-primary.js';
 import { OpenAlexClient } from './openalex.client.js';
 import type {
   OpenAlexAffiliation,
@@ -194,7 +195,7 @@ export class OpenAlexAuthorRecordService {
   ): Promise<void> {
     await tx.researcher_affiliations.deleteMany({ where: { user_id: userId } });
 
-    const primary = this.primaryInstitution(record.affiliations);
+    const primary = primaryAffiliationId(record.affiliations);
 
     for (const affiliation of record.affiliations) {
       await tx.researcher_affiliations.create({
@@ -211,52 +212,6 @@ export class OpenAlexAuthorRecordService {
         },
       });
     }
-  }
-
-  /**
-   * The affiliation the researcher is at now.
-   *
-   * The most recent one, by the last year it held. OpenAlex's own
-   * "last known institution" is deliberately not used: it is the
-   * institution of the latest *authorship*, which for a researcher who
-   * moved is the one they left.
-   *
-   * A tie on the last year is broken by the *first* year: among the
-   * affiliations that are still running, the one that started earliest
-   * is the home institution, and the others are the co-affiliations of
-   * a particular paper. A researcher who was at FPT University from
-   * 2020 and at another university for one year in 2026 is at FPT
-   * University; both rows end in 2026, and the longer one is the one
-   * that says where they work.
-   */
-  private primaryInstitution(
-    affiliations: OpenAlexAffiliation[],
-  ): string | null {
-    let best: OpenAlexAffiliation | null = null;
-    for (const affiliation of affiliations) {
-      if (best === null) {
-        best = affiliation;
-        continue;
-      }
-      // An affiliation with no end year is still running, so it is the
-      // most recent one by definition.
-      const candidateEnd = affiliation.yearEnd ?? Number.MAX_SAFE_INTEGER;
-      const bestEnd = best.yearEnd ?? Number.MAX_SAFE_INTEGER;
-      if (candidateEnd > bestEnd) {
-        best = affiliation;
-        continue;
-      }
-      if (candidateEnd < bestEnd) {
-        continue;
-      }
-      // A tie on the last year: the earlier start wins.
-      const candidateStart = affiliation.yearStart ?? Number.MAX_SAFE_INTEGER;
-      const bestStart = best.yearStart ?? Number.MAX_SAFE_INTEGER;
-      if (candidateStart < bestStart) {
-        best = affiliation;
-      }
-    }
-    return best?.institutionId ?? null;
   }
 
   /** The platform's vocabulary for an institution type. */

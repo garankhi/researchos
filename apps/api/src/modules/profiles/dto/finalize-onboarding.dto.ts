@@ -10,8 +10,10 @@ import {
   IsUrl,
   Matches,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
 import { AvailabilityStatusEnum } from './availability-status.enum.js';
+import { OnboardingAffiliationDto } from './onboarding-affiliation.dto.js';
 import { UpdateProfileAccountDto } from './update-profile-account.dto.js';
 
 /** The visibility an accepted work is published with. */
@@ -90,6 +92,15 @@ export class OnboardingWorkDecisionDto {
  * The candidate rows do not exist until the pull runs, so the decisions
  * travel as OpenAlex work ids. The server pulls the works it is given
  * and applies the decision to each one it created.
+ *
+ * ## Why the affiliations are a full list too
+ *
+ * The affiliation timeline is the one part of the OpenAlex record the
+ * researcher may correct: the counts, the byline spellings and the
+ * topics are OpenAlex's business, but where the researcher was and
+ * until when is their own history. The payload therefore states the
+ * set the researcher ended up with, exactly like the interests, and the
+ * server replaces the stored rows with it.
  */
 export class FinalizeOnboardingDto extends UpdateProfileAccountDto {
   @ApiProperty({
@@ -178,4 +189,16 @@ export class FinalizeOnboardingDto extends UpdateProfileAccountDto {
   @ArrayMaxSize(200, { message: 'too_many_works' })
   @Type(() => OnboardingWorkDecisionDto)
   works?: OnboardingWorkDecisionDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'The affiliation timeline the researcher corrected, as the set they ended up with. Omitted means the researcher did not edit the timeline, and the affiliations OpenAlex reports are kept as they are. The rows replace the stored ones — the ones that are gone are removed — and the affiliation the researcher is at now is marked as the primary one.',
+    type: [OnboardingAffiliationDto],
+  })
+  @IsOptional()
+  @IsArray({ message: 'affiliations_invalid' })
+  @ArrayMaxSize(50, { message: 'too_many_affiliations' })
+  @Type(() => OnboardingAffiliationDto)
+  @ValidateNested({ each: true, message: 'affiliation_invalid' })
+  affiliations?: OnboardingAffiliationDto[];
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -13,6 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { ConfirmationModal } from '@/components/ui/confirmation-modal';
 import { useSnackbar } from '@/components/providers/snackbar-provider';
 import { useCurrentUser } from '@/features/identity';
 import { useProfile } from '../../hooks/use-profile';
@@ -21,13 +22,20 @@ import {
   useOnboarding,
   type OnboardingStep,
 } from '../../hooks/use-onboarding';
+import { useOnboardingLeaveGuard } from '../../hooks/use-onboarding-leave-guard';
 import {
   createOnboardingDraftStore,
-  type OnboardingDraftOpenAlexAuthor,
   type OnboardingDraftProfileValues,
-} from '../../store/onboarding-draft-store';import { OnboardingAuthorStep } from './steps/onboarding-author-step';
+} from '../../store/onboarding-draft-store';
+import {
+  OnboardingAuthorStep,
+  toDraftOpenAlexAuthor,
+} from './steps/onboarding-author-step';
 import { OnboardingInterestsStep } from './steps/onboarding-interests-step';
-import { OnboardingProfileStep } from './steps/onboarding-profile-step';
+import {
+  OnboardingProfileStep,
+  type OnboardingProfileFormHandle,
+} from './steps/onboarding-profile-step';
 import { OnboardingWorksStep } from './steps/onboarding-works-step';
 
 /**
@@ -80,6 +88,27 @@ export function OnboardingFlow({
   const [step, setStep] = useState<OnboardingStep>('interests');
 
   /*
+   * The candidate the researcher picked in the author list.
+   *
+   * The selection lives here rather than in the author step, because
+   * the *decision* is the flow's: the Next button confirms the picked
+   * candidate and the Skip button leaves the step without one. The step
+   * only shows the choice.
+   */
+  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(
+    null,
+  );
+
+  /*
+   * The profile form's handle.
+   *
+   * The flow's Next button saves the profile on the way out, so the
+   * flow has to be able to reach the form. The ref is the seam: the
+   * form owns the values and the rules, the flow owns the decision.
+   */
+  const profileFormRef = useRef<OnboardingProfileFormHandle | null>(null);
+
+  /*
    * The visibility an accepted work is published with. It is a single
    * choice for the whole step — a researcher publishes their accepted
    * works the same way, or the visibility picker is noise.
@@ -123,10 +152,100 @@ export function OnboardingFlow({
 
   const isLastStep = stepIndex === ONBOARDING_STEPS.length - 1;
 
-  const goNext = () => {
+  /*
+   * Confirms the candidate the researcher picked.
+   *
+   * The record rides along so the profile step can prefill from it
+   * without asking OpenAlex a second time.
+   */
+  const confirmSelectedAuthor = () => {
+    if (!selectedAuthorId) {
+      return;
+    }
+    const chosen = onboarding.authors.find(
+      (author) => author.shortId === selectedAuthorId,
+    );
+    if (!chosen) {
+      return;
+    }
+    draft
+      .getState()
+      .confirmAuthor(
+        selectedAuthorId,
+        chosen.orcid ?? null,
+        toDraftOpenAlexAuthor(chosen),
+      );
+  };
+
+  /*
+   * The steps that may be skipped.
+   *
+   * The interests are mandatory — the server refuses the completion
+   * without one — so they have no Skip button. The last step has none
+   * either: there is no step to skip to, and its optional content is
+   * already optional.
+   */
+  const canSkip = step !== 'interests' && !isLastStep;
+
+  /*
+   * What the Next button does on the step the researcher is on.
+   *
+   * Next is the one button that moves on, so it is also the one that
+   * keeps what the researcher entered:
+   *
+   * - **The author step.** It confirms the picked candidate. A
+   *   researcher who picked nothing simply moves on, which is the same
+   *   as skipping — there is nothing to confirm.
+   * - **The profile step.** It saves the form and moves on. The form
+   *   validates itself, so an invalid field is reported next to the
+   *   input and the step is not left.
+   * - **The other steps.** They have nothing to keep.
+   */
+  const handleNext = () => {
     if (!canAdvance) {
       return;
     }
+
+    if (step === 'author') {
+      confirmSelectedAuthor();
+    }
+
+    if (step === 'profile') {
+      /*
+       * The form validates and reports itself; the values land in the
+       * draft through the step's own callback, and the step moves on
+       * once they do.
+       *
+       * The ref is null only if the form has not mounted yet, which
+       * cannot happen while the profile step is on screen — but the
+       * step must not be left in place with no way out if it ever did.
+       */
+      const form = profileFormRef.current;
+      if (form) {
+        form.submit();
+        return;
+      }
+    }
+
+    const next = ONBOARDING_STEPS[stepIndex + 1];
+    if (next) {
+      setStep(next);
+    }
+  };
+
+  /*
+   * The Skip button.
+   *
+   * It leaves the step without an answer. On the author step that
+   * means no author is confirmed; on the profile step it means the
+   * form is left as it is — the values are not saved.
+   */
+  const handleSkip = () => {
+    if (step === 'author') {
+      draft.getState().clearAuthor();
+      setSelectedAuthorId(null);
+    }
+
     const next = ONBOARDING_STEPS[stepIndex + 1];
     if (next) {
       setStep(next);
@@ -153,20 +272,46 @@ export function OnboardingFlow({
    * and corrects it rather than typing everything.
    */
   const openAlexAuthor = draft((state) => state.openAlexAuthor);
+  /*
+   * The affiliation timeline the researcher edited, or null when they
+   * never touched it.
+   *
+   * Null is not the same as an empty list: null means the timeline was
+   * left alone, and the finalize call then says nothing about the
+   * affiliations, so the rows the OpenAlex sync wrote stay as they
+   * are.
+   */
+  const draftAffiliationValues = draft((state) => state.affiliationValues);
 
-  const handleConfirmAuthor = (
-    shortId: string,
-    orcid: string | null,
-    author: OnboardingDraftOpenAlexAuthor | null,
-  ) => {
-    draft.getState().confirmAuthor(shortId, orcid, author);
-    setStep('profile');
-  };
+  /*
+   * Whether the researcher has anything to lose.
+   *
+   * The draft lives in memory, so a navigation empties it. The guard is
+   * only armed once there is an answer worth keeping: a picked
+   * interest, a confirmed author, a filled profile, an edited
+   * affiliation timeline or a decision on a work. A researcher who has
+   * answered nothing is never interrupted.
+   */
+  const hasUnsavedWork = draft(
+    (state) =>
+      state.topicIds.length > 0 ||
+      state.confirmedAuthorId !== null ||
+      state.profileValues !== null ||
+      state.affiliationValues !== null ||
+      Object.keys(state.workDecisions).length > 0,
+  );
 
-  const handleSkipAuthor = () => {
-    draft.getState().clearAuthor();
-    setStep('profile');
-  };
+  /*
+   * The guard is off once the onboarding has been written. The draft is
+   * emptied on the same path, but the flag is explicit: the flow may
+   * still be mounted while the page changes, and a warning on the way
+   * out of a finished onboarding would be noise.
+   */
+  const [isFinalized, setIsFinalized] = useState(false);
+
+  const leaveGuard = useOnboardingLeaveGuard({
+    isActive: hasUnsavedWork && !isFinalized,
+  });
 
   const handleSaveProfile = (values: OnboardingDraftProfileValues) => {
     draft.getState().setProfileValues(values);
@@ -182,6 +327,7 @@ export function OnboardingFlow({
        */
       await onboarding.finalizeOnboarding();
       draft.getState().reset();
+      setIsFinalized(true);
       showSnackbar({ message: t('finished'), severity: 'success' });
       onFinish?.();
     } catch {
@@ -260,21 +406,33 @@ export function OnboardingFlow({
             isFailed={onboarding.isFailedAuthors}
             onRetry={onboarding.refetchAuthors}
             confirmedAuthorId={onboarding.confirmedAuthorId}
-            onConfirm={handleConfirmAuthor}
-            onSkip={handleSkipAuthor}
+            selectedAuthorId={selectedAuthorId}
+            onSelect={setSelectedAuthorId}
           />
         ) : null}
 
         {step === 'profile' ? (
           <OnboardingProfileStep
             profile={profileQuery.profile ?? null}
-            prefillFromOpenAlex={onboarding.confirmedAuthorId !== null}
+            /*
+             * The flag says whether the form was prefilled from OpenAlex,
+             * and only the record can do that. A confirmed author id on
+             * its own is not enough: a researcher who reaches this step
+             * through the step tabs never triggered the author step's
+             * confirm, so the record was never fetched and nothing was
+             * prefilled — the flag must not claim otherwise.
+             */
+            prefillFromOpenAlex={openAlexAuthor !== null}
             openAlexOrcid={onboarding.openAlexOrcid}
             openAlexAuthor={openAlexAuthor}
             confirmedAuthorId={onboarding.confirmedAuthorId}
             draftValues={draftProfileValues}
+            affiliationValues={draftAffiliationValues}
+            onAffiliationChange={(values) =>
+              draft.getState().setAffiliationValues(values)
+            }
             onSave={handleSaveProfile}
-            onSkip={goNext}
+            formRef={profileFormRef}
           />
         ) : null}
 
@@ -294,6 +452,15 @@ export function OnboardingFlow({
           />
         ) : null}
 
+        {/*
+         * The footer. Every step has the same two buttons: Back on the
+         * left, and Skip and Next on the right.
+         *
+         * The Skip button sits immediately left of Next, because the
+         * two are alternatives — skip the step, or complete it and move
+         * on — and the researcher should read them as a pair rather
+         * than hunt for a third button inside the step itself.
+         */}
         <Flex justify="space-between" gap="3" flexWrap="wrap">
           <Button variant="outline" onClick={goBack} disabled={stepIndex === 0}>
             <ArrowLeft />
@@ -301,6 +468,12 @@ export function OnboardingFlow({
           </Button>
 
           <Flex gap="3">
+            {canSkip ? (
+              <Button variant="outline" onClick={handleSkip}>
+                {t('skip')}
+              </Button>
+            ) : null}
+
             {isLastStep ? (
               <Button
                 onClick={() => void handleFinish()}
@@ -310,7 +483,7 @@ export function OnboardingFlow({
                 {t('finish')}
               </Button>
             ) : (
-              <Button onClick={goNext} disabled={!canAdvance}>
+              <Button onClick={handleNext} disabled={!canAdvance}>
                 {tCommon('next')}
                 <ArrowRight />
               </Button>
@@ -318,6 +491,23 @@ export function OnboardingFlow({
           </Flex>
         </Flex>
       </Stack>
+
+      {/*
+       * The leave guard's confirmation. It replaces the browser's own
+       * dialog for an in-app navigation, so the researcher is told what
+       * they are about to lose.
+       */}
+      <ConfirmationModal
+        open={leaveGuard.isConfirmOpen}
+        onClose={leaveGuard.cancelLeave}
+        title={t('leaveGuard.title')}
+        description={t('leaveGuard.description')}
+        confirmLabel={t('leaveGuard.confirm')}
+        cancelLabel={t('leaveGuard.cancel')}
+        onConfirm={leaveGuard.confirmLeave}
+        colorPalette="orange"
+        role="alertdialog"
+      />
     </Container>
   );
 }
