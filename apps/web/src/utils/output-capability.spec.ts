@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveOutputCapability } from './output-capability';
+import {
+  allowedOutputAudiences,
+  resolveOutputCapability,
+} from './output-capability';
 
 /**
  * The rule the UI mirrors from the backend's
@@ -16,6 +19,8 @@ describe('resolveOutputCapability', () => {
       userId: OWNER,
       ownerId: OWNER,
       authorUserIds: [OWNER],
+      scopeType: 'PERSONAL',
+      canChangeVisibility: true,
     });
 
     expect(capability.role).toBe('owner');
@@ -28,6 +33,8 @@ describe('resolveOutputCapability', () => {
       userId: CO_AUTHOR,
       ownerId: OWNER,
       authorUserIds: [OWNER, CO_AUTHOR],
+      scopeType: 'PERSONAL',
+      canChangeVisibility: false,
     });
 
     expect(capability.role).toBe('author');
@@ -36,27 +43,35 @@ describe('resolveOutputCapability', () => {
     expect(capability.canChangeVisibility).toBe(false);
   });
 
-  it('lets the affiliated group lead change the visibility', () => {
+  it('lets the group lead change the visibility of a group work', () => {
+    // The server settles this: the group owns the work, so the leads
+    // decide who may read it, not the poster.
     const capability = resolveOutputCapability({
       userId: GROUP_LEAD,
       ownerId: OWNER,
       authorUserIds: [OWNER],
-      groupLeadId: GROUP_LEAD,
+      scopeType: 'GROUP',
+      canChangeVisibility: true,
     });
 
-    expect(capability.role).toBe('groupLead');
+    expect(capability.role).toBe('reader');
     expect(capability.canChangeVisibility).toBe(true);
+    expect(capability.allowedAudiences).toEqual([
+      'CONTAINER',
+      'FPTU_COMMUNITY',
+    ]);
   });
 
-  it('does not let a group lead of an unaffiliated work change it', () => {
+  it('does not let the poster of a group work change its visibility', () => {
     const capability = resolveOutputCapability({
-      userId: GROUP_LEAD,
+      userId: OWNER,
       ownerId: OWNER,
-      authorUserIds: [OWNER, GROUP_LEAD],
-      groupLeadId: null,
+      authorUserIds: [OWNER],
+      scopeType: 'GROUP',
+      canChangeVisibility: false,
     });
 
-    expect(capability.role).toBe('author');
+    expect(capability.role).toBe('owner');
     expect(capability.canChangeVisibility).toBe(false);
   });
 
@@ -65,6 +80,8 @@ describe('resolveOutputCapability', () => {
       userId: READER,
       ownerId: OWNER,
       authorUserIds: [OWNER],
+      scopeType: 'PERSONAL',
+      canChangeVisibility: false,
     });
 
     expect(capability.role).toBe('reader');
@@ -76,7 +93,8 @@ describe('resolveOutputCapability', () => {
       userId: null,
       ownerId: OWNER,
       authorUserIds: [OWNER],
-      groupLeadId: GROUP_LEAD,
+      scopeType: 'PERSONAL',
+      canChangeVisibility: true,
     });
 
     expect(capability.role).toBe('reader');
@@ -84,15 +102,51 @@ describe('resolveOutputCapability', () => {
     expect(capability.canChangeVisibility).toBe(false);
   });
 
-  it('treats the owner as the owner even when they lead the group', () => {
+  it('offers the personal audiences for a personal work', () => {
     const capability = resolveOutputCapability({
       userId: OWNER,
       ownerId: OWNER,
-      authorUserIds: [OWNER],
-      groupLeadId: OWNER,
+      scopeType: 'PERSONAL',
+      canChangeVisibility: true,
     });
 
-    expect(capability.role).toBe('owner');
-    expect(capability.isGroupLead).toBe(false);
+    expect(capability.allowedAudiences).toEqual(['PRIVATE', 'FPTU_COMMUNITY']);
+  });
+
+  it('offers the container audiences for a project work', () => {
+    const capability = resolveOutputCapability({
+      userId: OWNER,
+      ownerId: OWNER,
+      scopeType: 'PROJECT',
+      canChangeVisibility: true,
+    });
+
+    expect(capability.allowedAudiences).toEqual([
+      'CONTAINER',
+      'FPTU_COMMUNITY',
+    ]);
+  });
+});
+
+describe('allowedOutputAudiences', () => {
+  it('gives a personal work a private and a community audience', () => {
+    expect(allowedOutputAudiences('PERSONAL')).toEqual([
+      'PRIVATE',
+      'FPTU_COMMUNITY',
+    ]);
+  });
+
+  it('gives a group work a container and a community audience', () => {
+    expect(allowedOutputAudiences('GROUP')).toEqual([
+      'CONTAINER',
+      'FPTU_COMMUNITY',
+    ]);
+  });
+
+  it('gives a project work a container and a community audience', () => {
+    expect(allowedOutputAudiences('PROJECT')).toEqual([
+      'CONTAINER',
+      'FPTU_COMMUNITY',
+    ]);
   });
 });

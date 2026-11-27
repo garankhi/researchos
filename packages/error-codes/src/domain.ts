@@ -116,6 +116,10 @@ export const domainErrorCodes = {
     noteRequired: 'application_note_required',
     noteTooLong: 'application_note_too_long',
   },
+  projects: {
+    projectNotFound: 'project_not_found',
+    projectAccessDenied: 'project_access_denied',
+  },
   outputs: {
     outputNotFound: 'output_not_found',
     outputAccessDenied: 'output_access_denied',
@@ -126,6 +130,7 @@ export const domainErrorCodes = {
     outputRevisionLocked: 'output_revision_locked',
     outputRevisionNotFound: 'output_revision_not_found',
     outputVisibilityInvalid: 'output_visibility_invalid',
+    outputScopeInvalid: 'output_scope_invalid',
     outputAccessGroupInvalid: 'output_access_group_invalid',
     outputIdempotencyKeyInvalid: 'output_idempotency_key_invalid',
     outputIdempotencyKeyConflict: 'output_idempotency_key_conflict',

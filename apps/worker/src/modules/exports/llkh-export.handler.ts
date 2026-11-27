@@ -53,7 +53,7 @@ async function fetchData(
         { sharing_status: 'DRAFT', owner_id: ownerId },
         {
           sharing_status: 'SHARED',
-          visibility: 'FPTU_COMMUNITY',
+          audience: 'FPTU_COMMUNITY',
           OR: [
             { owner_id: ownerId },
             { output_authors: { some: { user_id: ownerId } } },

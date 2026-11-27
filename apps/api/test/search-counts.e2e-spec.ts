@@ -26,7 +26,7 @@ const { Client } = createRequire(import.meta.resolve('@researchos/database'))(
  * validation pipe rejects a term outside [2, 200], and the four totals are
  * permission filtered exactly like the results they count.
  *
- * The fixtures cover all four tabs and three output visibility levels.
+ * The fixtures cover all four tabs and three output audiences.
  *
  * The spec runs against its own database, built from the schema source and
  * dropped again afterwards, so it never touches the development data and
@@ -160,18 +160,26 @@ describe('Search API', () => {
        WHERE title = 'Quantum Fellowship'`,
     );
 
-    for (const [visibility, title, accessGroupId] of [
-      ['FPTU_COMMUNITY', publicTitle, null],
-      ['RESEARCH_GROUP', groupTitle, groupId],
-      ['PRIVATE', privateTitle, null],
+    for (const [scopeType, audience, title, accessGroupId] of [
+      ['PERSONAL', 'FPTU_COMMUNITY', publicTitle, null],
+      ['GROUP', 'CONTAINER', groupTitle, groupId],
+      ['PERSONAL', 'PRIVATE', privateTitle, null],
     ] as const) {
       const output = randomUUID();
       const revision = randomUUID();
 
       await database.query(
-        `INSERT INTO research_outputs(id, sharing_status, visibility, owner_id, created_by, access_group_id)
-         VALUES ($1, 'DRAFT', $2, $3, $3, $4)`,
-        [output, visibility, ownerId, accessGroupId],
+        `INSERT INTO research_outputs(
+           id, sharing_status, scope_type, scope_group_id, audience, owner_id, created_by, access_group_id
+         ) VALUES ($1, 'DRAFT', $2, $4, $3, $5, $5, $6)`,
+        [
+          output,
+          scopeType,
+          audience,
+          accessGroupId ? groupId : null,
+          ownerId,
+          accessGroupId,
+        ],
       );
       await database.query(
         `INSERT INTO output_revisions(

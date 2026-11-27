@@ -28,6 +28,10 @@ export {
   OutputShareButton,
 } from './components/output-actions';
 export { OutputDetailSkeleton } from './components/output-skeletons';
+export {
+  OutputScopePicker,
+  type OutputScopeSelection,
+} from './components/output-scope-picker';
 export type {
   OutputAuthor,
   OutputDetail,

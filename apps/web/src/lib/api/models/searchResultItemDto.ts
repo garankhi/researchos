@@ -6,14 +6,15 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { SearchResultItemDtoAccessGroupId } from './searchResultItemDtoAccessGroupId';
+import type { SearchResultItemDtoAudience } from './searchResultItemDtoAudience';
 import type { SearchResultItemDtoAuthorsText } from './searchResultItemDtoAuthorsText';
 import type { SearchResultItemDtoBody } from './searchResultItemDtoBody';
 import type { SearchResultItemDtoEntityType } from './searchResultItemDtoEntityType';
 import type { SearchResultItemDtoOwnerId } from './searchResultItemDtoOwnerId';
 import type { SearchResultItemDtoRevisionId } from './searchResultItemDtoRevisionId';
+import type { SearchResultItemDtoScopeType } from './searchResultItemDtoScopeType';
 import type { SearchResultItemDtoSubtitleEntityId } from './searchResultItemDtoSubtitleEntityId';
 import type { SearchResultItemDtoSubtitleEntityType } from './searchResultItemDtoSubtitleEntityType';
-import type { SearchResultItemDtoVisibility } from './searchResultItemDtoVisibility';
 
 export interface SearchResultItemDto {
   /** Entity category of the indexed record (`OUTPUT`, `RESEARCHER`, `GROUP`, or `OPPORTUNITY`). */
@@ -30,10 +31,12 @@ export interface SearchResultItemDto {
    * @nullable
    */
   ownerId: SearchResultItemDtoOwnerId;
-  /** Visibility scope of the indexed record (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`). */
-  visibility: SearchResultItemDtoVisibility;
+  /** Where an indexed work was posted: PERSONAL (its author owns it), GROUP (the group owns it) or PROJECT (the project owns it). PERSONAL for the other entity types, which carry no scope of their own. */
+  scopeType: SearchResultItemDtoScopeType;
+  /** Who may read an indexed work: PRIVATE (the owner alone), CONTAINER (the narrow audience of the group or the project) or FPTU_COMMUNITY (every signed-in researcher). */
+  audience: SearchResultItemDtoAudience;
   /**
-   * Research group UUID scoping access when `visibility` is `RESEARCH_GROUP`; `null` otherwise.
+   * Research group UUID scoping access when the work is scoped to a group or to a project inside one; `null` otherwise.
    * @nullable
    */
   accessGroupId: SearchResultItemDtoAccessGroupId;

@@ -54,7 +54,7 @@ function normalizeOrcid(value: unknown): string | null {
  *
  * Turns a shaped OpenAlex work into a persisted candidate:
  * `research_outputs` (`import_state = 'CANDIDATE'`, `sharing_status =
- * 'DRAFT'`, `visibility = 'PRIVATE'`, `owner_id = NULL`), one draft
+ * 'DRAFT'`, `audience = 'PRIVATE'`, `owner_id = NULL`), one draft
  * `output_revisions` row (`revision_no = 1`, `publisher = NULL` —
  * OpenAlex has no publisher, that null is correct), the authorship rows,
  * the `output_external_ids` link, and the `SUGGESTED` claim that makes
@@ -216,7 +216,8 @@ export class OpenAlexIngestService {
           owner_id: null,
           created_by: userId,
           sharing_status: 'DRAFT',
-          visibility: 'PRIVATE',
+          scope_type: 'PERSONAL',
+          audience: 'PRIVATE',
           access_group_id: null,
           current_release_id: null,
           import_state: 'CANDIDATE',

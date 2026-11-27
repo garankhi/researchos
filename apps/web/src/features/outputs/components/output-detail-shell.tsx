@@ -59,7 +59,8 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
     authorUserIds: output?.authors
       .map((author) => author.userId)
       .filter((id): id is string => Boolean(id)),
-    groupLeadId: groupQuery.groupLeadId,
+    scopeType: output?.scopeType,
+    canChangeVisibility: output?.canChangeVisibility,
   });
 
   if (isLoading) {

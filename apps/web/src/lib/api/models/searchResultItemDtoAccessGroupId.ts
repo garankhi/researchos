@@ -7,7 +7,7 @@
  */
 
 /**
- * Research group UUID scoping access when `visibility` is `RESEARCH_GROUP`; `null` otherwise.
+ * Research group UUID scoping access when the work is scoped to a group or to a project inside one; `null` otherwise.
  * @nullable
  */
 export type SearchResultItemDtoAccessGroupId = {

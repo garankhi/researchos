@@ -101,7 +101,7 @@ function GroupOutputCard({
             doi: output.data?.doi,
             externalUrl: revision.externalUrl,
             sharingStatus: output.data?.sharingStatus,
-            visibility: output.data?.visibility,
+            audience: output.data?.audience,
             authors: output.data?.authors,
             topics: output.data?.topics,
           })}

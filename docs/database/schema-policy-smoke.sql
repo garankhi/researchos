@@ -44,7 +44,7 @@ BEGIN
  PERFORM pg_temp.policy_error(format('INSERT INTO research_groups(code,name,lead_id) VALUES(''policy-guest-group'',''Invalid'',%L)',guest),'23514');
  PERFORM pg_temp.policy_error(format('INSERT INTO research_groups(code,name,lead_id) VALUES(''policy-admin-only-group'',''Invalid'',%L)',admin1),'23514');
 
- INSERT INTO research_outputs(id,owner_id,created_by,doi,visibility) VALUES(work,owner1,owner1,'  HTTPS://DOI.ORG/10.1234/Policy.Article  ','FPTU_COMMUNITY');
+ INSERT INTO research_outputs(id,owner_id,created_by,doi,audience) VALUES(work,owner1,owner1,'  HTTPS://DOI.ORG/10.1234/Policy.Article  ','FPTU_COMMUNITY');
  PERFORM pg_temp.policy_assert((SELECT doi='10.1234/policy.article' FROM research_outputs WHERE id=work),'DOI canonical form');
  PERFORM pg_temp.policy_error(format('INSERT INTO research_outputs(owner_id,doi) VALUES(%L,''DOI:10.1234/POLICY.ARTICLE'')',recipient),'23505');
  PERFORM pg_temp.policy_error(format('INSERT INTO research_outputs(owner_id,doi) VALUES(%L,''http://dx.doi.org/10.1234/POLICY.ARTICLE'')',recipient),'23505');
@@ -110,7 +110,7 @@ BEGIN
  INSERT INTO resource_handovers(group_id,previous_user_id,new_user_id,performed_by,basis,authorization_reference,reason)
  VALUES(other_grp,owner1,student,admin1,'INSTITUTIONAL_AUTHORIZATION','Official decision #2','Replacement of inactive leader');
  PERFORM pg_temp.policy_assert((SELECT lead_id=student FROM research_groups WHERE id=other_grp) AND can_manage_group(student,other_grp) AND NOT can_manage_group(admin1,other_grp),'leader handover grants only recipient group authority');
- UPDATE research_outputs SET visibility='PRIVATE' WHERE id=work;
+ UPDATE research_outputs SET audience='PRIVATE' WHERE id=work;
  PERFORM pg_temp.policy_assert(NOT can_view_output(admin1,work) AND NOT can_manage_output(admin1,work) AND can_manage_output(recipient,work),'admin handover does not grant admin private/owner rights');
  RAISE NOTICE 'PASS atomic owner/Leader handover, conflict no-op, evidence shape, stale holder, immutability and admin scope';
 END $$;

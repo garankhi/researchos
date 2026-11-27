@@ -830,8 +830,11 @@ const OPPORTUNITIES = [
  * publish step: the publish action belongs to the deferred external epic
  * (RES-130).
  *
- * The visibility is copied onto the row rather than derived, because
- * `ck_output_access_scope` requires a group-scoped work to name its group.
+ * The scope and the audience are copied onto the row rather than derived.
+ * The scope says where the work was posted - `PERSONAL` for a work of the
+ * author alone, `GROUP` for a work of a group - and it names the group, so
+ * `ck_output_scope` is satisfied. The audience says who may read it: a
+ * group work is `CONTAINER`, a personal work reaches the community.
  */
 const OUTPUTS = [
   {
@@ -844,7 +847,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2025,
     external_url: 'https://doi.org/10.5555/researchos.demo.0001',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T11689'],
@@ -864,7 +868,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0002',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10181'],
@@ -884,7 +889,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2025,
     external_url: 'https://doi.org/10.5555/researchos.demo.0003',
-    visibility: 'RESEARCH_GROUP',
+    scope_type: 'GROUP',
+    audience: 'CONTAINER',
     group_code: 'FPTU-SUSTAIN',
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10047', 'https://openalex.org/T10539'],
@@ -903,7 +909,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0004',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T12205', 'https://openalex.org/T11270'],
@@ -923,7 +930,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0005',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T11714'],
@@ -943,7 +951,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2025,
     external_url: 'https://doi.org/10.5555/researchos.demo.0006',
-    visibility: 'RESEARCH_GROUP',
+    scope_type: 'GROUP',
+    audience: 'CONTAINER',
     group_code: 'FPTU-GREENFIN',
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10019'],
@@ -963,7 +972,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0007',
-    visibility: 'RESEARCH_GROUP',
+    scope_type: 'GROUP',
+    audience: 'CONTAINER',
     group_code: 'FPTU-FORECAST',
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10328'],
@@ -983,7 +993,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0008',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10286'],
@@ -1002,7 +1013,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0009',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10462', 'https://openalex.org/T10191'],
@@ -1021,7 +1033,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0010',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T11512'],
@@ -1040,7 +1053,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2026,
     external_url: 'https://doi.org/10.5555/researchos.demo.0011',
-    visibility: 'RESEARCH_GROUP',
+    scope_type: 'GROUP',
+    audience: 'CONTAINER',
     group_code: 'FPTU-GREENFIN',
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10539', 'https://openalex.org/T11821'],
@@ -1059,7 +1073,8 @@ const OUTPUTS = [
     publisher: 'FPTU Press',
     publication_year: 2025,
     external_url: 'https://doi.org/10.5555/researchos.demo.0012',
-    visibility: 'FPTU_COMMUNITY',
+    scope_type: 'PERSONAL',
+    audience: 'FPTU_COMMUNITY',
     group_code: null,
     provenance_tag: 'PAPER',
     topic_external_ids: ['https://openalex.org/T10538', 'https://openalex.org/T11912'],
@@ -1986,6 +2001,12 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
       fail(`The publication "${output.title}" has no group.`);
     }
 
+    const scopeGroupId = output.scope_type === 'GROUP' ? accessGroupId : null;
+
+    if (output.scope_type === 'GROUP' && !scopeGroupId) {
+      fail(`The publication "${output.title}" has no group.`);
+    }
+
     const outputRow = await prisma.research_outputs.upsert({
       where: { doi: output.doi },
       create: {
@@ -1993,15 +2014,20 @@ async function seedOutputs(prisma, idsByEmail, idsByCode, idsByTopicExternalId) 
         owner_id: ownerId,
         created_by: ownerId,
         sharing_status: 'DRAFT',
-        visibility: output.visibility,
+        scope_type: output.scope_type,
+        scope_group_id: scopeGroupId,
+        audience: output.audience,
         access_group_id: accessGroupId,
         provenance_tag: output.provenance_tag,
         import_state: 'NONE',
       },
+      // The scope is immutable, so the update only refreshes the audience
+      // and the affiliation. Writing the scope here would trip the trigger
+      // `guard_output_scope`.
       update: {
         owner_id: ownerId,
         created_by: ownerId,
-        visibility: output.visibility,
+        audience: output.audience,
         access_group_id: accessGroupId,
         provenance_tag: output.provenance_tag,
       },

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, fn, mocked, waitFor, within } from 'storybook/test';
 import { AddResearchDrawer } from '@/features/identity';
 import type { ArticlePdfReader } from '../hooks/use-article-pdf-preview';
@@ -29,6 +30,20 @@ const meta = {
   title: 'Outputs/Article creation/First steps',
   component: ArticleCreationBasics,
   parameters: { layout: 'fullscreen' },
+  // The scope picker reads the groups and the projects of the caller, so the
+  // stories need a query client. The queries are disabled, so they resolve
+  // empty and the picker offers the personal scope only.
+  decorators: [
+    (Story) => (
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { enabled: false } } })
+        }
+      >
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
   args: {
     reader,
     accounts: [
@@ -37,6 +52,8 @@ const meta = {
         userId: '73300f56-725f-441e-90b5-de66578dc2e1',
       },
     ],
+    scope: { scopeType: 'PERSONAL' },
+    onScopeChange: fn(),
     onContinue: fn(),
   },
 } satisfies Meta<typeof ArticleCreationBasics>;

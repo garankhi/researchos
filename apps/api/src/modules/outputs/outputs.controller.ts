@@ -454,7 +454,7 @@ export class OutputsController {
   @ApiOperation({
     summary: 'Publishes a work and shares it with the chosen audience',
     description:
-      'Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the visibility the caller chose. The work becomes searchable, discoverable, and linkable into a group. This is the single visibility action, whether the draft came from an OpenAlex pull or from a work created inside the platform.',
+      'Releases the draft revision of a work the caller owns, pins it as the current release, and shares the work under the audience the caller chose. The audience follows the scope of the work: a personal work reaches the community, a container work reaches its group or project. The work becomes searchable, discoverable, and linkable into a group. This is the single publish action, whether the draft came from an OpenAlex pull or from a work created inside the platform.',
   })
   @ApiParam({
     name: 'outputId',
@@ -462,13 +462,12 @@ export class OutputsController {
     format: 'uuid',
   })
   @ApiOkResponse({
-    description:
-      'The published work, now shared under the requested visibility.',
+    description: 'The published work, now shared under the requested audience.',
     type: OutputResponseDto,
   })
   @ApiBadRequestResponse({
     description:
-      'Invalid UUID format for outputId, an unsupported visibility, or a visibility that does not match the access group.',
+      'Invalid UUID format for outputId, an unsupported audience, or an access group the caller is not a member of.',
   })
   @ApiUnauthorizedResponse({
     description: 'Caller is not authenticated.',
@@ -537,7 +536,7 @@ export class OutputsController {
   @ApiOperation({
     summary: 'Changes who may see a shared work',
     description:
-      'Changes the visibility of an already shared work and optionally its affiliated group. The owner may always change it; the lead of the affiliated group may too, so a group keeps control of works carrying its banner. A FPTU_COMMUNITY work may keep its affiliation and stays public.',
+      'Changes the audience of an already shared work. The authority follows the scope of the work: the owner of a personal work, the leads of the group of a group work, or the project lead and the parent group leads of a project work. The poster of a container work may not, because the container owns the post.',
   })
   @ApiParam({
     name: 'outputId',
@@ -545,25 +544,25 @@ export class OutputsController {
     format: 'uuid',
   })
   @ApiOkResponse({
-    description: 'The work with its updated visibility.',
+    description: 'The work with its updated audience.',
     type: OutputResponseDto,
   })
   @ApiBadRequestResponse({
     description:
-      'Invalid UUID format for outputId, an unsupported visibility, or a group the caller is not a member of.',
+      'Invalid UUID format for outputId, or an audience the scope of the work does not allow.',
   })
   @ApiUnauthorizedResponse({
     description: 'Caller is not authenticated.',
   })
   @ApiForbiddenResponse({
     description:
-      'Caller is not an active researcher, or is neither the owner nor the lead of the affiliated group.',
+      'Caller is not an active researcher, or does not manage the container of the work.',
   })
   @ApiNotFoundResponse({
     description: 'The research output was not found.',
   })
   @ApiConflictResponse({
-    description: 'The work is not published, so its visibility cannot change.',
+    description: 'The work is not published, so its audience cannot change.',
   })
   async updateVisibility(
     @Param('outputId', ParseUUIDPipe) outputId: string,

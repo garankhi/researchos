@@ -239,7 +239,7 @@ export class OpenAlexCandidatesService {
    * `CANDIDATE -> ACCEPTED` with the caller as owner (the first claimer
    * wins — a co-author accepting an already-accepted work attaches without
    * taking `owner_id` over), while `sharing_status` stays `DRAFT`,
-   * `visibility` stays `PRIVATE` and `current_release_id` is never set
+   * `audience` stays `PRIVATE` and `current_release_id` is never set
    * (`guard_output_release` only accepts a released revision). The
    * caller's claim becomes `CONFIRMED` with `reviewed_at` set and
    * `author_id` pointing at their own `output_authors` row, satisfying

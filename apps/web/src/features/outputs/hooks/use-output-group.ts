@@ -13,8 +13,6 @@ export function useOutputGroup({ groupId }: { groupId?: string | null }) {
   return {
     group: query.data,
     groupName: query.data?.name,
-    /** The group leader, who may also change the visibility of the group's works. */
-    groupLeadId: query.data?.leadId ?? null,
     isLoading: query.isPending && query.fetchStatus !== 'idle',
     isFailed: query.isError,
     refetch: query.refetch,

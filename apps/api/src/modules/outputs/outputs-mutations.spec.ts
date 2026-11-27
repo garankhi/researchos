@@ -1,7 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
-  OutputFileVisibility,
+  OutputAudience,
+  OutputScopeType,
   OutputSharingStatus,
   PrismaService,
 } from '@researchos/database';
@@ -31,6 +32,10 @@ describe('OutputsController mutations', () => {
     id: outputId,
     owner_id: ownerId,
     sharing_status: OutputSharingStatus.DRAFT,
+    scope_type: OutputScopeType.PERSONAL,
+    scope_group_id: null,
+    scope_project_id: null,
+    audience: OutputAudience.PRIVATE,
     current_release_id: null,
     first_shared_at: null,
     output_authors: [],
@@ -282,7 +287,7 @@ describe('OutputsController mutations', () => {
   });
 
   describe('publish', () => {
-    it('releases the draft, pins it, shares the work and sets the visibility', async () => {
+    it('releases the draft, pins it, shares the work and sets the audience', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
@@ -315,7 +320,7 @@ describe('OutputsController mutations', () => {
 
       const controller = await setupController(prismaMock, provenanceMock);
       const result = await controller.publish(outputId, ownerId, {
-        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        audience: OutputAudience.FPTU_COMMUNITY,
       });
 
       expect(prismaMock.tx.output_revisions.update).toHaveBeenCalledWith({
@@ -328,14 +333,14 @@ describe('OutputsController mutations', () => {
           current_release_id: draftRevId,
           sharing_status: OutputSharingStatus.SHARED,
           first_shared_at: now,
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
           access_group_id: null,
         },
       });
       expect(result.sharingStatus).toBe(OutputSharingStatus.SHARED);
     });
 
-    it('scopes a group work to the group and checks the caller is a member', async () => {
+    it('publishes a personal work to the community whatever the caller asked for', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
@@ -351,70 +356,36 @@ describe('OutputsController mutations', () => {
       prismaMock.tx.research_outputs.update.mockResolvedValue(mockDraftOutput);
       prismaMock.tx.$queryRaw
         .mockResolvedValueOnce([mockDraftOutput])
-        .mockResolvedValueOnce([{ allowed: true }])
         .mockResolvedValueOnce([{ now }]);
-      prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
-        mockDraftRevision,
-      );
+      prismaMock.tx.output_revisions.findUnique.mockResolvedValue({
+        ...mockDraftRevision,
+        released_at: now,
+      });
       prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
 
       const controller = await setupController(prismaMock, provenanceMock);
       await controller.publish(outputId, ownerId, {
-        visibility: OutputFileVisibility.RESEARCH_GROUP,
-        accessGroupId: groupId,
+        audience: OutputAudience.CONTAINER,
       });
 
+      // A personal work has no container, so CONTAINER would leave it
+      // unreadable. It publishes to the community instead.
       expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
         where: { id: outputId },
         data: expect.objectContaining({
-          visibility: OutputFileVisibility.RESEARCH_GROUP,
-          access_group_id: groupId,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       });
     });
 
-    it('refuses to scope a work to a group the caller is not a member of', async () => {
+    it('publishes a container work to its container', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
-      prismaMock.tx.$queryRaw
-        .mockResolvedValueOnce([mockDraftOutput])
-        .mockResolvedValueOnce([{ allowed: false }]);
-
-      const controller = await setupController(prismaMock, provenanceMock);
-
-      await expect(
-        controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.RESEARCH_GROUP,
-          accessGroupId: groupId,
-        }),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        code: domainErrorCodes.outputs.outputAccessGroupInvalid,
+      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
+        ...mockDraftOutput,
+        scope_type: OutputScopeType.GROUP,
+        scope_group_id: groupId,
       });
-    });
-
-    it('refuses a group visibility without an access group', async () => {
-      const prismaMock = createPrismaMock();
-      const provenanceMock = createProvenanceMock();
-
-      const controller = await setupController(prismaMock, provenanceMock);
-
-      await expect(
-        controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.RESEARCH_GROUP,
-        }),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        code: domainErrorCodes.outputs.outputVisibilityInvalid,
-      });
-    });
-
-    it('accepts an access group with a community visibility when the caller is a member', async () => {
-      const prismaMock = createPrismaMock();
-      const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
-        mockDraftOutput,
-      );
       prismaMock.tx.output_revisions.findFirst.mockResolvedValue(
         mockDraftRevision,
       );
@@ -424,46 +395,30 @@ describe('OutputsController mutations', () => {
       });
       prismaMock.tx.research_outputs.update.mockResolvedValue(mockDraftOutput);
       prismaMock.tx.$queryRaw
-        .mockResolvedValueOnce([mockDraftOutput])
-        .mockResolvedValueOnce([{ allowed: true }])
+        .mockResolvedValueOnce([
+          {
+            ...mockDraftOutput,
+            scope_type: OutputScopeType.GROUP,
+            scope_group_id: groupId,
+          },
+        ])
         .mockResolvedValueOnce([{ now }]);
-      prismaMock.tx.output_revisions.findUnique.mockResolvedValue(
-        mockDraftRevision,
-      );
+      prismaMock.tx.output_revisions.findUnique.mockResolvedValue({
+        ...mockDraftRevision,
+        released_at: now,
+      });
       prismaMock.tx.output_topics.findMany.mockResolvedValue([]);
 
       const controller = await setupController(prismaMock, provenanceMock);
       await controller.publish(outputId, ownerId, {
-        visibility: OutputFileVisibility.FPTU_COMMUNITY,
-        accessGroupId: groupId,
+        audience: OutputAudience.CONTAINER,
       });
 
       expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
         where: { id: outputId },
         data: expect.objectContaining({
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
-          access_group_id: groupId,
+          audience: OutputAudience.CONTAINER,
         }),
-      });
-    });
-
-    it('refuses a community-affiliated work scoped to a group the caller is not a member of', async () => {
-      const prismaMock = createPrismaMock();
-      const provenanceMock = createProvenanceMock();
-      prismaMock.tx.$queryRaw
-        .mockResolvedValueOnce([mockDraftOutput])
-        .mockResolvedValueOnce([{ allowed: false }]);
-
-      const controller = await setupController(prismaMock, provenanceMock);
-
-      await expect(
-        controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
-          accessGroupId: groupId,
-        }),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        code: domainErrorCodes.outputs.outputAccessGroupInvalid,
       });
     });
 
@@ -481,7 +436,7 @@ describe('OutputsController mutations', () => {
 
       await expect(
         controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
@@ -503,7 +458,7 @@ describe('OutputsController mutations', () => {
 
       await expect(
         controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
@@ -521,7 +476,7 @@ describe('OutputsController mutations', () => {
 
       await expect(
         controller.publish(outputId, ownerId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,
@@ -535,18 +490,19 @@ describe('OutputsController mutations', () => {
       ...mockDraftOutput,
       sharing_status: OutputSharingStatus.SHARED,
       current_release_id: draftRevId,
-      visibility: OutputFileVisibility.RESEARCH_GROUP,
+      scope_type: OutputScopeType.PERSONAL,
+      audience: OutputAudience.PRIVATE,
       access_group_id: groupId,
       output_authors: [],
     };
 
     const mockLoadedOutput = {
       ...mockSharedOutput,
-      visibility: OutputFileVisibility.FPTU_COMMUNITY,
+      audience: OutputAudience.FPTU_COMMUNITY,
       output_authors: [],
     };
 
-    it('lets the owner open an affiliated work to the community while keeping the group', async () => {
+    it('lets the owner open a personal work to the community', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique
@@ -561,25 +517,26 @@ describe('OutputsController mutations', () => {
 
       const controller = await setupController(prismaMock, provenanceMock);
       const result = await controller.updateVisibility(outputId, ownerId, {
-        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        audience: OutputAudience.FPTU_COMMUNITY,
       });
 
       expect(prismaMock.tx.research_outputs.update).toHaveBeenCalledWith({
         where: { id: outputId },
         data: {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
-          access_group_id: groupId,
+          audience: OutputAudience.FPTU_COMMUNITY,
         },
       });
-      expect(result.visibility).toBe(OutputFileVisibility.FPTU_COMMUNITY);
-      expect(result.accessGroupId).toBe(groupId);
+      expect(result.audience).toBe(OutputAudience.FPTU_COMMUNITY);
     });
 
-    it('lets the lead of the affiliated group change visibility', async () => {
+    it('lets the lead of the container change the audience of a group work', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique
-        .mockResolvedValueOnce(mockSharedOutput)
+        .mockResolvedValueOnce({
+          ...mockSharedOutput,
+          scope_type: OutputScopeType.GROUP,
+        })
         .mockResolvedValueOnce(mockLoadedOutput);
       prismaMock.tx.$queryRaw.mockResolvedValueOnce([{ allowed: true }]);
       prismaMock.tx.research_outputs.update.mockResolvedValue(mockLoadedOutput);
@@ -590,13 +547,13 @@ describe('OutputsController mutations', () => {
 
       const controller = await setupController(prismaMock, provenanceMock);
       await controller.updateVisibility(outputId, otherUserId, {
-        visibility: OutputFileVisibility.FPTU_COMMUNITY,
+        audience: OutputAudience.FPTU_COMMUNITY,
       });
 
       expect(prismaMock.tx.research_outputs.update).toHaveBeenCalled();
     });
 
-    it('refuses a caller who is neither owner nor group lead', async () => {
+    it('refuses a caller who may not manage the container of the work', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
@@ -608,7 +565,7 @@ describe('OutputsController mutations', () => {
 
       await expect(
         controller.updateVisibility(outputId, otherUserId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
@@ -616,27 +573,7 @@ describe('OutputsController mutations', () => {
       });
     });
 
-    it('refuses a group visibility with no affiliated group', async () => {
-      const prismaMock = createPrismaMock();
-      const provenanceMock = createProvenanceMock();
-      prismaMock.tx.research_outputs.findUnique.mockResolvedValue({
-        ...mockSharedOutput,
-        access_group_id: null,
-      });
-
-      const controller = await setupController(prismaMock, provenanceMock);
-
-      await expect(
-        controller.updateVisibility(outputId, ownerId, {
-          visibility: OutputFileVisibility.RESEARCH_GROUP,
-        }),
-      ).rejects.toMatchObject({
-        status: HttpStatus.BAD_REQUEST,
-        code: domainErrorCodes.outputs.outputVisibilityInvalid,
-      });
-    });
-
-    it('refuses to change visibility of an unpublished work', async () => {
+    it('refuses to change the audience of an unpublished work', async () => {
       const prismaMock = createPrismaMock();
       const provenanceMock = createProvenanceMock();
       prismaMock.tx.research_outputs.findUnique.mockResolvedValue(
@@ -647,7 +584,7 @@ describe('OutputsController mutations', () => {
 
       await expect(
         controller.updateVisibility(outputId, ownerId, {
-          visibility: OutputFileVisibility.FPTU_COMMUNITY,
+          audience: OutputAudience.FPTU_COMMUNITY,
         }),
       ).rejects.toMatchObject({
         status: HttpStatus.CONFLICT,

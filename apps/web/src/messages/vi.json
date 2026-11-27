@@ -435,19 +435,15 @@
       "doi": "DOI: {doi}",
       "authors": "Tác giả: {authors}",
       "actionsMenuLabel": "Thao tác với công trình",
-      "visibilityAction": "Phạm vi hiển thị",
-      "visibilityDialogTitle": "Ai có thể xem công trình này",
-      "visibilityDialogDesc": "Công trình cộng đồng vẫn hiển thị ngay cả khi mang tên nhóm liên kết.",
+      "visibilityAction": "Đối tượng xem",
+      "visibilityDialogTitle": "Ai có thể thấy tác phẩm này",
+      "visibilityDialogDesc": "Đối tượng xem phụ thuộc vào nơi tác phẩm được đăng: tác phẩm cá nhân chỉ ở riêng chủ sở hữu hoặc công khai cho cộng đồng; tác phẩm của nhóm hoặc dự án chỉ ở trong nhóm/dự án hoặc công khai cho cộng đồng.",
       "visibilityPublicOption": "Cộng đồng FPTU",
-      "visibilityPublicDesc": "Mọi người trong cộng đồng FPTU đều có thể xem công trình.",
-      "visibilityGroupOption": "Chỉ nhóm liên kết",
-      "visibilityGroupDesc": "Chỉ thành viên của nhóm liên kết mới xem được công trình.",
-      "visibilityNoGroupHint": "Công trình này chưa có nhóm liên kết nên không thể giới hạn theo nhóm.",
-      "visibilityUpdated": "Đã cập nhật phạm vi hiển thị.",
-      "visibilityUpdateError": "Không thể cập nhật phạm vi hiển thị. Vui lòng thử lại.",
-      "visibilityLockedReason": "Chỉ chủ sở hữu mới có thể thay đổi",
+      "visibilityPublicDesc": "Mọi người trong cộng đồng FPTU đều có thể thấy tác phẩm.",
+      "visibilityUpdated": "Đã cập nhật đối tượng xem.",
+      "visibilityUpdateError": "Không thể cập nhật đối tượng xem. Vui lòng thử lại.",
+      "visibilityLockedReason": "Chủ sở hữu của nhóm hoặc dự án này quyết định ai có thể xem",
       "visibilityPublic": "Cộng đồng FPTU",
-      "visibilityGroupOnly": "Chỉ nhóm",
       "filterAll": "Tất cả ({count})",
       "filterPublished": "Đã công bố ({count})",
       "filterDrafts": "Bản nháp ({count})",
@@ -467,7 +463,12 @@
         "BOOK": "Sách",
         "DATASET": "Bộ dữ liệu",
         "DISSERTATION": "Luận án"
-      }
+      },
+      "visibilityPrivateOption": "Chỉ riêng tôi",
+      "visibilityPrivateDesc": "Chỉ chủ sở hữu mới có thể thấy tác phẩm.",
+      "visibilityContainerOption": "Chỉ trong nhóm hoặc dự án",
+      "visibilityContainerDesc": "Chỉ thành viên của nhóm hoặc dự án mới có thể thấy tác phẩm.",
+      "visibilityContainerOnly": "Chỉ trong nhóm hoặc dự án"
     },
     "interestsTab": {
       "title": "Sở thích nghiên cứu",
@@ -542,17 +543,14 @@
       "linkCopied": "Đã sao chép liên kết.",
       "shareError": "Không thể sao chép liên kết. Vui lòng thử lại.",
       "actionsMenuLabel": "Thao tác với công trình",
-      "visibilityAction": "Phạm vi hiển thị",
-      "visibilityDialogTitle": "Ai có thể xem công trình này",
-      "visibilityDialogDesc": "Công trình cộng đồng vẫn hiển thị ngay cả khi mang tên nhóm liên kết.",
+      "visibilityAction": "Đối tượng xem",
+      "visibilityDialogTitle": "Ai có thể thấy tác phẩm này",
+      "visibilityDialogDesc": "Đối tượng xem phụ thuộc vào nơi tác phẩm được đăng: tác phẩm cá nhân chỉ ở riêng chủ sở hữu hoặc công khai cho cộng đồng; tác phẩm của nhóm hoặc dự án chỉ ở trong nhóm/dự án hoặc công khai cho cộng đồng.",
       "visibilityPublicOption": "Cộng đồng FPTU",
-      "visibilityPublicDesc": "Mọi người trong cộng đồng FPTU đều có thể xem công trình.",
-      "visibilityGroupOption": "Chỉ nhóm liên kết",
-      "visibilityGroupDesc": "Chỉ thành viên của nhóm liên kết mới xem được công trình.",
-      "visibilityNoGroupHint": "Công trình này chưa có nhóm liên kết nên không thể giới hạn theo nhóm.",
-      "visibilityUpdated": "Đã cập nhật phạm vi hiển thị.",
-      "visibilityUpdateError": "Không thể cập nhật phạm vi hiển thị. Vui lòng thử lại.",
-      "visibilityLockedReason": "Chỉ chủ sở hữu mới có thể thay đổi",
+      "visibilityPublicDesc": "Mọi người trong cộng đồng FPTU đều có thể thấy tác phẩm.",
+      "visibilityUpdated": "Đã cập nhật đối tượng xem.",
+      "visibilityUpdateError": "Không thể cập nhật đối tượng xem. Vui lòng thử lại.",
+      "visibilityLockedReason": "Chủ sở hữu của nhóm hoặc dự án này quyết định ai có thể xem",
       "followed": "Bạn đang theo dõi nhóm này.",
       "unfollowed": "Bạn đã bỏ theo dõi nhóm này.",
       "followError": "Không thể cập nhật theo dõi. Vui lòng thử lại.",
@@ -570,7 +568,7 @@
       "metadataTitle": "Thông tin công bố",
       "venueRowLabel": "Tạp chí / Hội nghị",
       "publisherRowLabel": "Nhà xuất bản",
-      "visibilityRowLabel": "Phạm vi hiển thị",
+      "visibilityRowLabel": "Đối tượng xem",
       "visibilityPublic": "Cộng đồng FPTU",
       "visibilityGroupOnly": "Chỉ nhóm liên kết",
       "visibilityPrivate": "Bản nháp riêng tư",
@@ -590,7 +588,12 @@
         "BOOK": "Sách",
         "DATASET": "Bộ dữ liệu",
         "DISSERTATION": "Luận án"
-      }
+      },
+      "visibilityPrivateOption": "Chỉ riêng tôi",
+      "visibilityPrivateDesc": "Chỉ chủ sở hữu mới có thể thấy tác phẩm.",
+      "visibilityContainerOption": "Chỉ trong nhóm hoặc dự án",
+      "visibilityContainerDesc": "Chỉ thành viên của nhóm hoặc dự án mới có thể thấy tác phẩm.",
+      "visibilityContainerOnly": "Chỉ trong nhóm hoặc dự án"
     },
     "card": {
       "draftBadge": "Bản nháp",
@@ -600,7 +603,6 @@
       "linkCopied": "Đã sao chép liên kết bài báo.",
       "copyError": "Không thể sao chép liên kết.",
       "visibilityPublic": "Cộng đồng FPTU",
-      "visibilityGroupOnly": "Chỉ nhóm liên quan",
       "types": {
         "PAPER": "Bài báo",
         "PREPRINT": "Bản thảo trước xuất bản",
@@ -610,8 +612,13 @@
         "BOOK": "Sách",
         "DATASET": "Bộ dữ liệu",
         "DISSERTATION": "Luận án"
-      }
-    }
+      },
+      "visibilityContainerOnly": "Chỉ trong nhóm hoặc dự án",
+      "visibilityPrivate": "Bản nháp riêng tư"
+    },
+    "visibilityPublic": "Cộng đồng FPTU",
+    "visibilityContainerOnly": "Chỉ trong nhóm hoặc dự án",
+    "visibilityPrivate": "Bản nháp riêng tư"
   },
   "errors": {
     "title": "Đã xảy ra lỗi khi tải trang",
@@ -743,6 +750,7 @@
         "output_revision_locked": "Phiên bản này đã được phát hành nên không thể chỉnh sửa.",
         "output_revision_not_found": "Không tìm thấy phiên bản yêu cầu.",
         "output_visibility_invalid": "Phạm vi hiển thị và nhóm nghiên cứu được cấp quyền không khớp.",
+        "output_scope_invalid": "Hãy chọn nơi đăng hợp lệ: bài cá nhân, nhóm nghiên cứu bạn tham gia, hoặc dự án bạn là thành viên.",
         "output_access_group_invalid": "Bạn không phải thành viên của nhóm nghiên cứu nào có thể được cấp quyền.",
         "output_idempotency_key_invalid": "Cần có khóa idempotency hợp lệ để gửi bài báo.",
         "output_idempotency_key_conflict": "Khóa idempotency đã được dùng cho một lượt gửi bài báo khác.",
@@ -812,7 +820,9 @@
         "chat_attachment_invalid_type": "Định dạng tệp này không được hỗ trợ trong trò chuyện.",
         "chat_attachment_size_exceeded": "Kích thước tệp vượt quá giới hạn tối đa 25 MB.",
         "chat_attachment_limit_exceeded": "Tối đa 5 tệp đính kèm trên mỗi tin nhắn.",
-        "chat_attachment_already_linked": "Tệp đính kèm này đã được gắn vào một tin nhắn khác."
+        "chat_attachment_already_linked": "Tệp đính kèm này đã được gắn vào một tin nhắn khác.",
+        "project_not_found": "Không tìm thấy dự án nghiên cứu.",
+        "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này."
       }
     }
   },
@@ -1239,5 +1249,14 @@
       "DECLINED": "Đã từ chối",
       "WITHDRAWN": "Đã rút"
     }
+  },
+  "outputScope": {
+    "label": "Nơi đăng tác phẩm này",
+    "hint": "Nơi đăng quyết định ai sở hữu tác phẩm và ai có thể đọc. Không thể thay đổi sau khi tạo.",
+    "personalOption": "Trang cá nhân của tôi",
+    "groupOption": "Một nhóm nghiên cứu",
+    "projectOption": "Một dự án nghiên cứu",
+    "containerNote": "Nhóm hoặc dự án sở hữu bài đăng này. Trưởng nhóm hoặc dự án quyết định ai có thể đọc.",
+    "fixedNote": "Nơi đăng được cố định sau khi tác phẩm được tạo."
   }
 }

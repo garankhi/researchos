@@ -193,10 +193,10 @@ BEGIN
 
  -- The polymorphic entity_id has no foreign key, so the trigger guards it.
  PERFORM pg_temp.expect_error(format(
-  'INSERT INTO search_index(entity_type,entity_id,visibility,title,doc) VALUES(''OUTPUT'',%L,''FPTU_COMMUNITY'',''x'',to_tsvector(''simple'',''x''))',gen_random_uuid()),'23503');
- -- RESEARCH_GROUP visibility needs an access_group_id.
+  'INSERT INTO search_index(entity_type,entity_id,audience,title,doc) VALUES(''OUTPUT'',%L,''FPTU_COMMUNITY'',''x'',to_tsvector(''simple'',''x''))',gen_random_uuid()),'23503');
+ -- A group-scoped index row may not carry the banner of another group.
  PERFORM pg_temp.expect_error(format(
-  'INSERT INTO search_index(entity_type,entity_id,visibility,title,doc) VALUES(''OUTPUT'',%L,''RESEARCH_GROUP'',''x'',to_tsvector(''simple'',''x''))',o),'23514');
+  'INSERT INTO search_index(entity_type,entity_id,scope_type,scope_group_id,access_group_id,audience,title,doc) VALUES(''OUTPUT'',%L,''GROUP'',gen_random_uuid(),gen_random_uuid(),''CONTAINER'',''x'',to_tsvector(''simple'',''x''))',o),'23514');
 
  -- A draft is not indexed.
  SELECT count(*) INTO n FROM search_index WHERE entity_type='OUTPUT' AND entity_id=o;
@@ -278,7 +278,7 @@ BEGIN
  PERFORM pg_temp.assert_true(n=0,'an inactive actor sees no search row');
 
  -- An inactive owner does not reach their own private row either.
- UPDATE research_outputs SET visibility='PRIVATE' WHERE id=o;
+ UPDATE research_outputs SET audience='PRIVATE' WHERE id=o;
  UPDATE users SET is_active=false WHERE id=u;
  SELECT count(*) INTO n FROM visible_search_index(u) WHERE entity_id=o;
  PERFORM pg_temp.assert_true(n=0,'an inactive owner does not see their own private work');
@@ -392,7 +392,7 @@ BEGIN
  -- The index row is community-wide, and carries no group scope.
  PERFORM pg_temp.assert_true(
   EXISTS(SELECT 1 FROM search_index WHERE entity_type='OPPORTUNITY' AND entity_id=op
-    AND visibility='FPTU_COMMUNITY' AND access_group_id IS NULL),
+    AND audience='FPTU_COMMUNITY' AND access_group_id IS NULL),
   'a group opportunity is indexed as community-wide');
 
  -- An actor outside the group still sees it.
@@ -439,14 +439,14 @@ BEGIN
  SELECT id INTO op FROM research_opportunities WHERE title='Quantum Fellowship';
 
  -- A community work and a private one, both matching the term.
- INSERT INTO research_outputs(id,sharing_status,visibility,owner_id,created_by)
+ INSERT INTO research_outputs(id,sharing_status,audience,owner_id,created_by)
  VALUES(gen_random_uuid(),'DRAFT','FPTU_COMMUNITY',owner,owner) RETURNING id INTO o;
  INSERT INTO output_revisions(id,output_id,revision_no,title,abstract,created_by)
  VALUES(gen_random_uuid(),o,1,'Quantum Materials at Scale','A study of quantum materials at scale',owner) RETURNING id INTO r;
  UPDATE output_revisions SET released_at=clock_timestamp(),released_by=owner WHERE id=r;
  UPDATE research_outputs SET sharing_status='SHARED',first_shared_at=clock_timestamp(),current_release_id=r WHERE id=o;
 
- INSERT INTO research_outputs(id,sharing_status,visibility,owner_id,created_by)
+ INSERT INTO research_outputs(id,sharing_status,audience,owner_id,created_by)
  VALUES(gen_random_uuid(),'DRAFT','PRIVATE',owner,owner) RETURNING id INTO priv;
  INSERT INTO output_revisions(id,output_id,revision_no,title,abstract,created_by)
  VALUES(gen_random_uuid(),priv,1,'Private Quantum Materials Notes','Unpublished notes on quantum materials',owner) RETURNING id INTO privr;

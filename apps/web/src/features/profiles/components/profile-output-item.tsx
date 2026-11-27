@@ -36,7 +36,7 @@ export function ProfileOutputItem({
     doi: output.doi,
     externalUrl: rev?.externalUrl,
     sharingStatus: output.sharingStatus,
-    visibility: output.visibility,
+    audience: output.audience,
     authors: output.authors,
     topics: output.topics,
   });

@@ -8,12 +8,15 @@
 import type { DownloadablePdfDto } from './downloadablePdfDto';
 import type { OutputAuthorResponseDto } from './outputAuthorResponseDto';
 import type { OutputResponseDtoAccessGroupId } from './outputResponseDtoAccessGroupId';
+import type { OutputResponseDtoAudience } from './outputResponseDtoAudience';
 import type { OutputResponseDtoDoi } from './outputResponseDtoDoi';
 import type { OutputResponseDtoFirstSharedAt } from './outputResponseDtoFirstSharedAt';
 import type { OutputResponseDtoImportState } from './outputResponseDtoImportState';
 import type { OutputResponseDtoOwnerId } from './outputResponseDtoOwnerId';
+import type { OutputResponseDtoScopeGroupId } from './outputResponseDtoScopeGroupId';
+import type { OutputResponseDtoScopeProjectId } from './outputResponseDtoScopeProjectId';
+import type { OutputResponseDtoScopeType } from './outputResponseDtoScopeType';
 import type { OutputResponseDtoSharingStatus } from './outputResponseDtoSharingStatus';
-import type { OutputResponseDtoVisibility } from './outputResponseDtoVisibility';
 import type { OutputRevisionResponseDto } from './outputRevisionResponseDto';
 import type { OutputTopicResponseDto } from './outputTopicResponseDto';
 import type { RequestableFileDto } from './requestableFileDto';
@@ -33,10 +36,24 @@ export interface OutputResponseDto {
   ownerId: OutputResponseDtoOwnerId;
   /** Internal sharing status (`DRAFT`, `SHARED`, or `ARCHIVED`). */
   sharingStatus: OutputResponseDtoSharingStatus;
-  /** Visibility scope (`PRIVATE`, `RESEARCH_GROUP`, or `FPTU_COMMUNITY`). */
-  visibility: OutputResponseDtoVisibility;
+  /** Where the work was posted: PERSONAL (its author owns it), GROUP (the group owns it) or PROJECT (the project owns it). Fixed at creation. */
+  scopeType: OutputResponseDtoScopeType;
   /**
-   * Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.
+   * The group the work was posted in. For a GROUP scope it is the group itself; for a PROJECT scope it is the parent group, when the project has one. Null for a personal work.
+   * @nullable
+   */
+  scopeGroupId: OutputResponseDtoScopeGroupId;
+  /**
+   * The project the work was posted in. Set only for a PROJECT scope.
+   * @nullable
+   */
+  scopeProjectId: OutputResponseDtoScopeProjectId;
+  /** Who may read the work: PRIVATE (the owner alone), CONTAINER (the narrow audience of the group or project) or FPTU_COMMUNITY (every signed-in researcher). */
+  audience: OutputResponseDtoAudience;
+  /** Whether the caller may change the audience of this work. The owner may for a personal work; the group leads may for a group work; the project lead and the parent group leads may for a project work. The poster of a container work may not: the container owns the post. */
+  canChangeVisibility: boolean;
+  /**
+   * Affiliated research group whose banner the work carries. Display information only: it grants no authority over the work.
    * @nullable
    */
   accessGroupId: OutputResponseDtoAccessGroupId;
