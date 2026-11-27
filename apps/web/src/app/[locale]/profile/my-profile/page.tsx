@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { RequireAuth } from '@/features/identity';
+import { RequireAuth, RequireOnboarding } from '@/features/identity';
 import { ProfilePageSkeleton, ProfileShell } from '@/features/profiles';
 
 export default function MyProfilePage() {
@@ -12,7 +12,9 @@ export default function MyProfilePage() {
      */
     <Suspense fallback={<ProfilePageSkeleton />}>
       <RequireAuth>
-        <ProfileShell isOwner={true} />
+        <RequireOnboarding>
+          <ProfileShell isOwner={true} />
+        </RequireOnboarding>
       </RequireAuth>
     </Suspense>
   );

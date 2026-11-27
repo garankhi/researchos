@@ -23,6 +23,7 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  CompleteOnboardingDto,
   ProfilePreviewResponseDtoEnvelope,
   ProfileResponseDtoEnvelope,
   ProfilesControllerGetInterestsByUserIdEnvelope,
@@ -823,3 +824,105 @@ export function useProfilesControllerGetInterestsByUserId<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Finishes the onboarding: writes the profile information the researcher filled in — including the ORCID, which the ordinary profile update refuses — and marks the account as onboarded. Requires at least one ACTIVE research interest, the one mandatory step of the onboarding.
+ * @summary Complete the onboarding of the current user
+ */
+export const profilesControllerCompleteOnboarding = (
+  completeOnboardingDto: CompleteOnboardingDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfileResponseDtoEnvelope>(
+    {
+      url: `/profiles/me/onboarding`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: completeOnboardingDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProfilesControllerCompleteOnboardingMutationKey = () =>
+  ['profilesControllerCompleteOnboarding'] as const;
+
+export const getProfilesControllerCompleteOnboardingMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+    TError,
+    ProfilesControllerCompleteOnboardingMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+  TError,
+  ProfilesControllerCompleteOnboardingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getProfilesControllerCompleteOnboardingMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+    ProfilesControllerCompleteOnboardingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return profilesControllerCompleteOnboarding(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProfilesControllerCompleteOnboardingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>
+>;
+export type ProfilesControllerCompleteOnboardingMutationBody =
+  CompleteOnboardingDto;
+export type ProfilesControllerCompleteOnboardingMutationError =
+  ApiErrorResponseDto;
+export type ProfilesControllerCompleteOnboardingMutationVariables = {
+  data: CompleteOnboardingDto;
+};
+
+/**
+ * @summary Complete the onboarding of the current user
+ */
+export const useProfilesControllerCompleteOnboarding = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+      TError,
+      ProfilesControllerCompleteOnboardingMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+  TError,
+  ProfilesControllerCompleteOnboardingMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getProfilesControllerCompleteOnboardingMutationOptions(options),
+    queryClient,
+  );
+};

@@ -83,6 +83,17 @@ export function LoginForm() {
 
       // The redirect comes **after** the account is known, so the header
       // renders the right name on the page the user lands on.
+      //
+      // An account that has not finished the onboarding is sent to the
+      // onboarding screen instead: the interest it declares there is what
+      // the discovery matches on, so every other screen is thin until
+      // the onboarding is done. The gate on the protected routes would
+      // send them there anyway — this saves the extra hop.
+      if (account && !account.onboardingCompleted) {
+        router.replace('/profile/onboarding');
+        return;
+      }
+
       router.replace(resolveReturnTo(searchParams));
     } catch (error) {
       const codes = apiFieldErrorCodes(error);

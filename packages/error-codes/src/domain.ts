@@ -167,6 +167,8 @@ export const domainErrorCodes = {
   profiles: {
     profileNotFound: 'profile_not_found',
     profileAccessDenied: 'profile_access_denied',
+    onboardingRequiresInterest: 'onboarding_requires_interest',
+    orcidAlreadyClaimed: 'orcid_already_claimed',
   },
   provenance: {
     fieldLocked: 'provenance_field_locked',

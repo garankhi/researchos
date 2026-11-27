@@ -131,7 +131,9 @@
     "close": "Đóng",
     "notifications": "Thông báo",
     "backToHome": "Về trang chủ",
-    "add": "Thêm"
+    "add": "Thêm",
+    "back": "Quay lại",
+    "next": "Tiếp tục"
   },
   "nav": {
     "home": "Trang chủ",
@@ -300,6 +302,38 @@
     "welcome": "Chào mừng, {name}."
   },
   "onboarding": {
+    "title": "Chào mừng bạn đến với ResearchOS",
+    "description": "Bốn bước ngắn để thiết lập hồ sơ researcher của bạn. Chỉ bước đầu là bắt buộc — các bước còn lại bạn có thể bỏ qua và quay lại sau.",
+    "steps": {
+      "interests": {
+        "label": "Lĩnh vực nghiên cứu",
+        "mandatory": "Bắt buộc"
+      },
+      "author": {
+        "label": "Hồ sơ OpenAlex"
+      },
+      "profile": {
+        "label": "Thông tin của bạn"
+      },
+      "works": {
+        "label": "Công bố của bạn"
+      }
+    },
+    "interestsStep": {
+      "title": "Bạn nghiên cứu về lĩnh vực nào?",
+      "description": "Hãy chọn ít nhất một lĩnh vực nghiên cứu. Đây là bước bắt buộc duy nhất, và cũng là điều nền tảng dùng để hiển thị cho bạn những nội dung phù hợp.",
+      "selected": "{count, plural, =0 {Chưa chọn lĩnh vực nào} =1 {Đã chọn 1 lĩnh vực} other {Đã chọn # lĩnh vực}}",
+      "add": "Thêm lĩnh vực",
+      "addAnother": "Thêm lĩnh vực khác",
+      "searchPlaceholder": "Tìm một chủ đề nghiên cứu",
+      "searching": "Đang tìm chủ đề…",
+      "searchFailed": "Không thể tải danh sách chủ đề nghiên cứu.",
+      "noTopicsTitle": "Không tìm thấy chủ đề",
+      "noTopicsMessage": "Hãy thử một từ khác. Các chủ đề đến từ cây phân cấp nghiên cứu của FPTU.",
+      "emptyTitle": "Chưa chọn lĩnh vực nghiên cứu",
+      "emptyMessage": "Tìm một chủ đề ở trên và chọn những chủ đề mô tả nghiên cứu của bạn.",
+      "declareFailed": "Không thể lưu lĩnh vực. Hãy thử lại."
+    },
     "authorStep": {
       "title": "Tìm tác giả của bạn",
       "description": "Chúng tôi đã tìm trên OpenAlex theo tên của bạn tại FPT University. Hãy xác nhận tác giả đúng là bạn, hoặc bỏ qua — bạn vẫn có thể nhập tác phẩm sau.",
@@ -312,7 +346,29 @@
       "confirm": "Đây là tôi",
       "skip": "Bỏ qua",
       "continue": "Tiếp tục mà không xác nhận",
+      "pulled": "Đã tải công bố của bạn từ OpenAlex.",
       "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau."
+    },
+    "profileStep": {
+      "title": "Thông tin researcher của bạn",
+      "description": "Điền những gì bạn muốn công bố trên hồ sơ. Bạn có thể để trống tất cả và hoàn thiện sau.",
+      "descriptionPrefilled": "Chúng tôi đã điền từ tác giả OpenAlex mà bạn xác nhận. Hãy kiểm tra và sửa nếu có chỗ sai.",
+      "prefillTitle": "Điền từ OpenAlex",
+      "prefillAuthor": "Tác giả OpenAlex {authorId}",
+      "prefillAuthorUnknown": "Tác giả bạn xác nhận không có ORCID, nên bạn có thể tự điền.",
+      "fullName": "Họ và tên",
+      "departmentUnit": "Khoa hoặc đơn vị",
+      "academicTitle": "Chức danh học thuật",
+      "academicDegree": "Học vị",
+      "orcidId": "ORCID",
+      "availabilityStatus": "Mức độ sẵn sàng hợp tác",
+      "googleScholarUrl": "Hồ sơ Google Scholar",
+      "scopusAuthorId": "Mã tác giả Scopus",
+      "bio": "Tiểu sử",
+      "saved": "Đã lưu hồ sơ của bạn.",
+      "failed": "Không thể lưu hồ sơ. Hãy thử lại.",
+      "save": "Lưu thông tin của tôi",
+      "skip": "Bỏ qua"
     },
     "worksStep": {
       "title": "Nhập tác phẩm của bạn",
@@ -332,7 +388,10 @@
       "fetchMore": "Tải thêm từ OpenAlex",
       "finish": "Hoàn tất",
       "failed": "Đã xảy ra lỗi. Hãy thử lại."
-    }
+    },
+    "finish": "Hoàn tất thiết lập",
+    "finished": "Hồ sơ của bạn đã sẵn sàng. Chào mừng bạn đến với ResearchOS.",
+    "finishFailed": "Không thể hoàn tất thiết lập. Hãy chọn ít nhất một lĩnh vực nghiên cứu rồi thử lại."
   },
   "profile": {
     "llkh": {
@@ -757,7 +816,14 @@
         "visibility_required": "Phạm vi hiển thị là bắt buộc.",
         "visibility_invalid": "Phạm vi hiển thị phải là FPTU_COMMUNITY hoặc RESEARCH_GROUP.",
         "access_group_id_invalid": "Nhóm nghiên cứu được cấp quyền phải là UUID hợp lệ.",
-        "access_group_id_required": "Cần nhóm nghiên cứu được cấp quyền khi phạm vi hiển thị là RESEARCH_GROUP."
+        "access_group_id_required": "Cần nhóm nghiên cứu được cấp quyền khi phạm vi hiển thị là RESEARCH_GROUP.",
+        "orcid_id_invalid": "Nhập ORCID theo dạng 0000-0000-0000-0000.",
+        "bio_invalid": "Tiểu sử phải là văn bản.",
+        "bio_too_long": "Dùng tối đa 2.000 ký tự.",
+        "google_scholar_url_invalid": "Nhập một URL hợp lệ.",
+        "google_scholar_url_too_long": "Dùng tối đa 500 ký tự.",
+        "scopus_author_id_invalid": "Mã tác giả Scopus phải là văn bản.",
+        "scopus_author_id_too_long": "Dùng tối đa 50 ký tự."
       },
       "domain": {
         "follow_self": "Bạn không thể tự theo dõi mình.",
@@ -875,7 +941,9 @@
         "chat_attachment_limit_exceeded": "Tối đa 5 tệp đính kèm trên mỗi tin nhắn.",
         "chat_attachment_already_linked": "Tệp đính kèm này đã được gắn vào một tin nhắn khác.",
         "project_not_found": "Không tìm thấy dự án nghiên cứu.",
-        "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này."
+        "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này.",
+        "onboarding_requires_interest": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập.",
+        "orcid_already_claimed": "ORCID này đã thuộc về một hồ sơ researcher khác."
       }
     }
   },

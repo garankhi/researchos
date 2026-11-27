@@ -5,8 +5,10 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -14,8 +16,10 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto.js';
 import { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import { ProfileResponseDto } from './dto/profile-response.dto.js';
@@ -31,6 +35,9 @@ import { ProfilesService } from './profiles.service.js';
  */
 @ApiTags('profiles')
 @ApiBearerAuth()
+@ApiUnauthorizedResponse({
+  description: 'There is no valid session behind the request.',
+})
 @Controller('profiles')
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
@@ -157,5 +164,30 @@ export class ProfilesController {
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
     return this.profilesService.updateMyProfile(userId, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Complete the onboarding of the current user',
+    description:
+      'Finishes the onboarding: writes the profile information the researcher filled in — including the ORCID, which the ordinary profile update refuses — and marks the account as onboarded. Requires at least one ACTIVE research interest, the one mandatory step of the onboarding.',
+  })
+  @ApiOkResponse({
+    description:
+      'The onboarding completed. The returned profile carries the new onboardingCompletedAt timestamp.',
+    type: ProfileResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'The caller has no ACTIVE research interest, which is the one mandatory step of the onboarding.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested researcher profile was not found.',
+  })
+  @Post('me/onboarding')
+  async completeOnboarding(
+    @CurrentUserId() userId: string,
+    @Body() dto: CompleteOnboardingDto,
+  ): Promise<ProfileResponseDto> {
+    return this.profilesService.completeOnboarding(userId, dto);
   }
 }

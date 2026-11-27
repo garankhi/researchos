@@ -74,6 +74,8 @@ export * from './chatUploadPreparedResponseDto';
 export * from './chatUploadPreparedResponseDtoEnvelope';
 export * from './chatUploadPreparedResponseDtoHeaders';
 export * from './chatUserSummaryDto';
+export * from './completeOnboardingDto';
+export * from './completeOnboardingDtoAvailabilityStatus';
 export * from './confirmChatUploadDto';
 export * from './confirmedOutputFileDto';
 export * from './confirmedOutputFileDtoEnvelope';

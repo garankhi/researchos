@@ -3,6 +3,7 @@ import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
+import type { CompleteOnboardingDto } from './dto/complete-onboarding.dto.js';
 import type { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import type { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import type { ProfileResponseDto } from './dto/profile-response.dto.js';
@@ -275,6 +276,109 @@ export class ProfilesService {
   }
 
   /**
+   * Finishes the onboarding of the caller.
+   *
+   * The onboarding has one mandatory step — the research interests — and
+   * three optional ones. This method is the last action of the flow: it
+   * writes whatever profile information the researcher filled in (Step 3)
+   * and marks the account as onboarded, which is what lets the gate
+   * stop routing them back here.
+   *
+   * ## Why the interest is checked here
+   *
+   * The interest is the one mandatory step, so the rule belongs to the
+   * server rather than to the screen: a caller who has no ACTIVE
+   * interest cannot complete the onboarding, whatever the client says.
+   * The check is a read inside the same transaction that writes the
+   * profile, so an interest deleted between the check and the write
+   * cannot slip through.
+   *
+   * ## Why the ORCID is accepted here
+   *
+   * `updateMyProfile` refuses the ORCID on purpose — it drives the
+   * OpenAlex ORCID path. The onboarding is the one moment where the
+   * ORCID is a *first* claim, typed by the researcher themselves, and
+   * the OpenAlex pull resolves it scoped to FPT University. See
+   * `CompleteOnboardingDto` for the full reasoning.
+   */
+  async completeOnboarding(
+    userId: string,
+    dto: CompleteOnboardingDto,
+  ): Promise<ProfileResponseDto> {
+    const account = this.accountData(dto);
+    const profile = this.profileData(dto);
+
+    if (dto.orcidId !== undefined && dto.orcidId !== null) {
+      profile.orcid_id = dto.orcidId;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      /*
+       * The mandatory step. An account with no ACTIVE interest has not
+       * finished the onboarding, so the completion is refused with a
+       * code the client resolves into a message.
+       */
+      const interests = await tx.research_interests.count({
+        where: { user_id: userId, status: 'ACTIVE' },
+      });
+
+      if (interests === 0) {
+        throw new CodedHttpException(
+          domainErrorCodes.profiles.onboardingRequiresInterest,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (Object.keys(account).length > 0) {
+        await tx.users.update({
+          where: { id: userId },
+          data: account,
+        });
+      }
+
+      try {
+        await tx.researcher_profiles.upsert({
+          where: { user_id: userId },
+          create: {
+            user_id: userId,
+            ...profile,
+            onboarding_completed_at: new Date(),
+          },
+          update: {
+            ...profile,
+            onboarding_completed_at: new Date(),
+          },
+        });
+      } catch (error) {
+        /*
+         * The ORCID is unique across the profiles. A researcher who
+         * claims one that another researcher already holds is refused
+         * with a code rather than a raw constraint violation — the
+         * claim is wrong, and the researcher has to pick another ORCID
+         * or leave it empty.
+         */
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          throw new CodedHttpException(
+            domainErrorCodes.profiles.orcidAlreadyClaimed,
+            HttpStatus.CONFLICT,
+          );
+        }
+        throw error;
+      }
+
+      return tx.users.findUniqueOrThrow({
+        where: { id: userId },
+        include: { researcher_profiles: true },
+      });
+    });
+
+    return this.mapToResponse(updated);
+  }
+
+  /**
    * The account columns the caller asked to change.
    *
    * These live on `users`, not on `researcher_profiles`, so they are a
@@ -282,7 +386,7 @@ export class ProfilesService {
    * object means the payload carried no account field, and the caller
    * skips the `users` write entirely.
    */
-  private accountData(dto: UpdateProfileDto): Prisma.usersUpdateInput {
+  private accountData(dto: UpdateProfileDto | CompleteOnboardingDto): Prisma.usersUpdateInput {
     const data: Prisma.usersUpdateInput = {};
     if (dto.fullName !== undefined) {
       data.full_name = dto.fullName;
@@ -310,17 +414,19 @@ export class ProfilesService {
    * values are used for the `create` and the `update` of the upsert, and
    * the two Prisma input types do not overlap.
    */
-  private profileData(dto: UpdateProfileDto): {
+  private profileData(dto: UpdateProfileDto | CompleteOnboardingDto): {
     bio?: string | null;
     availability_status?: AvailabilityStatusEnum;
     google_scholar_url?: string | null;
     scopus_author_id?: string | null;
+    orcid_id?: string | null;
   } {
     const data: {
       bio?: string | null;
       availability_status?: AvailabilityStatusEnum;
       google_scholar_url?: string | null;
       scopus_author_id?: string | null;
+      orcid_id?: string | null;
     } = {};
     if (dto.bio !== undefined) {
       data.bio = dto.bio?.trim() || null;

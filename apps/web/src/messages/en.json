@@ -131,7 +131,9 @@
     "close": "Close",
     "add": "Add",
     "notifications": "Notifications",
-    "backToHome": "Back to home"
+    "backToHome": "Back to home",
+    "back": "Back",
+    "next": "Next"
   },
   "nav": {
     "home": "Home",
@@ -300,6 +302,38 @@
     "welcome": "Welcome, {name}."
   },
   "onboarding": {
+    "title": "Welcome to ResearchOS",
+    "description": "Four short steps set up your researcher profile. Only the first one is required — the rest you can skip and come back to later.",
+    "steps": {
+      "interests": {
+        "label": "Research interests",
+        "mandatory": "Required"
+      },
+      "author": {
+        "label": "OpenAlex profile"
+      },
+      "profile": {
+        "label": "Your information"
+      },
+      "works": {
+        "label": "Your publications"
+      }
+    },
+    "interestsStep": {
+      "title": "What do you research?",
+      "description": "Pick at least one research interest. This is the only required step, and it is what the platform uses to show you relevant work.",
+      "selected": "{count, plural, =0 {No interest picked yet} =1 {1 interest picked} other {# interests picked}}",
+      "add": "Add an interest",
+      "addAnother": "Add another interest",
+      "searchPlaceholder": "Search a research topic",
+      "searching": "Searching topics…",
+      "searchFailed": "Could not load the research topics.",
+      "noTopicsTitle": "No topic found",
+      "noTopicsMessage": "Try another word. The topics come from the FPTU research taxonomy.",
+      "emptyTitle": "No research interest picked",
+      "emptyMessage": "Search for a topic above and pick the ones that describe your research.",
+      "declareFailed": "Could not save the interest. Try again."
+    },
     "authorStep": {
       "title": "Let us find your publications",
       "description": "We searched OpenAlex for your name at FPT University. Confirm the author that is yours, or skip this step — you can still import your works later.",
@@ -312,7 +346,29 @@
       "confirm": "This is me",
       "skip": "Skip for now",
       "continue": "Continue without confirming",
+      "pulled": "Your publications were fetched from OpenAlex.",
       "failed": "Could not reach OpenAlex. Try again in a moment."
+    },
+    "profileStep": {
+      "title": "Your researcher information",
+      "description": "Fill in what you want to publish on your profile. You can leave everything empty and complete it later.",
+      "descriptionPrefilled": "We filled this in from the OpenAlex author you confirmed. Check it and correct anything that is wrong.",
+      "prefillTitle": "Prefilled from OpenAlex",
+      "prefillAuthor": "OpenAlex author {authorId}",
+      "prefillAuthorUnknown": "The author you confirmed carries no ORCID, so you can fill that in yourself.",
+      "fullName": "Full name",
+      "departmentUnit": "Department or unit",
+      "academicTitle": "Academic title",
+      "academicDegree": "Academic degree",
+      "orcidId": "ORCID",
+      "availabilityStatus": "Collaboration availability",
+      "googleScholarUrl": "Google Scholar profile",
+      "scopusAuthorId": "Scopus author id",
+      "bio": "Biography",
+      "saved": "Your profile was saved.",
+      "failed": "Could not save your profile. Try again.",
+      "save": "Save my information",
+      "skip": "Skip for now"
     },
     "worksStep": {
       "title": "Import your publications",
@@ -332,7 +388,10 @@
       "fetchMore": "Fetch more from OpenAlex",
       "finish": "Finish",
       "failed": "Something went wrong. Try again."
-    }
+    },
+    "finish": "Finish onboarding",
+    "finished": "Your profile is ready. Welcome to ResearchOS.",
+    "finishFailed": "Could not finish the onboarding. Pick at least one research interest and try again."
   },
   "profile": {
     "llkh": {
@@ -757,7 +816,14 @@
         "visibility_required": "Visibility is required.",
         "visibility_invalid": "Visibility must be FPTU_COMMUNITY or RESEARCH_GROUP.",
         "access_group_id_invalid": "The access group must be a valid UUID.",
-        "access_group_id_required": "An access group is required when visibility is RESEARCH_GROUP."
+        "access_group_id_required": "An access group is required when visibility is RESEARCH_GROUP.",
+        "orcid_id_invalid": "Enter an ORCID in the form 0000-0000-0000-0000.",
+        "bio_invalid": "The biography must be text.",
+        "bio_too_long": "Use 2,000 characters or fewer.",
+        "google_scholar_url_invalid": "Enter a valid URL.",
+        "google_scholar_url_too_long": "Use 500 characters or fewer.",
+        "scopus_author_id_invalid": "The Scopus author id must be text.",
+        "scopus_author_id_too_long": "Use 50 characters or fewer."
       },
       "domain": {
         "follow_self": "You cannot follow yourself.",
@@ -875,7 +941,9 @@
         "chat_attachment_limit_exceeded": "You can attach up to 5 files per message.",
         "chat_attachment_already_linked": "This attachment has already been sent in another message.",
         "project_not_found": "The research project was not found.",
-        "project_access_denied": "You do not have permission to view this research project."
+        "project_access_denied": "You do not have permission to view this research project.",
+        "onboarding_requires_interest": "Pick at least one research interest before finishing the onboarding.",
+        "orcid_already_claimed": "This ORCID already belongs to another researcher profile."
       }
     }
   },

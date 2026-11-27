@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SearchPage } from '@/features/discovery';
-import { RequireAuth, useCurrentUser } from '@/features/identity';
+import { RequireAuth, RequireOnboarding, useCurrentUser } from '@/features/identity';
 import Loading from '../loading';
 
 function SearchScreen() {
@@ -12,11 +12,13 @@ function SearchScreen() {
 
   return (
     <RequireAuth returnTo={params ? `/search?${params}` : '/search'}>
-      {user && (
-        <SearchPage
-          user={{ id: user.id, canFollow: user.roles.includes('RESEARCHER') }}
-        />
-      )}
+      <RequireOnboarding>
+        {user && (
+          <SearchPage
+            user={{ id: user.id, canFollow: user.roles.includes('RESEARCHER') }}
+          />
+        )}
+      </RequireOnboarding>
     </RequireAuth>
   );
 }

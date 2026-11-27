@@ -9614,6 +9614,16 @@
               }
             }
           },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
             "description": "The requested researcher profile was not found.",
             "content": {
@@ -9656,6 +9666,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -9705,6 +9725,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
                 }
               }
             }
@@ -9768,6 +9798,16 @@
               }
             }
           },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "The profile is unconfirmed and the caller is not the owner.",
             "content": {
@@ -9827,6 +9867,16 @@
               }
             }
           },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "The profile is unconfirmed and the caller is not the owner.",
             "content": {
@@ -9854,6 +9904,74 @@
           }
         ],
         "summary": "List the research interests of a researcher",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
+    "/profiles/me/onboarding": {
+      "post": {
+        "description": "Finishes the onboarding: writes the profile information the researcher filled in — including the ORCID, which the ordinary profile update refuses — and marks the account as onboarded. Requires at least one ACTIVE research interest, the one mandatory step of the onboarding.",
+        "operationId": "ProfilesController_completeOnboarding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOnboardingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The onboarding completed. The returned profile carries the new onboardingCompletedAt timestamp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The caller has no ACTIVE research interest, which is the one mandatory step of the onboarding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested researcher profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Complete the onboarding of the current user",
         "tags": [
           "profiles"
         ]
@@ -16312,6 +16430,70 @@
             "example": "TS",
             "nullable": true,
             "maxLength": 100
+          },
+          "bio": {
+            "type": "string",
+            "description": "Biographical summary and research statement.",
+            "example": "Researcher specializing in distributed software architecture."
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "description": "Collaboration availability status of the researcher.",
+            "enum": [
+              "OPEN_FOR_COLLABORATION",
+              "SEEKING_GROUP",
+              "MENTORING_ONLY",
+              "LIMITED_AVAILABILITY",
+              "NOT_AVAILABLE"
+            ],
+            "example": "OPEN_FOR_COLLABORATION"
+          },
+          "googleScholarUrl": {
+            "type": "string",
+            "description": "External link to Google Scholar profile.",
+            "example": "https://scholar.google.com/citations?user=example"
+          },
+          "scopusAuthorId": {
+            "type": "string",
+            "description": "Scopus author identifier string.",
+            "example": "57193294821"
+          }
+        }
+      },
+      "CompleteOnboardingDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full display name of the researcher. Required to be non-blank when sent.",
+            "example": "PGS. TS. Nguyễn Văn A",
+            "maxLength": 255
+          },
+          "departmentUnit": {
+            "type": "string",
+            "description": "Department or administrative unit. Required to be non-blank when sent.",
+            "example": "Software Engineering",
+            "maxLength": 255
+          },
+          "academicTitle": {
+            "type": "string",
+            "description": "Academic title; null clears the stored title.",
+            "example": "PGS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "academicDegree": {
+            "type": "string",
+            "description": "Academic degree; null clears the stored degree.",
+            "example": "TS",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "orcidId": {
+            "type": "string",
+            "description": "ORCID of the researcher, in the bare 16-digit form with the dashes.",
+            "example": "0000-0002-1825-0097",
+            "nullable": true
           },
           "bio": {
             "type": "string",
