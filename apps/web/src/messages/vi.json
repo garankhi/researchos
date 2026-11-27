@@ -779,6 +779,7 @@
         "file_access_request_not_pending": "Yêu cầu này đã được xử lý.",
         "file_access_decision_denied": "Chỉ chủ sở hữu bài báo mới được quản lý quyền truy cập tệp này.",
         "file_access_requester_ineligible": "Người này hiện không thể được cấp quyền truy cập tệp.",
+        "file_access_request_limited": "Bạn đã yêu cầu tệp này quá nhiều lần. Vui lòng thử lại sau.",
         "group_not_found": "Không tìm thấy nhóm nghiên cứu yêu cầu.",
         "group_code_already_exists": "Mã nhóm nghiên cứu này đã tồn tại.",
         "group_leader_ineligible": "Trưởng nhóm nghiên cứu phải là nghiên cứu viên đang hoạt động.",

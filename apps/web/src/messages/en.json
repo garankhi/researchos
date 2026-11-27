@@ -779,6 +779,7 @@
         "file_access_request_not_pending": "This request has already been answered.",
         "file_access_decision_denied": "Only the Article owner can manage access to this file.",
         "file_access_requester_ineligible": "This person can no longer be given access to the file.",
+        "file_access_request_limited": "You have asked for this file too often. Please try again later.",
         "group_not_found": "The requested research group was not found.",
         "group_code_already_exists": "A research group with this code already exists.",
         "group_leader_ineligible": "The designated group leader must be an active researcher.",

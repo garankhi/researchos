@@ -163,6 +163,7 @@ export const domainErrorCodes = {
     requestNotPending: 'file_access_request_not_pending',
     decisionDenied: 'file_access_decision_denied',
     requesterIneligible: 'file_access_requester_ineligible',
+    requestLimited: 'file_access_request_limited',
   },
   profiles: {
     profileNotFound: 'profile_not_found',

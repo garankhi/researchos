@@ -92,6 +92,10 @@ const notRequestable = () =>
  * from `PENDING`, so the winner alone writes the audit entry and notification.
  * Download access itself is decided by the SQL policy `can_view_output_file`.
  */
+/** Window for the cooldown after a decline or revoke and for the request cap. */
+const REQUEST_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 3;
+
 @Injectable()
 export class FileAccessService {
   constructor(private readonly prisma: PrismaService) {}
@@ -130,6 +134,7 @@ export class FileAccessService {
         select: { id: true },
       });
       if (pending) return pending.id;
+      await this.assertWithinRequestLimit(tx, callerId, fileId);
 
       const created = await tx.file_access_requests.create({
         data: {
@@ -158,6 +163,51 @@ export class FileAccessService {
       return created.id;
     });
     return this.findVisible(callerId, requestId);
+  }
+
+  /**
+   * Stops a reader from re-asking right after an owner said no, or from
+   * looping submit and withdraw, because every new request notifies the owner.
+   * Runs under the file lock, so concurrent submits cannot both slip through.
+   */
+  private async assertWithinRequestLimit(
+    tx: Tx,
+    callerId: string,
+    fileId: string,
+  ): Promise<void> {
+    const since = new Date(Date.now() - REQUEST_LIMIT_WINDOW_MS);
+    const [declined, revoked, recent] = await Promise.all([
+      tx.file_access_requests.findFirst({
+        where: {
+          file_id: fileId,
+          requester_id: callerId,
+          status: 'DECLINED',
+          decided_at: { gt: since },
+        },
+        select: { id: true },
+      }),
+      tx.file_access_grants.findFirst({
+        where: {
+          file_id: fileId,
+          grantee_id: callerId,
+          revoked_at: { gt: since },
+        },
+        select: { id: true },
+      }),
+      tx.file_access_requests.count({
+        where: {
+          file_id: fileId,
+          requester_id: callerId,
+          created_at: { gt: since },
+        },
+      }),
+    ]);
+    if (declined || revoked || recent >= MAX_REQUESTS_PER_WINDOW) {
+      throw new CodedHttpException(
+        domainErrorCodes.fileAccess.requestLimited,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   async list(

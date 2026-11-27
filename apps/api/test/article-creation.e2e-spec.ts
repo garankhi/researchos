@@ -2110,6 +2110,7 @@ describe('Article creation', () => {
       granted: 'file_access_already_granted',
       notPending: 'file_access_request_not_pending',
       denied: 'file_access_decision_denied',
+      limited: 'file_access_request_limited',
       requestMissing: 'file_access_request_not_found',
       grantMissing: 'file_access_grant_not_found',
       notRequestable: 'file_access_not_requestable',
@@ -2157,6 +2158,31 @@ describe('Article creation', () => {
         .expect(200);
     const count = async (sql: string, params: unknown[]) =>
       Number((await db.query(sql, params)).rows[0].count);
+
+    /** Moves a file's request history back past the 24 h limit window. */
+    const ageRequests = async (fileId: string) => {
+      // The identity guards would reject editing history, so lift them here.
+      await db.query('ALTER TABLE file_access_requests DISABLE TRIGGER USER');
+      await db.query('ALTER TABLE file_access_grants DISABLE TRIGGER USER');
+      try {
+        await db.query(
+          `UPDATE file_access_requests
+              SET created_at = created_at - interval '2 days',
+                  decided_at = decided_at - interval '2 days'
+            WHERE file_id = $1`,
+          [fileId],
+        );
+        await db.query(
+          `UPDATE file_access_grants
+              SET revoked_at = revoked_at - interval '2 days'
+            WHERE file_id = $1 AND revoked_at IS NOT NULL`,
+          [fileId],
+        );
+      } finally {
+        await db.query('ALTER TABLE file_access_requests ENABLE TRIGGER USER');
+        await db.query('ALTER TABLE file_access_grants ENABLE TRIGGER USER');
+      }
+    };
 
     /** Runs the worker fan-out for one staged event on real PostgreSQL. */
     async function fanOut(eventKey: string): Promise<string[]> {
@@ -2389,6 +2415,12 @@ describe('Article creation', () => {
       ]);
       await download('reader', article.fileId).expect(403);
 
+      // The owner just revoked access, so asking again waits out the cooldown.
+      expect((await ask(article.fileId).expect(429)).body.message).toBe(
+        fileAccessCodes.limited,
+      );
+      await ageRequests(article.fileId);
+
       // A revoked grant is never restored; a new request issues a new grant.
       const second = await ask(article.fileId).expect(201);
       expect(second.body.data.id).not.toBe(requestId);
@@ -2425,6 +2457,18 @@ describe('Article creation', () => {
         actors.reader,
       ]);
 
+      // Asking again right after a decline is refused until the day is over.
+      expect((await ask(article.fileId).expect(429)).body.message).toBe(
+        fileAccessCodes.limited,
+      );
+      expect(
+        await count(
+          'SELECT count(*) FROM file_access_requests WHERE file_id = $1',
+          [article.fileId],
+        ),
+      ).toBe(1);
+      await ageRequests(article.fileId);
+
       const second: string = (await ask(article.fileId).expect(201)).body.data
         .id;
       expect(second).not.toBe(first);
@@ -2439,6 +2483,39 @@ describe('Article creation', () => {
           [article.fileId],
         ),
       ).toBe(0);
+    });
+
+    it('caps new requests per reader and file so the owner is not spammed', async () => {
+      const article = await privateArticle();
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const id: string = (await ask(article.fileId).expect(201)).body.data.id;
+        // Resending while pending is not a new request.
+        expect((await ask(article.fileId).expect(201)).body.data.id).toBe(id);
+        await act('reader', id, 'withdraw').expect(200);
+        ids.push(id);
+      }
+      expect((await ask(article.fileId).expect(429)).body.message).toBe(
+        fileAccessCodes.limited,
+      );
+      expect(
+        await count(
+          'SELECT count(*) FROM file_access_requests WHERE file_id = $1',
+          [article.fileId],
+        ),
+      ).toBe(3);
+      // Only the three accepted requests ever notified the owner.
+      expect(
+        await count(
+          "SELECT count(*) FROM notification_events WHERE event_key = ANY($1) AND event_type = 'FILE_ACCESS_REQUESTED'",
+          [ids.map((id) => `file-access:${id}:requested`)],
+        ),
+      ).toBe(3);
+
+      // Another reader is not affected by this reader's cap.
+      await ask(article.fileId, 'researcher').expect(201);
+      await ageRequests(article.fileId);
+      await ask(article.fileId).expect(201);
     });
 
     it('cancels pending requests and audits when the file becomes unavailable', async () => {
@@ -2584,6 +2661,7 @@ describe('Article creation', () => {
       ).toBe(1);
 
       // Approval racing a withdrawal: exactly one wins.
+      await ageRequests(article.fileId);
       const raced: string = (await ask(article.fileId).expect(201)).body.data
         .id;
       const [approve, withdraw] = await Promise.all([
