@@ -435,19 +435,15 @@
       "doi": "DOI: {doi}",
       "authors": "Authors: {authors}",
       "actionsMenuLabel": "Work actions",
-      "visibilityAction": "Visibility",
+      "visibilityAction": "Audience",
       "visibilityDialogTitle": "Who may see this work",
-      "visibilityDialogDesc": "Community-wide works stay visible even when they carry a group affiliation.",
+      "visibilityDialogDesc": "The audience follows where the work was posted: a personal work is either private to its owner or open to the community, a work of a group or a project is either open to its container or to the community.",
       "visibilityPublicOption": "FPTU community",
       "visibilityPublicDesc": "Everyone in the FPTU community may see the work.",
-      "visibilityGroupOption": "Affiliated group only",
-      "visibilityGroupDesc": "Only members of the affiliated group may see the work.",
-      "visibilityNoGroupHint": "This work has no affiliated group, so it cannot be restricted to one.",
-      "visibilityUpdated": "Visibility updated.",
-      "visibilityUpdateError": "Could not update the visibility. Please try again.",
-      "visibilityLockedReason": "Only the owner can change this",
+      "visibilityUpdated": "Audience updated.",
+      "visibilityUpdateError": "Could not update the audience. Please try again.",
+      "visibilityLockedReason": "The owner of this container decides who may see it",
       "visibilityPublic": "FPTU community",
-      "visibilityGroupOnly": "Group only",
       "filterAll": "All ({count})",
       "filterPublished": "Published ({count})",
       "filterDrafts": "Drafts ({count})",
@@ -467,7 +463,12 @@
         "BOOK": "Book",
         "DATASET": "Dataset",
         "DISSERTATION": "Dissertation"
-      }
+      },
+      "visibilityPrivateOption": "Private to me",
+      "visibilityPrivateDesc": "Only the owner may see the work.",
+      "visibilityContainerOption": "Group or project only",
+      "visibilityContainerDesc": "Only the members of the group or the project may see the work.",
+      "visibilityContainerOnly": "Group or project only"
     },
     "interestsTab": {
       "title": "Research Interests",
@@ -542,17 +543,14 @@
       "linkCopied": "Link copied to clipboard.",
       "shareError": "Could not copy the link. Please try again.",
       "actionsMenuLabel": "Work actions",
-      "visibilityAction": "Visibility",
+      "visibilityAction": "Audience",
       "visibilityDialogTitle": "Who may see this work",
-      "visibilityDialogDesc": "Community-wide works stay visible even when they carry a group affiliation.",
+      "visibilityDialogDesc": "The audience follows where the work was posted: a personal work is either private to its owner or open to the community, a work of a group or a project is either open to its container or to the community.",
       "visibilityPublicOption": "FPTU community",
       "visibilityPublicDesc": "Everyone in the FPTU community may see the work.",
-      "visibilityGroupOption": "Affiliated group only",
-      "visibilityGroupDesc": "Only members of the affiliated group may see the work.",
-      "visibilityNoGroupHint": "This work has no affiliated group, so it cannot be restricted to one.",
-      "visibilityUpdated": "Visibility updated.",
-      "visibilityUpdateError": "Could not update the visibility. Please try again.",
-      "visibilityLockedReason": "Only the owner can change this",
+      "visibilityUpdated": "Audience updated.",
+      "visibilityUpdateError": "Could not update the audience. Please try again.",
+      "visibilityLockedReason": "The owner of this container decides who may see it",
       "followed": "You are now following this group.",
       "unfollowed": "You unfollowed this group.",
       "followError": "Could not update the follow. Please try again.",
@@ -570,7 +568,7 @@
       "metadataTitle": "Publication Details",
       "venueRowLabel": "Venue / Journal",
       "publisherRowLabel": "Publisher",
-      "visibilityRowLabel": "Visibility",
+      "visibilityRowLabel": "Audience",
       "visibilityPublic": "FPTU community",
       "visibilityGroupOnly": "Affiliated group only",
       "visibilityPrivate": "Private draft",
@@ -590,7 +588,12 @@
         "BOOK": "Book",
         "DATASET": "Dataset",
         "DISSERTATION": "Dissertation"
-      }
+      },
+      "visibilityPrivateOption": "Private to me",
+      "visibilityPrivateDesc": "Only the owner may see the work.",
+      "visibilityContainerOption": "Group or project only",
+      "visibilityContainerDesc": "Only the members of the group or the project may see the work.",
+      "visibilityContainerOnly": "Group or project only"
     },
     "card": {
       "draftBadge": "Draft",
@@ -600,7 +603,6 @@
       "linkCopied": "Publication link copied.",
       "copyError": "Could not copy link.",
       "visibilityPublic": "FPTU community",
-      "visibilityGroupOnly": "Group only",
       "types": {
         "PAPER": "Article",
         "PREPRINT": "Preprint",
@@ -610,8 +612,13 @@
         "BOOK": "Book",
         "DATASET": "Dataset",
         "DISSERTATION": "Dissertation"
-      }
-    }
+      },
+      "visibilityContainerOnly": "Group or project only",
+      "visibilityPrivate": "Private draft"
+    },
+    "visibilityPublic": "FPTU community",
+    "visibilityContainerOnly": "Group or project only",
+    "visibilityPrivate": "Private draft"
   },
   "errors": {
     "title": "An error occurred while loading the page",
@@ -743,6 +750,7 @@
         "output_revision_locked": "This revision is already released and can no longer be edited.",
         "output_revision_not_found": "The requested revision was not found.",
         "output_visibility_invalid": "The visibility scope and the access group do not match.",
+        "output_scope_invalid": "Choose a valid place to post: a personal post, a group you belong to, or a project you are part of.",
         "output_access_group_invalid": "You are not a member of a research group that can be granted access.",
         "output_idempotency_key_invalid": "A valid idempotency key is required to submit the article.",
         "output_idempotency_key_conflict": "The idempotency key was already used for a different article submission.",
@@ -812,7 +820,9 @@
         "chat_attachment_invalid_type": "This file type is not supported in chat.",
         "chat_attachment_size_exceeded": "The file exceeds the maximum allowed size of 25 MB.",
         "chat_attachment_limit_exceeded": "You can attach up to 5 files per message.",
-        "chat_attachment_already_linked": "This attachment has already been sent in another message."
+        "chat_attachment_already_linked": "This attachment has already been sent in another message.",
+        "project_not_found": "The research project was not found.",
+        "project_access_denied": "You do not have permission to view this research project."
       }
     }
   },
@@ -1239,5 +1249,14 @@
       "DECLINED": "Declined",
       "WITHDRAWN": "Withdrawn"
     }
+  },
+  "outputScope": {
+    "label": "Where to post this work",
+    "hint": "The posting context decides who owns the work and who may read it. It cannot be changed afterwards.",
+    "personalOption": "My profile",
+    "groupOption": "A research group",
+    "projectOption": "A research project",
+    "containerNote": "The group or project owns this post. Its leads decide who may read it.",
+    "fixedNote": "The posting context is fixed once the work is created."
   }
 }

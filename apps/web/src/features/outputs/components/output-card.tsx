@@ -87,8 +87,8 @@ export interface OutputCardData {
   externalUrl: string | null;
   /** Whether the work is published and visible to the community. */
   isDraft: boolean;
-  /** Visibility scope, or `null` when the work is a draft. */
-  visibility: string | null;
+  /** Who may read the work, or `null` when the work is a draft. */
+  audience: string | null;
   authors: OutputCardAuthor[];
   topics: OutputCardTopic[];
 }
@@ -116,7 +116,7 @@ export function toOutputCardData({
   doi,
   externalUrl,
   sharingStatus,
-  visibility,
+  audience,
   authors,
   topics,
 }: {
@@ -132,7 +132,7 @@ export function toOutputCardData({
   doi?: unknown;
   externalUrl?: unknown;
   sharingStatus?: string;
-  visibility?: string | null;
+  audience?: string | null;
   authors?: {
     id: string;
     authorNameString: string;
@@ -174,7 +174,7 @@ export function toOutputCardData({
     doi: doiStr,
     externalUrl: externalUrlStr,
     isDraft: sharingStatus ? sharingStatus !== 'SHARED' : false,
-    visibility: visibility ?? null,
+    audience: audience ?? null,
     authors: orderedAuthors,
     topics: (topics ?? []).map((topic) => ({
       topicId: topic.topicId,
@@ -274,13 +274,13 @@ export function OutputCard({
                 {formattedDate}
               </Text>
             ) : null}
-            {!data.isDraft && data.visibility ? (
+            {!data.isDraft && data.audience ? (
               <Badge variant="outline" colorPalette="gray">
-                {data.visibility === 'FPTU_COMMUNITY'
+                {data.audience === 'FPTU_COMMUNITY'
                   ? t('visibilityPublic')
-                  : data.visibility === 'RESEARCH_GROUP'
-                    ? t('visibilityGroupOnly')
-                    : data.visibility}
+                  : data.audience === 'CONTAINER'
+                    ? t('visibilityContainerOnly')
+                    : t('visibilityPrivate')}
               </Badge>
             ) : null}
           </Flex>

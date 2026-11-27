@@ -35,10 +35,10 @@ export function OutputSidebar({
   const publishedDate = formatOutputPublicationDate(format, output);
 
   const visibilityLabel =
-    output.sharingStatus !== 'SHARED'
+    output.audience === 'PRIVATE'
       ? t('detail.visibilityPrivate')
-      : output.visibility === 'RESEARCH_GROUP'
-        ? t('detail.visibilityGroupOnly')
+      : output.audience === 'CONTAINER'
+        ? t('detail.visibilityContainerOnly')
         : t('detail.visibilityPublic');
 
   const groupId = output.accessGroupId;

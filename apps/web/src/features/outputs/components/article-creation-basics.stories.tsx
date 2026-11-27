@@ -37,6 +37,8 @@ const meta = {
         userId: '73300f56-725f-441e-90b5-de66578dc2e1',
       },
     ],
+    scope: { scopeType: 'PERSONAL' },
+    onScopeChange: fn(),
     onContinue: fn(),
   },
 } satisfies Meta<typeof ArticleCreationBasics>;

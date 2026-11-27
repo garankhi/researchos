@@ -7,7 +7,7 @@
  */
 
 /**
- * Affiliated research group whose banner the work carries. Always set when visibility is RESEARCH_GROUP; may be set for a FPTU_COMMUNITY work and is null for a work with no affiliation.
+ * Affiliated research group whose banner the work carries. Display information only: it grants no authority over the work.
  * @nullable
  */
 export type OutputResponseDtoAccessGroupId = { [key: string]: unknown } | null;

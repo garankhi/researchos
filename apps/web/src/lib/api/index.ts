@@ -19,4 +19,5 @@ export * from './opportunities/opportunities';
 export * from './output-files/output-files';
 export * from './outputs/outputs';
 export * from './profiles/profiles';
+export * from './projects/projects';
 export * from './taxonomy/taxonomy';
