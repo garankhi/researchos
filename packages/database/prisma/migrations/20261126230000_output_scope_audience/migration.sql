@@ -24,7 +24,20 @@
 -- becomes a GROUP-scoped work whose audience is CONTAINER, and a work
 -- without one becomes PERSONAL. A work that was FPTU_COMMUNITY and carried
 -- a group stays FPTU_COMMUNITY, so no live audience widens or narrows.
+--
+-- The `touch_updated_at` trigger is disabled around the backfill. It fires
+-- on every update and stamps the row with the current time, so the upgrade
+-- would otherwise mark every work and every search index row as modified
+-- right now. The Search screen orders by that column, so every existing
+-- result would jump to the top of the list after the upgrade. The work was
+-- not modified by the upgrade, so its timestamp has to survive it.
 BEGIN;
+
+ALTER TABLE research_outputs DISABLE TRIGGER touch_updated_at;
+
+ALTER TABLE research_outputs DISABLE TRIGGER sync_search_index;
+
+ALTER TABLE search_index DISABLE TRIGGER sync_search_index_ri;
 
 CREATE TYPE output_scope_type AS ENUM ('PERSONAL', 'GROUP', 'PROJECT');
 
@@ -79,6 +92,12 @@ UPDATE search_index s
        scope_project_id = o.scope_project_id, audience = o.audience
   FROM research_outputs o
  WHERE s.entity_type = 'OUTPUT' AND s.entity_id = o.id;
+
+ALTER TABLE research_outputs ENABLE TRIGGER touch_updated_at;
+
+ALTER TABLE research_outputs ENABLE TRIGGER sync_search_index;
+
+ALTER TABLE search_index ENABLE TRIGGER sync_search_index_ri;
 
 -- The scope is immutable. The audience is the part that changes, and only
 -- the container leads may change it.

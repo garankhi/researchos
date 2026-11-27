@@ -242,6 +242,8 @@ describe('Article creation', () => {
               ($1, 'Explicitly unlinked', 4, $4, true)`,
       [legacyOutput, actors.owner, actors.researcher, actors.reader],
     );
+    // The legacy fixture is seeded before the scope migration runs, so it
+    // still uses the old `visibility` column. The migration converts it.
     await db.query(
       `UPDATE research_outputs SET current_release_id = $1, sharing_status = 'SHARED',
          first_shared_at = clock_timestamp(), visibility = 'FPTU_COMMUNITY' WHERE id = $2`,
@@ -1421,7 +1423,7 @@ describe('Article creation', () => {
     expect(reloaded).toMatchObject({
       currentReleaseId: nextId,
       firstSharedAt: original.firstSharedAt,
-      visibility: original.visibility,
+      audience: original.audience,
       authors: original.authors,
       topics: original.topics,
       currentRevision: {
@@ -1644,7 +1646,8 @@ describe('Article creation', () => {
     const response = await detail(outputId).expect(200);
     expect(response.body.data).toMatchObject({
       ownerId: actors.owner,
-      visibility: 'FPTU_COMMUNITY',
+      scopeType: 'PERSONAL',
+      audience: 'FPTU_COMMUNITY',
       sharingStatus: 'SHARED',
       currentReleaseId: revisionId,
       doi: null,
@@ -2001,7 +2004,7 @@ describe('Article creation', () => {
       .request(server)
       .post(`/outputs/${outputId}/publish`)
       .set('Cookie', cookie)
-      .send({ visibility: 'FPTU_COMMUNITY' })
+      .send({ audience: 'FPTU_COMMUNITY' })
       .expect(200);
 
     const article = (await detail(outputId).expect(200)).body.data;

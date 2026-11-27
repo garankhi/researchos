@@ -198,10 +198,10 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
 
   async function createOutput(
     title: string,
-    visibility?: 'PRIVATE' | 'FPTU_COMMUNITY',
+    audience?: 'PRIVATE' | 'FPTU_COMMUNITY',
   ) {
     const output = await prisma.research_outputs.create({
-      data: { owner_id: author, created_by: author, visibility },
+      data: { owner_id: author, created_by: author, audience },
     });
     const timestamp = new Date();
     const revision = await prisma.output_revisions.create({
@@ -210,7 +210,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
         revision_no: 1,
         title,
         created_by: author,
-        ...(visibility
+        ...(audience
           ? {
               created_at: timestamp,
               released_by: author,
@@ -219,7 +219,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
           : {}),
       },
     });
-    if (visibility) {
+    if (audience) {
       await prisma.research_outputs.update({
         where: { id: output.id },
         data: {
@@ -605,7 +605,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
       await waitForDatabaseLock('UPDATE digest_items');
       await prisma.research_outputs.update({
         where: { id: event.output_id! },
-        data: { visibility: 'PRIVATE' },
+        data: { audience: 'PRIVATE' },
       });
     } finally {
       releaseItem.resolve();

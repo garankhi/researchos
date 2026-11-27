@@ -179,7 +179,7 @@ it('publishes committed research updates, retries, and deduplicates replay', asy
       [group, actor],
     );
     await producer.query(
-      "INSERT INTO research_outputs(id, owner_id, created_by, visibility) VALUES ($1, $2, $2, 'FPTU_COMMUNITY')",
+      "INSERT INTO research_outputs(id, owner_id, created_by, scope_type, audience) VALUES ($1, $2, $2, 'PERSONAL', 'FPTU_COMMUNITY')",
       [output, actor],
     );
     await producer.query(
