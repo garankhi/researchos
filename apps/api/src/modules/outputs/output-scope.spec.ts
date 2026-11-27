@@ -53,9 +53,18 @@ describe('Output scope resolution', () => {
         findUniqueOrThrow: vi.fn(),
         update: vi.fn().mockResolvedValue({}),
       },
-      output_authors: { createMany: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
-      output_topics: { createMany: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
-      output_files: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+      output_authors: {
+        createMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      output_topics: {
+        createMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      output_files: {
+        create: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       users: { count: vi.fn().mockResolvedValue(0) },
       research_topics: { count: vi.fn().mockResolvedValue(0) },
     };
@@ -79,13 +88,22 @@ describe('Output scope resolution', () => {
     };
   };
 
-  const setupController = async (prismaMock: ReturnType<typeof createPrismaMock>) => {
+  const setupController = async (
+    prismaMock: ReturnType<typeof createPrismaMock>,
+  ) => {
     const moduleRef = await Test.createTestingModule({
       controllers: [OutputsController],
       providers: [
         OutputsService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: ProvenanceService, useValue: { confirmField: vi.fn(), recordProvenance: vi.fn(), isFieldLocked: vi.fn() } },
+        {
+          provide: ProvenanceService,
+          useValue: {
+            confirmField: vi.fn(),
+            recordProvenance: vi.fn(),
+            isFieldLocked: vi.fn(),
+          },
+        },
         { provide: ArticleCreationUploadService, useValue: {} },
       ],
     }).compile();

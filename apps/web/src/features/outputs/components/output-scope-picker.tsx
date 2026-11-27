@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Badge, Box, NativeSelect, Stack, Text } from '@chakra-ui/react';
 import { useTranslations } from 'next-intl';
 import { useCurrentUser } from '@/features/identity';
@@ -37,8 +37,11 @@ export function OutputScopePicker({
 }) {
   const t = useTranslations('outputScope');
   const user = useCurrentUser();
-  const [groupId, setGroupId] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const scopeId = useId();
+  const groupId = useId();
+  const projectId = useId();
+  const [groupIdValue, setGroupIdValue] = useState('');
+  const [projectIdValue, setProjectIdValue] = useState('');
 
   const groupsQuery = useGroupsControllerFindAll(
     { memberId: user?.id, limit: 100 },
@@ -90,21 +93,21 @@ export function OutputScopePicker({
     if (next === 'GROUP') {
       onChange({
         scopeType: 'GROUP',
-        scopeGroupId: groupId || groups[0]?.id,
+        scopeGroupId: groupIdValue || groups[0]?.id,
       });
       return;
     }
     onChange({
       scopeType: 'PROJECT',
-      scopeProjectId: projectId || projects[0]?.id,
+      scopeProjectId: projectIdValue || projects[0]?.id,
     });
   }
 
   return (
     <Stack gap="3">
       <Box>
-        <Text textStyle="sm" fontWeight="bold" mb="1">
-          {t('label')}
+        <Text asChild textStyle="sm" fontWeight="bold" mb="1">
+          <label htmlFor={scopeId}>{t('label')}</label>
         </Text>
         <Text textStyle="sm" color="fg.muted">
           {t('hint')}
@@ -113,6 +116,7 @@ export function OutputScopePicker({
 
       <NativeSelect.Root size="sm" disabled={disabled}>
         <NativeSelect.Field
+          id={scopeId}
           value={value.scopeType}
           onChange={(event) =>
             changeScope(event.currentTarget.value as OutputScopeDtoScopeType)
@@ -130,10 +134,12 @@ export function OutputScopePicker({
       {value.scopeType === 'GROUP' && groups.length > 0 ? (
         <NativeSelect.Root size="sm" disabled={disabled}>
           <NativeSelect.Field
+            id={groupId}
+            aria-label={t('groupOption')}
             value={value.scopeGroupId ?? groups[0]?.id}
             onChange={(event) => {
               const next = event.currentTarget.value;
-              setGroupId(next);
+              setGroupIdValue(next);
               onChange({ scopeType: 'GROUP', scopeGroupId: next });
             }}
           >
@@ -150,10 +156,12 @@ export function OutputScopePicker({
       {value.scopeType === 'PROJECT' && projects.length > 0 ? (
         <NativeSelect.Root size="sm" disabled={disabled}>
           <NativeSelect.Field
+            id={projectId}
+            aria-label={t('projectOption')}
             value={value.scopeProjectId ?? projects[0]?.id}
             onChange={(event) => {
               const next = event.currentTarget.value;
-              setProjectId(next);
+              setProjectIdValue(next);
               onChange({ scopeType: 'PROJECT', scopeProjectId: next });
             }}
           >

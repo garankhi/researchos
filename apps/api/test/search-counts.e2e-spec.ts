@@ -172,7 +172,14 @@ describe('Search API', () => {
         `INSERT INTO research_outputs(
            id, sharing_status, scope_type, scope_group_id, audience, owner_id, created_by, access_group_id
          ) VALUES ($1, 'DRAFT', $2, $4, $3, $5, $5, $6)`,
-        [output, scopeType, audience, accessGroupId ? groupId : null, ownerId, accessGroupId],
+        [
+          output,
+          scopeType,
+          audience,
+          accessGroupId ? groupId : null,
+          ownerId,
+          accessGroupId,
+        ],
       );
       await database.query(
         `INSERT INTO output_revisions(
