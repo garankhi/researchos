@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ProvenanceModule } from '../provenance/provenance.module.js';
+import { OpenAlexAuthorRecordService } from './openalex-author-record.service.js';
 import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
 import { OpenAlexController } from './openalex.controller.js';
 import { OpenAlexIngestService } from './openalex-ingest.service.js';
@@ -26,6 +27,7 @@ import { OpenAlexClient } from './openalex.client.js';
     OpenAlexCandidatesService,
     OpenAlexPullService,
     OpenAlexWorksCache,
+    OpenAlexAuthorRecordService,
   ],
   exports: [
     OpenAlexClient,
@@ -34,6 +36,7 @@ import { OpenAlexClient } from './openalex.client.js';
     OpenAlexCandidatesService,
     OpenAlexPullService,
     OpenAlexWorksCache,
+    OpenAlexAuthorRecordService,
   ],
 })
 export class OpenAlexModule {}

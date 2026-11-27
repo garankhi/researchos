@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { OpenAlexAuthorRecordService } from '../openalex/openalex-author-record.service.js';
 import { OpenAlexCandidatesService } from '../openalex/openalex-candidates.service.js';
 import { CandidateVisibility } from '../openalex/dto/accept-candidate.dto.js';
 import { OpenAlexPullService } from '../openalex/openalex-pull.service.js';
@@ -49,6 +50,7 @@ export class OnboardingFinalizeService {
     private readonly prisma: PrismaService,
     private readonly openAlex: OpenAlexPullService,
     private readonly candidates: OpenAlexCandidatesService,
+    private readonly authorRecords: OpenAlexAuthorRecordService,
   ) {}
 
   /**
@@ -92,6 +94,19 @@ export class OnboardingFinalizeService {
      * transaction times out.
      */
     await this.applyWorkDecisions(userId, dto, authorId);
+
+    /*
+     * The full OpenAlex author record is stored last, and separately.
+     * It is an enrichment rather than part of the onboarding: the
+     * byline spellings, the affiliations with their years and the
+     * counts are what the platform learns about the researcher beyond
+     * what they typed. A failure to fetch it must not fail the
+     * onboarding — the researcher came to confirm their author, and
+     * the profile is written either way.
+     */
+    if (authorId !== null) {
+      await this.authorRecords.trySyncAuthorRecord(userId, authorId);
+    }
 
     return this.mapToResponse(user);
   }

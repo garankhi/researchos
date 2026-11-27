@@ -25,6 +25,7 @@ import type {
   ApiErrorResponseDto,
   CompleteOnboardingDto,
   FinalizeOnboardingDto,
+  OpenAlexAuthorRecordResponseDtoEnvelope,
   ProfilePreviewResponseDtoEnvelope,
   ProfileResponseDtoEnvelope,
   ProfilesControllerGetInterestsByUserIdEnvelope,
@@ -817,6 +818,164 @@ export function useProfilesControllerGetInterestsByUserId<
     userId,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the OpenAlex author record of the caller: the counts, the byline spellings OpenAlex has observed, and the affiliations with the years they held. The record is an enrichment fetched during the onboarding, so it is empty until the researcher confirms their author.
+ * @summary Get the OpenAlex record of the current user
+ */
+export const profilesControllerGetMyOpenAlexRecord = (
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpenAlexAuthorRecordResponseDtoEnvelope>(
+    { url: `/profiles/me/openalex-record`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getProfilesControllerGetMyOpenAlexRecordQueryKey = () => {
+  return [`/profiles/me/openalex-record`] as const;
+};
+
+export const getProfilesControllerGetMyOpenAlexRecordQueryOptions = <
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProfilesControllerGetMyOpenAlexRecordQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+  > = ({ signal }) =>
+    profilesControllerGetMyOpenAlexRecord(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProfilesControllerGetMyOpenAlexRecordQueryResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+>;
+export type ProfilesControllerGetMyOpenAlexRecordQueryError =
+  ApiErrorResponseDto;
+
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the OpenAlex record of the current user
+ */
+
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getProfilesControllerGetMyOpenAlexRecordQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

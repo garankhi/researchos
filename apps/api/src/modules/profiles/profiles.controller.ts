@@ -20,8 +20,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { OpenAlexAuthorRecordService } from '../openalex/openalex-author-record.service.js';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto.js';
 import { FinalizeOnboardingDto } from './dto/finalize-onboarding.dto.js';
+import { OpenAlexAuthorRecordResponseDto } from './dto/openalex-author-record-response.dto.js';
 import { ProfileInterestResponseDto } from './dto/profile-interest-response.dto.js';
 import { ProfilePreviewResponseDto } from './dto/profile-preview-response.dto.js';
 import { ProfileResponseDto } from './dto/profile-response.dto.js';
@@ -46,6 +48,7 @@ export class ProfilesController {
   constructor(
     private readonly profilesService: ProfilesService,
     private readonly onboardingFinalize: OnboardingFinalizeService,
+    private readonly authorRecords: OpenAlexAuthorRecordService,
   ) {}
 
   @ApiOperation({
@@ -150,6 +153,44 @@ export class ProfilesController {
     @CurrentUserId() callerId: string,
   ): Promise<ProfileInterestResponseDto[]> {
     return this.profilesService.findInterestsByUserId(targetUserId, callerId);
+  }
+
+  @ApiOperation({
+    summary: 'Get the OpenAlex record of the current user',
+    description:
+      'Returns the OpenAlex author record of the caller: the counts, the byline spellings OpenAlex has observed, and the affiliations with the years they held. The record is an enrichment fetched during the onboarding, so it is empty until the researcher confirms their author.',
+  })
+  @ApiOkResponse({
+    description: 'The OpenAlex author record of the caller.',
+    type: OpenAlexAuthorRecordResponseDto,
+  })
+  @Get('me/openalex-record')
+  async getMyOpenAlexRecord(
+    @CurrentUserId() userId: string,
+  ): Promise<OpenAlexAuthorRecordResponseDto> {
+    return this.authorRecords.readAuthorRecord(userId).then((record) => ({
+      authorId: record.profile?.openalexAuthorId ?? null,
+      displayName: record.profile?.openalexDisplayName ?? null,
+      counts: {
+        worksCount: record.profile?.openalexWorksCount ?? null,
+        citedByCount: record.profile?.openalexCitedByCount ?? null,
+        hIndex: record.profile?.openalexHIndex ?? null,
+        i10Index: record.profile?.openalexI10Index ?? null,
+        twoYearMeanCitedness: record.profile?.openalex2yrMeanCitedness ?? null,
+      },
+      names: record.names.map((entry) => entry.name),
+      affiliations: record.affiliations.map((affiliation) => ({
+        institutionId: affiliation.institutionId,
+        ror: affiliation.ror,
+        name: affiliation.name,
+        countryCode: affiliation.countryCode,
+        institutionType: affiliation.institutionType,
+        yearStart: affiliation.yearStart,
+        yearEnd: affiliation.yearEnd,
+        isPrimary: affiliation.isPrimary,
+      })),
+      syncedAt: record.profile?.openalexSyncedAt?.toISOString() ?? null,
+    }));
   }
 
   @ApiOperation({

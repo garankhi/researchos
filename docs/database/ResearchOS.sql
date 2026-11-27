@@ -268,6 +268,20 @@ CREATE TYPE "digest_subject_type" AS ENUM (
   'PROJECT'
 );
 
+-- The kind of institution an author was affiliated with. OpenAlex reports
+-- it on every affiliation: education, company, healthcare, nonprofit,
+-- government, facility, archive, other.
+CREATE TYPE "institution_type" AS ENUM (
+  'EDUCATION',
+  'COMPANY',
+  'HEALTHCARE',
+  'NONPROFIT',
+  'GOVERNMENT',
+  'FACILITY',
+  'ARCHIVE',
+  'OTHER'
+);
+
 CREATE TYPE "delivery_status" AS ENUM (
   'PENDING',
   'PROCESSING',
@@ -416,7 +430,87 @@ CREATE TABLE "researcher_profiles" (
   "onboarding_completed_at" timestamptz,
   "last_synced_at" timestamptz,
   "llkh_last_exported_at" timestamptz,
-  "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  "openalex_display_name" varchar(255),
+  "openalex_works_count" integer,
+  "openalex_cited_by_count" integer,
+  "openalex_h_index" integer,
+  "openalex_i10_index" integer,
+  "openalex_2yr_mean_citedness" double precision,
+  "openalex_synced_at" timestamptz,
+  "updated_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_profile_openalex_counts" CHECK (
+    (openalex_works_count IS NULL OR openalex_works_count >= 0)
+    AND (openalex_cited_by_count IS NULL OR openalex_cited_by_count >= 0)
+    AND (openalex_h_index IS NULL OR openalex_h_index >= 0)
+    AND (openalex_i10_index IS NULL OR openalex_i10_index >= 0)
+  )
+);
+
+-- The byline names OpenAlex has observed for an author.
+--
+-- A researcher publishes under several spellings: the publisher writes
+-- "Nguyen Hoang Khoi Tran", another publisher writes "N. H. Tran" and a
+-- third writes "Tran, Nguyen H.". OpenAlex collects all of them, and the
+-- set is what makes the name-based identity resolution work at all — a
+-- researcher whose byline spelling differs from their account name would
+-- otherwise match nothing.
+--
+-- The table exists because the corpus is queried: it is the set a byline
+-- match is checked against, and it cannot be a column.
+CREATE TABLE "researcher_author_names" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "user_id" uuid NOT NULL,
+  "name" varchar(255) NOT NULL,
+  "is_canonical" boolean NOT NULL DEFAULT false,
+  "source_updated_at" timestamptz,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+);
+
+-- The institutions an author was affiliated with, and when.
+--
+-- The years matter as much as the institution. A researcher may have been
+-- at FPT University for one year and at another university before that,
+-- and only the FPT period is the platform's business. A single
+-- "last_known_institution" column cannot answer that question — and
+-- OpenAlex's own "last known" is the latest authorship, not the current
+-- employment, so it regularly points at an institution the researcher has
+-- left.
+--
+-- The institution is keyed by its ROR id, which survives the renames and
+-- the merges that break a display name.
+CREATE TABLE "researcher_affiliations" (
+  "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
+  "user_id" uuid NOT NULL,
+  "institution_id" varchar(255) NOT NULL,
+  "ror" varchar(255),
+  "name" varchar(255) NOT NULL,
+  "country_code" varchar(2),
+  "institution_type" institution_type,
+  "year_start" smallint,
+  "year_end" smallint,
+  "is_primary" boolean NOT NULL DEFAULT false,
+  "created_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_affiliation_years" CHECK (
+    (year_start IS NULL OR year_start > 0)
+    AND (year_end IS NULL OR year_end > 0)
+    AND (year_start IS NULL OR year_end IS NULL OR year_start <= year_end)
+  )
+);
+
+-- The raw OpenAlex author payload, kept whole.
+--
+-- The structured columns cover what the platform queries on: the counts
+-- on the profile, the names and the affiliations in their own tables. This
+-- snapshot keeps everything else — the topics, the yearly counts, the
+-- award links — without a migration every time OpenAlex adds a field.
+--
+-- One snapshot per researcher: the last one wins. The payload is a
+-- document, not a set of rows, so a jsonb column is the honest shape.
+CREATE TABLE "researcher_openalex_snapshots" (
+  "user_id" uuid PRIMARY KEY,
+  "payload" jsonb NOT NULL,
+  "synced_at" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  CONSTRAINT "ck_openalex_snapshot_object" CHECK (jsonb_typeof(payload) = 'object')
 );
 
 CREATE TABLE "field_provenance" (
@@ -1037,6 +1131,16 @@ CREATE UNIQUE INDEX "uq_users_email_normalized" ON "users" ((lower(btrim(email))
 
 CREATE INDEX "idx_researcher_profiles_openalex_author" ON "researcher_profiles" ("openalex_author_id") WHERE "openalex_author_id" IS NOT NULL;
 
+CREATE UNIQUE INDEX "uq_researcher_author_names_user_name" ON "researcher_author_names" ("user_id", "name");
+
+CREATE INDEX "idx_researcher_author_names_user" ON "researcher_author_names" ("user_id");
+
+CREATE UNIQUE INDEX "uq_researcher_affiliations_user_institution" ON "researcher_affiliations" ("user_id", "institution_id");
+
+CREATE INDEX "idx_researcher_affiliations_user" ON "researcher_affiliations" ("user_id");
+
+CREATE INDEX "idx_researcher_affiliations_institution" ON "researcher_affiliations" ("institution_id");
+
 CREATE INDEX ON "user_role_assignments" ("user_id", "role");
 
 CREATE UNIQUE INDEX ON "oidc_identities" ("issuer", "subject");
@@ -1165,6 +1269,22 @@ COMMENT ON COLUMN "researcher_profiles"."papers_reviewed_at" IS 'May be set afte
 
 COMMENT ON COLUMN "researcher_profiles"."openalex_author_id" IS 'The OpenAlex author id of the researcher, e.g. A5023888391. Set when the researcher confirms the author during onboarding. Null when the researcher has no OpenAlex profile, in which case the name plus the hard-coded FPT University affiliation is the fallback. Not unique: OpenAlex merges duplicate author profiles, so several researchers may share one id.';
 
+COMMENT ON COLUMN "researcher_profiles"."openalex_display_name" IS 'The canonical display name OpenAlex holds for the author. Kept apart from users.full_name: the account name is what the researcher types, this one is what the source says, and they differ often enough that overwriting one with the other loses information.';
+
+COMMENT ON COLUMN "researcher_profiles"."openalex_h_index" IS 'The h-index OpenAlex reports for the author. Career-lifetime, so it favours a long career over a hot recent topic; openalex_2yr_mean_citedness is the recency-weighted counterpart.';
+
+COMMENT ON COLUMN "researcher_profiles"."openalex_i10_index" IS 'The number of works with at least ten citations, as OpenAlex reports it.';
+
+COMMENT ON COLUMN "researcher_profiles"."openalex_2yr_mean_citedness" IS 'The mean citations per work over the last two years. Recency-weighted, so it says how much the author is cited now rather than how much they ever were.';
+
+COMMENT ON COLUMN "researcher_profiles"."openalex_synced_at" IS 'When the OpenAlex author payload was last fetched for this researcher. Null when it never was.';
+
+COMMENT ON TABLE "researcher_author_names" IS 'The byline spellings OpenAlex has observed for a researcher. One row per spelling; is_canonical marks the one OpenAlex calls the display name. The set is what the name-based identity resolution matches against, and it has to be a table because it is queried rather than displayed. The names are the source spelling, not normalised — normalisation happens when they are compared.';
+
+COMMENT ON TABLE "researcher_affiliations" IS 'The institutions a researcher was affiliated with, and the years they were there. The year range is what makes an affiliation decidable: a year at FPT University is the platform''s business, a year at another institution is not. is_primary marks the affiliation the researcher is at now. institution_id is the OpenAlex institution id and ror is the same institution under its ROR id, which survives the renames and merges that break a display name.';
+
+COMMENT ON TABLE "researcher_openalex_snapshots" IS 'The raw OpenAlex author payload for a researcher, kept whole. The structured columns cover what the platform queries on — the counts on the profile, the names and the affiliations in their own tables — and this snapshot keeps the rest (the topics, the yearly counts, the award links) without a migration every time OpenAlex adds a field. One row per researcher: the last fetch wins.';
+
 COMMENT ON TABLE "field_provenance" IS 'Field-level provenance for auto-generated data. source classifies WHO STANDS BEHIND the value (PAPER/AI_TRACE/AI_INF/HUMAN/EXT/UNK), not the channel the data travelled through; sourceKind/sourceRef carry the channel. PK includes source_ref so an overwritten field keeps its history. Only auto-generated fields get a row - a field typed by a user is HUMAN by definition. is_locked is set when a human confirms a value: a sync job must never overwrite a locked field. AI without a replayable trace is AI_INF, never UNK; UNK means the value exists but its origin cannot be traced.';
 
 COMMENT ON TABLE "research_fields" IS 'OpenAlex Field, not Domain. internal_code is optional FPTU code, never the provider ID. Upsert imported nodes using (source,external_id), not name.';
@@ -1282,6 +1402,12 @@ ALTER TABLE "user_role_assignments" ADD FOREIGN KEY ("granted_by") REFERENCES "u
 ALTER TABLE "user_role_assignments" ADD FOREIGN KEY ("revoked_by") REFERENCES "users" ("id") ON DELETE RESTRICT DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "researcher_profiles" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "researcher_author_names" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "researcher_affiliations" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "researcher_openalex_snapshots" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "local_credentials" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
 

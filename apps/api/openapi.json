@@ -9909,6 +9909,44 @@
         ]
       }
     },
+    "/profiles/me/openalex-record": {
+      "get": {
+        "description": "Returns the OpenAlex author record of the caller: the counts, the byline spellings OpenAlex has observed, and the affiliations with the years they held. The record is an enrichment fetched during the onboarding, so it is empty until the researcher confirms their author.",
+        "operationId": "ProfilesController_getMyOpenAlexRecord",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The OpenAlex author record of the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAlexAuthorRecordResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the OpenAlex record of the current user",
+        "tags": [
+          "profiles"
+        ]
+      }
+    },
     "/profiles/me/onboarding": {
       "post": {
         "description": "Finishes the onboarding: writes the profile information the researcher filled in — including the ORCID, which the ordinary profile update refuses — and marks the account as onboarded. Requires at least one ACTIVE research interest, the one mandatory step of the onboarding.",
@@ -16480,6 +16518,166 @@
           "topicPath"
         ]
       },
+      "OpenAlexCountsDto": {
+        "type": "object",
+        "properties": {
+          "worksCount": {
+            "type": "integer",
+            "description": "Total works OpenAlex attributes to the author.",
+            "example": 313,
+            "nullable": true
+          },
+          "citedByCount": {
+            "type": "integer",
+            "description": "Total citations to those works.",
+            "example": 14816,
+            "nullable": true
+          },
+          "hIndex": {
+            "type": "integer",
+            "description": "The h-index. Career-lifetime, so it favours a long career over a hot recent topic.",
+            "example": 56,
+            "nullable": true
+          },
+          "i10Index": {
+            "type": "integer",
+            "description": "The number of works with at least ten citations.",
+            "example": 166,
+            "nullable": true
+          },
+          "twoYearMeanCitedness": {
+            "type": "number",
+            "description": "The mean citations per work over the last two years. Recency-weighted.",
+            "example": 12.304,
+            "nullable": true
+          }
+        },
+        "required": [
+          "worksCount",
+          "citedByCount",
+          "hIndex",
+          "i10Index",
+          "twoYearMeanCitedness"
+        ]
+      },
+      "OpenAlexAffiliationDto": {
+        "type": "object",
+        "properties": {
+          "institutionId": {
+            "type": "string",
+            "description": "The OpenAlex institution id.",
+            "example": "I109689652"
+          },
+          "ror": {
+            "type": "string",
+            "description": "The ROR id of the same institution. It survives the renames and merges that break a display name.",
+            "example": "https://ror.org/03esj4g97",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "The institution display name.",
+            "example": "FPT University"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "The ISO country code.",
+            "example": "VN",
+            "nullable": true
+          },
+          "institutionType": {
+            "type": "string",
+            "description": "The kind of institution: EDUCATION, COMPANY, HEALTHCARE, NONPROFIT, GOVERNMENT, FACILITY, ARCHIVE or OTHER.",
+            "example": "EDUCATION",
+            "nullable": true
+          },
+          "yearStart": {
+            "type": "integer",
+            "description": "The first year the affiliation held.",
+            "example": 2023,
+            "nullable": true
+          },
+          "yearEnd": {
+            "type": "integer",
+            "description": "The last year the affiliation held.",
+            "example": 2023,
+            "nullable": true
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "Whether this is the affiliation the researcher is at now — the most recent one by year.",
+            "example": true
+          }
+        },
+        "required": [
+          "institutionId",
+          "ror",
+          "name",
+          "countryCode",
+          "institutionType",
+          "yearStart",
+          "yearEnd",
+          "isPrimary"
+        ]
+      },
+      "OpenAlexAuthorRecordResponseDto": {
+        "type": "object",
+        "properties": {
+          "authorId": {
+            "type": "string",
+            "description": "The canonical OpenAlex author id.",
+            "example": "https://openalex.org/A5027558961",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The canonical display name OpenAlex holds for the author.",
+            "example": "Nguyen Hoang Khoi Tran",
+            "nullable": true
+          },
+          "counts": {
+            "description": "The counts OpenAlex reports for the author.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OpenAlexCountsDto"
+              }
+            ]
+          },
+          "names": {
+            "description": "Every byline spelling OpenAlex has observed for the author. The set is what the name-based identity resolution matches against.",
+            "example": [
+              "Nguyen Hoang Khoi Tran",
+              "N. H. Tran",
+              "Tran, Nguyen H"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "affiliations": {
+            "description": "The institutions the author was affiliated with.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexAffiliationDto"
+            }
+          },
+          "syncedAt": {
+            "type": "string",
+            "description": "When the record was last fetched.",
+            "example": "2026-11-27T10:00:31.000Z",
+            "nullable": true
+          }
+        },
+        "required": [
+          "authorId",
+          "displayName",
+          "counts",
+          "names",
+          "affiliations",
+          "syncedAt"
+        ]
+      },
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
@@ -19092,6 +19290,30 @@
             "items": {
               "$ref": "#/components/schemas/ProfileInterestResponseDto"
             }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OpenAlexAuthorRecordResponseDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OpenAlexAuthorRecordResponseDto"
           },
           "message": {
             "type": "string",

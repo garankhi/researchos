@@ -88,3 +88,112 @@ export interface OpenAlexWorksPage {
   /** Shaped works on this page. */
   works: OpenAlexWork[];
 }
+
+/**
+ * An institution an author was affiliated with.
+ *
+ * The years matter as much as the institution: a year at FPT University
+ * is the platform's business, a year at another institution is not.
+ */
+export interface OpenAlexAffiliation {
+  /** The OpenAlex institution id, e.g. `I109689652`. */
+  institutionId: string;
+  /** The ROR id of the same institution, when OpenAlex knows one. */
+  ror: string | null;
+  /** The institution display name. */
+  name: string;
+  /** The ISO country code, e.g. `VN`. */
+  countryCode: string | null;
+  /**
+   * The kind of institution: `education`, `company`, `healthcare`,
+   * `nonprofit`, `government`, `facility`, `archive` or `other`.
+   */
+  institutionType: string | null;
+  /** The first year the affiliation held. */
+  yearStart: number | null;
+  /** The last year the affiliation held. */
+  yearEnd: number | null;
+}
+
+/**
+ * The counts OpenAlex reports for an author.
+ *
+ * The two popularity measures answer different questions, and keeping
+ * both is the point: the h-index is career-lifetime, so it favours a long
+ * career over a hot recent topic, while the two-year mean is
+ * recency-weighted, so it says how much the author is cited *now*.
+ */
+export interface OpenAlexAuthorCounts {
+  /** Total works OpenAlex attributes to the author. */
+  worksCount: number | null;
+  /** Total citations to those works. */
+  citedByCount: number | null;
+  /** The h-index. */
+  hIndex: number | null;
+  /** The number of works with at least ten citations. */
+  i10Index: number | null;
+  /** The mean citations per work over the last two years. */
+  twoYearMeanCitedness: number | null;
+}
+
+/**
+ * One topic OpenAlex assigned to an author.
+ *
+ * `count` is the number of the author's works in the topic, which is the
+ * useful number for a single author. OpenAlex's own `topic_share` is
+ * deliberately not used: it divides by the works of the whole corpus, so
+ * for one author it reads as a vanishing fraction and says nothing about
+ * how much of *their* output the topic covers.
+ */
+export interface OpenAlexAuthorTopic {
+  /** The OpenAlex topic id, e.g. `T11409`. */
+  id: string;
+  /** The topic display name. */
+  name: string;
+  /** How many of the author's works sit in the topic. */
+  count: number | null;
+  /** The subfield the topic belongs to. */
+  subfieldId: string | null;
+  /** The field the topic belongs to. */
+  fieldId: string | null;
+  /** The domain the topic belongs to. */
+  domainId: string | null;
+}
+
+/**
+ * The full OpenAlex record of one author.
+ *
+ * This is what the onboarding stores: the identity, the observed byline
+ * spellings, the affiliations with their years, the counts and the
+ * topics — plus the raw payload, so the parts the platform does not
+ * model yet survive without a migration every time OpenAlex adds a
+ * field.
+ */
+export interface OpenAlexAuthorRecord {
+  /** The canonical id, e.g. `https://openalex.org/A5027558961`. */
+  id: string;
+  /** The short id, e.g. `A5027558961`. */
+  shortId: string;
+  /** The canonical display name. */
+  displayName: string;
+  /** The ORCID OpenAlex believes the author owns, in URL form. */
+  orcid: string | null;
+  /** Every ORCID seen across the author's workships. */
+  observedOrcids: string[];
+  /**
+   * Every byline spelling OpenAlex has observed for the author.
+   *
+   * This is the corpus the name-based identity resolution matches
+   * against. A researcher whose byline spelling differs from their
+   * account name would otherwise match nothing at all.
+   */
+  names: string[];
+  /** The affiliations, with the years they held. */
+  affiliations: OpenAlexAffiliation[];
+  /** The counts OpenAlex reports. */
+  counts: OpenAlexAuthorCounts;
+  /** The topics OpenAlex assigned. */
+  topics: OpenAlexAuthorTopic[];
+  /** The raw payload, kept whole. */
+  raw: Record<string, unknown>;
+}

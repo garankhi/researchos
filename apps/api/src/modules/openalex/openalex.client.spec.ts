@@ -153,6 +153,116 @@ describe('OpenAlexClient', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('shapes the full author record', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          id: 'https://openalex.org/A5027558961',
+          display_name: 'Nguyen Hoang Khoi Tran',
+          orcid: 'https://orcid.org/0000-0001-7323-9213',
+          works_count: 313,
+          cited_by_count: 14816,
+          summary_stats: {
+            h_index: 56,
+            i10_index: 166,
+            '2yr_mean_citedness': 12.3,
+          },
+          display_name_alternatives: ['N. H. Tran', 'Tran, Nguyen H'],
+          affiliations: [
+            {
+              institution: {
+                id: 'https://openalex.org/I109689652',
+                ror: 'https://ror.org/03esj4g97',
+                display_name: 'FPT University',
+                country_code: 'VN',
+                type: 'education',
+              },
+              years: [2023],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const record = await makeClient().getAuthorRecord('A5027558961');
+
+    expect(record.shortId).toBe('A5027558961');
+    expect(record.counts).toEqual({
+      worksCount: 313,
+      citedByCount: 14816,
+      hIndex: 56,
+      i10Index: 166,
+      twoYearMeanCitedness: 12.3,
+    });
+  });
+
+  it('collects the observed byline spellings, canonical name included', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          id: 'https://openalex.org/A1',
+          display_name: 'Jane Doe',
+          display_name_alternatives: ['J. Doe', 'Doe, Jane'],
+        }),
+      ),
+    );
+
+    const record = await makeClient().getAuthorRecord('A1');
+
+    expect(record.names).toEqual(['Jane Doe', 'J. Doe', 'Doe, Jane']);
+  });
+
+  it('reads the years of an affiliation as a range', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          id: 'https://openalex.org/A1',
+          display_name: 'Jane Doe',
+          affiliations: [
+            {
+              institution: {
+                id: 'https://openalex.org/I109689652',
+                display_name: 'FPT University',
+                type: 'education',
+              },
+              years: [2023, 2021, 2022],
+            },
+          ],
+        }),
+      ),
+    );
+
+    const record = await makeClient().getAuthorRecord('A1');
+
+    expect(record.affiliations[0]).toMatchObject({
+      institutionId: 'I109689652',
+      yearStart: 2021,
+      yearEnd: 2023,
+    });
+  });
+
+  it('keeps the raw payload whole', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          id: 'https://openalex.org/A1',
+          display_name: 'Jane Doe',
+          counts_by_year: [{ year: 2023, works_count: 11 }],
+        }),
+      ),
+    );
+
+    const record = await makeClient().getAuthorRecord('A1');
+
+    expect(record.raw.counts_by_year).toEqual([
+      { year: 2023, works_count: 11 },
+    ]);
+  });
+
   it('resolves an author by ORCID, scoped to FPT University', async () => {
     vi.stubGlobal(
       'fetch',

@@ -5,7 +5,11 @@ import { domainErrorCodes } from '@researchos/error-codes';
 import { normalizeDoi } from '@researchos/publication-metadata';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import type {
+  OpenAlexAffiliation,
   OpenAlexAuthor,
+  OpenAlexAuthorCounts,
+  OpenAlexAuthorRecord,
+  OpenAlexAuthorTopic,
   OpenAlexWork,
   OpenAlexWorksPage,
 } from './openalex.types.js';
@@ -251,9 +255,200 @@ type RawAuthor = {
   display_name?: unknown;
   orcid?: unknown;
   works_count?: unknown;
+  cited_by_count?: unknown;
   last_known_institutions?: unknown;
   affiliations?: unknown;
+  summary_stats?: unknown;
+  display_name_alternatives?: unknown;
+  raw_author_names?: unknown;
+  observed_orcids?: unknown;
+  topics?: unknown;
+  [key: string]: unknown;
 };
+
+type RawInstitution = {
+  id?: unknown;
+  ror?: unknown;
+  display_name?: unknown;
+  country_code?: unknown;
+  type?: unknown;
+};
+
+type RawAffiliation = {
+  institution?: RawInstitution;
+  years?: unknown;
+};
+
+/** The counts OpenAlex reports for an author. */
+function toAuthorCounts(raw: RawAuthor): OpenAlexAuthorCounts {
+  const stats =
+    typeof raw.summary_stats === 'object' && raw.summary_stats !== null
+      ? (raw.summary_stats as Record<string, unknown>)
+      : {};
+  return {
+    worksCount: numberOrNull(raw.works_count),
+    citedByCount: numberOrNull(raw.cited_by_count),
+    hIndex: numberOrNull(stats.h_index),
+    i10Index: numberOrNull(stats.i10_index),
+    twoYearMeanCitedness: numberOrNull(stats['2yr_mean_citedness']),
+  };
+}
+
+/**
+ * The affiliations of an author, with the years they held.
+ *
+ * The year range is the whole point of the record: it is what tells a
+ * year at FPT University apart from a year at another institution.
+ *
+ * OpenAlex reports the years as a list — `[2023]` — and the list is
+ * sparse: an author who was at an institution for three years has three
+ * entries, and the gaps in between are not spelled out. The range is
+ * therefore the first and the last year, not the count.
+ */
+function toAffiliations(raw: RawAuthor): OpenAlexAffiliation[] {
+  const entries = Array.isArray(raw.affiliations)
+    ? (raw.affiliations as RawAffiliation[])
+    : [];
+  const out: OpenAlexAffiliation[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    const institution = entry.institution;
+    if (!institution || typeof institution.id !== 'string') {
+      continue;
+    }
+    const id = institution.id.replace(/^https?:\/\/openalex\.org\//, '');
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+
+    const years = Array.isArray(entry.years)
+      ? entry.years.filter((year): year is number => typeof year === 'number')
+      : [];
+
+    out.push({
+      institutionId: id,
+      ror: typeof institution.ror === 'string' ? institution.ror : null,
+      name:
+        typeof institution.display_name === 'string'
+          ? institution.display_name
+          : id,
+      countryCode:
+        typeof institution.country_code === 'string'
+          ? institution.country_code
+          : null,
+      institutionType:
+        typeof institution.type === 'string' ? institution.type : null,
+      yearStart: years.length > 0 ? Math.min(...years) : null,
+      yearEnd: years.length > 0 ? Math.max(...years) : null,
+    });
+  }
+
+  return out;
+}
+
+/**
+ * The byline spellings OpenAlex has observed for an author.
+ *
+ * OpenAlex reports them twice — as `display_name_alternatives` and as
+ * `raw_author_names` — and the two lists are the same. They are read
+ * from both so a payload that carries only one still yields the corpus.
+ *
+ * The canonical display name is always part of the set: it is a spelling
+ * the author published under too.
+ */
+function toAuthorNames(raw: RawAuthor): string[] {
+  const out: string[] = [];
+  const push = (value: unknown) => {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const trimmed = value.trim();
+    if (trimmed === '' || out.includes(trimmed)) {
+      return;
+    }
+    out.push(trimmed);
+  };
+
+  push(raw.display_name);
+  for (const list of [raw.display_name_alternatives, raw.raw_author_names]) {
+    if (!Array.isArray(list)) {
+      continue;
+    }
+    for (const value of list) {
+      push(value);
+    }
+  }
+
+  return out;
+}
+
+/** The topics OpenAlex assigned to an author. */
+function toAuthorTopics(raw: RawAuthor): OpenAlexAuthorTopic[] {
+  const entries = Array.isArray(raw.topics)
+    ? (raw.topics as Record<string, unknown>[])
+    : [];
+  const out: OpenAlexAuthorTopic[] = [];
+
+  for (const entry of entries) {
+    if (!entry || typeof entry.id !== 'string') {
+      continue;
+    }
+    const id = entry.id.replace(/^https?:\/\/openalex\.org\//, '');
+    const hierarchy = (key: string): string | null => {
+      const value = entry[key];
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+      const nodeId = (value as { id?: unknown }).id;
+      return typeof nodeId === 'string'
+        ? nodeId.replace(/^https?:\/\/openalex\.org\//, '')
+        : null;
+    };
+
+    out.push({
+      id,
+      name: typeof entry.display_name === 'string' ? entry.display_name : id,
+      count: numberOrNull(entry.count),
+      subfieldId: hierarchy('subfield'),
+      fieldId: hierarchy('field'),
+      domainId: hierarchy('domain'),
+    });
+  }
+
+  return out;
+}
+
+/** A number, or null when the value is not one. */
+function numberOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** The full OpenAlex record of an author. */
+export function toAuthorRecord(raw: RawAuthor): OpenAlexAuthorRecord {
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  const observed = Array.isArray(raw.observed_orcids)
+    ? (raw.observed_orcids as unknown[])
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value !== '')
+    : [];
+
+  return {
+    id,
+    shortId: shortId(id) ?? id,
+    displayName:
+      typeof raw.display_name === 'string' ? raw.display_name : '',
+    orcid: typeof raw.orcid === 'string' ? raw.orcid : null,
+    observedOrcids: observed,
+    names: toAuthorNames(raw),
+    affiliations: toAffiliations(raw),
+    counts: toAuthorCounts(raw),
+    topics: toAuthorTopics(raw),
+    raw: raw as Record<string, unknown>,
+  };
+}
 
 /**
  * The OpenAlex client every pull path goes through.
@@ -365,6 +560,37 @@ export class OpenAlexClient {
       );
     }
     return this.toAuthor(body);
+  }
+
+  /**
+   * Fetches the full OpenAlex record of one author.
+   *
+   * `GET /authors/<author_id>` — the same endpoint as `getAuthorById`,
+   * but the whole record is kept instead of the few fields the lookup
+   * needs.
+   *
+   * The full record is fetched once, at onboarding, and stored. Later
+   * syncs do not need it: OpenAlex bills by request, and the counts move
+   * slowly enough that a periodic refresh of the cheap yearly view
+   * covers them.
+   */
+  async getAuthorRecord(authorId: string): Promise<OpenAlexAuthorRecord> {
+    const short = shortId(authorId);
+    if (!short) {
+      throw new CodedHttpException(
+        domainErrorCodes.openalex.authorNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const url = new URL(`${this.baseUrl}/authors/${encodeURIComponent(short)}`);
+    const body = await this.getJson<RawAuthor>(url);
+    if (!body || typeof body.id !== 'string') {
+      throw new CodedHttpException(
+        domainErrorCodes.openalex.authorNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return toAuthorRecord(body);
   }
 
   /**

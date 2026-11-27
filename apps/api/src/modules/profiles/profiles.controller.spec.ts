@@ -7,6 +7,7 @@ import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
 import { OnboardingFinalizeService } from './onboarding-finalize.service.js';
 import { ProfilesController } from './profiles.controller.js';
 import { ProfilesService } from './profiles.service.js';
+import { OpenAlexAuthorRecordService } from '../openalex/openalex-author-record.service.js';
 import { OpenAlexCandidatesService } from '../openalex/openalex-candidates.service.js';
 import { OpenAlexPullService } from '../openalex/openalex-pull.service.js';
 
@@ -137,6 +138,10 @@ describe('ProfilesController', () => {
         {
           provide: OpenAlexCandidatesService,
           useValue: { accept: vi.fn(), reject: vi.fn() },
+        },
+        {
+          provide: OpenAlexAuthorRecordService,
+          useValue: { trySyncAuthorRecord: vi.fn() },
         },
       ],
     }).compile();

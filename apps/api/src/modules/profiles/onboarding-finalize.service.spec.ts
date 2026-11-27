@@ -84,17 +84,23 @@ describe('OnboardingFinalizeService', () => {
     reject: vi.fn().mockResolvedValue(undefined),
   });
 
+  const createAuthorRecordsMock = () => ({
+    trySyncAuthorRecord: vi.fn().mockResolvedValue(null),
+  });
+
   const setupService = (
     prismaMock: ReturnType<typeof createPrismaMock>,
     pullMock = createPullMock(),
     candidatesMock = createCandidatesMock(),
+    authorRecordsMock = createAuthorRecordsMock(),
   ) => {
     const service = new OnboardingFinalizeService(
       prismaMock as unknown as PrismaService,
       pullMock as never,
       candidatesMock as never,
+      authorRecordsMock as never,
     );
-    return { service, pullMock, candidatesMock };
+    return { service, pullMock, candidatesMock, authorRecordsMock };
   };
 
   beforeEach(() => {
@@ -403,6 +409,88 @@ describe('OnboardingFinalizeService', () => {
       await service.finalize(userId, { topicIds: [topicId] });
 
       expect(pullMock.pullDecidedWorks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the OpenAlex author record', () => {
+    it('stores the record of the confirmed author', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_topics.findMany.mockResolvedValue([
+        { id: topicId, is_active: true },
+      ]);
+      prismaMock.research_interests.findMany.mockResolvedValue([]);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(storedUser);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await service.finalize(userId, {
+        topicIds: [topicId],
+        openAlexAuthorId: 'A5023888391',
+      });
+
+      expect(authorRecordsMock.trySyncAuthorRecord).toHaveBeenCalledWith(
+        userId,
+        'A5023888391',
+      );
+    });
+
+    it('does not store a record when no author was confirmed', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_topics.findMany.mockResolvedValue([
+        { id: topicId, is_active: true },
+      ]);
+      prismaMock.research_interests.findMany.mockResolvedValue([]);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(storedUser);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await service.finalize(userId, { topicIds: [topicId] });
+
+      expect(authorRecordsMock.trySyncAuthorRecord).not.toHaveBeenCalled();
+    });
+
+    it('finishes the onboarding even when the record cannot be stored', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_topics.findMany.mockResolvedValue([
+        { id: topicId, is_active: true },
+      ]);
+      prismaMock.research_interests.findMany.mockResolvedValue([]);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue(storedUser);
+
+      const authorRecordsMock = createAuthorRecordsMock();
+      /*
+       * The record service swallows a failed fetch and reports it as
+       * "nothing stored". The record is an enrichment: the researcher
+       * came to confirm their author, and the profile is written
+       * either way — a failed fetch must not take the onboarding down
+       * with it.
+       */
+      authorRecordsMock.trySyncAuthorRecord.mockResolvedValue(null);
+      const { service } = setupService(
+        prismaMock,
+        createPullMock(),
+        createCandidatesMock(),
+        authorRecordsMock,
+      );
+
+      await expect(
+        service.finalize(userId, {
+          topicIds: [topicId],
+          openAlexAuthorId: 'A5023888391',
+        }),
+      ).resolves.toBeDefined();
     });
   });
 });
