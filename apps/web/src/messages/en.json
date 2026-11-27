@@ -299,6 +299,41 @@
     "signOut": "Sign out",
     "welcome": "Welcome, {name}."
   },
+  "onboarding": {
+    "authorStep": {
+      "title": "Let us find your publications",
+      "description": "We searched OpenAlex for your name at FPT University. Confirm the author that is yours, or skip this step — you can still import your works later.",
+      "loading": "Searching OpenAlex…",
+      "emptyTitle": "No matching author found",
+      "emptyMessage": "OpenAlex has no author at FPT University that matches your name. You can skip this step and search again later.",
+      "affiliationMatch": "FPT University",
+      "worksCount": "{count, plural, =1 {1 work} other {# works}}",
+      "alreadyLinked": "Your profile already links an OpenAlex author. Pulling again will use it.",
+      "confirm": "This is me",
+      "skip": "Skip for now",
+      "continue": "Continue without confirming",
+      "failed": "Could not reach OpenAlex. Try again in a moment."
+    },
+    "worksStep": {
+      "title": "Import your publications",
+      "description": "These works come from OpenAlex. Accept the ones that are yours, or reject them — a rejected work stays in your profile so you can accept it later.",
+      "loading": "Loading your works…",
+      "emptyTitle": "No works found",
+      "emptyMessage": "OpenAlex has no works for you at the moment. You can fetch new ones whenever you like.",
+      "visibilityLabel": "Who may see the works you accept?",
+      "visibilityPrivate": "Private",
+      "visibilityPrivateHint": "Only you can see them. You can publish each one later.",
+      "visibilityPublic": "Public to the FPTU community",
+      "visibilityPublicHint": "Every signed-in FPTU researcher can see them as soon as you accept.",
+      "accept": "Accept",
+      "reject": "Reject",
+      "accepted": "Publication accepted and added to your outputs.",
+      "rejected": "Publication candidate rejected.",
+      "fetchMore": "Fetch more from OpenAlex",
+      "finish": "Finish",
+      "failed": "Something went wrong. Try again."
+    }
+  },
   "profile": {
     "llkh": {
       "title": "Export scientific CV",
@@ -493,16 +528,34 @@
       "rejected": "Rejected"
     },
     "openalexTab": {
-      "title": "OpenAlex Candidates Queue",
-      "description": "Candidate publication works matched from OpenAlex awaiting your confirmation.",
+      "title": "OpenAlex Candidates",
+      "description": "Publication works matched from OpenAlex awaiting your confirmation.",
       "emptyTitle": "Queue is empty",
       "emptyMessage": "You have no pending publication candidates from OpenAlex.",
-      "accept": "Accept Work",
+      "emptyRejectedTitle": "No rejected works",
+      "emptyRejectedMessage": "You have not rejected any OpenAlex candidate. Rejected works stay here so you can accept them later.",
+      "pendingTab": "Pending suggestions",
+      "rejectedTab": "Rejected works",
+      "accept": "Accept",
       "accepting": "Accepting…",
       "reject": "Reject",
       "rejecting": "Rejecting…",
       "workAccepted": "Publication accepted and added to your outputs.",
-      "workRejected": "Publication candidate rejected."
+      "workRejected": "Publication candidate rejected.",
+      "fetchNew": "Fetch new from OpenAlex",
+      "pullDone": "Pull finished: {created} new works, {existing} already known.",
+      "pullFailed": "Could not fetch works from OpenAlex.",
+      "acceptTitle": "Accept this publication",
+      "acceptDescription": "Choose who may see this work once you accept it.",
+      "acceptingWork": "Work: {title}",
+      "visibilityPrivate": "Private",
+      "visibilityPrivateHint": "Only you can see this work. You can publish it later from its detail page.",
+      "visibilityPublic": "Public to the FPTU community",
+      "visibilityPublicHint": "Every signed-in FPTU researcher can see this work as soon as you accept it.",
+      "confirmAccept": "Accept work",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}"
     }
   },
   "outputs": {

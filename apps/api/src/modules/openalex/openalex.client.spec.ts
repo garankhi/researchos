@@ -9,10 +9,14 @@ import {
   reconstructAbstract,
 } from './openalex.client.js';
 
-function makeClient(mailto = 'test@researchos.local'): OpenAlexClient {
+function makeClient(
+  mailto = 'test@researchos.local',
+  apiKey?: string,
+): OpenAlexClient {
   const config = {
     get: (key: string) => {
       if (key === 'OPENALEX_MAILTO') return mailto;
+      if (key === 'OPENALEX_API_KEY') return apiKey;
       return undefined;
     },
   } as unknown as ConfigService;
@@ -116,11 +120,50 @@ describe('OpenAlexClient', () => {
     expect(seen[0]).toContain('mailto:lab@fptu.edu.vn');
   });
 
-  it('resolves an author by ORCID', async () => {
+  it('resolves an author by its id', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: unknown) => {
-        expect(String(url)).toContain('filter=orcid%3A0000-0002-1825-0097');
+        expect(String(url)).toContain('/authors/A5023888391');
+        return jsonResponse({
+          id: 'https://openalex.org/A5023888391',
+          display_name: 'Jane Doe',
+          orcid: 'https://orcid.org/0000-0002-1825-0097',
+          works_count: 3,
+        });
+      }),
+    );
+    const author = await makeClient().getAuthorById('A5023888391');
+    expect(author).toMatchObject({
+      id: 'https://openalex.org/A5023888391',
+      shortId: 'A5023888391',
+      displayName: 'Jane Doe',
+    });
+  });
+
+  it('raises author_not_found for a blank author id', async () => {
+    const fetch = vi.fn(async () => jsonResponse({}));
+    vi.stubGlobal('fetch', fetch);
+    const err = await makeClient()
+      .getAuthorById('  ')
+      .catch((e: unknown) => e);
+    expect((err as CodedHttpException).message).toBe(
+      'openalex_author_not_found',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('resolves an author by ORCID, scoped to FPT University', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        const href = String(url);
+        expect(href).toContain('filter=orcid%3A0000-0002-1825-0097');
+        // The affiliation scope is what makes the ORCID answer
+        // trustworthy: an ORCID is often claimed by a merged author
+        // profile at another institution.
+        expect(href).toContain('affiliations.institution.id');
+        expect(href).toContain('I109689652');
         return jsonResponse({
           results: [
             {
@@ -209,6 +252,7 @@ describe('OpenAlexClient', () => {
         isCorresponding: true,
         authorId: 'https://openalex.org/A1',
         orcid: 'https://orcid.org/0000-0002-1825-0097',
+        affiliations: [],
       },
       {
         order: 2,
@@ -216,7 +260,99 @@ describe('OpenAlexClient', () => {
         isCorresponding: false,
         authorId: null,
         orcid: null,
+        affiliations: [],
       },
+    ]);
+  });
+
+  it('scopes the works of an author to FPT University', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        const href = String(url);
+        expect(href).toContain('author.id%3AA1');
+        // An OpenAlex author profile accumulates the works of every
+        // byline merged into it, so the affiliation scope is what keeps
+        // the pull from claiming another researcher's work.
+        expect(href).toContain('authorships.institutions.id');
+        expect(href).toContain('I109689652');
+        return jsonResponse({ meta: { count: 0 }, results: [] });
+      }),
+    );
+    await makeClient().getWorksByAuthor('A1');
+  });
+
+  it('scopes the author search to FPT University', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        const href = String(url);
+        expect(href).toContain('search=Nguyen');
+        // A Vietnamese name matches thousands of authors worldwide;
+        // the affiliation scope is what makes the list meaningful.
+        expect(href).toContain('affiliations.institution.id');
+        expect(href).toContain('I109689652');
+        return jsonResponse({ results: [] });
+      }),
+    );
+    await makeClient().searchAuthors('Nguyen');
+  });
+
+  it('sends the API key on every request', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        expect(String(url)).toContain('api_key=test-key');
+        return jsonResponse({ results: [] });
+      }),
+    );
+    await makeClient('test@researchos.local', 'test-key').searchAuthors(
+      'Nguyen',
+    );
+  });
+
+  it('omits the API key when none is configured', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) => {
+        expect(String(url)).not.toContain('api_key');
+        return jsonResponse({ results: [] });
+      }),
+    );
+    await makeClient().searchAuthors('Nguyen');
+  });
+
+  it('keeps the affiliation of each authorship on the author entry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          meta: { count: 1 },
+          results: [
+            {
+              id: 'https://openalex.org/W1',
+              title: 'T',
+              type: 'article',
+              authorships: [
+                {
+                  raw_author_name: 'Nguyen Van An',
+                  raw_affiliation_strings: [
+                    'FPT University, Can Tho, Viet Nam',
+                  ],
+                  institutions: [
+                    { institution: { display_name: 'FPT University' } },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    const page = await makeClient().getWorksByAuthor('A1');
+    expect(page.works[0].authors[0].affiliations).toEqual([
+      'FPT University, Can Tho, Viet Nam',
+      'FPT University',
     ]);
   });
 
@@ -292,8 +428,14 @@ describe('OpenAlexClient', () => {
         const text = String(url);
         expect(text).toContain('/works?');
         expect(text).toContain('raw_author_name.search');
-        expect(text).toContain('raw_affiliation_strings.search');
-        expect(text).toContain('FPT+University');
+        // The affiliation is the institution id, not the raw string: it
+        // matches the institution OpenAlex normalised every FPT
+        // affiliation to, including the messy bylines.
+        expect(text).toContain('authorships.institutions.id');
+        expect(text).toContain('I109689652');
+        // The name is not quoted. Quoting narrows the search to an
+        // exact string most bylines never match.
+        expect(text).not.toContain('%22Nguyen+Van+An%22');
         return jsonResponse({
           meta: { count: 1 },
           results: [

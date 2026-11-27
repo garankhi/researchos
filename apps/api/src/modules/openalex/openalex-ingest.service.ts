@@ -1,13 +1,16 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, PrismaService } from '@researchos/database';
-import { domainErrorCodes } from '@researchos/error-codes';
-import { CodedHttpException } from '../../common/errors/error-codes.js';
 import {
   OPENALEX_FIELD_PROVENANCE,
   type OpenAlexProvenanceField,
   ProvenanceService,
 } from '../provenance/provenance.service.js';
 import { OpenAlexClient } from './openalex.client.js';
+import {
+  normalizeOrcidValue as normalizeOrcid,
+  resolveAuthorshipOrder,
+  type ResearcherIdentity,
+} from './openalex.identity.js';
 import type { OpenAlexWork } from './openalex.types.js';
 import { snapshotAuthors } from '../outputs/article-byline.js';
 
@@ -29,24 +32,6 @@ export interface IngestResult {
    * it to link the claim.
    */
   authorOrder: number | null;
-}
-
-/**
- * Normalises an ORCID for comparison.
- *
- * OpenAlex reports the URL form (`https://orcid.org/0000-...`) while the
- * profile may hold the bare form. Both land on the same key.
- */
-function normalizeOrcid(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const orcid = value
-    .trim()
-    .toLowerCase()
-    .replace(/^(https?:\/\/(dx\.)?orcid\.org\/|orcid:\s*)/, '')
-    .trim();
-  return orcid === '' ? null : orcid;
 }
 
 /**
@@ -198,17 +183,8 @@ export class OpenAlexIngestService {
 
       // Insert: a candidate nobody owns yet. `current_release_id` stays
       // NULL — `guard_output_release` only accepts a released revision.
-      const profile = await tx.researcher_profiles.findUnique({
-        where: { user_id: userId },
-        select: { orcid_id: true },
-      });
-      if (!profile) {
-        throw new CodedHttpException(
-          domainErrorCodes.profiles.profileNotFound,
-          HttpStatus.NOT_FOUND,
-        );
-      }
-      const matchedOrder = this.matchAuthorOrder(profile.orcid_id, work);
+      const identity = await this.resolveIdentity(tx, userId);
+      const matchedOrder = this.matchAuthorOrder(identity, work);
 
       const output = await tx.research_outputs.create({
         data: {
@@ -244,6 +220,11 @@ export class OpenAlexIngestService {
             openAlexAuthorId: author.authorId,
             orcid: author.orcid,
             isCorresponding: author.isCorresponding,
+            // The affiliation of *this* authorship. The accept path
+            // resolves the researcher by name when no identifier is
+            // known, and the affiliation is what tells their own
+            // byline apart from a co-author's.
+            affiliations: author.affiliations,
           })),
           created_by: userId,
         },
@@ -339,17 +320,8 @@ export class OpenAlexIngestService {
       return linked.author_order;
     }
 
-    const profile = await tx.researcher_profiles.findUnique({
-      where: { user_id: userId },
-      select: { orcid_id: true },
-    });
-    if (!profile) {
-      throw new CodedHttpException(
-        domainErrorCodes.profiles.profileNotFound,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-    const matchedOrder = this.matchAuthorOrder(profile.orcid_id, work);
+    const identity = await this.resolveIdentity(tx, userId);
+    const matchedOrder = this.matchAuthorOrder(identity, work);
     if (matchedOrder === null) {
       return null;
     }
@@ -363,7 +335,7 @@ export class OpenAlexIngestService {
         ({ order }) => order === matchedOrder,
       );
       const openAlexAuthorId = sourceAuthor?.authorId;
-      const orcid = normalizeOrcid(profile.orcid_id);
+      const orcid = normalizeOrcid(identity.orcid);
       const matches = snapshotAuthors(release.authors_snapshot).filter(
         (author) =>
           typeof author.openAlexAuthorId === 'string' && openAlexAuthorId
@@ -421,21 +393,55 @@ export class OpenAlexIngestService {
   /**
    * Finds the requesting researcher's position in the author list.
    *
-   * ORCID comparison only — a name-only match is never authoritative
-   * (Vietnamese names collide), so it yields null here.
+   * The tiered chain, strongest signal first: the confirmed OpenAlex
+   * author id, then the ORCID, then the name plus the hard-coded FPT
+   * University affiliation. The last tier is what lets a researcher with
+   * no OpenAlex and no ORCID profile claim their work at all.
+   *
+   * Every tier is strict. An ambiguous name match resolves to null
+   * rather than to a guess, because a wrong authorship attaches another
+   * researcher's work to this one.
    */
   private matchAuthorOrder(
-    orcidId: string | null,
+    identity: ResearcherIdentity,
     work: OpenAlexWork,
   ): number | null {
-    const needle = normalizeOrcid(orcidId);
-    if (!needle) {
-      return null;
-    }
-    const match = work.authors.find(
-      (author) => normalizeOrcid(author.orcid) === needle,
-    );
-    return match ? match.order : null;
+    const resolved = resolveAuthorshipOrder(work, identity);
+    return resolved ? resolved.order : null;
+  }
+
+  /**
+   * Reads the researcher's identity signals from the database.
+   *
+   * The confirmed OpenAlex author id, the ORCID, and the account name.
+   * The affiliation is not read — it is the hard-coded FPT University.
+   *
+   * The profile row is **optional**. A fresh researcher — one the seed
+   * never provisioned — has no profile row at all, and that is exactly
+   * the case the name fallback exists for. The account row carries the
+   * name, so a work can still be attributed by name plus affiliation.
+   */
+  private async resolveIdentity(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<ResearcherIdentity> {
+    const profile = await tx.researcher_profiles.findUnique({
+      where: { user_id: userId },
+      select: {
+        orcid_id: true,
+        openalex_author_id: true,
+        users: { select: { full_name: true } },
+      },
+    });
+    const account = await tx.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true },
+    });
+    return {
+      openAlexAuthorId: profile?.openalex_author_id ?? null,
+      orcid: profile?.orcid_id ?? null,
+      name: profile?.users.full_name ?? account?.full_name ?? '',
+    };
   }
 
   /**

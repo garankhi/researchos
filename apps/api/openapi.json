@@ -6298,9 +6298,182 @@
         ]
       }
     },
+    "/external/openalex/authors": {
+      "get": {
+        "operationId": "OpenAlexController_findAuthors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The author candidates for the caller: the confirmed author when the profile carries an id, otherwise the candidates found by the byline name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAlexAuthorCandidatesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no researcher profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists the caller's OpenAlex author candidates",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
+    "/external/openalex/works/available": {
+      "get": {
+        "operationId": "OpenAlexController_findAvailableWorks",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "description": "The OpenAlex author to preview the works of. Defaults to the researcher’s own confirmed author.",
+            "schema": {
+              "maxLength": 50,
+              "example": "A5023888391",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live works OpenAlex holds for the caller, newest pull not applicable — the order is OpenAlex’s own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAlexControllerFindAvailableWorksEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The author id is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no researcher profile, or no author could be resolved for them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Previews the caller's OpenAlex works before they are pulled",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
+    "/external/openalex/pull": {
+      "post": {
+        "operationId": "OpenAlexController_pullWorks",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullOpenAlexWorksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pull result: the candidates that were created, the ones that already existed, and how the works were resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullOpenAlexWorksResultDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no researcher profile, or no author could be resolved for them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Pulls the caller's OpenAlex works into the platform as candidates",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
     "/external/openalex/works": {
       "get": {
-        "operationId": "OpenAlexCandidatesController_findAll",
+        "operationId": "OpenAlexController_findAll",
         "parameters": [
           {
             "name": "page",
@@ -6371,9 +6544,82 @@
         ]
       }
     },
+    "/external/openalex/works/rejected": {
+      "get": {
+        "operationId": "OpenAlexController_findRejected",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rejected candidates of the caller. A rejected work is never deleted, so it can be accepted later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCandidateWorksResponseDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The pagination parameters are invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session behind the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Lists the OpenAlex candidates the caller rejected",
+        "tags": [
+          "openalex"
+        ]
+      }
+    },
     "/external/openalex/works/count": {
       "get": {
-        "operationId": "OpenAlexCandidatesController_count",
+        "operationId": "OpenAlexController_count",
         "parameters": [],
         "responses": {
           "200": {
@@ -6410,7 +6656,7 @@
     },
     "/external/openalex/works/{outputId}/accept": {
       "post": {
-        "operationId": "OpenAlexCandidatesController_accept",
+        "operationId": "OpenAlexController_accept",
         "parameters": [
           {
             "name": "outputId",
@@ -6423,6 +6669,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptCandidateDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The accepted work: import state ACCEPTED with the caller as owner, unless a co-author already accepted it.",
@@ -6498,7 +6754,7 @@
     },
     "/external/openalex/works/{outputId}/reject": {
       "post": {
-        "operationId": "OpenAlexCandidatesController_reject",
+        "operationId": "OpenAlexController_reject",
         "parameters": [
           {
             "name": "outputId",
@@ -13515,6 +13771,197 @@
           "exportLevel"
         ]
       },
+      "OpenAlexAuthorCandidateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Canonical OpenAlex id of the author, e.g. https://openalex.org/A5023888391.",
+            "example": "https://openalex.org/A5023888391"
+          },
+          "shortId": {
+            "type": "string",
+            "description": "Short OpenAlex id of the author, e.g. A5023888391.",
+            "example": "A5023888391"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Display name of the author as OpenAlex records it.",
+            "example": "Nguyen Van An"
+          },
+          "orcid": {
+            "type": "string",
+            "description": "ORCID of the author, or null when OpenAlex knows none. A non-null ORCID is a strong signal that this is the researcher.",
+            "nullable": true,
+            "example": "https://orcid.org/0000-0002-1825-0097"
+          },
+          "worksCount": {
+            "type": "number",
+            "description": "Number of works OpenAlex records for the author, or null when it reports none.",
+            "nullable": true,
+            "example": 42
+          },
+          "affiliations": {
+            "description": "Institution display names from the author’s last known affiliations.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "affiliationMatch": {
+            "type": "boolean",
+            "description": "Whether the author is affiliated with FPT University, the one affiliation in scope.",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "shortId",
+          "displayName",
+          "orcid",
+          "worksCount",
+          "affiliations",
+          "affiliationMatch"
+        ]
+      },
+      "OpenAlexAuthorCandidatesDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "How the list was produced: AUTHOR_ID and ORCID resolved through a confirmed identifier, NAME through the byline name.",
+            "enum": [
+              "AUTHOR_ID",
+              "ORCID",
+              "NAME"
+            ],
+            "example": "NAME"
+          },
+          "authors": {
+            "description": "The author candidates. Empty in the NAME mode when the researcher’s name is blank.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexAuthorCandidateDto"
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "authors"
+        ]
+      },
+      "OpenAlexWorkPreviewDto": {
+        "type": "object",
+        "properties": {
+          "workId": {
+            "type": "string",
+            "description": "Canonical OpenAlex id of the work, e.g. https://openalex.org/W2741809807.",
+            "example": "https://openalex.org/W2741809807"
+          },
+          "shortId": {
+            "type": "string",
+            "description": "Short OpenAlex id of the work, e.g. W2741809807.",
+            "example": "W2741809807"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the work.",
+            "example": "A study of collaborative reading strategies"
+          },
+          "doi": {
+            "type": "string",
+            "description": "Normalised DOI of the work, or null when it has none.",
+            "nullable": true,
+            "example": "10.1234/example"
+          },
+          "publicationYear": {
+            "type": "number",
+            "description": "Publication year of the work, or null when OpenAlex reports none.",
+            "nullable": true,
+            "example": 2024
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Platform output-type vocabulary of the work.",
+            "example": "ARTICLE"
+          },
+          "venue": {
+            "type": "string",
+            "description": "Venue of the work, or null when OpenAlex reports none.",
+            "nullable": true,
+            "example": "Journal of Applied Research"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether the work was resolved through a confirmed identifier. A name-only result is never confirmed.",
+            "example": false
+          }
+        },
+        "required": [
+          "workId",
+          "shortId",
+          "title",
+          "doi",
+          "publicationYear",
+          "outputType",
+          "venue",
+          "confirmed"
+        ]
+      },
+      "PullOpenAlexWorksDto": {
+        "type": "object",
+        "properties": {
+          "openAlexAuthorId": {
+            "type": "string",
+            "description": "The OpenAlex author id the researcher picked during onboarding. Recorded on the profile, so every later pull resolves through it. Ignored when the profile already carries a confirmed id.",
+            "example": "A5023888391",
+            "maxLength": 50
+          }
+        }
+      },
+      "PullOpenAlexWorksResultDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "How the works were resolved: AUTHOR_ID through the confirmed OpenAlex author id, ORCID through the ORCID, NAME through the byline name and the FPT University affiliation.",
+            "enum": [
+              "AUTHOR_ID",
+              "ORCID",
+              "NAME"
+            ],
+            "example": "NAME"
+          },
+          "authorId": {
+            "type": "string",
+            "description": "The OpenAlex author id the pull resolved to, or null when the name fallback resolved no author.",
+            "nullable": true,
+            "example": "A5023888391"
+          },
+          "worksScanned": {
+            "type": "number",
+            "description": "How many works OpenAlex returned.",
+            "example": 12
+          },
+          "candidatesCreated": {
+            "type": "number",
+            "description": "How many of those works became new candidates.",
+            "example": 9
+          },
+          "candidatesExisting": {
+            "type": "number",
+            "description": "How many of those works were already stored — a re-pull of a known work never duplicates it.",
+            "example": 3
+          }
+        },
+        "required": [
+          "mode",
+          "authorId",
+          "worksScanned",
+          "candidatesCreated",
+          "candidatesExisting"
+        ]
+      },
       "CandidateWorkDto": {
         "type": "object",
         "properties": {
@@ -13635,6 +14082,21 @@
         "required": [
           "count"
         ]
+      },
+      "AcceptCandidateDto": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "description": "Who may see the work after the accept. PRIVATE keeps it as the researcher’s own working copy; FPTU_COMMUNITY publishes it to every signed-in researcher. Defaults to PRIVATE.",
+            "enum": [
+              "PRIVATE",
+              "FPTU_COMMUNITY"
+            ],
+            "default": "PRIVATE",
+            "example": "PRIVATE"
+          }
+        }
       },
       "CandidateDecisionDto": {
         "type": "object",
@@ -17617,6 +18079,81 @@
           },
           "data": {
             "$ref": "#/components/schemas/LlkhDownloadDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OpenAlexAuthorCandidatesDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/OpenAlexAuthorCandidatesDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OpenAlexControllerFindAvailableWorksEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenAlexWorkPreviewDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "PullOpenAlexWorksResultDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PullOpenAlexWorksResultDto"
           },
           "message": {
             "type": "string",

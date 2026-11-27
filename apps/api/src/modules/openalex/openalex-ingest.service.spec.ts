@@ -1,7 +1,5 @@
-import { HttpStatus } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaService } from '@researchos/database';
-import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { ProvenanceService } from '../provenance/provenance.service.js';
 import {
   OPENALEX_SOURCE,
@@ -35,6 +33,7 @@ function makeWork(
         isCorresponding: true,
         authorId: 'https://openalex.org/A1',
         orcid: 'https://orcid.org/0000-0002-1825-0097',
+        affiliations: ['FPT University, Can Tho, Viet Nam'],
       },
       {
         order: 2,
@@ -42,6 +41,7 @@ function makeWork(
         isCorresponding: false,
         authorId: 'https://openalex.org/A2',
         orcid: null,
+        affiliations: ['FPT University, Can Tho, Viet Nam'],
       },
     ],
     ...overrides,
@@ -61,7 +61,14 @@ function makeTx(overrides: Record<string, unknown> = {}) {
       create: vi.fn(async () => ({ id: OUTPUT_ID })),
     },
     researcher_profiles: {
-      findUnique: vi.fn(async () => ({ orcid_id: '0000-0002-1825-0097' })),
+      findUnique: vi.fn(async () => ({
+        orcid_id: '0000-0002-1825-0097',
+        openalex_author_id: null,
+        users: { full_name: 'Nguyen Van An' },
+      })),
+    },
+    users: {
+      findUnique: vi.fn(async () => ({ full_name: 'Nguyen Van An' })),
     },
     output_revisions: {
       create: vi.fn(async () => ({ id: 'rev-1' })),
@@ -321,7 +328,11 @@ describe('OpenAlexIngestService', () => {
   it('leaves authorship alone when the researcher matches no author', async () => {
     const tx = makeTx({
       researcher_profiles: {
-        findUnique: vi.fn(async () => ({ orcid_id: '0000-0001-0000-0000' })),
+        findUnique: vi.fn(async () => ({
+          orcid_id: '0000-0001-0000-0000',
+          openalex_author_id: null,
+          users: { full_name: 'Someone Entirely Different' },
+        })),
       },
     });
     const { service } = makeService(tx);
@@ -335,20 +346,100 @@ describe('OpenAlexIngestService', () => {
     expect(creates.every((call) => call[0].data.user_id === null)).toBe(true);
   });
 
-  it('rejects with profile_not_found when there is no profile', async () => {
+  it('claims the authorship by name when the researcher has no ORCID', async () => {
+    // The permanent fallback: a researcher with no OpenAlex and no ORCID
+    // profile still claims their work, through the byline name and the
+    // hard-coded FPT University affiliation.
     const tx = makeTx({
       researcher_profiles: {
-        findUnique: vi.fn(async () => null),
+        findUnique: vi.fn(async () => ({
+          orcid_id: null,
+          openalex_author_id: null,
+          users: { full_name: 'Nguyen Van An' },
+        })),
       },
     });
     const { service } = makeService(tx);
 
-    const err = await service
-      .upsertWork(USER_ID, makeWork('W1'))
-      .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(CodedHttpException);
-    expect((err as CodedHttpException).message).toBe('profile_not_found');
-    expect((err as CodedHttpException).getStatus()).toBe(HttpStatus.NOT_FOUND);
+    const result = await service.upsertWork(USER_ID, makeWork('W1'));
+
+    expect(result.authorOrder).toBe(1);
+  });
+
+  it('claims the authorship by the confirmed OpenAlex author id', async () => {
+    const tx = makeTx({
+      researcher_profiles: {
+        findUnique: vi.fn(async () => ({
+          orcid_id: null,
+          openalex_author_id: 'A1',
+          users: { full_name: 'Someone Entirely Different' },
+        })),
+      },
+    });
+    const { service } = makeService(tx);
+
+    const result = await service.upsertWork(USER_ID, makeWork('W1'));
+
+    expect(result.authorOrder).toBe(1);
+  });
+
+  it('leaves the authorship alone when the byline name is ambiguous', async () => {
+    const tx = makeTx({
+      researcher_profiles: {
+        findUnique: vi.fn(async () => ({
+          orcid_id: null,
+          openalex_author_id: null,
+          users: { full_name: 'Nguyen Van An' },
+        })),
+      },
+    });
+    const { service } = makeService(tx);
+
+    // Two authorships carry the same byline name, so neither is
+    // certainly the researcher — the work is left unattributed.
+    const result = await service.upsertWork(
+      USER_ID,
+      makeWork('W1', {
+        authors: [
+          {
+            order: 1,
+            name: 'Nguyen Van An',
+            isCorresponding: true,
+            authorId: null,
+            orcid: null,
+            affiliations: ['FPT University'],
+          },
+          {
+            order: 2,
+            name: 'Nguyen Van An',
+            isCorresponding: false,
+            authorId: null,
+            orcid: null,
+            affiliations: ['FPT University'],
+          },
+        ],
+      }),
+    );
+
+    expect(result.authorOrder).toBeNull();
+  });
+
+  it('falls back to the account name when there is no profile row', async () => {
+    // A fresh researcher has no profile row at all. The account row
+    // still carries the name, so the name tier resolves the authorship.
+    const tx = makeTx({
+      researcher_profiles: {
+        findUnique: vi.fn(async () => null),
+      },
+      users: {
+        findUnique: vi.fn(async () => ({ full_name: 'Nguyen Van An' })),
+      },
+    });
+    const { service } = makeService(tx);
+
+    const result = await service.upsertWork(USER_ID, makeWork('W1'));
+
+    expect(result.authorOrder).toBe(1);
   });
 
   it('skips provenance for null fields', async () => {

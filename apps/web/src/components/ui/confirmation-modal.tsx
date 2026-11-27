@@ -102,15 +102,17 @@ export function ConfirmationModal({
           >
             <Dialog.Header>
               <Dialog.Title>{title}</Dialog.Title>
-              {description ? (
-                <Dialog.Description textStyle="sm" color="fg.muted">
-                  {description}
-                </Dialog.Description>
-              ) : null}
             </Dialog.Header>
 
             <Dialog.Body>
-              <Stack gap="3">{body}</Stack>
+              <Stack gap="4">
+                {description ? (
+                  <Dialog.Description textStyle="sm" color="fg.muted">
+                    {description}
+                  </Dialog.Description>
+                ) : null}
+                <Stack gap="3">{body}</Stack>
+              </Stack>
             </Dialog.Body>
 
             <Dialog.Footer>

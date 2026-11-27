@@ -299,6 +299,41 @@
     "signOut": "Đăng xuất",
     "welcome": "Chào mừng, {name}."
   },
+  "onboarding": {
+    "authorStep": {
+      "title": "Tìm tác giả của bạn",
+      "description": "Chúng tôi đã tìm trên OpenAlex theo tên của bạn tại FPT University. Hãy xác nhận tác giả đúng là bạn, hoặc bỏ qua — bạn vẫn có thể nhập tác phẩm sau.",
+      "loading": "Đang tìm trên OpenAlex…",
+      "emptyTitle": "Không tìm thấy tác giả phù hợp",
+      "emptyMessage": "OpenAlex không có tác giả nào tại FPT University khớp với tên của bạn. Bạn có thể bỏ qua bước này và tìm lại sau.",
+      "affiliationMatch": "FPT University",
+      "worksCount": "{count, plural, =1 {1 bài báo} other {# bài báo}}",
+      "alreadyLinked": "Hồ sơ của bạn đã liên kết một tác giả OpenAlex. Lần tải sau sẽ dùng tác giả đó.",
+      "confirm": "Đây là tôi",
+      "skip": "Bỏ qua",
+      "continue": "Tiếp tục mà không xác nhận",
+      "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau."
+    },
+    "worksStep": {
+      "title": "Nhập tác phẩm của bạn",
+      "description": "Các bài báo này đến từ OpenAlex. Hãy xác nhận những bài của bạn, hoặc từ chối — bài bị từ chối vẫn ở trong hồ sơ để bạn xác nhận lại sau.",
+      "loading": "Đang tải tác phẩm…",
+      "emptyTitle": "Không có bài báo nào",
+      "emptyMessage": "Hiện OpenAlex chưa có bài báo nào cho bạn. Bạn có thể tải bài mới bất cứ lúc nào.",
+      "visibilityLabel": "Ai có thể nhìn thấy những bài bạn xác nhận?",
+      "visibilityPrivate": "Riêng tư",
+      "visibilityPrivateHint": "Chỉ bạn nhìn thấy. Bạn có thể công bố từng bài sau.",
+      "visibilityPublic": "Công khai cho cộng đồng FPTU",
+      "visibilityPublicHint": "Mọi researcher FPTU đã đăng nhập đều nhìn thấy ngay khi bạn xác nhận.",
+      "accept": "Xác nhận",
+      "reject": "Từ chối",
+      "accepted": "Đã xác nhận và thêm bài báo vào danh sách công bố của bạn.",
+      "rejected": "Đã từ chối bài báo ứng viên.",
+      "fetchMore": "Tải thêm từ OpenAlex",
+      "finish": "Hoàn tất",
+      "failed": "Đã xảy ra lỗi. Hãy thử lại."
+    }
+  },
   "profile": {
     "llkh": {
       "title": "Xuất Lý lịch khoa học",
@@ -493,16 +528,34 @@
       "rejected": "Đã từ chối"
     },
     "openalexTab": {
-      "title": "Hàng đợi ứng viên OpenAlex",
-      "description": "Các bài báo và công bố ứng viên được tìm thấy từ OpenAlex chờ bạn xác nhận.",
+      "title": "Ứng viên OpenAlex",
+      "description": "Các bài báo và công bố được tìm thấy từ OpenAlex chờ bạn xác nhận.",
       "emptyTitle": "Hàng đợi trống",
       "emptyMessage": "Bạn không có bài báo ứng viên nào cần xử lý từ OpenAlex.",
-      "accept": "Xác nhận bài báo",
+      "emptyRejectedTitle": "Không có bài bị từ chối",
+      "emptyRejectedMessage": "Bạn chưa từ chối bài báo ứng viên nào. Bài bị từ chối vẫn ở đây để bạn có thể xác nhận lại sau.",
+      "pendingTab": "Gợi ý đang chờ",
+      "rejectedTab": "Bài bị từ chối",
+      "accept": "Xác nhận",
       "accepting": "Đang xác nhận…",
       "reject": "Từ chối",
       "rejecting": "Đang từ chối…",
       "workAccepted": "Đã xác nhận và thêm bài báo vào danh sách công bố của bạn.",
-      "workRejected": "Đã từ chối bài báo ứng viên."
+      "workRejected": "Đã từ chối bài báo ứng viên.",
+      "fetchNew": "Tải bài mới từ OpenAlex",
+      "pullDone": "Đã tải: {created} bài mới, {existing} bài đã có.",
+      "pullFailed": "Không thể tải bài báo từ OpenAlex.",
+      "acceptTitle": "Xác nhận bài báo này",
+      "acceptDescription": "Chọn ai có thể nhìn thấy bài báo sau khi bạn xác nhận.",
+      "acceptingWork": "Bài báo: {title}",
+      "visibilityPrivate": "Riêng tư",
+      "visibilityPrivateHint": "Chỉ bạn nhìn thấy bài báo này. Bạn có thể công bố sau từ trang chi tiết.",
+      "visibilityPublic": "Công khai cho cộng đồng FPTU",
+      "visibilityPublicHint": "Mọi researcher FPTU đã đăng nhập đều nhìn thấy bài báo này ngay khi bạn xác nhận.",
+      "confirmAccept": "Xác nhận bài báo",
+      "previous": "Trước",
+      "next": "Sau",
+      "page": "Trang {page}"
     }
   },
   "outputs": {

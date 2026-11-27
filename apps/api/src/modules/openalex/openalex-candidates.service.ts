@@ -1,6 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
+  OutputAudience,
   OutputImportState,
+  OutputSharingStatus,
   OutputType,
   Prisma,
   PrismaService,
@@ -9,6 +11,11 @@ import {
 import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
 import { buildPaginationMeta } from '../../common/dto/pagination.dto.js';
+import { completeArticleByline } from '../outputs/article-byline.js';
+import {
+  AcceptCandidateDto,
+  CandidateVisibility,
+} from './dto/accept-candidate.dto.js';
 import {
   CandidateWorkDto,
   CandidateWorksCountDto,
@@ -16,7 +23,22 @@ import {
 } from './dto/candidate-work-response.dto.js';
 import { CandidateDecisionDto } from './dto/candidate-decision-response.dto.js';
 import { ListCandidateWorksQueryDto } from './dto/list-candidate-works.query.dto.js';
+import {
+  resolveSnapshotOrder,
+  type ResearcherIdentity,
+} from './openalex.identity.js';
 import { OPENALEX_SOURCE } from './openalex-ingest.service.js';
+
+/**
+ * Whether an accept also publishes the work.
+ *
+ * The default is the private working copy: the researcher publishes it
+ * themselves when they are ready. Only an explicit community choice
+ * publishes.
+ */
+function shouldPublish(visibility: CandidateVisibility | undefined): boolean {
+  return visibility === CandidateVisibility.FPTU_COMMUNITY;
+}
 
 /** One row of the suggestion queue: the work id and its DOI. */
 interface SuggestionRow {
@@ -54,24 +76,6 @@ interface LockedOutput {
 }
 
 /**
- * Normalises an ORCID for comparison, mirroring the ingest.
- *
- * OpenAlex reports the URL form (`https://orcid.org/0000-...`) while the
- * profile may hold the bare form. Both land on the same key.
- */
-function normalizeOrcid(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const orcid = value
-    .trim()
-    .toLowerCase()
-    .replace(/^(https?:\/\/(dx\.)?orcid\.org\/|orcid:\s*)/, '')
-    .trim();
-  return orcid === '' ? null : orcid;
-}
-
-/**
  * Reads author display names out of a revision's authors snapshot.
  *
  * The snapshot is the `[{ name, order, ... }]` array the ingest wrote, in
@@ -98,33 +102,6 @@ function toAuthorNames(snapshot: unknown): string[] {
 
 function toOrder(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-/**
- * Finds the caller's position in the draft authors snapshot by ORCID.
- *
- * Mirrors the ingest's `matchAuthorOrder`: ORCID comparison only, because
- * a name-only match is never authoritative. Returns null when the profile
- * has no ORCID, the snapshot has no ORCID match, or the matched entry has
- * no usable order.
- */
-function toSnapshotOrder(
-  snapshot: unknown,
-  needle: string | null,
-): number | null {
-  if (!needle || !Array.isArray(snapshot)) {
-    return null;
-  }
-  const match = snapshot.find(
-    (entry): entry is { orcid?: unknown; order?: unknown } =>
-      typeof entry === 'object' &&
-      entry !== null &&
-      normalizeOrcid((entry as { orcid?: unknown }).orcid) === needle,
-  );
-  if (!match || !Number.isInteger(match.order)) {
-    return null;
-  }
-  return match.order as number;
 }
 
 /**
@@ -156,23 +133,46 @@ export class OpenAlexCandidatesService {
     userId: string,
     query: ListCandidateWorksQueryDto,
   ): Promise<PaginatedCandidateWorksResponseDto> {
-    const { rows, total } = await this.prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.$queryRaw<SuggestionRow[]>`
-          SELECT o.id, s.doi
-          FROM visible_candidate_suggestions(${userId}::uuid) AS s
-          JOIN research_outputs AS o ON o.id = s.output_id
-          ORDER BY o.created_at DESC, o.id DESC
-          LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
-        `;
-        const [count] = await tx.$queryRaw<{ total: bigint }[]>`
-          SELECT count(*) AS total
-          FROM visible_candidate_suggestions(${userId}::uuid) AS s
-        `;
-        return { rows, total: Number(count?.total ?? 0n) };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    return this.listCandidates(userId, query, (tx) =>
+      this.readSuggestions(tx, userId, query),
     );
+  }
+
+  /**
+   * Lists the candidates the caller rejected, newest pull first.
+   *
+   * A rejection is never a deletion: the claim row stays `REJECTED` and
+   * the work stays `CANDIDATE`, so the work is still there to accept
+   * later. This is the read of that list, through
+   * `visible_rejected_candidates`.
+   */
+  async findRejected(
+    userId: string,
+    query: ListCandidateWorksQueryDto,
+  ): Promise<PaginatedCandidateWorksResponseDto> {
+    return this.listCandidates(userId, query, (tx) =>
+      this.readRejections(tx, userId, query),
+    );
+  }
+
+  /**
+   * The shared read of the stored candidates.
+   *
+   * The two lists differ only in the view they read — the suggestions
+   * exclude a rejected claim, the rejections are exactly the rejected
+   * claims — so the paging, the hydration and the shaping are one
+   * implementation.
+   */
+  private async listCandidates(
+    userId: string,
+    query: ListCandidateWorksQueryDto,
+    read: (
+      tx: Prisma.TransactionClient,
+    ) => Promise<{ rows: SuggestionRow[]; total: number }>,
+  ): Promise<PaginatedCandidateWorksResponseDto> {
+    const { rows, total } = await this.prisma.$transaction(read, {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
 
     if (rows.length === 0) {
       return { items: [], meta: buildPaginationMeta(query, 0, total) };
@@ -219,6 +219,57 @@ export class OpenAlexCandidatesService {
   }
 
   /**
+   * The paged read of the suggestion queue.
+   *
+   * `visible_candidate_suggestions` is the caller's own view of the
+   * candidates: the works they pulled, minus the ones they rejected.
+   */
+  private async readSuggestions(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    query: ListCandidateWorksQueryDto,
+  ): Promise<{ rows: SuggestionRow[]; total: number }> {
+    const rows = await tx.$queryRaw<SuggestionRow[]>`
+      SELECT o.id, s.doi
+      FROM visible_candidate_suggestions(${userId}::uuid) AS s
+      JOIN research_outputs AS o ON o.id = s.output_id
+      ORDER BY o.created_at DESC, o.id DESC
+      LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+    `;
+    const [count] = await tx.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total
+      FROM visible_candidate_suggestions(${userId}::uuid) AS s
+    `;
+    return { rows, total: Number(count?.total ?? 0n) };
+  }
+
+  /**
+   * The paged read of the rejection list.
+   *
+   * `visible_rejected_candidates` is the caller's own view of the works
+   * they rejected. The rows are never deleted, so every one of them can
+   * still be accepted later.
+   */
+  private async readRejections(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    query: ListCandidateWorksQueryDto,
+  ): Promise<{ rows: SuggestionRow[]; total: number }> {
+    const rows = await tx.$queryRaw<SuggestionRow[]>`
+      SELECT o.id, s.doi
+      FROM visible_rejected_candidates(${userId}::uuid) AS s
+      JOIN research_outputs AS o ON o.id = s.output_id
+      ORDER BY o.created_at DESC, o.id DESC
+      LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+    `;
+    const [count] = await tx.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total
+      FROM visible_rejected_candidates(${userId}::uuid) AS s
+    `;
+    return { rows, total: Number(count?.total ?? 0n) };
+  }
+
+  /**
    * Counts the caller's candidates still awaiting a decision.
    *
    * Cheap by design: it answers without the full list, so the entry card
@@ -245,9 +296,10 @@ export class OpenAlexCandidatesService {
    * `author_id` pointing at their own `output_authors` row, satisfying
    * `ck_claim_review` and `ck_confirmed_claim_author`. The authorship
    * link is resolved inside the same transaction, after the ingest's
-   * attach pattern: an existing link is reused, otherwise the profile
-   * ORCID is matched against the draft snapshot and the free position is
-   * claimed.
+   * attach pattern: an existing link is reused, otherwise the identity
+   * chain — the confirmed OpenAlex author id, the ORCID, then the name
+   * plus the hard-coded FPT University affiliation — is matched against
+   * the draft snapshot and the free position is claimed.
    *
    * Reversible in one direction: accepting after a rejection confirms the
    * same claim row. Repeating an accept returns the current state.
@@ -255,6 +307,7 @@ export class OpenAlexCandidatesService {
   async accept(
     userId: string,
     outputId: string,
+    body: AcceptCandidateDto = {},
   ): Promise<CandidateDecisionDto> {
     return this.prisma.$transaction(async (tx) => {
       const output = await this.lockOutput(tx, outputId);
@@ -303,9 +356,73 @@ export class OpenAlexCandidatesService {
           },
           select: { id: true, import_state: true, owner_id: true },
         });
+        if (shouldPublish(body.visibility)) {
+          await this.publishAccepted(tx, userId, outputId);
+        }
         return this.toDecision(updated, 'CONFIRMED');
       }
+      if (shouldPublish(body.visibility)) {
+        await this.publishAccepted(tx, userId, outputId);
+      }
       return this.toDecision(output, 'CONFIRMED');
+    });
+  }
+
+  /**
+   * Publishes an accepted candidate to the FPTU community.
+   *
+   * The accept and the publish share one transaction, so a failure to
+   * publish rolls the accept back rather than leaving a half-published
+   * work behind. The publish is the same act the outputs module performs:
+   * the draft revision is released and pinned, and the audience is set.
+   *
+   * A personal work has no container, so its audience is the community —
+   * the same rule `OutputsService.publishAudience` applies.
+   */
+  private async publishAccepted(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    outputId: string,
+  ): Promise<void> {
+    const draft = await tx.output_revisions.findFirst({
+      where: { output_id: outputId, released_at: null },
+    });
+    if (!draft) {
+      throw new CodedHttpException(
+        domainErrorCodes.outputs.outputNotPublishable,
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const authors = await tx.output_authors.findMany({
+      where: { output_id: outputId },
+      orderBy: { author_order: 'asc' },
+    });
+    const authorsSnapshot =
+      draft.output_type === OutputType.ARTICLE
+        ? completeArticleByline(draft.authors_snapshot, authors)
+        : undefined;
+
+    const now = new Date();
+    await tx.output_revisions.update({
+      where: { id: draft.id },
+      data: {
+        released_at: now,
+        released_by: userId,
+        ...(authorsSnapshot === undefined
+          ? {}
+          : { authors_snapshot: authorsSnapshot }),
+      },
+    });
+    await tx.research_outputs.update({
+      where: { id: outputId },
+      data: {
+        current_release_id: draft.id,
+        sharing_status: OutputSharingStatus.SHARED,
+        first_shared_at: now,
+        audience: OutputAudience.FPTU_COMMUNITY,
+        access_group_id: null,
+      },
     });
   }
 
@@ -459,11 +576,18 @@ export class OpenAlexCandidatesService {
    *
    * `ck_confirmed_claim_author` requires every `CONFIRMED` claim to name
    * its author, so an accept without a linkable position fails instead of
-   * writing a row the database would reject. An existing link is reused;
-   * otherwise the profile ORCID is matched against the draft snapshot
-   * (mirroring the ingest) and the free position is claimed in the same
-   * transaction. A position held by another researcher is an author
-   * conflict and fails.
+   * writing a row the database would reject. The chain:
+   *
+   * 1. the claim's own `author_id` — a decision that already happened;
+   * 2. an existing `output_authors` link for this researcher;
+   * 3. the identity chain against the stored draft snapshot — the
+   *    confirmed OpenAlex author id, then the ORCID, then the name plus
+   *    the hard-coded FPT University affiliation.
+   *
+   * The third step is what lets a researcher with no OpenAlex and no
+   * ORCID profile accept their work at all. It is strict: an ambiguous
+   * name match resolves to nothing, and a position held by another
+   * researcher is an author conflict.
    */
   private async resolveAuthorId(
     tx: Prisma.TransactionClient,
@@ -482,18 +606,12 @@ export class OpenAlexCandidatesService {
       return linked.id;
     }
 
-    const profile = await tx.researcher_profiles.findUnique({
-      where: { user_id: userId },
-      select: { orcid_id: true },
+    const identity = await this.resolveIdentity(tx, userId);
+    const revision = await tx.output_revisions.findFirst({
+      where: { output_id: outputId, released_at: null },
+      select: { authors_snapshot: true },
     });
-    const needle = normalizeOrcid(profile?.orcid_id ?? null);
-    const revision = needle
-      ? await tx.output_revisions.findFirst({
-          where: { output_id: outputId, released_at: null },
-          select: { authors_snapshot: true },
-        })
-      : null;
-    const order = toSnapshotOrder(revision?.authors_snapshot, needle);
+    const order = resolveSnapshotOrder(revision?.authors_snapshot, identity);
     if (order === null) {
       throw new CodedHttpException(
         domainErrorCodes.openalex.authorNotFound,
@@ -522,6 +640,38 @@ export class OpenAlexCandidatesService {
       });
     }
     return row.id;
+  }
+
+  /**
+   * Reads the researcher's identity signals from the database.
+   *
+   * The confirmed OpenAlex author id, the ORCID, and the account name.
+   * The affiliation is not read — it is the hard-coded FPT University.
+   *
+   * The profile row is **optional**: a fresh researcher may have none,
+   * and the account row still carries the name the name tier matches on.
+   */
+  private async resolveIdentity(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<ResearcherIdentity> {
+    const profile = await tx.researcher_profiles.findUnique({
+      where: { user_id: userId },
+      select: {
+        orcid_id: true,
+        openalex_author_id: true,
+        users: { select: { full_name: true } },
+      },
+    });
+    const account = await tx.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true },
+    });
+    return {
+      openAlexAuthorId: profile?.openalex_author_id ?? null,
+      orcid: profile?.orcid_id ?? null,
+      name: profile?.users.full_name ?? account?.full_name ?? '',
+    };
   }
 
   private toDecision(

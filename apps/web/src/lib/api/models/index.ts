@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 
+export * from './acceptCandidateDto';
+export * from './acceptCandidateDtoVisibility';
 export * from './acceptedGroupMembershipDto';
 export * from './acceptedGroupMembershipDtoRole';
 export * from './addChatParticipantDto';
@@ -198,7 +200,15 @@ export * from './notificationPreferencesDto';
 export * from './notificationPreferencesDtoEnvelope';
 export * from './notificationsControllerListParams';
 export * from './notificationType';
-export * from './openAlexCandidatesControllerFindAllParams';
+export * from './openAlexAuthorCandidateDto';
+export * from './openAlexAuthorCandidatesDto';
+export * from './openAlexAuthorCandidatesDtoEnvelope';
+export * from './openAlexAuthorCandidatesDtoMode';
+export * from './openAlexControllerFindAllParams';
+export * from './openAlexControllerFindAvailableWorksEnvelope';
+export * from './openAlexControllerFindAvailableWorksParams';
+export * from './openAlexControllerFindRejectedParams';
+export * from './openAlexWorkPreviewDto';
 export * from './opportunitiesControllerCreateHeaders';
 export * from './opportunitiesControllerFindAllArchived';
 export * from './opportunitiesControllerFindAllParams';
@@ -281,6 +291,10 @@ export * from './projectsControllerFindAllParams';
 export * from './projectsControllerFindAllRelation';
 export * from './publishOutputDto';
 export * from './publishOutputDtoAudience';
+export * from './pullOpenAlexWorksDto';
+export * from './pullOpenAlexWorksResultDto';
+export * from './pullOpenAlexWorksResultDtoEnvelope';
+export * from './pullOpenAlexWorksResultDtoMode';
 export * from './pushPlatform';
 export * from './registeredPushDeviceDto';
 export * from './registeredPushDeviceDtoEnvelope';

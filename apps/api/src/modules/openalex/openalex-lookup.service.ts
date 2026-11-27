@@ -1,11 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '@researchos/database';
-import { domainErrorCodes } from '@researchos/error-codes';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { FPT_UNIVERSITY, OpenAlexClient } from './openalex.client.js';
 import {
-  FPT_UNIVERSITY_AFFILIATION,
-  OpenAlexClient,
-} from './openalex.client.js';
+  affiliationMatchesFpt,
+  filterWorksByAuthorship,
+  filterWorksByIdentity,
+  type ResearcherIdentity,
+} from './openalex.identity.js';
 import type {
   OpenAlexAuthor,
   OpenAlexWork,
@@ -17,9 +19,10 @@ import type {
  *
  * This is the input to the ingest (RES-137): the OpenAlex work id becomes
  * `output_external_ids.external_id` with `source = 'OPENALEX'`.
- * `confirmed` is true only for the ORCID path — a name-only search is
- * never authoritative (Vietnamese names collide), so every candidate from
- * that path stays unconfirmed until the researcher ticks what is theirs.
+ * `confirmed` is true only when the work was resolved through an
+ * identifier — a name-only search is never authoritative (Vietnamese
+ * names collide), so every candidate from that path stays unconfirmed
+ * until the researcher ticks what is theirs.
  */
 export interface CandidateWorkPreview {
   /** Canonical OpenAlex id, e.g. `https://openalex.org/W2741809807`. */
@@ -36,25 +39,30 @@ export interface CandidateWorkPreview {
   outputType: string;
   /** Venue or null. */
   venue: string | null;
-  /** True only when resolved through the researcher's ORCID. */
+  /** True only when resolved through a confirmed identifier. */
   confirmed: boolean;
 }
 
 /**
  * One author candidate from the name fallback.
  *
- * Returned when the researcher has no ORCID: an OpenAlex author search by
- * name plus affiliation. The researcher still ticks what is theirs — this
+ * Returned when the researcher has no confirmed identifier: an OpenAlex
+ * author search by name. The researcher still ticks what is theirs — this
  * list never feeds the ingest directly.
  */
 export interface CandidateAuthorPreview {
   author: OpenAlexAuthor;
-  /** Whether an affiliation matches the researcher's department. */
+  /** Whether the author's affiliation is FPT University. */
   affiliationMatch: boolean;
 }
 
-/** How the candidate list was produced. */
-export type LookupMode = 'ORCID' | 'NAME';
+/**
+ * How the candidate list was produced.
+ *
+ * `AUTHOR_ID` and `ORCID` are the confirmed identifiers; `NAME` is the
+ * fallback for a researcher with no OpenAlex and no ORCID profile.
+ */
+export type LookupMode = 'AUTHOR_ID' | 'ORCID' | 'NAME';
 
 /**
  * The lookup half of the pull (RES-134).
@@ -73,57 +81,75 @@ export class OpenAlexLookupService {
   /**
    * Finds candidate works for a researcher.
    *
-   * ORCID path when `researcher_profiles.orcid_id` is set: one author
-   * lookup plus paged works calls, de-duplicated by work id and DOI.
-   * A work with no DOI is kept — that is not a duplicate signal. The
-   * same work under two ids (preprint + published) is caught by the DOI.
+   * The chain, strongest identifier first:
    *
-   * Name fallback when there is no ORCID: author candidates by name plus
-   * affiliation, all unconfirmed, with no works attached. The researcher
-   * picks their author first; works come after.
+   * 1. **The confirmed OpenAlex author id.** One author lookup plus paged
+   *    works calls. This is the path every later pull takes, once the
+   *    researcher has confirmed their author during onboarding.
+   * 2. **The ORCID.** The same shape, resolved through the ORCID.
+   * 3. **The name.** Author candidates by name, all unconfirmed, with no
+   *    works attached. The researcher picks their author first; works come
+   *    after.
+   *
+   * A work with no DOI is kept — that is not a duplicate signal. The same
+   * work under two ids (preprint + published) is caught by the DOI.
    */
-  async findCandidates(
-    userId: string,
-  ): Promise<
-    | { mode: 'ORCID'; author: OpenAlexAuthor; works: CandidateWorkPreview[] }
+  async findCandidates(userId: string): Promise<
+    | {
+        mode: 'AUTHOR_ID' | 'ORCID';
+        author: OpenAlexAuthor;
+        works: CandidateWorkPreview[];
+      }
     | { mode: 'NAME'; authors: CandidateAuthorPreview[] }
   > {
-    const profile = await this.prisma.researcher_profiles.findUnique({
-      where: { user_id: userId },
-      include: { users: true },
-    });
+    const identity = await this.resolveIdentity(userId);
 
-    if (!profile) {
-      throw new CodedHttpException(
-        domainErrorCodes.profiles.profileNotFound,
-        HttpStatus.NOT_FOUND,
+    if (identity.openAlexAuthorId) {
+      const author = await this.client.getAuthorById(identity.openAlexAuthorId);
+      const works = await this.listAllWorks(
+        author.shortId || author.id,
+        identity,
       );
-    }
-
-    const orcid = profile.orcid_id?.trim();
-    if (orcid) {
-      const author = await this.client.getAuthorByOrcid(orcid);
-      const works = await this.listAllWorks(author.shortId || author.id);
       return {
-        mode: 'ORCID',
+        mode: 'AUTHOR_ID',
         author,
         works: works.map((work) => toPreview(work, true)),
       };
     }
 
-    const fullName = profile.users.full_name?.trim() ?? '';
+    const orcid = identity.orcid?.trim();
+    if (orcid) {
+      // The ORCID tier is a *best effort*: OpenAlex knows only the
+      // ORCIDs that were claimed there, and a researcher may hold an
+      // ORCID that was never linked to an OpenAlex profile. A miss is
+      // not a failure — it falls through to the name tier, which is the
+      // permanent fallback.
+      const author = await this.findAuthorByOrcid(orcid);
+      if (author) {
+        const works = await this.listAllWorks(
+          author.shortId || author.id,
+          identity,
+        );
+        return {
+          mode: 'ORCID',
+          author,
+          works: works.map((work) => toPreview(work, true)),
+        };
+      }
+    }
+
+    const fullName = identity.name.trim();
     if (fullName === '') {
       return { mode: 'NAME', authors: [] };
     }
     const authors = await this.client.searchAuthors(fullName, {
       perPage: 10,
     });
-    const department = profile.users.department_unit?.trim() ?? '';
     return {
       mode: 'NAME',
       authors: authors.map((author) => ({
         author,
-        affiliationMatch: matchesAffiliation(author, department),
+        affiliationMatch: matchesAffiliation(author),
       })),
     };
   }
@@ -137,36 +163,134 @@ export class OpenAlexLookupService {
    *
    * Fallback when the id is missing: an OpenAlex author id is not always
    * present (unlinked authorships, name-only path), so a caller may pass
-   * the researcher's byline name instead. The fetch then matches
-   * `raw_author_name` plus the affiliation text (default
-   * `FPT_UNIVERSITY_AFFILIATION`). A blank id with a blank name still
-   * raises `openalex_author_not_found` (404).
+   * the researcher's byline name instead. The fetch then matches the
+   * byline name plus the FPT University affiliation, and narrows the
+   * result to the works whose *named* byline is at FPT University — the
+   * filter itself pairs at the work level, so a work whose named byline
+   * is elsewhere still passes it when a co-author is at FPT.
+   *
+   * A blank id with a blank name raises `openalex_author_not_found` (404).
    */
   async findWorksForAuthor(
     authorId: string,
-    options: { authorName?: string; affiliation?: string } = {},
+    options: {
+      authorName?: string;
+      affiliation?: string;
+      identity?: ResearcherIdentity;
+    } = {},
   ): Promise<CandidateWorkPreview[]> {
     const works = await this.listAllWorksWithFallback(
       authorId,
       options.authorName,
       options.affiliation,
+      options.identity,
     );
     return works.map((work) => toPreview(work, false));
   }
 
   /**
+   * The full works of an author, for the ingest.
+   *
+   * The same fetch as `findWorksForAuthor`, but the shaped works rather
+   * than their previews: the ingest needs the byline, the abstract and
+   * the per-authorship affiliation, none of which a preview carries.
+   */
+  async listWorksForAuthor(
+    authorId: string,
+    options: {
+      authorName?: string;
+      affiliation?: string;
+      identity?: ResearcherIdentity;
+    } = {},
+  ): Promise<OpenAlexWork[]> {
+    return this.listAllWorksWithFallback(
+      authorId,
+      options.authorName,
+      options.affiliation,
+      options.identity,
+    );
+  }
+
+  /**
+   * The full works of a byline name, for the ingest.
+   *
+   * The same fetch as `findWorksByAuthorName`, but the shaped works.
+   */
+  async listWorksByAuthorName(
+    authorName: string,
+    affiliation: string = FPT_UNIVERSITY.name,
+  ): Promise<OpenAlexWork[]> {
+    return this.listAllWorksByName(authorName, affiliation);
+  }
+
+  /**
    * Lists works by author byline name plus affiliation, without an id.
    *
-   * Direct fallback entry point: same `raw_author_name` + affiliation
-   * match as the `findWorksForAuthor` fallback, paged and de-duplicated.
-   * Every preview stays unconfirmed.
+   * Direct fallback entry point: same byline-name + affiliation match as
+   * the `findWorksForAuthor` fallback, paged and de-duplicated, narrowed
+   * to the works whose named byline is at FPT University. Every preview
+   * stays unconfirmed.
    */
   async findWorksByAuthorName(
     authorName: string,
-    affiliation: string = FPT_UNIVERSITY_AFFILIATION,
+    affiliation: string = FPT_UNIVERSITY.name,
   ): Promise<CandidateWorkPreview[]> {
     const works = await this.listAllWorksByName(authorName, affiliation);
     return works.map((work) => toPreview(work, false));
+  }
+
+  /**
+   * Reads the researcher's identity signals.
+   *
+   * The confirmed OpenAlex author id, the ORCID, and the account name.
+   * The affiliation is not read — it is the hard-coded FPT University.
+   *
+   * The profile row is **optional**. A fresh researcher — one the seed
+   * never provisioned — has no profile row at all, and that is exactly
+   * the case the name fallback exists for. The account row carries the
+   * name, so the fallback works without a profile row.
+   */
+  private async resolveIdentity(userId: string): Promise<ResearcherIdentity> {
+    const profile = await this.prisma.researcher_profiles.findUnique({
+      where: { user_id: userId },
+      select: {
+        orcid_id: true,
+        openalex_author_id: true,
+        users: { select: { full_name: true } },
+      },
+    });
+    const account = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: { full_name: true },
+    });
+
+    return {
+      openAlexAuthorId: profile?.openalex_author_id ?? null,
+      orcid: profile?.orcid_id ?? null,
+      name: profile?.users.full_name ?? account?.full_name ?? '',
+    };
+  }
+
+  /**
+   * Resolves an OpenAlex author through an ORCID, if there is one.
+   *
+   * OpenAlex only knows the ORCIDs that were claimed there, so an ORCID
+   * the researcher holds but never linked resolves to nothing. That is
+   * not an error — it is the signal to fall through to the name tier.
+   */
+  private async findAuthorByOrcid(
+    orcid: string,
+  ): Promise<OpenAlexAuthor | null> {
+    try {
+      return await this.client.getAuthorByOrcid(orcid);
+    } catch (error) {
+      if (error instanceof CodedHttpException) {
+        if (error.getStatus() === HttpStatus.NOT_FOUND) {
+          return null;
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -175,11 +299,24 @@ export class OpenAlexLookupService {
    * Cheap by design: one works call per page, never one metadata call per
    * item. De-dupe is by work id first, then by DOI — a work with no DOI
    * is always kept.
+   *
+   * The fetch is scoped to FPT University, but the scope is at the
+   * *work* level: a work passes it when a co-author is at FPT. The
+   * post-filter narrows it back down to the works where the author
+   * themselves are at FPT — the researcher is at FPT, so only their own
+   * FPT works are theirs.
    */
-  private async listAllWorks(authorId: string): Promise<OpenAlexWork[]> {
-    return this.collectAllPages((page, perPage) =>
+  private async listAllWorks(
+    authorId: string,
+    identity?: ResearcherIdentity,
+  ): Promise<OpenAlexWork[]> {
+    const works = await this.collectAllPages((page, perPage) =>
       this.client.getWorksByAuthor(authorId, { page, perPage }),
     );
+    if (!identity) {
+      return works;
+    }
+    return filterWorksByIdentity(works, identity);
   }
 
   /**
@@ -194,9 +331,10 @@ export class OpenAlexLookupService {
     authorId: string,
     authorName?: string,
     affiliation?: string,
+    identity?: ResearcherIdentity,
   ): Promise<OpenAlexWork[]> {
     if (authorId.trim() !== '') {
-      return this.listAllWorks(authorId);
+      return this.listAllWorks(authorId, identity);
     }
     return this.listAllWorksByName(authorName ?? '', affiliation);
   }
@@ -206,13 +344,18 @@ export class OpenAlexLookupService {
     authorName: string,
     affiliation?: string,
   ): Promise<OpenAlexWork[]> {
-    return this.collectAllPages((page, perPage) =>
+    const works = await this.collectAllPages((page, perPage) =>
       this.client.searchWorksByAuthorName(authorName, {
         affiliation,
         page,
         perPage,
       }),
     );
+    // The filter pairs the name and the affiliation at the work level, so
+    // a work whose named byline is at another institution still passes
+    // when a co-author is at FPT University. Narrow it back down to the
+    // works where the named byline itself is at FPT University.
+    return filterWorksByAuthorship(works, authorName);
   }
 
   /** Pages a works fetch to completion with id-then-DOI de-duplication. */
@@ -271,16 +414,13 @@ function toPreview(
   };
 }
 
-/** Whether any OpenAlex affiliation mentions the researcher's department. */
-function matchesAffiliation(
-  author: OpenAlexAuthor,
-  department: string,
-): boolean {
-  if (department === '' || author.affiliations.length === 0) {
-    return false;
-  }
-  const needle = department.toLowerCase();
-  return author.affiliations.some((affiliation) =>
-    affiliation.toLowerCase().includes(needle),
-  );
+/**
+ * Whether an OpenAlex author is affiliated with FPT University.
+ *
+ * The affiliation is the hard-coded one, never the researcher's
+ * department: every researcher in scope is at FPT University, and a
+ * fresh account has no department to compare against.
+ */
+function matchesAffiliation(author: OpenAlexAuthor): boolean {
+  return affiliationMatchesFpt(author.affiliations);
 }

@@ -35,6 +35,16 @@ export interface OpenAlexWorkAuthor {
   authorId: string | null;
   /** ORCID URL when OpenAlex knows it. */
   orcid: string | null;
+  /**
+   * The affiliation strings OpenAlex recorded for *this* authorship.
+   *
+   * The affiliation filter is applied at the work level, not per
+   * authorship, so a work whose named byline sits at another institution
+   * still passes the filter when a co-author is at FPT University. The
+   * strings below are the only way to tell the two apart, so the ingest
+   * keeps them on the authorship.
+   */
+  affiliations: string[];
 }
 
 /**

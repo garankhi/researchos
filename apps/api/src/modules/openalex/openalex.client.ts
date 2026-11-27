@@ -33,14 +33,34 @@ const OPENALEX_TYPE_MAP = new Map<string, OutputType>([
 const MAX_PER_PAGE = 200;
 
 /**
- * Hard-coded affiliation fallback for the name-based works search.
+ * The one institution every researcher in scope belongs to.
+ *
+ * Hard-coded on purpose: every researcher in scope is at FPT University,
+ * so the affiliation is never read from the profile. The OpenAlex
+ * institution id is what the works filter uses — it matches the
+ * institution OpenAlex normalised every FPT affiliation to, including the
+ * bylines whose raw string was messy (`"FPT University, Can Tho, Viet
+ * Nam"` vs `"FPT University, Can Tho City, Vietnam"`). The name stays as
+ * the text the raw affiliation strings are matched against, because the
+ * raw strings are the only affiliation a work carries per authorship.
+ */
+export const FPT_UNIVERSITY = {
+  /** The display name as FPT University writes it. */
+  name: 'FPT University',
+  /** The OpenAlex institution id — `https://openalex.org/I109689652`. */
+  openAlexId: 'I109689652',
+  /** The ROR id of the same institution. */
+  ror: 'https://ror.org/03esj4g97',
+} as const;
+
+/**
+ * The affiliation filter for the name-based works search.
  *
  * OpenAlex author ids are not always present (unlinked authorships, name
  * fallback path), so the works fetch falls back to matching the byline
- * name plus this affiliation text. Hard-coded on purpose: every
- * researcher in scope belongs to FPT University.
+ * name plus this affiliation.
  */
-export const FPT_UNIVERSITY_AFFILIATION = 'FPT University';
+export const FPT_UNIVERSITY_AFFILIATION = FPT_UNIVERSITY.name;
 
 const FETCH_ATTEMPTS = 3;
 const FETCH_RETRY_BASE_MS = 1000;
@@ -169,10 +189,48 @@ export function extractAffiliations(raw: RawAuthor): string[] {
   return out;
 }
 
+/**
+ * The affiliation strings of one authorship.
+ *
+ * Two sources, both needed. `raw_affiliation_strings` is the affiliation
+ * exactly as the publisher wrote it (`"FPT University, Can Tho, Viet
+ * Nam"`), and `institutions` is the institution OpenAlex resolved it to.
+ * The raw string is what a name match is checked against, because the
+ * resolved institution is absent from an unlinked authorship.
+ */
+function extractAuthorshipAffiliations(raw: RawAuthorship): string[] {
+  const out: string[] = [];
+  const push = (value: unknown) => {
+    if (typeof value === 'string' && value.trim() !== '') {
+      const name = value.trim();
+      if (!out.includes(name)) {
+        out.push(name);
+      }
+    }
+  };
+  if (Array.isArray(raw.raw_affiliation_strings)) {
+    for (const entry of raw.raw_affiliation_strings) {
+      push(entry);
+    }
+  }
+  if (Array.isArray(raw.institutions)) {
+    for (const entry of raw.institutions) {
+      const record = entry as {
+        institution?: { display_name?: unknown };
+        display_name?: unknown;
+      };
+      push(record?.institution?.display_name ?? record?.display_name);
+    }
+  }
+  return out;
+}
+
 type RawAuthorship = {
   author?: { id?: unknown; display_name?: unknown; orcid?: unknown };
   raw_author_name?: unknown;
   is_corresponding?: unknown;
+  raw_affiliation_strings?: unknown;
+  institutions?: unknown;
 };
 
 type RawWork = {
@@ -209,6 +267,7 @@ export class OpenAlexClient {
   private readonly logger = new Logger(OpenAlexClient.name);
   private readonly baseUrl: string;
   private readonly mailto: string;
+  private readonly apiKey: string | null;
 
   constructor(private readonly config: ConfigService) {
     const base =
@@ -218,6 +277,13 @@ export class OpenAlexClient {
     // from being rate-limited. Configured, never hard-coded.
     this.mailto =
       this.config.get<string>('OPENALEX_MAILTO') ?? 'dev@researchos.local';
+    // The API key lifts the client out of the anonymous pool. The
+    // anonymous pool shares one daily budget across everyone on the
+    // network's IP address, so it runs out for the whole office at once;
+    // a key gives the workspace its own budget. Optional — the client
+    // works without one, just more fragile.
+    const key = this.config.get<string>('OPENALEX_API_KEY')?.trim();
+    this.apiKey = key && key !== '' ? key : null;
   }
 
   private userAgent(): string {
@@ -225,10 +291,30 @@ export class OpenAlexClient {
   }
 
   /**
+   * Adds the API key to a request, when there is one.
+   *
+   * The key travels as the `api_key` query parameter, which is how
+   * OpenAlex authenticates a server-to-server call.
+   */
+  private withApiKey(url: URL): URL {
+    if (this.apiKey !== null) {
+      url.searchParams.set('api_key', this.apiKey);
+    }
+    return url;
+  }
+
+  /**
    * Resolves an OpenAlex author by ORCID.
    *
    * `GET /authors?filter=orcid:<orcid>`. Throws `openalex_author_not_found`
    * (404) when OpenAlex knows no such author.
+   *
+   * The ORCID is **not** unique in OpenAlex. The same ORCID is often
+   * claimed by a merged author profile — the one that swallowed the
+   * works of several people over the years — so the filter alone
+   * resolves to the wrong author very easily. The affiliation filter is
+   * what makes the answer trustworthy: only an author OpenAlex has
+   * recorded at FPT University qualifies.
    */
   async getAuthorByOrcid(orcid: string): Promise<OpenAlexAuthor> {
     const cleaned = orcid.trim();
@@ -239,7 +325,10 @@ export class OpenAlexClient {
       );
     }
     const url = new URL(`${this.baseUrl}/authors`);
-    url.searchParams.set('filter', `orcid:${cleaned}`);
+    url.searchParams.set(
+      'filter',
+      `orcid:${cleaned},affiliations.institution.id:${FPT_UNIVERSITY.openAlexId}`,
+    );
     const body = await this.getJson<{ results?: RawAuthor[] }>(url);
     const raw = body.results?.[0];
     if (!raw) {
@@ -252,11 +341,44 @@ export class OpenAlexClient {
   }
 
   /**
+   * Resolves an OpenAlex author by its id.
+   *
+   * `GET /authors/<author_id>`. The strongest identifier OpenAlex has:
+   * the researcher confirmed this author during onboarding, so every
+   * later pull resolves through it. Throws `openalex_author_not_found`
+   * (404) when OpenAlex knows no such author.
+   */
+  async getAuthorById(authorId: string): Promise<OpenAlexAuthor> {
+    const short = shortId(authorId);
+    if (!short) {
+      throw new CodedHttpException(
+        domainErrorCodes.openalex.authorNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const url = new URL(`${this.baseUrl}/authors/${encodeURIComponent(short)}`);
+    const body = await this.getJson<RawAuthor>(url);
+    if (!body || typeof body.id !== 'string') {
+      throw new CodedHttpException(
+        domainErrorCodes.openalex.authorNotFound,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return this.toAuthor(body);
+  }
+
+  /**
    * Searches OpenAlex authors by name.
    *
    * `GET /authors?search:<name>`. The fallback when the researcher has no
-   * ORCID (RES-134): the result is only a candidate list, never
-   * authoritative — the researcher still ticks what is theirs.
+   * confirmed identifier (RES-134): the result is only a candidate list,
+   * never authoritative — the researcher still ticks what is theirs.
+   *
+   * The search is scoped to FPT University, because every researcher in
+   * scope is there. Without the scope the search for a Vietnamese name
+   * returns thousands of authors worldwide, none of whom is the
+   * researcher — the affiliation filter is what makes the candidate list
+   * meaningful.
    */
   async searchAuthors(
     query: string,
@@ -269,6 +391,10 @@ export class OpenAlexClient {
     const perPage = Math.min(Math.max(options.perPage ?? 10, 1), MAX_PER_PAGE);
     const url = new URL(`${this.baseUrl}/authors`);
     url.searchParams.set('search', cleaned);
+    url.searchParams.set(
+      'filter',
+      `affiliations.institution.id:${FPT_UNIVERSITY.openAlexId}`,
+    );
     url.searchParams.set('per-page', String(perPage));
     const body = await this.getJson<{ results?: RawAuthor[] }>(url);
     return (body.results ?? []).map((raw) => this.toAuthor(raw));
@@ -279,6 +405,13 @@ export class OpenAlexClient {
    *
    * `GET /works?filter=author.id:<author_id>`, paged. The lookup pages
    * through the works; the read endpoint (RES-138) reads the database.
+   *
+   * The fetch is scoped to FPT University. An OpenAlex author profile
+   * accumulates the works of every byline that was ever merged into it,
+   * so the author's own works are only a subset of what the id returns.
+   * The affiliation scope is what keeps the pull from claiming another
+   * researcher's work — the researcher is at FPT University, and only
+   * their FPT works are theirs.
    */
   async getWorksByAuthor(
     authorId: string,
@@ -293,7 +426,10 @@ export class OpenAlexClient {
     }
     const { page, perPage } = normalizePaging(options);
     const url = new URL(`${this.baseUrl}/works`);
-    url.searchParams.set('filter', `author.id:${short}`);
+    url.searchParams.set(
+      'filter',
+      `author.id:${short},authorships.institutions.id:${FPT_UNIVERSITY.openAlexId}`,
+    );
     url.searchParams.set('page', String(page));
     url.searchParams.set('per-page', String(perPage));
     const body = await this.getJson<{
@@ -309,12 +445,29 @@ export class OpenAlexClient {
   /**
    * Lists works by author byline name plus affiliation.
    *
-   * `GET /works?filter=raw_author_name.search:"<name>",raw_affiliation_strings.search:<affiliation>`,
+   * `GET /works?filter=raw_author_name.search:<name>,authorships.institutions.id:<institution id>`,
    * paged. The fallback when no OpenAlex author id is present: an author
    * id is not always available (unlinked authorships, name-only path), so
-   * the lookup matches the name as published plus the affiliation text.
-   * The name is quoted so it matches one byline, not tokens scattered
-   * across co-authors; the affiliation defaults to `FPT_UNIVERSITY_AFFILIATION`.
+   * the lookup matches the name as published plus the affiliation.
+   *
+   * Two details of the filter matter:
+   *
+   * - The name is **not** quoted. `raw_author_name.search` is already a
+   *   phrase search over a single authorship field, and quoting narrows it
+   *   to an exact string that most bylines never match — `"Thi Thuy An
+   *   Ngo"` returns 53 works while the unquoted form returns 227, and a
+   *   name with no FPT works returns 0 quoted against 3257 unquoted.
+   *   Quoting therefore loses works, it never filters noise.
+   * - The affiliation uses the **institution id**, not the raw string.
+   *   `authorships.institutions.id` matches the institution OpenAlex
+   *   normalised the affiliation to, so a byline written
+   *   `"FPT University, Can Tho, Viet Nam"` matches the same as
+   *   `"FPT University, Can Tho City, Vietnam"`.
+   *
+   * The filter pairs at the *work* level, not the authorship level: a work
+   * whose named byline is at another institution still passes when a
+   * co-author is at FPT University. `filterWorksByAuthorship` narrows that
+   * down to the works where the named byline itself is at FPT University.
    */
   async searchWorksByAuthorName(
     authorName: string,
@@ -335,8 +488,8 @@ export class OpenAlexClient {
     const url = new URL(`${this.baseUrl}/works`);
     const filter =
       affiliation === ''
-        ? `raw_author_name.search:"${cleaned}"`
-        : `raw_author_name.search:"${cleaned}",raw_affiliation_strings.search:${affiliation}`;
+        ? `raw_author_name.search:${cleaned}`
+        : `raw_author_name.search:${cleaned},authorships.institutions.id:${FPT_UNIVERSITY.openAlexId}`;
     url.searchParams.set('filter', filter);
     url.searchParams.set('page', String(page));
     url.searchParams.set('per-page', String(perPage));
@@ -424,6 +577,7 @@ export class OpenAlexClient {
         authorId,
         orcid:
           typeof entry.author?.orcid === 'string' ? entry.author.orcid : null,
+        affiliations: extractAuthorshipAffiliations(entry),
       };
     });
 
@@ -454,11 +608,14 @@ export class OpenAlexClient {
    */
   private async getJson<T>(url: URL): Promise<T> {
     let lastStatus: number | undefined;
+    // The key goes on every request. `getJson` is the single way out to
+    // OpenAlex, so one call covers the whole client.
+    const requestUrl = this.withApiKey(url);
 
     for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await fetch(requestUrl, {
           headers: {
             Accept: 'application/json',
             'User-Agent': this.userAgent(),

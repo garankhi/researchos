@@ -2054,6 +2054,7 @@ describe('Article creation', () => {
             isCorresponding: true,
             authorId: 'https://openalex.org/A101',
             orcid: importedOrcid,
+            affiliations: [],
           },
           {
             order: 2,
@@ -2061,6 +2062,7 @@ describe('Article creation', () => {
             isCorresponding: false,
             authorId: 'https://openalex.org/A102',
             orcid: null,
+            affiliations: [],
           },
         ],
       });

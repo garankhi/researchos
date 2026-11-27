@@ -405,6 +405,7 @@ CREATE TABLE "user_sessions" (
 CREATE TABLE "researcher_profiles" (
   "user_id" uuid PRIMARY KEY,
   "orcid_id" varchar(19) UNIQUE,
+  "openalex_author_id" varchar(50),
   "scopus_author_id" varchar(50),
   "google_scholar_url" text,
   "availability_status" availability_status_type NOT NULL DEFAULT 'NOT_AVAILABLE',
@@ -1034,6 +1035,8 @@ CREATE UNIQUE INDEX "uq_outbox_delivery" ON "outbox" ("job_id", "generation", "d
 
 CREATE UNIQUE INDEX "uq_users_email_normalized" ON "users" ((lower(btrim(email))));
 
+CREATE INDEX "idx_researcher_profiles_openalex_author" ON "researcher_profiles" ("openalex_author_id") WHERE "openalex_author_id" IS NOT NULL;
+
 CREATE INDEX ON "user_role_assignments" ("user_id", "role");
 
 CREATE UNIQUE INDEX ON "oidc_identities" ("issuer", "subject");
@@ -1159,6 +1162,8 @@ COMMENT ON TABLE "user_sessions" IS 'Shared app session for LOCAL and future OID
 COMMENT ON TABLE "researcher_profiles" IS 'Shared by faculty, students and staff. Profile existence does not grant researcher/admin access. API completes researcher onboarding only after profile/paper review and at least one ACTIVE interest.';
 
 COMMENT ON COLUMN "researcher_profiles"."papers_reviewed_at" IS 'May be set after explicitly confirming no matching publications.';
+
+COMMENT ON COLUMN "researcher_profiles"."openalex_author_id" IS 'The OpenAlex author id of the researcher, e.g. A5023888391. Set when the researcher confirms the author during onboarding. Null when the researcher has no OpenAlex profile, in which case the name plus the hard-coded FPT University affiliation is the fallback. Not unique: OpenAlex merges duplicate author profiles, so several researchers may share one id.';
 
 COMMENT ON TABLE "field_provenance" IS 'Field-level provenance for auto-generated data. source classifies WHO STANDS BEHIND the value (PAPER/AI_TRACE/AI_INF/HUMAN/EXT/UNK), not the channel the data travelled through; sourceKind/sourceRef carry the channel. PK includes source_ref so an overwritten field keeps its history. Only auto-generated fields get a row - a field typed by a user is HUMAN by definition. is_locked is set when a human confirms a value: a sync job must never overwrite a locked field. AI without a replayable trace is AI_INF, never UNK; UNK means the value exists but its origin cannot be traced.';
 
