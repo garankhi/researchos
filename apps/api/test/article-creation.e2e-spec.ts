@@ -34,6 +34,7 @@ import {
 import { Queue } from 'bullmq';
 import cookieParser from 'cookie-parser';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { FPT_UNIVERSITY_AFFILIATION } from '../src/modules/openalex/openalex.client.js';
 import { createHttpTestClient } from './http-test-client.js';
 
 const { Client } = createRequire(import.meta.resolve('@researchos/database'))(
@@ -1979,6 +1980,14 @@ describe('Article creation', () => {
             order: 1,
             orcid: importedOrcid,
             isCorresponding: true,
+            /*
+             * The affiliation of *this* authorship. The ingest records
+             * it, and the accept path needs it: an ORCID is shared with
+             * the bylines of other researchers, so a snapshot entry with
+             * no recorded affiliation cannot be told apart from those
+             * and does not qualify for the identifier tier.
+             */
+            affiliations: [FPT_UNIVERSITY_AFFILIATION],
           },
           { name: 'Other author', order: 2 },
         ]),
@@ -2054,7 +2063,11 @@ describe('Article creation', () => {
             isCorresponding: true,
             authorId: 'https://openalex.org/A101',
             orcid: importedOrcid,
-            affiliations: [],
+            // The affiliation of this authorship. The ingest needs it
+            // to attribute the work to the researcher: an ORCID is
+            // shared with the bylines of other researchers, so the
+            // affiliation is what tells their own byline apart.
+            affiliations: [FPT_UNIVERSITY_AFFILIATION],
           },
           {
             order: 2,
