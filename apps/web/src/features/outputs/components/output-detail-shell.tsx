@@ -29,6 +29,7 @@ import {
 } from './output-actions';
 import { OutputDetailActionsMenu } from './output-detail-actions-menu';
 import { OutputHeader } from './output-header';
+import { OutputHistory } from './output-history';
 import { OutputReferences } from './output-references';
 import { OutputSidebar } from './output-sidebar';
 import { OutputDetailSkeleton } from './output-skeletons';
@@ -184,6 +185,9 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
                 <Tabs.Trigger value="references" height="12" px="0">
                   {t('detail.tabsReferences')}
                 </Tabs.Trigger>
+                <Tabs.Trigger value="history" height="12" px="0">
+                  {t('detail.tabsHistory')}
+                </Tabs.Trigger>
               </Tabs.List>
 
               <Flex
@@ -290,6 +294,10 @@ export function OutputDetailShell({ outputId }: { outputId?: string }) {
               <Box bg="bg.panel" boxShadow="xs">
                 <OutputReferences />
               </Box>
+            </Tabs.Content>
+
+            <Tabs.Content value="history" pt="0">
+              <OutputHistory outputId={output.id} />
             </Tabs.Content>
           </Box>
 

@@ -46,6 +46,22 @@ const sidebarLayout: SkeletonResult = {
   ],
 };
 
+const historyLayout: SkeletonResult = {
+  name: 'output-detail-history',
+  viewportWidth: 768,
+  width: 640,
+  height: 210,
+  bones: [
+    [0, 0, 22, 18, 0],
+    [0, 28, 86, 14, 0],
+    [0, 56, 60, 12, 0],
+    [0, 84, 96, 14, 0],
+    [0, 108, 72, 12, 0],
+    [0, 136, 88, 14, 0],
+    [0, 160, 54, 12, 0],
+  ],
+};
+
 /** The skeleton shown while the publication detail page is loading. */
 export function OutputDetailSkeleton() {
   return (
@@ -87,4 +103,15 @@ export function OutputDetailSkeleton() {
       </Container>
     </Box>
   );
+}
+
+/**
+ * The skeleton shown while the edit history of a work is loading.
+ *
+ * It shows the shape of a timeline: a badge row, a title, a byline and
+ * the changed fields — so the space is already reserved when the entries
+ * arrive.
+ */
+export function OutputHistorySkeleton() {
+  return <DelayedSkeleton layout={historyLayout} announce={false} />;
 }

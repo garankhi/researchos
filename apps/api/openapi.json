@@ -8417,6 +8417,85 @@
         ]
       }
     },
+    "/outputs/{outputId}/history": {
+      "get": {
+        "description": "Returns the edit history of the specified research output, newest revision first. Each entry names the account that wrote the revision and the account that released it, and lists the metadata fields the revision changed against the revision before it.",
+        "operationId": "OutputsController_findRevisionHistory",
+        "parameters": [
+          {
+            "name": "outputId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the research output (UUID).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Edit history retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputsControllerFindRevisionHistoryEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid UUID format for outputId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller is not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not authorized to view this research output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested research output was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List the edit history of a research output",
+        "tags": [
+          "outputs"
+        ]
+      }
+    },
     "/outputs/{outputId}/files": {
       "get": {
         "description": "Returns the list of files attached to the specified research output that the caller is authorized to view.",
@@ -16043,6 +16122,186 @@
           "meta"
         ]
       },
+      "OutputRevisionActorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User identifier of the account.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Display name of the account.",
+            "example": "Nguyen Van A"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "OutputRevisionChangeDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Stable key of the changed field: `title`, `abstract`, `venue`, `publisher`, `publicationDate`, `volume`, `issue`, `pages`, `peerReviewed`, `externalUrl` or `authors`.",
+            "example": "title"
+          },
+          "previousValue": {
+            "type": "string",
+            "description": "Value before the edit. Null when the field carried no value yet.",
+            "nullable": true,
+            "example": "Deep Learning for Medical Image Classification"
+          },
+          "currentValue": {
+            "type": "string",
+            "description": "Value after the edit. Null when the edit cleared the field.",
+            "nullable": true,
+            "example": "Deep Learning for Medical Image Segmentation"
+          }
+        },
+        "required": [
+          "field",
+          "previousValue",
+          "currentValue"
+        ]
+      },
+      "OutputRevisionHistoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the revision.",
+            "format": "uuid",
+            "example": "11111111-1111-4111-8111-111111111111"
+          },
+          "revisionNo": {
+            "type": "number",
+            "description": "Monotonically increasing revision number.",
+            "example": 2
+          },
+          "title": {
+            "type": "string",
+            "description": "Title carried by this revision.",
+            "example": "Deep Learning for Medical Image Classification"
+          },
+          "abstract": {
+            "type": "object",
+            "description": "Abstract carried by this revision.",
+            "nullable": true,
+            "example": "In this paper, we propose a novel deep convolutional network..."
+          },
+          "venue": {
+            "type": "object",
+            "description": "Publication venue carried by this revision.",
+            "nullable": true,
+            "example": "IEEE Transactions on Medical Imaging"
+          },
+          "publisher": {
+            "type": "object",
+            "description": "Publisher carried by this revision.",
+            "nullable": true,
+            "example": "IEEE"
+          },
+          "publicationYear": {
+            "type": "object",
+            "description": "Publication year carried by this revision.",
+            "nullable": true,
+            "example": 2026
+          },
+          "publicationDate": {
+            "type": "object",
+            "description": "Publication date at the recorded precision: YYYY, YYYY-MM or YYYY-MM-DD.",
+            "nullable": true,
+            "example": "2026-11"
+          },
+          "publicationStatus": {
+            "type": "string",
+            "description": "Publication status of the work (`UNPUBLISHED` or `PUBLISHED`).",
+            "enum": [
+              "UNPUBLISHED",
+              "PUBLISHED"
+            ],
+            "example": "PUBLISHED"
+          },
+          "outputType": {
+            "type": "string",
+            "description": "Type classification of the output (e.g. ARTICLE).",
+            "example": "ARTICLE"
+          },
+          "externalUrl": {
+            "type": "object",
+            "description": "External URL pointing to the publication source.",
+            "nullable": true,
+            "example": "https://doi.org/10.1109/TMI.2026.1234567"
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "description": "Whether this revision is the one currently pinned.",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the revision record was created.",
+            "format": "date-time",
+            "example": "2026-11-10T12:00:00.000Z"
+          },
+          "releasedAt": {
+            "type": "object",
+            "description": "Timestamp when this revision was released / pinned. Null while the revision is the owner working copy.",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-11T00:00:00.000Z"
+          },
+          "createdBy": {
+            "description": "The account that wrote this revision.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputRevisionActorDto"
+              }
+            ]
+          },
+          "releasedBy": {
+            "description": "The account that released this revision, if any.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputRevisionActorDto"
+              }
+            ]
+          },
+          "changes": {
+            "description": "The metadata fields this revision changed, compared with the revision before it. Empty for the first revision.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRevisionChangeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "revisionNo",
+          "title",
+          "abstract",
+          "venue",
+          "publisher",
+          "publicationYear",
+          "publicationDate",
+          "publicationStatus",
+          "outputType",
+          "externalUrl",
+          "isCurrent",
+          "createdAt",
+          "releasedAt",
+          "createdBy",
+          "releasedBy",
+          "changes"
+        ]
+      },
       "OutputFileResponseDto": {
         "type": "object",
         "properties": {
@@ -19345,6 +19604,33 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OutputRevisionResponseDto"
+            }
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "OutputsControllerFindRevisionHistoryEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRevisionHistoryResponseDto"
             }
           },
           "message": {

@@ -54,6 +54,8 @@ import {
   PaginatedOutputsResponseDto,
 } from './dto/output-response.dto.js';
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
+import type { OutputRevisionHistoryResponseDto } from './dto/output-revision-history-response.dto.js';
+import { diffRevisions } from './output-revision-history.js';
 import type { OutputScopeDto } from './dto/output-scope.dto.js';
 import { OutputTopicResponseDto } from './dto/output-topic-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
@@ -582,7 +584,7 @@ export class OutputsService {
         `);
 
         const outputIds = ids.map((row) => row.id);
-        const items = await this.loadOutputPage(tx, outputIds);
+        const items = await this.loadOutputPage(tx, outputIds, callerId);
         return {
           items,
           meta: buildPaginationMeta({ page, limit }, items.length, total),
@@ -640,6 +642,7 @@ export class OutputsService {
           tx,
           pageRows.map(({ id }) => id),
           callerId,
+          { withPdfs: true },
         );
         return { items, meta: { total, nextCursor } };
       },
@@ -662,7 +665,8 @@ export class OutputsService {
   private async loadOutputPage(
     tx: Prisma.TransactionClient,
     outputIds: string[],
-    homeReaderId?: string,
+    callerId: string,
+    options: { withPdfs?: boolean } = {},
   ): Promise<OutputResponseDto[]> {
     if (outputIds.length === 0) return [];
 
@@ -689,7 +693,7 @@ export class OutputsService {
       .filter((o) => !o.current_release_id)
       .map((o) => o.id);
 
-    const [pinnedRevisions, draftRevisions, outputTopics, pdfs] =
+    const [pinnedRevisions, draftRevisions, outputTopics, pdfs, capabilityMap] =
       await Promise.all([
         pinnedRevisionIds.length > 0
           ? tx.output_revisions.findMany({
@@ -726,9 +730,10 @@ export class OutputsService {
             },
           },
         }),
-        homeReaderId
-          ? this.findFeedPdfs(tx, outputIds, homeReaderId)
+        options.withPdfs
+          ? this.findFeedPdfs(tx, outputIds, callerId)
           : new Map<string, DownloadablePdfDto>(),
+        this.findVisibilityCapabilities(tx, outputIds, callerId),
       ]);
 
     const revisionMap = new Map<string, (typeof pinnedRevisions)[number]>();
@@ -769,10 +774,42 @@ export class OutputsService {
         pinnedRev ?? null,
         o.output_authors,
         (pinnedRev && topicMap.get(pinnedRev.id)) ?? [],
+        capabilityMap.get(o.id) ?? false,
       );
       const downloadablePdf = pdfs.get(o.id);
       return downloadablePdf ? { ...output, downloadablePdf } : output;
     });
+  }
+
+  /**
+   * Resolves, for a whole page of outputs at once, whether the caller may
+   * change each one's audience.
+   *
+   * The rule belongs to the database (`can_change_output_visibility`), so
+   * the server is the only place that can answer it. The detail endpoint
+   * already asked; the list did not, and reported `false` for every work —
+   * which greyed out the audience action on the profile cards of the very
+   * owner who may use it. Asking once for the whole page keeps the answer
+   * in a single round trip, so a page of a hundred works costs one query
+   * rather than a hundred.
+   */
+  private async findVisibilityCapabilities(
+    tx: Prisma.TransactionClient,
+    outputIds: string[],
+    callerId: string,
+  ): Promise<Map<string, boolean>> {
+    if (outputIds.length === 0) return new Map();
+
+    const ids = Prisma.join(outputIds.map((id) => Prisma.sql`${id}::uuid`));
+    const rows = await tx.$queryRaw<{ id: string; allowed: boolean }[]>(
+      Prisma.sql`
+        SELECT o.id, can_change_output_visibility(${callerId}::uuid, o.id) AS allowed
+        FROM research_outputs o
+        WHERE o.id IN (${ids})
+      `,
+    );
+
+    return new Map(rows.map((row) => [row.id, row.allowed]));
   }
 
   private async findFeedPdfs(
@@ -953,6 +990,81 @@ export class OutputsService {
     });
 
     return revisions.map((r) => this.mapToRevisionResponse(r));
+  }
+
+  /**
+   * Lists the edit history of a visible research output.
+   *
+   * Every revision of the work is kept — a released one and the owner's
+   * working copy alike — so the history is read straight from the revision
+   * table. Each entry names the account that wrote it and the account that
+   * released it, and lists the metadata fields it changed against the
+   * revision before it.
+   *
+   * The comparison walks the revision numbers rather than the pinned
+   * release, because a work that was edited twice and then pinned must
+   * still show what the first edit changed.
+   */
+  async findRevisionHistory(
+    outputId: string,
+    callerId: string,
+  ): Promise<OutputRevisionHistoryResponseDto[]> {
+    await this.assertCanViewOutput(outputId, callerId);
+
+    const output = await this.prisma.research_outputs.findUnique({
+      where: { id: outputId },
+      select: { current_release_id: true },
+    });
+
+    const revisions = await this.prisma.output_revisions.findMany({
+      where: { output_id: outputId },
+      orderBy: { revision_no: 'desc' },
+      include: {
+        users_output_revisions_created_byTousers: {
+          select: { id: true, full_name: true },
+        },
+        users_output_revisions_released_byTousers: {
+          select: { id: true, full_name: true },
+        },
+      },
+    });
+
+    const byRevisionNo = new Map(revisions.map((r) => [r.revision_no, r]));
+
+    return revisions.map((revision) => {
+      const previous = byRevisionNo.get(revision.revision_no - 1) ?? null;
+      return {
+        id: revision.id,
+        revisionNo: revision.revision_no,
+        title: revision.title,
+        abstract: revision.abstract ?? null,
+        venue: revision.venue ?? null,
+        publisher: revision.publisher ?? null,
+        publicationYear: revision.publication_year ?? null,
+        publicationDate:
+          revision.publication_date ??
+          revision.publication_year?.toString() ??
+          null,
+        publicationStatus: revision.publication_status,
+        outputType: revision.output_type,
+        externalUrl: revision.external_url ?? null,
+        isCurrent: output?.current_release_id === revision.id,
+        createdAt: revision.created_at.toISOString(),
+        releasedAt: revision.released_at?.toISOString() ?? null,
+        createdBy: {
+          id: revision.users_output_revisions_created_byTousers.id,
+          fullName: revision.users_output_revisions_created_byTousers.full_name,
+        },
+        releasedBy: revision.users_output_revisions_released_byTousers
+          ? {
+              id: revision.users_output_revisions_released_byTousers.id,
+              fullName:
+                revision.users_output_revisions_released_byTousers.full_name,
+            }
+          : null,
+        changes: previous ? diffRevisions(previous, revision) : [],
+      };
+    });
   }
 
   /**
