@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type OpenAlexCandidatesControllerFindAllParams = {
+export type OpenAlexControllerFindRejectedParams = {
   /**
    * Page number, 1-based.
    * @minimum 1

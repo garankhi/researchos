@@ -131,7 +131,9 @@
     "close": "Đóng",
     "notifications": "Thông báo",
     "backToHome": "Về trang chủ",
-    "add": "Thêm"
+    "add": "Thêm",
+    "back": "Quay lại",
+    "next": "Tiếp tục"
   },
   "nav": {
     "home": "Trang chủ",
@@ -299,6 +301,148 @@
     "signOut": "Đăng xuất",
     "welcome": "Chào mừng, {name}."
   },
+  "onboarding": {
+    "title": "Chào mừng bạn đến với ResearchOS",
+    "description": "Bốn bước ngắn để thiết lập hồ sơ researcher của bạn. Chỉ bước đầu là bắt buộc — chưa có gì được lưu cho đến khi bạn nhấn Hoàn tất, nên bạn có thể quay lại và thay đổi bất cứ điều gì.",
+    "steps": {
+      "interests": {
+        "label": "Lĩnh vực nghiên cứu",
+        "mandatory": "Bắt buộc"
+      },
+      "author": {
+        "label": "Hồ sơ OpenAlex"
+      },
+      "profile": {
+        "label": "Thông tin của bạn"
+      },
+      "works": {
+        "label": "Công bố của bạn"
+      }
+    },
+    "interestsStep": {
+      "title": "Bạn nghiên cứu về lĩnh vực nào?",
+      "description": "Hãy chọn ít nhất một lĩnh vực nghiên cứu. Đây là bước bắt buộc duy nhất, và đó là thứ nền tảng dùng để hiển thị cho bạn những nội dung liên quan. Hãy tìm kiếm trong danh mục hoặc duyệt danh sách — bạn có thể bỏ chọn trước khi hoàn tất.",
+      "selected": "{count, plural, =0 {Chưa chọn lĩnh vực nào} =1 {Đã chọn 1 lĩnh vực} other {Đã chọn # lĩnh vực}}",
+      "searchPlaceholder": "Tìm một chủ đề nghiên cứu",
+      "searching": "Đang tải lĩnh vực…",
+      "searchFailed": "Không thể tải danh sách chủ đề nghiên cứu.",
+      "topicGroup": "Chủ đề nghiên cứu",
+      "noTopicsTitle": "Không tìm thấy chủ đề",
+      "noTopicsMessage": "Hãy thử một từ khác. Các chủ đề đến từ cây phân cấp nghiên cứu của FPTU.",
+      "emptyTitle": "Chưa chọn lĩnh vực nghiên cứu",
+      "emptyMessage": "Tìm một chủ đề ở trên và chọn những chủ đề mô tả nghiên cứu của bạn.",
+      "remove": "Bỏ lĩnh vực này"
+    },
+    "authorStep": {
+      "title": "Tìm hồ sơ của bạn",
+      "description": "Chúng tôi đã tìm hồ sơ OpenAlex theo tên của bạn tại Đại học FPT. Hãy xác nhận hồ sơ là của bạn, hoặc bỏ qua bước này.",
+      "emptyTitle": "Không tìm thấy tác giả phù hợp",
+      "emptyMessage": "OpenAlex không có tác giả nào tại FPT University khớp với tên của bạn. Bạn có thể bỏ qua bước này và tìm lại sau.",
+      "affiliationMatch": "FPT University",
+      "worksCount": "{count, plural, =1 {1 bài báo} other {# bài báo}}",
+      "alreadyLinked": "Hồ sơ của bạn đã liên kết một tác giả OpenAlex. Lần tải sau sẽ dùng tác giả đó.",
+      "failed": "Không thể kết nối OpenAlex. Hãy thử lại sau.",
+      "detail": {
+        "empty": "Chọn một hồ sơ bên trái để xem toàn bộ thông tin — chỉ số trích dẫn, các biến thể tên đã xuất bản, chủ đề nghiên cứu, tổ chức và các tác phẩm gần đây.",
+        "affiliationMatch": "FPT University",
+        "openAlexProfile": "Hồ sơ OpenAlex",
+        "orcid": "ORCID",
+        "metrics": "Chỉ số trích dẫn",
+        "works": "Tác phẩm",
+        "citations": "Lượt trích dẫn",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "twoYearCitedness": "Ảnh hưởng 2 năm",
+        "nameVariants": "Cũng xuất bản dưới tên",
+        "topics": "Chủ đề nghiên cứu",
+        "affiliations": "Tổ chức",
+        "recentWorks": "Tác phẩm gần đây"
+      }
+    },
+    "profileStep": {
+      "title": "Thông tin của bạn",
+      "description": "Điền những gì bạn muốn công bố trên hồ sơ. Bạn có thể để trống tất cả và hoàn thiện sau.",
+      "descriptionPrefilled": "Chúng tôi đã điền từ tác giả OpenAlex mà bạn xác nhận.",
+      "prefillTitle": "Điền từ OpenAlex",
+      "prefillAuthor": "Tác giả OpenAlex {authorId}",
+      "prefillAuthorUnknown": "Tác giả bạn xác nhận không có ORCID, nên bạn có thể tự điền.",
+      "prefill": {
+        "title": "Hồ sơ OpenAlex của bạn",
+        "description": "Đây là những gì OpenAlex lưu về tác giả bạn đã xác nhận. Hãy đối chiếu với thông tin bên dưới và sửa nếu có chỗ sai.",
+        "author": "Tác giả OpenAlex {authorId}",
+        "metrics": "Chỉ số trích dẫn",
+        "works": "Tác phẩm",
+        "citations": "Lượt trích dẫn",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "nameVariants": "Cũng xuất bản dưới tên",
+        "topics": "Chủ đề nghiên cứu",
+        "affiliations": "Tổ chức"
+      },
+      "affiliations": {
+        "title": "Dòng thời gian công tác của bạn",
+        "description": "Nơi bạn đã làm việc và trong bao lâu. Hãy sửa nếu OpenAlex ghi sai — thường thì nó giữ lại tổ chức bạn đã rời đi.",
+        "empty": "Bạn chưa ghi tổ chức nào.",
+        "institution": "Tổ chức",
+        "institutionPlaceholder": "Tên tổ chức",
+        "yearFrom": "Năm bắt đầu",
+        "yearTo": "Năm kết thúc",
+        "yearFromPlaceholder": "Từ",
+        "yearToPlaceholder": "Đến",
+        "current": "Hiện tại",
+        "add": "Thêm một tổ chức",
+        "remove": "Bỏ tổ chức này",
+        "invalidSummary": "Hãy sửa các tổ chức được đánh dấu trước khi hoàn tất.",
+        "institutionIdLabel": "Mã tổ chức: {id}"
+      },
+      "fullName": "Họ và tên",
+      "departmentUnit": "Khoa hoặc đơn vị",
+      "academicTitle": "Chức danh học thuật",
+      "academicDegree": "Học vị",
+      "orcidId": "ORCID",
+      "availabilityStatus": "Mức độ sẵn sàng hợp tác",
+      "googleScholarUrl": "Hồ sơ Google Scholar",
+      "scopusAuthorId": "Mã tác giả Scopus",
+      "bio": "Tiểu sử",
+      "identityCard": "Danh tính của bạn",
+      "publicationsCard": "Tác phẩm và mức độ sẵn sàng của bạn",
+      "biographyCard": "Tiểu sử của bạn",
+      "failed": "Không thể lưu hồ sơ. Hãy thử lại."
+    },
+    "worksStep": {
+      "title": "Nhập tác phẩm của bạn",
+      "description": "Các tác phẩm này đến từ OpenAlex. Hãy chấp nhận những tác phẩm là của bạn, hoặc từ chối chúng. Chỉ những tác phẩm bạn quyết định mới được nhập, vào lúc bạn hoàn tất.",
+      "emptyTitle": "Không có bài báo nào",
+      "emptyMessage": "Hiện OpenAlex chưa có bài báo nào cho bạn. Bạn có thể tải bài mới bất cứ lúc nào.",
+      "visibilityPrivate": "Riêng tư",
+      "visibilityPrivateHint": "Chỉ bạn nhìn thấy bài báo này. Bạn có thể công bố sau từ trang chi tiết.",
+      "visibilityPublic": "Công khai cho cộng đồng FPTU",
+      "visibilityPublicHint": "Mọi researcher FPTU đã đăng nhập đều nhìn thấy bài báo này ngay khi bạn xác nhận.",
+      "acceptTitle": "Xác nhận bài báo này",
+      "acceptDescription": "Chọn ai có thể nhìn thấy bài báo này sau khi bạn xác nhận.",
+      "acceptingWork": "Bài báo: {title}",
+      "confirmAccept": "Xác nhận bài báo",
+      "accept": "Xác nhận",
+      "reject": "Từ chối",
+      "accepted": "Đã chấp nhận",
+      "rejected": "Đã từ chối",
+      "fetchMore": "Tải thêm từ OpenAlex",
+      "finish": "Hoàn tất",
+      "failed": "Đã xảy ra lỗi. Hãy thử lại.",
+      "undo": "Hoàn tác",
+      "decidedCount": "{count, plural, =0 {Chưa quyết định tác phẩm nào} other {Đã quyết định # tác phẩm}}"
+    },
+    "finish": "Hoàn tất thiết lập",
+    "finished": "Hồ sơ của bạn đã sẵn sàng. Chào mừng bạn đến với ResearchOS.",
+    "finishFailed": "Không thể hoàn tất thiết lập. Hãy chọn ít nhất một lĩnh vực nghiên cứu rồi thử lại.",
+    "leaveGuard": {
+      "title": "Rời khỏi bước thiết lập?",
+      "description": "Các câu trả lời của bạn chỉ được giữ trên trang này. Nếu bạn rời đi ngay, mọi thứ bạn đã nhập sẽ mất và bạn phải bắt đầu lại từ bước đầu tiên.",
+      "confirm": "Rời đi và mất các câu trả lời",
+      "cancel": "Ở lại trang này"
+    },
+    "skip": "Bỏ qua"
+  },
   "profile": {
     "llkh": {
       "title": "Xuất Lý lịch khoa học",
@@ -368,6 +512,11 @@
       "statsDrafts": "{count} bản nháp",
       "statsGroups": "Nhóm",
       "statsTopics": "Chủ đề",
+      "citationMetricsTitle": "Chỉ số trích dẫn",
+      "citationWorks": "Tác phẩm",
+      "citationCitations": "Lượt trích dẫn",
+      "citationHIndex": "h-index",
+      "citationI10Index": "i10-index",
       "pendingClaimsNotice": "{count} công trình OpenAlex đang chờ duyệt",
       "reviewNow": "Duyệt ngay",
       "affiliationTitle": "Đơn vị & Định danh học thuật",
@@ -493,16 +642,34 @@
       "rejected": "Đã từ chối"
     },
     "openalexTab": {
-      "title": "Hàng đợi ứng viên OpenAlex",
-      "description": "Các bài báo và công bố ứng viên được tìm thấy từ OpenAlex chờ bạn xác nhận.",
+      "title": "Ứng viên OpenAlex",
+      "description": "Các bài báo và công bố được tìm thấy từ OpenAlex chờ bạn xác nhận.",
       "emptyTitle": "Hàng đợi trống",
       "emptyMessage": "Bạn không có bài báo ứng viên nào cần xử lý từ OpenAlex.",
-      "accept": "Xác nhận bài báo",
+      "emptyRejectedTitle": "Không có bài bị từ chối",
+      "emptyRejectedMessage": "Bạn chưa từ chối bài báo ứng viên nào. Bài bị từ chối vẫn ở đây để bạn có thể xác nhận lại sau.",
+      "pendingTab": "Gợi ý đang chờ",
+      "rejectedTab": "Bài bị từ chối",
+      "accept": "Xác nhận",
       "accepting": "Đang xác nhận…",
       "reject": "Từ chối",
       "rejecting": "Đang từ chối…",
       "workAccepted": "Đã xác nhận và thêm bài báo vào danh sách công bố của bạn.",
-      "workRejected": "Đã từ chối bài báo ứng viên."
+      "workRejected": "Đã từ chối bài báo ứng viên.",
+      "fetchNew": "Tải bài mới từ OpenAlex",
+      "pullDone": "Đã tải: {created} bài mới, {existing} bài đã có.",
+      "pullFailed": "Không thể tải bài báo từ OpenAlex.",
+      "acceptTitle": "Xác nhận bài báo này",
+      "acceptDescription": "Chọn ai có thể nhìn thấy bài báo sau khi bạn xác nhận.",
+      "acceptingWork": "Bài báo: {title}",
+      "visibilityPrivate": "Riêng tư",
+      "visibilityPrivateHint": "Chỉ bạn nhìn thấy bài báo này. Bạn có thể công bố sau từ trang chi tiết.",
+      "visibilityPublic": "Công khai cho cộng đồng FPTU",
+      "visibilityPublicHint": "Mọi researcher FPTU đã đăng nhập đều nhìn thấy bài báo này ngay khi bạn xác nhận.",
+      "confirmAccept": "Xác nhận bài báo",
+      "previous": "Trước",
+      "next": "Sau",
+      "page": "Trang {page}"
     }
   },
   "outputs": {
@@ -704,7 +871,29 @@
         "visibility_required": "Phạm vi hiển thị là bắt buộc.",
         "visibility_invalid": "Phạm vi hiển thị phải là FPTU_COMMUNITY hoặc RESEARCH_GROUP.",
         "access_group_id_invalid": "Nhóm nghiên cứu được cấp quyền phải là UUID hợp lệ.",
-        "access_group_id_required": "Cần nhóm nghiên cứu được cấp quyền khi phạm vi hiển thị là RESEARCH_GROUP."
+        "access_group_id_required": "Cần nhóm nghiên cứu được cấp quyền khi phạm vi hiển thị là RESEARCH_GROUP.",
+        "orcid_id_invalid": "Nhập ORCID theo dạng 0000-0000-0000-0000.",
+        "bio_invalid": "Tiểu sử phải là văn bản.",
+        "bio_too_long": "Dùng tối đa 2.000 ký tự.",
+        "google_scholar_url_invalid": "Nhập một URL hợp lệ.",
+        "google_scholar_url_too_long": "Dùng tối đa 500 ký tự.",
+        "scopus_author_id_invalid": "Mã tác giả Scopus phải là văn bản.",
+        "scopus_author_id_too_long": "Dùng tối đa 50 ký tự.",
+        "affiliations_invalid": "Danh sách cơ quan phải là một danh sách.",
+        "affiliation_invalid": "Mỗi cơ quan phải là một cơ quan hợp lệ.",
+        "too_many_affiliations": "Dùng tối đa 50 cơ quan.",
+        "affiliation_institution_id_required": "Mã cơ quan là bắt buộc.",
+        "affiliation_institution_id_invalid": "Mã cơ quan phải là văn bản.",
+        "affiliation_institution_id_too_long": "Dùng tối đa 255 ký tự cho mã cơ quan.",
+        "affiliation_name_required": "Tên cơ quan là bắt buộc.",
+        "affiliation_name_invalid": "Tên cơ quan phải là văn bản.",
+        "affiliation_name_too_long": "Dùng tối đa 255 ký tự cho tên cơ quan.",
+        "affiliation_ror_invalid": "Mã ROR phải là văn bản.",
+        "affiliation_ror_too_long": "Dùng tối đa 255 ký tự cho mã ROR.",
+        "affiliation_country_code_invalid": "Mã quốc gia phải gồm hai chữ cái, ví dụ VN.",
+        "affiliation_institution_type_invalid": "Hãy chọn một loại cơ quan hợp lệ.",
+        "affiliation_year_start_invalid": "Năm bắt đầu phải là năm trong khoảng 1000 đến năm hiện tại cộng một.",
+        "affiliation_year_end_invalid": "Năm kết thúc phải là năm trong khoảng 1000 đến năm hiện tại cộng một."
       },
       "domain": {
         "follow_self": "Bạn không thể tự theo dõi mình.",
@@ -823,7 +1012,13 @@
         "chat_attachment_limit_exceeded": "Tối đa 5 tệp đính kèm trên mỗi tin nhắn.",
         "chat_attachment_already_linked": "Tệp đính kèm này đã được gắn vào một tin nhắn khác.",
         "project_not_found": "Không tìm thấy dự án nghiên cứu.",
-        "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này."
+        "project_access_denied": "Bạn không có quyền xem dự án nghiên cứu này.",
+        "onboarding_requires_interest": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập.",
+        "orcid_already_claimed": "ORCID này đã thuộc về một hồ sơ researcher khác.",
+        "onboarding_affiliation_years_invalid": "Một cơ quan không thể kết thúc trước khi bắt đầu.",
+        "interest_topic_not_found": "Một trong các lĩnh vực nghiên cứu đã chọn không còn tồn tại.",
+        "interest_topic_inactive": "Một trong các lĩnh vực nghiên cứu đã chọn không còn khả dụng.",
+        "interests_required": "Hãy chọn ít nhất một lĩnh vực nghiên cứu trước khi hoàn tất quá trình thiết lập."
       }
     }
   },

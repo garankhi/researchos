@@ -2,6 +2,8 @@ export * from './types';
 export * from './components/profile-header';
 export * from './components/profile-edit-dialog';
 export * from './components/profile-shell';
+export * from './components/onboarding/onboarding-flow';
+export * from './components/onboarding/onboarding-skeletons';
 export {
   ProfilePageSkeleton,
   topicOptions,
@@ -21,4 +23,7 @@ export * from './hooks/use-output-visibility';
 export * from './hooks/use-profile-interests';
 export * from './hooks/use-my-applications';
 export * from './hooks/use-openalex-candidates';
+export * from './hooks/use-onboarding';
+export * from './hooks/use-onboarding-leave-guard';
 export * from './schemas/profile-form.schema';
+export * from './schemas/onboarding-profile.schema';

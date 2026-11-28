@@ -23,6 +23,9 @@ import type {
 
 import type {
   ApiErrorResponseDto,
+  CompleteOnboardingDto,
+  FinalizeOnboardingDto,
+  OpenAlexAuthorRecordResponseDtoEnvelope,
   ProfilePreviewResponseDtoEnvelope,
   ProfileResponseDtoEnvelope,
   ProfilesControllerGetInterestsByUserIdEnvelope,
@@ -823,3 +826,364 @@ export function useProfilesControllerGetInterestsByUserId<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * Returns the OpenAlex author record of the caller: the counts, the byline spellings OpenAlex has observed, and the affiliations with the years they held. The record is an enrichment fetched during the onboarding, so it is empty until the researcher confirms their author.
+ * @summary Get the OpenAlex record of the current user
+ */
+export const profilesControllerGetMyOpenAlexRecord = (
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpenAlexAuthorRecordResponseDtoEnvelope>(
+    { url: `/profiles/me/openalex-record`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getProfilesControllerGetMyOpenAlexRecordQueryKey = () => {
+  return [`/profiles/me/openalex-record`] as const;
+};
+
+export const getProfilesControllerGetMyOpenAlexRecordQueryOptions = <
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getProfilesControllerGetMyOpenAlexRecordQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+  > = ({ signal }) =>
+    profilesControllerGetMyOpenAlexRecord(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ProfilesControllerGetMyOpenAlexRecordQueryResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+>;
+export type ProfilesControllerGetMyOpenAlexRecordQueryError =
+  ApiErrorResponseDto;
+
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+          TError,
+          Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Get the OpenAlex record of the current user
+ */
+
+export function useProfilesControllerGetMyOpenAlexRecord<
+  TData = Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof profilesControllerGetMyOpenAlexRecord>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions =
+    getProfilesControllerGetMyOpenAlexRecordQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Finishes the onboarding: writes the profile information the researcher filled in — including the ORCID, which the ordinary profile update refuses — and marks the account as onboarded. Requires at least one ACTIVE research interest, the one mandatory step of the onboarding.
+ * @summary Complete the onboarding of the current user
+ */
+export const profilesControllerCompleteOnboarding = (
+  completeOnboardingDto: CompleteOnboardingDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfileResponseDtoEnvelope>(
+    {
+      url: `/profiles/me/onboarding`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: completeOnboardingDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProfilesControllerCompleteOnboardingMutationKey = () =>
+  ['profilesControllerCompleteOnboarding'] as const;
+
+export const getProfilesControllerCompleteOnboardingMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+    TError,
+    ProfilesControllerCompleteOnboardingMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+  TError,
+  ProfilesControllerCompleteOnboardingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getProfilesControllerCompleteOnboardingMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+    ProfilesControllerCompleteOnboardingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return profilesControllerCompleteOnboarding(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProfilesControllerCompleteOnboardingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>
+>;
+export type ProfilesControllerCompleteOnboardingMutationBody =
+  CompleteOnboardingDto;
+export type ProfilesControllerCompleteOnboardingMutationError =
+  ApiErrorResponseDto;
+export type ProfilesControllerCompleteOnboardingMutationVariables = {
+  data: CompleteOnboardingDto;
+};
+
+/**
+ * @summary Complete the onboarding of the current user
+ */
+export const useProfilesControllerCompleteOnboarding = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+      TError,
+      ProfilesControllerCompleteOnboardingMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof profilesControllerCompleteOnboarding>>,
+  TError,
+  ProfilesControllerCompleteOnboardingMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getProfilesControllerCompleteOnboardingMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * Finishes the onboarding in one write. The wizard is a draft — the researcher picks interests, confirms an OpenAlex author, fills in their information and decides on their works, and nothing reaches the database until this call. The payload carries every answer: the full set of research interests, the confirmed OpenAlex author, the profile information including the ORCID, the decisions on the works, and — when the researcher corrected it — the affiliation timeline. The interests are reconciled to the set the researcher ended up with, only the decided works are pulled, and the corrected affiliations are written after the OpenAlex sync so the researcher's version of the timeline is the one that survives.
+ * @summary Finalize the onboarding of the current user
+ */
+export const profilesControllerFinalizeOnboarding = (
+  finalizeOnboardingDto: FinalizeOnboardingDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<ProfileResponseDtoEnvelope>(
+    {
+      url: `/profiles/me/onboarding/finalize`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: finalizeOnboardingDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getProfilesControllerFinalizeOnboardingMutationKey = () =>
+  ['profilesControllerFinalizeOnboarding'] as const;
+
+export const getProfilesControllerFinalizeOnboardingMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+    TError,
+    ProfilesControllerFinalizeOnboardingMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+  TError,
+  ProfilesControllerFinalizeOnboardingMutationVariables,
+  TContext
+> => {
+  const mutationKey = getProfilesControllerFinalizeOnboardingMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+    ProfilesControllerFinalizeOnboardingMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return profilesControllerFinalizeOnboarding(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ProfilesControllerFinalizeOnboardingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>
+>;
+export type ProfilesControllerFinalizeOnboardingMutationBody =
+  FinalizeOnboardingDto;
+export type ProfilesControllerFinalizeOnboardingMutationError =
+  ApiErrorResponseDto;
+export type ProfilesControllerFinalizeOnboardingMutationVariables = {
+  data: FinalizeOnboardingDto;
+};
+
+/**
+ * @summary Finalize the onboarding of the current user
+ */
+export const useProfilesControllerFinalizeOnboarding = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+      TError,
+      ProfilesControllerFinalizeOnboardingMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof profilesControllerFinalizeOnboarding>>,
+  TError,
+  ProfilesControllerFinalizeOnboardingMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getProfilesControllerFinalizeOnboardingMutationOptions(options),
+    queryClient,
+  );
+};

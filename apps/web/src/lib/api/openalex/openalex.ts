@@ -22,11 +22,18 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AcceptCandidateDto,
   ApiErrorResponseDto,
   CandidateDecisionDtoEnvelope,
   CandidateWorksCountDtoEnvelope,
-  OpenAlexCandidatesControllerFindAllParams,
+  OpenAlexAuthorCandidatesDtoEnvelope,
+  OpenAlexControllerFindAllParams,
+  OpenAlexControllerFindAvailableWorksEnvelope,
+  OpenAlexControllerFindAvailableWorksParams,
+  OpenAlexControllerFindRejectedParams,
   PaginatedCandidateWorksResponseDtoEnvelope,
+  PullOpenAlexWorksDto,
+  PullOpenAlexWorksResultDtoEnvelope,
 } from '../models';
 
 import { axiosInstance } from '../../axios-instance';
@@ -52,34 +59,195 @@ const withQueryKey = <T extends object, K>(
 };
 
 /**
- * @summary Lists the caller's stored OpenAlex candidates
+ * @summary Lists the caller's OpenAlex author candidates
  */
-export const openAlexCandidatesControllerFindAll = (
-  params: OpenAlexCandidatesControllerFindAllParams,
+export const openAlexControllerFindAuthors = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
-  return axiosInstance<PaginatedCandidateWorksResponseDtoEnvelope>(
-    { url: `/external/openalex/works`, method: 'GET', params, signal },
+  return axiosInstance<OpenAlexAuthorCandidatesDtoEnvelope>(
+    { url: `/external/openalex/authors`, method: 'GET', signal },
     options,
   );
 };
 
-export const getOpenAlexCandidatesControllerFindAllQueryKey = (
-  params?: OpenAlexCandidatesControllerFindAllParams,
-) => {
-  return [`/external/openalex/works`, ...(params ? [params] : [])] as const;
+export const getOpenAlexControllerFindAuthorsQueryKey = () => {
+  return [`/external/openalex/authors`] as const;
 };
 
-export const getOpenAlexCandidatesControllerFindAllQueryOptions = <
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+export const getOpenAlexControllerFindAuthorsQueryOptions = <
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+  TError = ApiErrorResponseDto,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getOpenAlexControllerFindAuthorsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof openAlexControllerFindAuthors>>
+  > = ({ signal }) => openAlexControllerFindAuthors(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OpenAlexControllerFindAuthorsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerFindAuthors>>
+>;
+export type OpenAlexControllerFindAuthorsQueryError = ApiErrorResponseDto;
+
+export function useOpenAlexControllerFindAuthors<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
   TError = ApiErrorResponseDto,
 >(
-  params: OpenAlexCandidatesControllerFindAllParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindAuthors>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindAuthors<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+  TError = ApiErrorResponseDto,
+>(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+        Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindAuthors>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindAuthors<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Lists the caller's OpenAlex author candidates
+ */
+
+export function useOpenAlexControllerFindAuthors<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+  TError = ApiErrorResponseDto,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAuthors>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOpenAlexControllerFindAuthorsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Previews the caller's OpenAlex works before they are pulled
+ */
+export const openAlexControllerFindAvailableWorks = (
+  params?: OpenAlexControllerFindAvailableWorksParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OpenAlexControllerFindAvailableWorksEnvelope>(
+    {
+      url: `/external/openalex/works/available`,
+      method: 'GET',
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOpenAlexControllerFindAvailableWorksQueryKey = (
+  params?: OpenAlexControllerFindAvailableWorksParams,
+) => {
+  return [
+    `/external/openalex/works/available`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getOpenAlexControllerFindAvailableWorksQueryOptions = <
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
+  TError = ApiErrorResponseDto,
+>(
+  params?: OpenAlexControllerFindAvailableWorksParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
         TError,
         TData
       >
@@ -91,43 +259,44 @@ export const getOpenAlexCandidatesControllerFindAllQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getOpenAlexCandidatesControllerFindAllQueryKey(params);
+    getOpenAlexControllerFindAvailableWorksQueryKey(params);
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>
+    Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>
   > = ({ signal }) =>
-    openAlexCandidatesControllerFindAll(params, requestOptions, signal);
+    openAlexControllerFindAvailableWorks(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+    Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type OpenAlexCandidatesControllerFindAllQueryResult = NonNullable<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>
+export type OpenAlexControllerFindAvailableWorksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>
 >;
-export type OpenAlexCandidatesControllerFindAllQueryError = ApiErrorResponseDto;
+export type OpenAlexControllerFindAvailableWorksQueryError =
+  ApiErrorResponseDto;
 
-export function useOpenAlexCandidatesControllerFindAll<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+export function useOpenAlexControllerFindAvailableWorks<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
   TError = ApiErrorResponseDto,
 >(
-  params: OpenAlexCandidatesControllerFindAllParams,
+  params: undefined | OpenAlexControllerFindAvailableWorksParams,
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+        Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+          Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
           TError,
-          Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>
+          Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>
         >,
         'initialData'
       >;
@@ -137,24 +306,24 @@ export function useOpenAlexCandidatesControllerFindAll<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useOpenAlexCandidatesControllerFindAll<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+export function useOpenAlexControllerFindAvailableWorks<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
   TError = ApiErrorResponseDto,
 >(
-  params: OpenAlexCandidatesControllerFindAllParams,
+  params?: OpenAlexControllerFindAvailableWorksParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+        Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+          Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
           TError,
-          Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>
+          Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>
         >,
         'initialData'
       >;
@@ -164,15 +333,279 @@ export function useOpenAlexCandidatesControllerFindAll<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useOpenAlexCandidatesControllerFindAll<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+export function useOpenAlexControllerFindAvailableWorks<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
   TError = ApiErrorResponseDto,
 >(
-  params: OpenAlexCandidatesControllerFindAllParams,
+  params?: OpenAlexControllerFindAvailableWorksParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+        Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Previews the caller's OpenAlex works before they are pulled
+ */
+
+export function useOpenAlexControllerFindAvailableWorks<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
+  TError = ApiErrorResponseDto,
+>(
+  params?: OpenAlexControllerFindAvailableWorksParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAvailableWorks>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOpenAlexControllerFindAvailableWorksQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Pulls the caller's OpenAlex works into the platform as candidates
+ */
+export const openAlexControllerPullWorks = (
+  pullOpenAlexWorksDto: PullOpenAlexWorksDto,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<PullOpenAlexWorksResultDtoEnvelope>(
+    {
+      url: `/external/openalex/pull`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: pullOpenAlexWorksDto,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getOpenAlexControllerPullWorksMutationKey = () =>
+  ['openAlexControllerPullWorks'] as const;
+
+export const getOpenAlexControllerPullWorksMutationOptions = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof openAlexControllerPullWorks>>,
+    TError,
+    OpenAlexControllerPullWorksMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof axiosInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof openAlexControllerPullWorks>>,
+  TError,
+  OpenAlexControllerPullWorksMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOpenAlexControllerPullWorksMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      'mutationKey' in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof openAlexControllerPullWorks>>,
+    OpenAlexControllerPullWorksMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return openAlexControllerPullWorks(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpenAlexControllerPullWorksMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerPullWorks>>
+>;
+export type OpenAlexControllerPullWorksMutationBody = PullOpenAlexWorksDto;
+export type OpenAlexControllerPullWorksMutationError = ApiErrorResponseDto;
+export type OpenAlexControllerPullWorksMutationVariables = {
+  data: PullOpenAlexWorksDto;
+};
+
+/**
+ * @summary Pulls the caller's OpenAlex works into the platform as candidates
+ */
+export const useOpenAlexControllerPullWorks = <
+  TError = ApiErrorResponseDto,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof openAlexControllerPullWorks>>,
+      TError,
+      OpenAlexControllerPullWorksMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof openAlexControllerPullWorks>>,
+  TError,
+  OpenAlexControllerPullWorksMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getOpenAlexControllerPullWorksMutationOptions(options),
+    queryClient,
+  );
+};
+/**
+ * @summary Lists the caller's stored OpenAlex candidates
+ */
+export const openAlexControllerFindAll = (
+  params: OpenAlexControllerFindAllParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<PaginatedCandidateWorksResponseDtoEnvelope>(
+    { url: `/external/openalex/works`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getOpenAlexControllerFindAllQueryKey = (
+  params?: OpenAlexControllerFindAllParams,
+) => {
+  return [`/external/openalex/works`, ...(params ? [params] : [])] as const;
+};
+
+export const getOpenAlexControllerFindAllQueryOptions = <
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getOpenAlexControllerFindAllQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof openAlexControllerFindAll>>
+  > = ({ signal }) => openAlexControllerFindAll(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OpenAlexControllerFindAllQueryResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerFindAll>>
+>;
+export type OpenAlexControllerFindAllQueryError = ApiErrorResponseDto;
+
+export function useOpenAlexControllerFindAll<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindAllParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindAll<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindAll>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindAll<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAll>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindAllParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindAll>>,
         TError,
         TData
       >
@@ -187,15 +620,15 @@ export function useOpenAlexCandidatesControllerFindAll<
  * @summary Lists the caller's stored OpenAlex candidates
  */
 
-export function useOpenAlexCandidatesControllerFindAll<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+export function useOpenAlexControllerFindAll<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindAll>>,
   TError = ApiErrorResponseDto,
 >(
-  params: OpenAlexCandidatesControllerFindAllParams,
+  params: OpenAlexControllerFindAllParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerFindAll>>,
+        Awaited<ReturnType<typeof openAlexControllerFindAll>>,
         TError,
         TData
       >
@@ -206,7 +639,177 @@ export function useOpenAlexCandidatesControllerFindAll<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions = getOpenAlexCandidatesControllerFindAllQueryOptions(
+  const queryOptions = getOpenAlexControllerFindAllQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * @summary Lists the OpenAlex candidates the caller rejected
+ */
+export const openAlexControllerFindRejected = (
+  params: OpenAlexControllerFindRejectedParams,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<PaginatedCandidateWorksResponseDtoEnvelope>(
+    { url: `/external/openalex/works/rejected`, method: 'GET', params, signal },
+    options,
+  );
+};
+
+export const getOpenAlexControllerFindRejectedQueryKey = (
+  params?: OpenAlexControllerFindRejectedParams,
+) => {
+  return [
+    `/external/openalex/works/rejected`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getOpenAlexControllerFindRejectedQueryOptions = <
+  TData = Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindRejectedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getOpenAlexControllerFindRejectedQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof openAlexControllerFindRejected>>
+  > = ({ signal }) =>
+    openAlexControllerFindRejected(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OpenAlexControllerFindRejectedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerFindRejected>>
+>;
+export type OpenAlexControllerFindRejectedQueryError = ApiErrorResponseDto;
+
+export function useOpenAlexControllerFindRejected<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindRejectedParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindRejected>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindRejected<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindRejectedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+          TError,
+          Awaited<ReturnType<typeof openAlexControllerFindRejected>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOpenAlexControllerFindRejected<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindRejectedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary Lists the OpenAlex candidates the caller rejected
+ */
+
+export function useOpenAlexControllerFindRejected<
+  TData = Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+  TError = ApiErrorResponseDto,
+>(
+  params: OpenAlexControllerFindRejectedParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof openAlexControllerFindRejected>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOpenAlexControllerFindRejectedQueryOptions(
     params,
     options,
   );
@@ -222,7 +825,7 @@ export function useOpenAlexCandidatesControllerFindAll<
 /**
  * @summary Counts the caller's remaining OpenAlex candidates
  */
-export const openAlexCandidatesControllerCount = (
+export const openAlexControllerCount = (
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
@@ -232,17 +835,17 @@ export const openAlexCandidatesControllerCount = (
   );
 };
 
-export const getOpenAlexCandidatesControllerCountQueryKey = () => {
+export const getOpenAlexControllerCountQueryKey = () => {
   return [`/external/openalex/works/count`] as const;
 };
 
-export const getOpenAlexCandidatesControllerCountQueryOptions = <
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+export const getOpenAlexControllerCountQueryOptions = <
+  TData = Awaited<ReturnType<typeof openAlexControllerCount>>,
   TError = ApiErrorResponseDto,
 >(options?: {
   query?: Partial<
     UseQueryOptions<
-      Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+      Awaited<ReturnType<typeof openAlexControllerCount>>,
       TError,
       TData
     >
@@ -252,41 +855,41 @@ export const getOpenAlexCandidatesControllerCountQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getOpenAlexCandidatesControllerCountQueryKey();
+    queryOptions?.queryKey ?? getOpenAlexControllerCountQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>
-  > = ({ signal }) => openAlexCandidatesControllerCount(requestOptions, signal);
+    Awaited<ReturnType<typeof openAlexControllerCount>>
+  > = ({ signal }) => openAlexControllerCount(requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+    Awaited<ReturnType<typeof openAlexControllerCount>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type OpenAlexCandidatesControllerCountQueryResult = NonNullable<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>
+export type OpenAlexControllerCountQueryResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerCount>>
 >;
-export type OpenAlexCandidatesControllerCountQueryError = ApiErrorResponseDto;
+export type OpenAlexControllerCountQueryError = ApiErrorResponseDto;
 
-export function useOpenAlexCandidatesControllerCount<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+export function useOpenAlexControllerCount<
+  TData = Awaited<ReturnType<typeof openAlexControllerCount>>,
   TError = ApiErrorResponseDto,
 >(
   options: {
     query: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+        Awaited<ReturnType<typeof openAlexControllerCount>>,
         TError,
         TData
       >
     > &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+          Awaited<ReturnType<typeof openAlexControllerCount>>,
           TError,
-          Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>
+          Awaited<ReturnType<typeof openAlexControllerCount>>
         >,
         'initialData'
       >;
@@ -296,23 +899,23 @@ export function useOpenAlexCandidatesControllerCount<
 ): DefinedUseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useOpenAlexCandidatesControllerCount<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+export function useOpenAlexControllerCount<
+  TData = Awaited<ReturnType<typeof openAlexControllerCount>>,
   TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+        Awaited<ReturnType<typeof openAlexControllerCount>>,
         TError,
         TData
       >
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+          Awaited<ReturnType<typeof openAlexControllerCount>>,
           TError,
-          Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>
+          Awaited<ReturnType<typeof openAlexControllerCount>>
         >,
         'initialData'
       >;
@@ -322,14 +925,14 @@ export function useOpenAlexCandidatesControllerCount<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 };
-export function useOpenAlexCandidatesControllerCount<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+export function useOpenAlexControllerCount<
+  TData = Awaited<ReturnType<typeof openAlexControllerCount>>,
   TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+        Awaited<ReturnType<typeof openAlexControllerCount>>,
         TError,
         TData
       >
@@ -344,14 +947,14 @@ export function useOpenAlexCandidatesControllerCount<
  * @summary Counts the caller's remaining OpenAlex candidates
  */
 
-export function useOpenAlexCandidatesControllerCount<
-  TData = Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+export function useOpenAlexControllerCount<
+  TData = Awaited<ReturnType<typeof openAlexControllerCount>>,
   TError = ApiErrorResponseDto,
 >(
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof openAlexCandidatesControllerCount>>,
+        Awaited<ReturnType<typeof openAlexControllerCount>>,
         TError,
         TData
       >
@@ -362,8 +965,7 @@ export function useOpenAlexCandidatesControllerCount<
 ): UseQueryResult<TData, TError> & {
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
-  const queryOptions =
-    getOpenAlexCandidatesControllerCountQueryOptions(options);
+  const queryOptions = getOpenAlexControllerCountQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
@@ -376,8 +978,9 @@ export function useOpenAlexCandidatesControllerCount<
 /**
  * @summary Accepts a stored OpenAlex candidate as the caller's work
  */
-export const openAlexCandidatesControllerAccept = (
+export const openAlexControllerAccept = (
   outputId: string,
+  acceptCandidateDto: AcceptCandidateDto,
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
 ) => {
@@ -385,33 +988,35 @@ export const openAlexCandidatesControllerAccept = (
     {
       url: `/external/openalex/works/${outputId}/accept`,
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      data: acceptCandidateDto,
       signal,
     },
     options,
   );
 };
 
-export const getOpenAlexCandidatesControllerAcceptMutationKey = () =>
-  ['openAlexCandidatesControllerAccept'] as const;
+export const getOpenAlexControllerAcceptMutationKey = () =>
+  ['openAlexControllerAccept'] as const;
 
-export const getOpenAlexCandidatesControllerAcceptMutationOptions = <
+export const getOpenAlexControllerAcceptMutationOptions = <
   TError = ApiErrorResponseDto,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+    Awaited<ReturnType<typeof openAlexControllerAccept>>,
     TError,
-    OpenAlexCandidatesControllerAcceptMutationVariables,
+    OpenAlexControllerAcceptMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof axiosInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+  Awaited<ReturnType<typeof openAlexControllerAccept>>,
   TError,
-  OpenAlexCandidatesControllerAcceptMutationVariables,
+  OpenAlexControllerAcceptMutationVariables,
   TContext
 > => {
-  const mutationKey = getOpenAlexCandidatesControllerAcceptMutationKey();
+  const mutationKey = getOpenAlexControllerAcceptMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -421,59 +1026,59 @@ export const getOpenAlexCandidatesControllerAcceptMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
-    OpenAlexCandidatesControllerAcceptMutationVariables
+    Awaited<ReturnType<typeof openAlexControllerAccept>>,
+    OpenAlexControllerAcceptMutationVariables
   > = (props) => {
-    const { outputId } = props ?? {};
+    const { outputId, data } = props ?? {};
 
-    return openAlexCandidatesControllerAccept(outputId, requestOptions);
+    return openAlexControllerAccept(outputId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type OpenAlexCandidatesControllerAcceptMutationResult = NonNullable<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>
+export type OpenAlexControllerAcceptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerAccept>>
 >;
-
-export type OpenAlexCandidatesControllerAcceptMutationError =
-  ApiErrorResponseDto;
-export type OpenAlexCandidatesControllerAcceptMutationVariables = {
+export type OpenAlexControllerAcceptMutationBody = AcceptCandidateDto;
+export type OpenAlexControllerAcceptMutationError = ApiErrorResponseDto;
+export type OpenAlexControllerAcceptMutationVariables = {
   outputId: string;
+  data: AcceptCandidateDto;
 };
 
 /**
  * @summary Accepts a stored OpenAlex candidate as the caller's work
  */
-export const useOpenAlexCandidatesControllerAccept = <
+export const useOpenAlexControllerAccept = <
   TError = ApiErrorResponseDto,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+      Awaited<ReturnType<typeof openAlexControllerAccept>>,
       TError,
-      OpenAlexCandidatesControllerAcceptMutationVariables,
+      OpenAlexControllerAcceptMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof axiosInstance>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerAccept>>,
+  Awaited<ReturnType<typeof openAlexControllerAccept>>,
   TError,
-  OpenAlexCandidatesControllerAcceptMutationVariables,
+  OpenAlexControllerAcceptMutationVariables,
   TContext
 > => {
   return useMutation(
-    getOpenAlexCandidatesControllerAcceptMutationOptions(options),
+    getOpenAlexControllerAcceptMutationOptions(options),
     queryClient,
   );
 };
 /**
  * @summary Rejects a stored OpenAlex candidate for the caller only
  */
-export const openAlexCandidatesControllerReject = (
+export const openAlexControllerReject = (
   outputId: string,
   options?: SecondParameter<typeof axiosInstance>,
   signal?: AbortSignal,
@@ -488,27 +1093,27 @@ export const openAlexCandidatesControllerReject = (
   );
 };
 
-export const getOpenAlexCandidatesControllerRejectMutationKey = () =>
-  ['openAlexCandidatesControllerReject'] as const;
+export const getOpenAlexControllerRejectMutationKey = () =>
+  ['openAlexControllerReject'] as const;
 
-export const getOpenAlexCandidatesControllerRejectMutationOptions = <
+export const getOpenAlexControllerRejectMutationOptions = <
   TError = ApiErrorResponseDto,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+    Awaited<ReturnType<typeof openAlexControllerReject>>,
     TError,
-    OpenAlexCandidatesControllerRejectMutationVariables,
+    OpenAlexControllerRejectMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof axiosInstance>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+  Awaited<ReturnType<typeof openAlexControllerReject>>,
   TError,
-  OpenAlexCandidatesControllerRejectMutationVariables,
+  OpenAlexControllerRejectMutationVariables,
   TContext
 > => {
-  const mutationKey = getOpenAlexCandidatesControllerRejectMutationKey();
+  const mutationKey = getOpenAlexControllerRejectMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       'mutationKey' in options.mutation &&
@@ -518,52 +1123,49 @@ export const getOpenAlexCandidatesControllerRejectMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
-    OpenAlexCandidatesControllerRejectMutationVariables
+    Awaited<ReturnType<typeof openAlexControllerReject>>,
+    OpenAlexControllerRejectMutationVariables
   > = (props) => {
     const { outputId } = props ?? {};
 
-    return openAlexCandidatesControllerReject(outputId, requestOptions);
+    return openAlexControllerReject(outputId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type OpenAlexCandidatesControllerRejectMutationResult = NonNullable<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>
+export type OpenAlexControllerRejectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openAlexControllerReject>>
 >;
 
-export type OpenAlexCandidatesControllerRejectMutationError =
-  ApiErrorResponseDto;
-export type OpenAlexCandidatesControllerRejectMutationVariables = {
-  outputId: string;
-};
+export type OpenAlexControllerRejectMutationError = ApiErrorResponseDto;
+export type OpenAlexControllerRejectMutationVariables = { outputId: string };
 
 /**
  * @summary Rejects a stored OpenAlex candidate for the caller only
  */
-export const useOpenAlexCandidatesControllerReject = <
+export const useOpenAlexControllerReject = <
   TError = ApiErrorResponseDto,
   TContext = unknown,
 >(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+      Awaited<ReturnType<typeof openAlexControllerReject>>,
       TError,
-      OpenAlexCandidatesControllerRejectMutationVariables,
+      OpenAlexControllerRejectMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof axiosInstance>;
   },
   queryClient?: QueryClient,
 ): UseMutationResult<
-  Awaited<ReturnType<typeof openAlexCandidatesControllerReject>>,
+  Awaited<ReturnType<typeof openAlexControllerReject>>,
   TError,
-  OpenAlexCandidatesControllerRejectMutationVariables,
+  OpenAlexControllerRejectMutationVariables,
   TContext
 > => {
   return useMutation(
-    getOpenAlexCandidatesControllerRejectMutationOptions(options),
+    getOpenAlexControllerRejectMutationOptions(options),
     queryClient,
   );
 };

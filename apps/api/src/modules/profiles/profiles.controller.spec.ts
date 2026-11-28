@@ -1,11 +1,15 @@
 import { HttpStatus } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { PrismaService } from '@researchos/database';
+import { Prisma, PrismaService } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import { describe, expect, it, vi } from 'vitest';
 import { AvailabilityStatusEnum } from './dto/availability-status.enum.js';
+import { OnboardingFinalizeService } from './onboarding-finalize.service.js';
 import { ProfilesController } from './profiles.controller.js';
 import { ProfilesService } from './profiles.service.js';
+import { OpenAlexAuthorRecordService } from '../openalex/openalex-author-record.service.js';
+import { OpenAlexCandidatesService } from '../openalex/openalex-candidates.service.js';
+import { OpenAlexPullService } from '../openalex/openalex-pull.service.js';
 
 describe('ProfilesController', () => {
   const callerId = 'u0000000-0000-0000-0000-000000000001';
@@ -105,6 +109,7 @@ describe('ProfilesController', () => {
       },
       research_interests: {
         findMany: vi.fn(),
+        count: vi.fn(),
       },
     };
 
@@ -124,7 +129,20 @@ describe('ProfilesController', () => {
       controllers: [ProfilesController],
       providers: [
         ProfilesService,
+        OnboardingFinalizeService,
         { provide: PrismaService, useValue: prismaMock },
+        {
+          provide: OpenAlexPullService,
+          useValue: { pullDecidedWorks: vi.fn() },
+        },
+        {
+          provide: OpenAlexCandidatesService,
+          useValue: { accept: vi.fn(), reject: vi.fn() },
+        },
+        {
+          provide: OpenAlexAuthorRecordService,
+          useValue: { trySyncAuthorRecord: vi.fn() },
+        },
       ],
     }).compile();
 
@@ -176,6 +194,44 @@ describe('ProfilesController', () => {
       expect(result.availabilityStatus).toBe(
         AvailabilityStatusEnum.NOT_AVAILABLE,
       );
+    });
+
+    it('carries the OpenAlex citation metrics when the profile has them', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockUser,
+        researcher_profiles: {
+          ...unconfirmedProfile,
+          user_id: callerId,
+          openalex_works_count: 47,
+          openalex_cited_by_count: 1712,
+          openalex_h_index: 19,
+          openalex_i10_index: 23,
+        },
+      });
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getMyProfile(callerId);
+
+      expect(result.citationMetrics).toEqual({
+        worksCount: 47,
+        citedByCount: 1712,
+        hIndex: 19,
+        i10Index: 23,
+      });
+    });
+
+    it('leaves the citation metrics out when OpenAlex has none', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.users.findUnique.mockResolvedValue({
+        ...mockUser,
+        researcher_profiles: { ...unconfirmedProfile, user_id: callerId },
+      });
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.getMyProfile(callerId);
+
+      expect(result.citationMetrics).toBeNull();
     });
 
     it('throws 404 when the account does not exist', async () => {
@@ -396,6 +452,128 @@ describe('ProfilesController', () => {
       await controller.updateMyProfile(callerId, { fullName: 'New Name' });
 
       expect(prismaMock.researcher_profiles.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completeOnboarding', () => {
+    const completedProfile = {
+      ...confirmedProfile,
+      onboarding_completed_at: new Date('2026-11-27T12:00:00.000Z'),
+    };
+
+    it('writes the profile and marks the onboarding as completed', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_interests.count.mockResolvedValue(1);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue({
+        ...mockConfirmedUser,
+        researcher_profiles: completedProfile,
+      });
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
+
+      const controller = await setupController(prismaMock);
+      const result = await controller.completeOnboarding(callerId, {
+        fullName: 'Nguyễn Văn A',
+        departmentUnit: 'Software Engineering',
+        bio: 'Distributed systems researcher.',
+        availabilityStatus: AvailabilityStatusEnum.OPEN_FOR_COLLABORATION,
+      });
+
+      expect(result.onboardingCompletedAt).toBe('2026-11-27T12:00:00.000Z');
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { user_id: callerId },
+          update: expect.objectContaining({
+            onboarding_completed_at: expect.any(Date),
+            bio: 'Distributed systems researcher.',
+          }),
+        }),
+      );
+    });
+
+    it('accepts the ORCID, which the ordinary profile update refuses', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_interests.count.mockResolvedValue(1);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue({
+        ...mockConfirmedUser,
+        researcher_profiles: completedProfile,
+      });
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
+
+      const controller = await setupController(prismaMock);
+      await controller.completeOnboarding(callerId, {
+        orcidId: '0000-0002-1825-0097',
+      });
+
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            orcid_id: '0000-0002-1825-0097',
+          }),
+        }),
+      );
+    });
+
+    it('refuses the completion when the researcher has no ACTIVE interest', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_interests.count.mockResolvedValue(0);
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.completeOnboarding(callerId, { fullName: 'Nguyễn Văn A' }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.BAD_REQUEST,
+          code: domainErrorCodes.profiles.onboardingRequiresInterest,
+        }),
+      );
+      expect(prismaMock.researcher_profiles.upsert).not.toHaveBeenCalled();
+    });
+
+    it('refuses an ORCID that another researcher already claimed', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_interests.count.mockResolvedValue(1);
+      prismaMock.researcher_profiles.upsert.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      const controller = await setupController(prismaMock);
+
+      await expect(
+        controller.completeOnboarding(callerId, {
+          orcidId: '0000-0001-8391-4472',
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          status: HttpStatus.CONFLICT,
+          code: domainErrorCodes.profiles.orcidAlreadyClaimed,
+        }),
+      );
+    });
+
+    it('creates the profile row when the account has none', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.research_interests.count.mockResolvedValue(1);
+      prismaMock.users.findUniqueOrThrow.mockResolvedValue({
+        ...mockUserWithoutProfile,
+        researcher_profiles: completedProfile,
+      });
+      prismaMock.researcher_profiles.upsert.mockResolvedValue(completedProfile);
+
+      const controller = await setupController(prismaMock);
+      await controller.completeOnboarding(callerId, { bio: 'A first bio.' });
+
+      expect(prismaMock.researcher_profiles.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            user_id: callerId,
+            onboarding_completed_at: expect.any(Date),
+          }),
+        }),
+      );
     });
   });
 

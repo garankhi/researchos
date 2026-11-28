@@ -11,6 +11,7 @@ export { AccountSlot } from './components/account-slot';
 export { AddResearchDrawer } from './components/add-research-drawer';
 export { LoginForm } from './components/login-form';
 export { RequireAuth } from './components/require-auth';
+export { RequireOnboarding } from './components/require-onboarding';
 export { SessionSummary } from './components/session-summary';
 export {
   LoginFormSkeleton,

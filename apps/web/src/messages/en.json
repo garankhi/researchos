@@ -131,7 +131,9 @@
     "close": "Close",
     "add": "Add",
     "notifications": "Notifications",
-    "backToHome": "Back to home"
+    "backToHome": "Back to home",
+    "back": "Back",
+    "next": "Next"
   },
   "nav": {
     "home": "Home",
@@ -299,6 +301,148 @@
     "signOut": "Sign out",
     "welcome": "Welcome, {name}."
   },
+  "onboarding": {
+    "title": "Welcome to ResearchOS",
+    "description": "Four short steps set up your researcher profile. Only the first one is required — nothing is saved until you press Finish, so you can go back and change anything.",
+    "steps": {
+      "interests": {
+        "label": "Research interests",
+        "mandatory": "Required"
+      },
+      "author": {
+        "label": "OpenAlex profile"
+      },
+      "profile": {
+        "label": "Your information"
+      },
+      "works": {
+        "label": "Your publications"
+      }
+    },
+    "interestsStep": {
+      "title": "What do you research?",
+      "description": "Pick at least one research interest. This is the only required step, and it is what the platform uses to show you relevant work. Search the taxonomy or browse the list — you can remove a pick before you finish.",
+      "selected": "{count, plural, =0 {No interest picked yet} =1 {1 interest picked} other {# interests picked}}",
+      "searchPlaceholder": "Search a research topic",
+      "searching": "Loading topics…",
+      "searchFailed": "Could not load the research topics.",
+      "topicGroup": "Research topics",
+      "noTopicsTitle": "No topic found",
+      "noTopicsMessage": "Try another word. The topics come from the FPTU research taxonomy.",
+      "emptyTitle": "No research interest picked",
+      "emptyMessage": "Search for a topic above and pick the ones that describe your research.",
+      "remove": "Remove this interest"
+    },
+    "authorStep": {
+      "title": "Let us find your profile",
+      "description": "We searched OpenAlex for your name at FPT University. Confirm the author that is you, or skip this step.",
+      "emptyTitle": "No matching author found",
+      "emptyMessage": "OpenAlex has no author at FPT University that matches your name. You can skip this step and search again later.",
+      "affiliationMatch": "FPT University",
+      "worksCount": "{count, plural, =1 {1 work} other {# works}}",
+      "alreadyLinked": "Your profile already links an OpenAlex author. Pulling again will use it.",
+      "failed": "Could not reach OpenAlex. Try again in a moment.",
+      "detail": {
+        "empty": "Pick a profile on the left to see its full record — the metrics, the byline spellings, the topics, the affiliations and the recent works.",
+        "affiliationMatch": "FPT University",
+        "openAlexProfile": "OpenAlex profile",
+        "orcid": "ORCID",
+        "metrics": "Citation metrics",
+        "works": "Works",
+        "citations": "Citations",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "twoYearCitedness": "2-year impact",
+        "nameVariants": "Also published as",
+        "topics": "Research topics",
+        "affiliations": "Affiliations",
+        "recentWorks": "Recent works"
+      }
+    },
+    "profileStep": {
+      "title": "Your researcher information",
+      "description": "Fill in what you want to publish on your profile. You can leave everything empty and complete it later. Nothing is saved until you finish.",
+      "descriptionPrefilled": "We filled this in from the OpenAlex author you confirmed. Check it and correct anything that is wrong.",
+      "prefillTitle": "Prefilled from OpenAlex",
+      "prefillAuthor": "OpenAlex author {authorId}",
+      "prefillAuthorUnknown": "The author you confirmed carries no ORCID, so you can fill that in yourself.",
+      "prefill": {
+        "title": "Your OpenAlex record",
+        "description": "This is what OpenAlex holds for the author you confirmed. Check your details below against it and correct anything that is wrong.",
+        "author": "OpenAlex author {authorId}",
+        "metrics": "Citation metrics",
+        "works": "Works",
+        "citations": "Citations",
+        "hIndex": "h-index",
+        "i10Index": "i10-index",
+        "nameVariants": "Also published as",
+        "topics": "Research topics",
+        "affiliations": "Affiliations"
+      },
+      "affiliations": {
+        "title": "Your affiliation timeline",
+        "description": "Where you have worked and for how long. Correct anything OpenAlex got wrong — it often keeps the institution you left.",
+        "empty": "You have not listed any affiliation yet.",
+        "institution": "Institution",
+        "institutionPlaceholder": "Institution name",
+        "yearFrom": "Start year",
+        "yearTo": "End year",
+        "yearFromPlaceholder": "From",
+        "yearToPlaceholder": "To",
+        "current": "Current",
+        "add": "Add an affiliation",
+        "remove": "Remove this affiliation",
+        "invalidSummary": "Fix the highlighted affiliations before you finish.",
+        "institutionIdLabel": "Institution id: {id}"
+      },
+      "fullName": "Full name",
+      "departmentUnit": "Department or unit",
+      "academicTitle": "Academic title",
+      "academicDegree": "Academic degree",
+      "orcidId": "ORCID",
+      "availabilityStatus": "Collaboration availability",
+      "googleScholarUrl": "Google Scholar profile",
+      "scopusAuthorId": "Scopus author id",
+      "bio": "Biography",
+      "identityCard": "Your identity",
+      "publicationsCard": "Your publications and availability",
+      "biographyCard": "Your biography",
+      "failed": "Could not save your profile. Try again."
+    },
+    "worksStep": {
+      "title": "Import your publications",
+      "description": "These works come from OpenAlex. Accept the ones that are yours, or reject them. Only the works you decide on are imported, when you finish.",
+      "emptyTitle": "No works found",
+      "emptyMessage": "OpenAlex has no works for you at the moment. You can fetch new ones whenever you like.",
+      "visibilityPrivate": "Private",
+      "visibilityPrivateHint": "Only you can see this work. You can publish it later from its detail page.",
+      "visibilityPublic": "Public to the FPTU community",
+      "visibilityPublicHint": "Every signed-in FPTU researcher can see this work as soon as you accept it.",
+      "acceptTitle": "Accept this publication",
+      "acceptDescription": "Choose who may see this work once you accept it.",
+      "acceptingWork": "Work: {title}",
+      "confirmAccept": "Accept work",
+      "accept": "Accept",
+      "reject": "Reject",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "fetchMore": "Fetch more from OpenAlex",
+      "finish": "Finish",
+      "failed": "Something went wrong. Try again.",
+      "undo": "Undo",
+      "decidedCount": "{count, plural, =0 {No work decided yet} =1 {1 work decided} other {# works decided}}"
+    },
+    "finish": "Finish onboarding",
+    "finished": "Your profile is ready. Welcome to ResearchOS.",
+    "finishFailed": "Could not finish the onboarding. Pick at least one research interest and try again.",
+    "leaveGuard": {
+      "title": "Leave the onboarding?",
+      "description": "Your answers are only kept on this page. If you leave now, everything you have entered so far is lost and you start again from the first step.",
+      "confirm": "Leave and lose my answers",
+      "cancel": "Stay on this page"
+    },
+    "skip": "Skip for now"
+  },
   "profile": {
     "llkh": {
       "title": "Export scientific CV",
@@ -368,6 +512,11 @@
       "statsDrafts": "{count} draft(s)",
       "statsGroups": "Groups",
       "statsTopics": "Topics",
+      "citationMetricsTitle": "Citation metrics",
+      "citationWorks": "Works",
+      "citationCitations": "Citations",
+      "citationHIndex": "h-index",
+      "citationI10Index": "i10-index",
       "pendingClaimsNotice": "{count} OpenAlex candidate(s) awaiting review",
       "reviewNow": "Review",
       "affiliationTitle": "Affiliation & Identifiers",
@@ -493,16 +642,34 @@
       "rejected": "Rejected"
     },
     "openalexTab": {
-      "title": "OpenAlex Candidates Queue",
-      "description": "Candidate publication works matched from OpenAlex awaiting your confirmation.",
+      "title": "OpenAlex Candidates",
+      "description": "Publication works matched from OpenAlex awaiting your confirmation.",
       "emptyTitle": "Queue is empty",
       "emptyMessage": "You have no pending publication candidates from OpenAlex.",
-      "accept": "Accept Work",
+      "emptyRejectedTitle": "No rejected works",
+      "emptyRejectedMessage": "You have not rejected any OpenAlex candidate. Rejected works stay here so you can accept them later.",
+      "pendingTab": "Pending suggestions",
+      "rejectedTab": "Rejected works",
+      "accept": "Accept",
       "accepting": "Accepting…",
       "reject": "Reject",
       "rejecting": "Rejecting…",
       "workAccepted": "Publication accepted and added to your outputs.",
-      "workRejected": "Publication candidate rejected."
+      "workRejected": "Publication candidate rejected.",
+      "fetchNew": "Fetch new from OpenAlex",
+      "pullDone": "Pull finished: {created} new works, {existing} already known.",
+      "pullFailed": "Could not fetch works from OpenAlex.",
+      "acceptTitle": "Accept this publication",
+      "acceptDescription": "Choose who may see this work once you accept it.",
+      "acceptingWork": "Work: {title}",
+      "visibilityPrivate": "Private",
+      "visibilityPrivateHint": "Only you can see this work. You can publish it later from its detail page.",
+      "visibilityPublic": "Public to the FPTU community",
+      "visibilityPublicHint": "Every signed-in FPTU researcher can see this work as soon as you accept it.",
+      "confirmAccept": "Accept work",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}"
     }
   },
   "outputs": {
@@ -704,7 +871,29 @@
         "visibility_required": "Visibility is required.",
         "visibility_invalid": "Visibility must be FPTU_COMMUNITY or RESEARCH_GROUP.",
         "access_group_id_invalid": "The access group must be a valid UUID.",
-        "access_group_id_required": "An access group is required when visibility is RESEARCH_GROUP."
+        "access_group_id_required": "An access group is required when visibility is RESEARCH_GROUP.",
+        "orcid_id_invalid": "Enter an ORCID in the form 0000-0000-0000-0000.",
+        "bio_invalid": "The biography must be text.",
+        "bio_too_long": "Use 2,000 characters or fewer.",
+        "google_scholar_url_invalid": "Enter a valid URL.",
+        "google_scholar_url_too_long": "Use 500 characters or fewer.",
+        "scopus_author_id_invalid": "The Scopus author id must be text.",
+        "scopus_author_id_too_long": "Use 50 characters or fewer.",
+        "affiliations_invalid": "The affiliations must be a list.",
+        "affiliation_invalid": "Each affiliation must be a valid affiliation.",
+        "too_many_affiliations": "Use 50 affiliations or fewer.",
+        "affiliation_institution_id_required": "The institution id is required.",
+        "affiliation_institution_id_invalid": "The institution id must be text.",
+        "affiliation_institution_id_too_long": "Use 255 characters or fewer for the institution id.",
+        "affiliation_name_required": "The institution name is required.",
+        "affiliation_name_invalid": "The institution name must be text.",
+        "affiliation_name_too_long": "Use 255 characters or fewer for the institution name.",
+        "affiliation_ror_invalid": "The ROR id must be text.",
+        "affiliation_ror_too_long": "Use 255 characters or fewer for the ROR id.",
+        "affiliation_country_code_invalid": "The country code must be two letters, e.g. VN.",
+        "affiliation_institution_type_invalid": "Select a valid institution type.",
+        "affiliation_year_start_invalid": "The start year must be a year between 1000 and the current year plus one.",
+        "affiliation_year_end_invalid": "The end year must be a year between 1000 and the current year plus one."
       },
       "domain": {
         "follow_self": "You cannot follow yourself.",
@@ -823,7 +1012,13 @@
         "chat_attachment_limit_exceeded": "You can attach up to 5 files per message.",
         "chat_attachment_already_linked": "This attachment has already been sent in another message.",
         "project_not_found": "The research project was not found.",
-        "project_access_denied": "You do not have permission to view this research project."
+        "project_access_denied": "You do not have permission to view this research project.",
+        "onboarding_requires_interest": "Pick at least one research interest before finishing the onboarding.",
+        "orcid_already_claimed": "This ORCID already belongs to another researcher profile.",
+        "onboarding_affiliation_years_invalid": "An affiliation cannot end before it starts.",
+        "interest_topic_not_found": "One of the selected research topics no longer exists.",
+        "interest_topic_inactive": "One of the selected research topics is no longer available.",
+        "interests_required": "Pick at least one research interest before finishing the onboarding."
       }
     }
   },

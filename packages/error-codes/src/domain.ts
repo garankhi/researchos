@@ -168,6 +168,14 @@ export const domainErrorCodes = {
   profiles: {
     profileNotFound: 'profile_not_found',
     profileAccessDenied: 'profile_access_denied',
+    onboardingRequiresInterest: 'onboarding_requires_interest',
+    orcidAlreadyClaimed: 'orcid_already_claimed',
+    onboardingAffiliationYearsInvalid: 'onboarding_affiliation_years_invalid',
+  },
+  interests: {
+    topicNotFound: 'interest_topic_not_found',
+    topicInactive: 'interest_topic_inactive',
+    interestsRequired: 'interests_required',
   },
   provenance: {
     fieldLocked: 'provenance_field_locked',

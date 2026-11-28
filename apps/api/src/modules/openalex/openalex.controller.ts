@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -21,19 +22,31 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUserId } from '../../common/decorators/current-user-id.decorator.js';
+import { AcceptCandidateDto } from './dto/accept-candidate.dto.js';
+import { AvailableWorksQueryDto } from './dto/available-works.query.dto.js';
+import { CandidateDecisionDto } from './dto/candidate-decision-response.dto.js';
 import {
   CandidateWorksCountDto,
   PaginatedCandidateWorksResponseDto,
 } from './dto/candidate-work-response.dto.js';
-import { CandidateDecisionDto } from './dto/candidate-decision-response.dto.js';
 import { ListCandidateWorksQueryDto } from './dto/list-candidate-works.query.dto.js';
+import { OpenAlexAuthorCandidatesDto } from './dto/openalex-author-response.dto.js';
+import { OpenAlexWorkPreviewDto } from './dto/openalex-work-preview.dto.js';
+import { PullOpenAlexWorksDto } from './dto/pull-openalex-works.dto.js';
+import { PullOpenAlexWorksResultDto } from './dto/pull-openalex-works-result.dto.js';
 import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
+import { OpenAlexPullService } from './openalex-pull.service.js';
 
 /**
- * The stored-candidate reads of the OpenAlex pull (RES-138).
+ * The OpenAlex routes of the pull (RES-138, RES-141).
  *
- * Both routes read the candidates the ingest persisted — never OpenAlex
- * itself — for the researcher behind the session.
+ * Three groups:
+ *
+ * - **discovery** — the author candidates and the live works preview,
+ *   both resolved from the caller's own identity;
+ * - **pull** — the trigger that pulls the works into the platform as
+ *   candidates;
+ * - **decisions** — the accept and the reject on a stored candidate.
  */
 @ApiTags('openalex')
 @ApiCookieAuth()
@@ -41,8 +54,74 @@ import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
   description: 'There is no valid session behind the request.',
 })
 @Controller('external/openalex')
-export class OpenAlexCandidatesController {
-  constructor(private readonly candidates: OpenAlexCandidatesService) {}
+export class OpenAlexController {
+  constructor(
+    private readonly candidates: OpenAlexCandidatesService,
+    private readonly pull: OpenAlexPullService,
+  ) {}
+
+  @ApiOperation({
+    summary: "Lists the caller's OpenAlex author candidates",
+  })
+  @ApiOkResponse({
+    description:
+      'The author candidates for the caller: the confirmed author when the profile carries an id, otherwise the candidates found by the byline name.',
+    type: OpenAlexAuthorCandidatesDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'The caller has no researcher profile.',
+  })
+  @Get('authors')
+  findAuthors(
+    @CurrentUserId() userId: string,
+  ): Promise<OpenAlexAuthorCandidatesDto> {
+    return this.pull.findAuthorCandidates(userId);
+  }
+
+  @ApiOperation({
+    summary: "Previews the caller's OpenAlex works before they are pulled",
+  })
+  @ApiOkResponse({
+    description:
+      'The live works OpenAlex holds for the caller, newest pull not applicable — the order is OpenAlex’s own.',
+    type: [OpenAlexWorkPreviewDto],
+  })
+  @ApiNotFoundResponse({
+    description:
+      'The caller has no researcher profile, or no author could be resolved for them.',
+  })
+  @ApiBadRequestResponse({
+    description: 'The author id is malformed.',
+  })
+  @Get('works/available')
+  findAvailableWorks(
+    @CurrentUserId() userId: string,
+    @Query() query: AvailableWorksQueryDto,
+  ): Promise<OpenAlexWorkPreviewDto[]> {
+    return this.pull.findAvailableWorks(userId, query.authorId);
+  }
+
+  @ApiOperation({
+    summary:
+      "Pulls the caller's OpenAlex works into the platform as candidates",
+  })
+  @ApiOkResponse({
+    description:
+      'The pull result: the candidates that were created, the ones that already existed, and how the works were resolved.',
+    type: PullOpenAlexWorksResultDto,
+  })
+  @ApiNotFoundResponse({
+    description:
+      'The caller has no researcher profile, or no author could be resolved for them.',
+  })
+  @Post('pull')
+  @HttpCode(HttpStatus.OK)
+  pullWorks(
+    @CurrentUserId() userId: string,
+    @Body() body: PullOpenAlexWorksDto,
+  ): Promise<PullOpenAlexWorksResultDto> {
+    return this.pull.pull(userId, body);
+  }
 
   @ApiOperation({
     summary: "Lists the caller's stored OpenAlex candidates",
@@ -61,6 +140,25 @@ export class OpenAlexCandidatesController {
     @Query() query: ListCandidateWorksQueryDto,
   ): Promise<PaginatedCandidateWorksResponseDto> {
     return this.candidates.findAll(userId, query);
+  }
+
+  @ApiOperation({
+    summary: 'Lists the OpenAlex candidates the caller rejected',
+  })
+  @ApiOkResponse({
+    description:
+      'The rejected candidates of the caller. A rejected work is never deleted, so it can be accepted later.',
+    type: PaginatedCandidateWorksResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'The pagination parameters are invalid.',
+  })
+  @Get('works/rejected')
+  findRejected(
+    @CurrentUserId() userId: string,
+    @Query() query: ListCandidateWorksQueryDto,
+  ): Promise<PaginatedCandidateWorksResponseDto> {
+    return this.candidates.findRejected(userId, query);
   }
 
   @ApiOperation({
@@ -105,8 +203,9 @@ export class OpenAlexCandidatesController {
   accept(
     @CurrentUserId() userId: string,
     @Param('outputId', new ParseUUIDPipe()) outputId: string,
+    @Body() body: AcceptCandidateDto,
   ): Promise<CandidateDecisionDto> {
-    return this.candidates.accept(userId, outputId);
+    return this.candidates.accept(userId, outputId, body);
   }
 
   @Post('works/:outputId/reject')

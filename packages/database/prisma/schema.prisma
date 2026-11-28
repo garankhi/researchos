@@ -1081,20 +1081,83 @@ model research_updates {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
 model researcher_profiles {
-  user_id                 String                   @id @db.Uuid
-  orcid_id                String?                  @unique @db.VarChar(19)
-  scopus_author_id        String?                  @db.VarChar(50)
-  google_scholar_url      String?
-  availability_status     availability_status_type @default(NOT_AVAILABLE)
-  bio                     String?
-  avatar_storage_key      String?
-  profile_confirmed_at    DateTime?                @db.Timestamptz(6)
-  papers_reviewed_at      DateTime?                @db.Timestamptz(6)
-  onboarding_completed_at DateTime?                @db.Timestamptz(6)
-  last_synced_at          DateTime?                @db.Timestamptz(6)
-  llkh_last_exported_at   DateTime?                @db.Timestamptz(6)
-  updated_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  users                   users                    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user_id                     String                   @id @db.Uuid
+  orcid_id                    String?                  @unique @db.VarChar(19)
+  openalex_author_id          String?                  @db.VarChar(50)
+  scopus_author_id            String?                  @db.VarChar(50)
+  google_scholar_url          String?
+  availability_status         availability_status_type @default(NOT_AVAILABLE)
+  bio                         String?
+  avatar_storage_key          String?
+  profile_confirmed_at        DateTime?                @db.Timestamptz(6)
+  papers_reviewed_at          DateTime?                @db.Timestamptz(6)
+  onboarding_completed_at     DateTime?                @db.Timestamptz(6)
+  last_synced_at              DateTime?                @db.Timestamptz(6)
+  llkh_last_exported_at       DateTime?                @db.Timestamptz(6)
+  openalex_display_name       String?                  @db.VarChar(255)
+  openalex_works_count        Int?
+  openalex_cited_by_count     Int?
+  openalex_h_index            Int?
+  openalex_i10_index          Int?
+  openalex_2yr_mean_citedness Float?
+  openalex_synced_at          DateTime?                @db.Timestamptz(6)
+  updated_at                  DateTime                 @default(now()) @db.Timestamptz(6)
+  users                       users                    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([openalex_author_id], map: "idx_researcher_profiles_openalex_author", where: raw("(\"openalex_author_id\" IS NOT NULL)"))
+}
+
+/// The byline spellings OpenAlex has observed for a researcher.
+///
+/// One row per spelling. The set is what the name-based identity
+/// resolution matches against, so it has to be a table rather than a
+/// column: it is queried, not displayed.
+model researcher_author_names {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String    @db.Uuid
+  name              String    @db.VarChar(255)
+  is_canonical      Boolean   @default(false)
+  source_updated_at DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  users             users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, name], map: "uq_researcher_author_names_user_name")
+  @@index([user_id], map: "idx_researcher_author_names_user")
+}
+
+/// The institutions a researcher was affiliated with, and the years.
+///
+/// The year range is what makes an affiliation decidable: a year at FPT
+/// University is the platform's business, a year at another institution
+/// is not.
+model researcher_affiliations {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String            @db.Uuid
+  institution_id   String            @db.VarChar(255)
+  ror              String?           @db.VarChar(255)
+  name             String            @db.VarChar(255)
+  country_code     String?           @db.VarChar(2)
+  institution_type institution_type?
+  year_start       Int?              @db.SmallInt
+  year_end         Int?              @db.SmallInt
+  is_primary       Boolean           @default(false)
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  users            users             @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, institution_id], map: "uq_researcher_affiliations_user_institution")
+  @@index([user_id], map: "idx_researcher_affiliations_user")
+  @@index([institution_id], map: "idx_researcher_affiliations_institution")
+}
+
+/// The raw OpenAlex author payload for a researcher, kept whole.
+///
+/// The structured columns cover what the platform queries on; this keeps
+/// the rest without a migration every time OpenAlex adds a field.
+model researcher_openalex_snapshots {
+  user_id   String   @id @db.Uuid
+  payload   Json
+  synced_at DateTime @default(now()) @db.Timestamptz(6)
+  users     users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -1268,6 +1331,9 @@ model users {
   research_topics                                                       research_topics[]
   research_updates                                                      research_updates[]
   researcher_profiles                                                   researcher_profiles?
+  researcher_affiliations                                               researcher_affiliations[]
+  researcher_author_names                                               researcher_author_names[]
+  researcher_openalex_snapshots                                         researcher_openalex_snapshots?
   resource_handovers_resource_handovers_new_user_idTousers              resource_handovers[]             @relation("resource_handovers_new_user_idTousers")
   resource_handovers_resource_handovers_performed_byTousers             resource_handovers[]             @relation("resource_handovers_performed_byTousers")
   resource_handovers_resource_handovers_previous_user_idTousers         resource_handovers[]             @relation("resource_handovers_previous_user_idTousers")
@@ -1604,6 +1670,18 @@ enum target_audience {
 enum taxonomy_source {
   LOCAL
   OPENALEX
+}
+
+/// The kind of institution an author was affiliated with.
+enum institution_type {
+  EDUCATION
+  COMPANY
+  HEALTHCARE
+  NONPROFIT
+  GOVERNMENT
+  FACILITY
+  ARCHIVE
+  OTHER
 }
 
 enum user_type {

@@ -3,6 +3,7 @@ import { domainErrorCodes } from '@researchos/error-codes';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OutputImportState, PrismaService } from '@researchos/database';
 import { CodedHttpException } from '../../common/errors/error-codes.js';
+import { CandidateVisibility } from './dto/accept-candidate.dto.js';
 import { ListCandidateWorksQueryDto } from './dto/list-candidate-works.query.dto.js';
 import { OpenAlexCandidatesService } from './openalex-candidates.service.js';
 import { OPENALEX_SOURCE } from './openalex-ingest.service.js';
@@ -148,6 +149,36 @@ describe('OpenAlexCandidatesService', () => {
     );
   });
 
+  it('lists the rejected candidates through the rejection view', async () => {
+    const { service, tx } = makeService({
+      suggestionRows: [{ id: OUT_1, doi: '10.1234/one' }],
+      total: 1n,
+      revisions: [makeRevision(OUT_1)],
+      externalIds: [
+        { output_id: OUT_1, external_id: 'https://openalex.org/W1' },
+      ],
+      claims: [
+        {
+          output_id: OUT_1,
+          user_id: USER_ID,
+          status: 'REJECTED',
+          match_source: 'OPENALEX:A1',
+          reviewed_at: new Date('2026-01-01'),
+        },
+      ],
+    });
+
+    const result = await service.findRejected(
+      USER_ID,
+      new ListCandidateWorksQueryDto(),
+    );
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].claimStatus).toBe('REJECTED');
+    // The rejection list reads its own view, not the suggestion view.
+    expect(suggestionSql(tx)).toContain('visible_rejected_candidates');
+  });
+
   it('counts the remaining candidates without the full list', async () => {
     const { service, prisma } = makeService({ countTotal: 3n });
 
@@ -236,9 +267,19 @@ function makeDecisionService(options: {
   view?: boolean;
   claim?: { author_id: string | null; status: string } | null;
   linkedAuthor?: { id: string } | null;
-  profile?: { orcid_id: string | null } | null;
-  revision?: { authors_snapshot: unknown } | null;
+  profile?: {
+    orcid_id: string | null;
+    openalex_author_id?: string | null;
+    users?: { full_name: string | null } | null;
+  } | null;
+  account?: { full_name: string | null } | null;
+  revision?: {
+    authors_snapshot: unknown;
+    output_type?: string;
+    id?: string;
+  } | null;
   authorRow?: { id: string; user_id: string | null } | null;
+  authors?: unknown[];
 }) {
   const tx = {
     $queryRaw: vi.fn(async (parts: TemplateStringsArray) => {
@@ -262,13 +303,14 @@ function makeDecisionService(options: {
     output_authors: {
       findFirst: vi.fn(async () => options.linkedAuthor ?? null),
       findUnique: vi.fn(async () => options.authorRow ?? null),
+      findMany: vi.fn(async () => options.authors ?? []),
       update: vi.fn(async () => ({})),
     },
     researcher_profiles: {
       findUnique: vi.fn(async () => options.profile ?? null),
     },
-    output_revisions: {
-      findFirst: vi.fn(async () => options.revision ?? null),
+    users: {
+      findUnique: vi.fn(async () => options.account ?? null),
     },
     research_outputs: {
       update: vi.fn(
@@ -280,6 +322,10 @@ function makeDecisionService(options: {
           owner_id: args.data.owner_id,
         }),
       ),
+    },
+    output_revisions: {
+      findFirst: vi.fn(async () => options.revision ?? null),
+      update: vi.fn(async () => ({})),
     },
   };
   const prisma = {
@@ -342,12 +388,69 @@ describe('OpenAlexCandidatesService decisions', () => {
     );
   });
 
+  it('keeps the accepted work private by default', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: { id: 'author-1' },
+      revision: {
+        authors_snapshot: [{ name: 'Nguyen Van An', order: 1 }],
+        output_type: 'ARTICLE',
+        id: 'rev-1',
+      },
+    });
+
+    await service.accept(USER_ID, OUT_1);
+
+    // The draft is not released: the work stays the researcher's own
+    // working copy until they publish it themselves.
+    expect(tx.output_revisions.update).not.toHaveBeenCalled();
+  });
+
+  it('publishes the accepted work when the community is chosen', async () => {
+    const { service, tx } = makeDecisionService({
+      output: CANDIDATE,
+      claim: { author_id: null, status: 'SUGGESTED' },
+      linkedAuthor: { id: 'author-1' },
+      revision: {
+        authors_snapshot: [{ name: 'Nguyen Van An', order: 1 }],
+        output_type: 'ARTICLE',
+        id: 'rev-1',
+      },
+    });
+
+    await service.accept(USER_ID, OUT_1, {
+      visibility: CandidateVisibility.FPTU_COMMUNITY,
+    });
+
+    expect(tx.output_revisions.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'rev-1' },
+        data: expect.objectContaining({ released_by: USER_ID }),
+      }),
+    );
+    expect(tx.research_outputs.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: OUT_1 },
+        data: expect.objectContaining({
+          current_release_id: 'rev-1',
+          sharing_status: 'SHARED',
+          audience: 'FPTU_COMMUNITY',
+        }),
+      }),
+    );
+  });
+
   it('accepts by matching the profile ORCID against the draft snapshot', async () => {
     const { service, tx } = makeDecisionService({
       output: CANDIDATE,
       claim: { author_id: null, status: 'SUGGESTED' },
       linkedAuthor: null,
-      profile: { orcid_id: '0000-0002-1825-0097' },
+      profile: {
+        orcid_id: '0000-0002-1825-0097',
+        openalex_author_id: null,
+        users: { full_name: 'Nguyen Van An' },
+      },
       revision: { authors_snapshot: ORCID_SNAPSHOT },
       authorRow: { id: 'author-1', user_id: null },
     });
@@ -368,7 +471,11 @@ describe('OpenAlexCandidatesService decisions', () => {
       output: CANDIDATE,
       claim: { author_id: null, status: 'SUGGESTED' },
       linkedAuthor: null,
-      profile: { orcid_id: null },
+      profile: {
+        orcid_id: null,
+        openalex_author_id: null,
+        users: { full_name: 'Nguyen Van An' },
+      },
     });
 
     const err = await service.accept(USER_ID, OUT_1).catch((e: unknown) => e);
@@ -385,7 +492,11 @@ describe('OpenAlexCandidatesService decisions', () => {
       output: CANDIDATE,
       claim: { author_id: null, status: 'SUGGESTED' },
       linkedAuthor: null,
-      profile: { orcid_id: '0000-0002-1825-0097' },
+      profile: {
+        orcid_id: '0000-0002-1825-0097',
+        openalex_author_id: null,
+        users: { full_name: 'Nguyen Van An' },
+      },
       revision: { authors_snapshot: ORCID_SNAPSHOT },
       authorRow: { id: 'author-1', user_id: 'other-user' },
     });
