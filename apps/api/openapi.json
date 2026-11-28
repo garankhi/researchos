@@ -3023,7 +3023,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "cookie": []
           }
         ],
         "summary": "Get the caller’s digest preferences",
@@ -3088,7 +3088,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "cookie": []
           }
         ],
         "summary": "Update the caller’s digest preferences",
@@ -3181,7 +3181,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "cookie": []
           }
         ],
         "summary": "List the caller’s digest delivery history",
@@ -3259,7 +3259,7 @@
         },
         "security": [
           {
-            "bearer": []
+            "cookie": []
           }
         ],
         "summary": "Get a digest delivery and its items",

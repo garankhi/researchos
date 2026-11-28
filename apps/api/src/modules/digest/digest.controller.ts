@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiBearerAuth,
+  ApiCookieAuth,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -30,7 +30,7 @@ import {
 import { DigestService } from './digest.service.js';
 
 @ApiTags('digest')
-@ApiBearerAuth()
+@ApiCookieAuth()
 @ApiUnauthorizedResponse({
   description: 'A valid session is required.',
 })
