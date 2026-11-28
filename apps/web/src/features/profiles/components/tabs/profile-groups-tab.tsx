@@ -4,6 +4,8 @@ import { Badge, Box, Flex, Heading, Icon, Stack, Text } from '@chakra-ui/react';
 import { Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EntityLink } from '@/features/discovery';
+import { CreateGroupButton } from '@/features/groups';
+import { useCurrentUser } from '@/features/identity';
 import { EmptyState, ErrorState } from '@/components/ui/feedback';
 import { useProfileGroups } from '../../hooks/use-profile-groups';
 import type { ResearchGroupResponseDto } from '../../types';
@@ -11,10 +13,28 @@ import { ProfileTabSkeleton } from '../profile-skeletons';
 
 export function ProfileGroupsTab({
   userId,
+  isOwner = false,
 }: {
   userId?: string;
   isOwner?: boolean;
 }) {
+  const user = useCurrentUser();
+  const canCreate =
+    isOwner && user?.id === userId && user?.roles.includes('RESEARCHER');
+
+  return (
+    <Stack gap="4">
+      {canCreate ? (
+        <Flex justify="flex-end">
+          <CreateGroupButton />
+        </Flex>
+      ) : null}
+      <ProfileGroupList userId={userId} />
+    </Stack>
+  );
+}
+
+function ProfileGroupList({ userId }: { userId?: string }) {
   const t = useTranslations('profile');
   const {
     allGroups,

@@ -1113,6 +1113,17 @@
     "readonlyNotice": "Bạn đang xem nhóm này với tư cách thành viên.",
     "viewAll": "Xem tất cả",
     "editGroup": "Chỉnh sửa thông tin nhóm",
+    "newGroup": "Nhóm mới",
+    "createGroup": "Tạo nhóm",
+    "createGroupDescription": "Bạn sẽ là trưởng nhóm nghiên cứu mới.",
+    "groupCreated": "Đã tạo nhóm nghiên cứu.",
+    "createGroupError": "Không thể tạo nhóm nghiên cứu",
+    "createGroupValidation": {
+      "group_code_required": "Mã nhóm là bắt buộc.",
+      "group_code_too_long": "Mã nhóm không được vượt quá 50 ký tự.",
+      "group_name_required": "Tên nhóm là bắt buộc.",
+      "group_name_too_long": "Tên nhóm không được vượt quá 255 ký tự."
+    },
     "name": "Tên nhóm",
     "code": "Mã nhóm",
     "archiveGroup": "Lưu trữ nhóm",

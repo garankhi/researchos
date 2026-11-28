@@ -1113,6 +1113,17 @@
     "readonlyNotice": "You are viewing this group as a member.",
     "viewAll": "View all",
     "editGroup": "Edit group information",
+    "newGroup": "New group",
+    "createGroup": "Create group",
+    "createGroupDescription": "You’ll become the lead of the new research group.",
+    "groupCreated": "Research group created.",
+    "createGroupError": "Could not create the research group",
+    "createGroupValidation": {
+      "group_code_required": "Group code is required.",
+      "group_code_too_long": "Group code must not exceed 50 characters.",
+      "group_name_required": "Group name is required.",
+      "group_name_too_long": "Group name must not exceed 255 characters."
+    },
     "name": "Group name",
     "code": "Group code",
     "archiveGroup": "Archive group",

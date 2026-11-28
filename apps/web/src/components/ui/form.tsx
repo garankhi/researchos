@@ -38,11 +38,14 @@ type FieldProps<
 function useFormField<
   TValues extends FieldValues,
   TName extends FieldPath<TValues>,
->({
-  name,
-  control: controlProp,
-  disabled,
-}: Pick<FieldProps<TValues, TName>, 'name' | 'control' | 'disabled'>) {
+>(
+  {
+    name,
+    control: controlProp,
+    disabled,
+  }: Pick<FieldProps<TValues, TName>, 'name' | 'control' | 'disabled'>,
+  resolveFieldError?: (code: string) => string | undefined,
+) {
   const context = useFormContext<TValues>();
   const control = controlProp ?? context?.control;
   if (!control) {
@@ -59,7 +62,8 @@ function useFormField<
     ...field,
     invalid: fieldState.invalid,
     errorMessage: code
-      ? resolveErrorCode(t, code, t('unknown'), 'field')
+      ? (resolveFieldError?.(code) ??
+        resolveErrorCode(t, code, t('unknown'), 'field'))
       : undefined,
   };
 }
@@ -88,6 +92,7 @@ export function FormTextField<
   disabled,
   required,
   wrapperProps,
+  resolveFieldError,
   ...inputProps
 }: FieldProps<TValues, TName> &
   Omit<
@@ -102,12 +107,13 @@ export function FormTextField<
      * than the input. The input always keeps the shared control height.
      */
     wrapperProps?: FieldRootProps;
+    /** Resolve feature-specific validation codes before using the shared catalog. */
+    resolveFieldError?: (code: string) => string | undefined;
   }) {
-  const { invalid, errorMessage, ...field } = useFormField({
-    name,
-    control,
-    disabled,
-  });
+  const { invalid, errorMessage, ...field } = useFormField(
+    { name, control, disabled },
+    resolveFieldError,
+  );
 
   return (
     <Field.Root

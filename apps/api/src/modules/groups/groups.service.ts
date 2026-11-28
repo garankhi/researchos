@@ -71,8 +71,8 @@ export class GroupsService {
    * Creates a new research group.
    *
    * - Defaults `lead_id` to `callerId` when `dto.leadId` is omitted.
-   * - Verifies that the designated lead exists (`404 user_not_found`) and is
-   *   an active researcher (`400 group_leader_ineligible`).
+   * - Requires an existing active researcher as the designated lead
+   *   (`400 group_leader_ineligible`).
    * - Enforces unique `code` (`409 group_code_already_exists`).
    */
   async create(
@@ -83,7 +83,7 @@ export class GroupsService {
     const trimmedName = dto.name.trim();
     const targetLeadId = dto.leadId ?? callerId;
 
-    await this.assertValidGroupLeader(targetLeadId);
+    await this.assertValidGroupLeader(targetLeadId, 'create');
 
     const existingCode = await this.prisma.research_groups.findFirst({
       where: {
@@ -361,7 +361,7 @@ export class GroupsService {
     }
 
     if (dto.leadId !== undefined) {
-      await this.assertValidGroupLeader(dto.leadId);
+      await this.assertValidGroupLeader(dto.leadId, 'update');
       data.users = { connect: { id: dto.leadId } };
     }
 
@@ -392,24 +392,25 @@ export class GroupsService {
     }
   }
 
-  /**
-   * Ensures `userId` belongs to an existing account (`404 user_not_found`)
-   * with active `RESEARCHER` access (`400 group_leader_ineligible`).
-   */
-  private async assertValidGroupLeader(userId: string): Promise<void> {
+  private async assertValidGroupLeader(
+    userId: string,
+    operation: 'create' | 'update',
+  ): Promise<void> {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
     });
 
-    if (!user) {
+    if (!user && operation === 'update') {
       throw new CodedHttpException(
         domainErrorCodes.identity.userNotFound,
         HttpStatus.NOT_FOUND,
       );
     }
 
-    const access = await this.accessService.effectiveRoles(userId);
-    if (!access.isResearcher) {
+    if (
+      !user ||
+      !(await this.accessService.effectiveRoles(userId)).isResearcher
+    ) {
       throw new CodedHttpException(
         domainErrorCodes.groups.groupLeaderIneligible,
         HttpStatus.BAD_REQUEST,

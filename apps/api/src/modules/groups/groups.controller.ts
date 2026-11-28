@@ -53,13 +53,10 @@ export class GroupsController {
   })
   @ApiBadRequestResponse({
     description:
-      'Invalid payload or designated leader is not an active researcher.',
+      'Invalid payload, or the designated lead does not exist or lacks active researcher access.',
   })
   @ApiForbiddenResponse({
     description: 'Caller does not hold the RESEARCHER role.',
-  })
-  @ApiNotFoundResponse({
-    description: 'The specified leader user account was not found.',
   })
   @ApiConflictResponse({
     description: 'A research group with this code already exists.',

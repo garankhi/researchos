@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -10,7 +11,6 @@ import {
   OpportunityApplicationStatus,
   Prisma,
   PrismaService,
-  stageNotificationEvent,
 } from '@researchos/database';
 import { domainErrorCodes } from '@researchos/error-codes';
 import {
@@ -633,4 +633,31 @@ export class ApplicationsService {
       isOverdue: pending && remaining <= 0,
     };
   }
+}
+function stageNotificationEvent(
+  tx: Prisma.TransactionClient,
+  event: {
+    key: string;
+    type:
+      | 'APPLICATION_RECEIVED'
+      | 'APPLICATION_ACCEPTED'
+      | 'APPLICATION_DECLINED'
+      | 'APPLICATION_WITHDRAWN';
+    actorId: string;
+    subjectType: string;
+    subjectId: string;
+    payload: { link: string };
+  },
+) {
+  // Persist the event alongside the application update. A duplicate key is
+  // harmless, allowing transaction retries without staging duplicate events.
+  return tx.$executeRaw`
+    INSERT INTO notification_events
+      (key, type, actor_id, subject_type, subject_id, payload)
+    VALUES
+      (${event.key}, ${event.type}, ${event.actorId}::uuid,
+       ${event.subjectType}, ${event.subjectId}::uuid,
+       ${JSON.stringify(event.payload)}::jsonb)
+    ON CONFLICT (key) DO NOTHING
+  `;
 }
