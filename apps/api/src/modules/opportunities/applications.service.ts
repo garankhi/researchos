@@ -661,4 +661,3 @@ function stageNotificationEvent(
     ON CONFLICT (key) DO NOTHING
   `;
 }
-
