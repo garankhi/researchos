@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { resolveEnvFilePaths } from '@researchos/config';
 import {
   BackgroundJobsService,
@@ -23,11 +23,17 @@ import {
 } from '@researchos/queue';
 import { Queue } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  DIGEST_SCHEDULER_JOB,
+  DIGEST_SCHEDULER_QUEUE,
+  DigestScheduler,
+} from '../../worker/dist/modules/notifications/digest-scheduler.service.js';
 import type {
   MailMessage,
   MailOutcome,
 } from '../../worker/dist/modules/notifications/mail-provider.js';
 import { JobStatusService } from '../dist/modules/jobs/job-status.service.js';
+import { DigestService } from '../dist/modules/digest/digest.service.js';
 
 const workspace = resolve(import.meta.dirname, '../../..');
 const accepted = {
@@ -48,6 +54,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   let queue: Queue;
   let backgroundQueue: Queue;
   let researchUpdatesQueue: Queue;
+  let schedulerQueue: Queue;
   let dlq: Queue;
   let worker: ChildProcess | undefined;
   let created = false;
@@ -94,6 +101,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     queue = new Queue(DIGEST_QUEUE, options);
     backgroundQueue = new Queue(BACKGROUND_QUEUE, options);
     researchUpdatesQueue = new Queue(RESEARCH_UPDATES_QUEUE, options);
+    schedulerQueue = new Queue(DIGEST_SCHEDULER_QUEUE, options);
     dlq = new Queue(DEAD_LETTER_QUEUE, options);
 
     await startWorker();
@@ -128,10 +136,12 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     await queue?.obliterate({ force: true });
     await backgroundQueue?.obliterate({ force: true });
     await researchUpdatesQueue?.obliterate({ force: true });
+    await schedulerQueue?.obliterate({ force: true });
     await dlq?.obliterate({ force: true });
     await queue?.close();
     await backgroundQueue?.close();
     await researchUpdatesQueue?.close();
+    await schedulerQueue?.close();
     await dlq?.close();
     await prisma?.$disconnect();
     if (created) await admin.$executeRawUnsafe(`DROP DATABASE "${database}"`);
@@ -199,9 +209,16 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
   async function createOutput(
     title: string,
     audience?: 'PRIVATE' | 'FPTU_COMMUNITY',
+    groupId?: string,
+    topicId?: string,
   ) {
     const output = await prisma.research_outputs.create({
-      data: { owner_id: author, created_by: author, audience },
+      data: {
+        owner_id: author,
+        created_by: author,
+        audience,
+        ...(groupId ? { scope_type: 'GROUP', scope_group_id: groupId } : {}),
+      },
     });
     const timestamp = new Date();
     const revision = await prisma.output_revisions.create({
@@ -210,7 +227,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
         revision_no: 1,
         title,
         created_by: author,
-        ...(audience
+        ...(audience && !topicId
           ? {
               created_at: timestamp,
               released_by: author,
@@ -220,6 +237,20 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
       },
     });
     if (audience) {
+      if (topicId) {
+        await prisma.output_topics.create({
+          data: {
+            output_id: output.id,
+            revision_id: revision.id,
+            topic_id: topicId,
+            added_by: author,
+          },
+        });
+        await prisma.output_revisions.update({
+          where: { id: revision.id },
+          data: { released_by: author, released_at: new Date() },
+        });
+      }
       await prisma.research_outputs.update({
         where: { id: output.id },
         data: {
@@ -340,6 +371,157 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
       )
       .toBe(true);
   }
+
+  it('stages and sends one permission-filtered weekly digest with merged follow reasons', async () => {
+    await expect(
+      schedulerQueue.getJobScheduler(DIGEST_SCHEDULER_JOB),
+    ).resolves.toBeTruthy();
+    const index = received.length;
+    const digest = new DigestService(prisma);
+    const recipient = await createUser();
+    const disabled = await createUser();
+    const empty = await createUser();
+    const group = await prisma.research_groups.create({
+      data: { name: 'Weekly research group', code: 'DIGEST', lead_id: author },
+    });
+    const field = await prisma.research_fields.create({
+      data: { name: 'Digest field', source: 'LOCAL' },
+    });
+    const subfield = await prisma.research_subfields.create({
+      data: { name: 'Digest subfield', source: 'LOCAL', field_id: field.id },
+    });
+    const topic = await prisma.research_topics.create({
+      data: {
+        name: 'Digest topic',
+        subfield_id: subfield.id,
+        created_by: author,
+      },
+    });
+    const eventId = await createOutput(
+      'Weekly selected work',
+      'FPTU_COMMUNITY',
+      group.id,
+      topic.id,
+    );
+    const published = await prisma.research_updates.findUniqueOrThrow({
+      where: { id: eventId },
+    });
+    const hidden = await prisma.research_updates.findUniqueOrThrow({
+      where: { id: privateOutput },
+    });
+    const periodStart = new Date('2026-03-02T05:00:00Z');
+    const periodEnd = new Date('2026-03-09T04:00:00Z');
+
+    async function addEvent(
+      source: typeof published,
+      occurredAt: Date,
+      type: 'OUTPUT_SHARED' | 'OUTPUT_REVISION_RELEASED',
+    ) {
+      return prisma.research_updates.create({
+        data: {
+          event_key: randomUUID(),
+          event_type: type,
+          actor_id: author,
+          output_id: source.output_id,
+          revision_id: source.revision_id,
+          occurred_at: occurredAt,
+        },
+      });
+    }
+
+    await addEvent(published, periodStart, 'OUTPUT_SHARED');
+    const latest = await addEvent(
+      published,
+      new Date(periodEnd.getTime() - 1),
+      'OUTPUT_REVISION_RELEASED',
+    );
+    await addEvent(published, periodEnd, 'OUTPUT_REVISION_RELEASED');
+    await addEvent(hidden, periodStart, 'OUTPUT_SHARED');
+
+    const follows = [
+      { entity_type: 'RESEARCHER', entity_id: author },
+      { entity_type: 'GROUP', entity_id: group.id },
+      { entity_type: 'TOPIC', entity_id: topic.id },
+    ] as const;
+    await prisma.user_follows.createMany({
+      data: [
+        ...follows.map((follow) => ({ ...follow, follower_id: recipient })),
+        { ...follows[0], follower_id: disabled },
+        { entity_type: 'RESEARCHER', entity_id: disabled, follower_id: empty },
+      ],
+    });
+    await expect(digest.getPreferences(disabled)).resolves.toMatchObject({
+      enabled: false,
+      timezone: 'Asia/Ho_Chi_Minh',
+      language: 'vi',
+    });
+    await expect(
+      digest.updatePreferences(recipient, {
+        enabled: true,
+        timezone: 'America/New_York',
+        language: 'en',
+      }),
+    ).resolves.toMatchObject({
+      enabled: true,
+      timezone: 'America/New_York',
+      language: 'en',
+    });
+    await digest.updatePreferences(empty, { enabled: true });
+
+    const scheduler = new DigestScheduler(
+      prisma,
+      jobs,
+      schedulerQueue,
+      new ConfigService({ QUEUE_PREFIX: prefix }),
+    );
+    const now = new Date('2026-03-09T16:00:00Z');
+    await Promise.all([scheduler.schedule(now), scheduler.schedule(now)]);
+
+    const history = await digest.listDeliveries(recipient, {
+      page: 1,
+      limit: 20,
+    });
+    expect(history.meta.total).toBe(1);
+    const [delivery] = history.items;
+    expect(delivery).toMatchObject({ periodStart, periodEnd });
+    expect(
+      await prisma.digest_deliveries.count({
+        where: { user_id: { in: [disabled, empty] } },
+      }),
+    ).toBe(0);
+    await expect(
+      digest.getDelivery(disabled, delivery!.id),
+    ).rejects.toMatchObject({ status: 404 });
+    const { items } = await digest.getDelivery(recipient, delivery!.id);
+    expect(items).toEqual([
+      {
+        eventId: latest.id,
+        subjectType: 'OUTPUT',
+        subjectId: published.output_id,
+        contentSnapshot: {
+          title: 'Weekly selected work',
+          revision_id: published.revision_id,
+        },
+        matchedReasons: expect.arrayContaining(
+          follows.map(({ entity_type, entity_id }) => ({
+            entityType: entity_type,
+            entityId: entity_id,
+          })),
+        ),
+      },
+    ]);
+    const mail = await waitMail(index);
+    expect(mail.html).toContain('Weekly selected work');
+    expect(mail.html).not.toContain('Private work');
+    respond(index, accepted);
+    await waitStatus(delivery!.id, 'SENT');
+    await scheduler.schedule(now);
+    expect(
+      await prisma.background_jobs.count({
+        where: { owner_id: recipient, kind: DIGEST_SEND_JOB },
+      }),
+    ).toBe(1);
+  });
 
   it('commits the reference and outbox with the delivery or rolls everything back', async () => {
     const user = await createUser();
