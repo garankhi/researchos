@@ -35,6 +35,9 @@ interface ReleasedOutput {
 interface AuthorizedDigest {
   email: string;
   language: string;
+  timezone: string;
+  periodStart: Date;
+  periodEnd: Date;
   outputs: ReleasedOutput[];
 }
 
@@ -139,8 +142,8 @@ export class DigestSender {
     });
     if (!claim) return;
 
-    const { email, language, outputs } = claim.content;
-    const message = this.template.render(language, outputs);
+    const { email, ...digest } = claim.content;
+    const message = this.template.render(digest);
     // Snapshot writes can block while access changes elsewhere. Read current
     // permissions and the address after commit, immediately before submission.
     const current = await this.readAuthorizedDigest(
@@ -173,7 +176,8 @@ export class DigestSender {
     attempt: number | null = null,
   ): Promise<AuthorizedDigest | null> {
     const [content] = await db.$queryRaw<AuthorizedDigest[]>`
-      SELECT u.email::text AS email, p.language,
+      SELECT u.email::text AS email, p.language, p.timezone,
+        d.period_start AS "periodStart", d.period_end AS "periodEnd",
         COALESCE((
           SELECT jsonb_agg(jsonb_build_object(
             'output_id', r.output_id, 'revision_id', r.revision_id, 'title', r.title

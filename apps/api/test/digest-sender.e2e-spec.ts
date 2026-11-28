@@ -512,6 +512,7 @@ describe('digest sender: PostgreSQL → outbox → Redis → standalone worker',
     ]);
     const mail = await waitMail(index);
     expect(mail.html).toContain('Weekly selected work');
+    expect(mail.html).toMatch(/Mar 2\s*–\s*8, 2026/);
     expect(mail.html).not.toContain('Private work');
     respond(index, accepted);
     await waitStatus(delivery!.id, 'SENT');
