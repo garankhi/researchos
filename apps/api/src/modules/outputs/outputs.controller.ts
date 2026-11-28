@@ -48,6 +48,7 @@ import {
   PaginatedOutputsResponseDto,
 } from './dto/output-response.dto.js';
 import { OutputRevisionResponseDto } from './dto/output-revision-response.dto.js';
+import { OutputRevisionHistoryResponseDto } from './dto/output-revision-history-response.dto.js';
 import { PublishOutputDto } from './dto/publish-output.dto.js';
 import { UpdateArticleAbstractDto } from './dto/update-article-abstract.dto.js';
 import { UpdateArticleDto } from './dto/update-article.dto.js';
@@ -211,6 +212,43 @@ export class OutputsController {
     @CurrentUserId() callerId: string,
   ): Promise<OutputRevisionResponseDto[]> {
     return this.outputsService.findRevisions(outputId, callerId);
+  }
+
+  @ApiOperation({
+    summary: 'List the edit history of a research output',
+    description:
+      'Returns the edit history of the specified research output, newest revision first. ' +
+      'Each entry names the account that wrote the revision and the account that ' +
+      'released it, and lists the metadata fields the revision changed against the ' +
+      'revision before it.',
+  })
+  @ApiParam({
+    name: 'outputId',
+    description: 'Unique identifier of the research output (UUID).',
+    format: 'uuid',
+  })
+  @ApiOkResponse({
+    description: 'Edit history retrieved successfully.',
+    type: [OutputRevisionHistoryResponseDto],
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid UUID format for outputId.',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Caller is not authenticated.',
+  })
+  @ApiForbiddenResponse({
+    description: 'Caller is not authorized to view this research output.',
+  })
+  @ApiNotFoundResponse({
+    description: 'The requested research output was not found.',
+  })
+  @Get(':outputId/history')
+  async findRevisionHistory(
+    @Param('outputId', ParseUUIDPipe) outputId: string,
+    @CurrentUserId() callerId: string,
+  ): Promise<OutputRevisionHistoryResponseDto[]> {
+    return this.outputsService.findRevisionHistory(outputId, callerId);
   }
 
   @ApiOperation({

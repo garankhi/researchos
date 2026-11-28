@@ -150,7 +150,8 @@ describe('OutputsController & OutputsService', () => {
       const prismaMock = createPrismaMock();
       prismaMock.tx.$queryRaw
         .mockResolvedValueOnce([{ total: 1n }])
-        .mockResolvedValueOnce([{ id: outputId }]);
+        .mockResolvedValueOnce([{ id: outputId }])
+        .mockResolvedValueOnce([{ id: outputId, allowed: true }]);
       prismaMock.research_outputs.findMany.mockResolvedValue([
         mockSharedOutput,
       ]);
@@ -201,6 +202,48 @@ describe('OutputsController & OutputsService', () => {
       });
     });
 
+    it('reports whether the caller may change the audience of each listed work', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([{ id: outputId }])
+        .mockResolvedValueOnce([{ id: outputId, allowed: true }]);
+      prismaMock.research_outputs.findMany.mockResolvedValue([
+        mockSharedOutput,
+      ]);
+      prismaMock.output_revisions.findMany.mockResolvedValue([
+        mockPinnedRevision,
+      ]);
+      prismaMock.output_topics.findMany.mockResolvedValue([]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.findAll(callerId, { page: 1, limit: 10 });
+
+      // The database decides, so the list asks it once for the whole page
+      // instead of assuming the capability is off.
+      expect(result.items[0].canChangeVisibility).toBe(true);
+    });
+
+    it('reports a work whose audience the caller may not change', async () => {
+      const prismaMock = createPrismaMock();
+      prismaMock.tx.$queryRaw
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([{ id: outputId }])
+        .mockResolvedValueOnce([{ id: outputId, allowed: false }]);
+      prismaMock.research_outputs.findMany.mockResolvedValue([
+        mockSharedOutput,
+      ]);
+      prismaMock.output_revisions.findMany.mockResolvedValue([
+        mockPinnedRevision,
+      ]);
+      prismaMock.output_topics.findMany.mockResolvedValue([]);
+
+      const { controller } = await setupController(prismaMock);
+      const result = await controller.findAll(callerId, { page: 1, limit: 10 });
+
+      expect(result.items[0].canChangeVisibility).toBe(false);
+    });
+
     it('filters shared releases before paginating Home and fetches only authorized release PDFs', async () => {
       const sharedAt = '2026-11-11T00:00:00.123456Z';
       const olderOutputId = '33333333-3333-4333-8333-333333333332';
@@ -213,7 +256,8 @@ describe('OutputsController & OutputsService', () => {
         ])
         .mockResolvedValueOnce([
           { output_id: outputId, id: fileId, file_name: 'paper.pdf' },
-        ]);
+        ])
+        .mockResolvedValueOnce([{ id: outputId, allowed: true }]);
       prismaMock.tx.research_outputs.findMany.mockResolvedValue([
         mockSharedOutput,
       ]);
@@ -256,7 +300,8 @@ describe('OutputsController & OutputsService', () => {
       prismaMock.tx.$queryRaw
         .mockResolvedValueOnce([{ total: 1n }])
         .mockResolvedValueOnce([{ id: outputId, sharedAt }])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: outputId, allowed: true }]);
       prismaMock.tx.research_outputs.findMany.mockResolvedValue([
         mockSharedOutput,
       ]);

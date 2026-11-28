@@ -36,6 +36,7 @@ import type {
   OutputsControllerFindAllParams,
   OutputsControllerFindFilesEnvelope,
   OutputsControllerFindHomeFeedParams,
+  OutputsControllerFindRevisionHistoryEnvelope,
   OutputsControllerFindRevisionsEnvelope,
   PaginatedOutputsResponseDtoEnvelope,
   PublishOutputDto,
@@ -832,6 +833,181 @@ export function useOutputsControllerFindRevisions<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getOutputsControllerFindRevisionsQueryOptions(
+    outputId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Returns the edit history of the specified research output, newest revision first. Each entry names the account that wrote the revision and the account that released it, and lists the metadata fields the revision changed against the revision before it.
+ * @summary List the edit history of a research output
+ */
+export const outputsControllerFindRevisionHistory = (
+  outputId: string,
+  options?: SecondParameter<typeof axiosInstance>,
+  signal?: AbortSignal,
+) => {
+  return axiosInstance<OutputsControllerFindRevisionHistoryEnvelope>(
+    { url: `/outputs/${outputId}/history`, method: 'GET', signal },
+    options,
+  );
+};
+
+export const getOutputsControllerFindRevisionHistoryQueryKey = (
+  outputId: string,
+) => {
+  return [`/outputs/${outputId}/history`] as const;
+};
+
+export const getOutputsControllerFindRevisionHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+  TError = ApiErrorResponseDto,
+>(
+  outputId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getOutputsControllerFindRevisionHistoryQueryKey(outputId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>
+  > = ({ signal }) =>
+    outputsControllerFindRevisionHistory(outputId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: outputId !== null && outputId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type OutputsControllerFindRevisionHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>
+>;
+export type OutputsControllerFindRevisionHistoryQueryError =
+  ApiErrorResponseDto;
+
+export function useOutputsControllerFindRevisionHistory<
+  TData = Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+  TError = ApiErrorResponseDto,
+>(
+  outputId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindRevisionHistory<
+  TData = Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+  TError = ApiErrorResponseDto,
+>(
+  outputId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+          TError,
+          Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+export function useOutputsControllerFindRevisionHistory<
+  TData = Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+  TError = ApiErrorResponseDto,
+>(
+  outputId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+};
+/**
+ * @summary List the edit history of a research output
+ */
+
+export function useOutputsControllerFindRevisionHistory<
+  TData = Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+  TError = ApiErrorResponseDto,
+>(
+  outputId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof outputsControllerFindRevisionHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof axiosInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getOutputsControllerFindRevisionHistoryQueryOptions(
     outputId,
     options,
   );
