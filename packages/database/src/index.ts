@@ -31,6 +31,8 @@ export {
   interest_status,
   opportunity_application_status as OpportunityApplicationStatus,
   entity_types as FollowEntityType,
+  delivery_status as DigestDeliveryStatus,
+  digest_subject_type as DigestSubjectType,
   group_member_role as GroupMemberRole,
   group_output_status as GroupOutputStatus,
   opportunity_kind as OpportunityKind,

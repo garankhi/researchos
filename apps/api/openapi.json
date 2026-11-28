@@ -2985,6 +2985,289 @@
         ]
       }
     },
+    "/digest/preferences": {
+      "get": {
+        "operationId": "DigestController_getPreferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The caller’s current preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active RESEARCHER access is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the caller’s digest preferences",
+        "tags": [
+          "digest"
+        ]
+      },
+      "patch": {
+        "operationId": "DigestController_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDigestPreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestPreferencesDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid digest preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active RESEARCHER access is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the caller’s digest preferences",
+        "tags": [
+          "digest"
+        ]
+      }
+    },
+    "/digest/deliveries": {
+      "get": {
+        "operationId": "DigestController_listDeliveries",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "Page number, 1-based.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "How many records one page holds.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort key, e.g. `createdAt` or `-createdAt` for descending. The fields a resource accepts are the ones its service allows.",
+            "schema": {
+              "example": "-createdAt",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the caller’s deliveries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestDeliveryPageDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pagination parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active RESEARCHER access is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the caller’s digest delivery history",
+        "tags": [
+          "digest"
+        ]
+      }
+    },
+    "/digest/deliveries/{id}": {
+      "get": {
+        "operationId": "DigestController_getDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the digest delivery.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The delivery and its visible items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestDeliveryDetailDtoEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid delivery ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active RESEARCHER access is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The delivery is unavailable to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a digest delivery and its items",
+        "tags": [
+          "digest"
+        ]
+      }
+    },
     "/search/counts": {
       "get": {
         "description": "Returns one permission-filtered total per search tab (`research`, `people`, `group`, `opportunity`) for the given term, using the same matching expression as `GET /search`. The totals are the source for the tab badges, so a tab nobody has opened yet still has a count.",
@@ -12136,6 +12419,263 @@
           "id"
         ]
       },
+      "DigestPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to receive the weekly digest."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone used to determine the weekly period.",
+            "example": "Asia/Ho_Chi_Minh"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language used to render the digest.",
+            "example": "vi"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When these preferences were saved.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "enabled",
+          "timezone",
+          "language",
+          "updatedAt"
+        ]
+      },
+      "UpdateDigestPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to receive the weekly digest."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone used to determine the weekly period.",
+            "example": "Asia/Ho_Chi_Minh",
+            "maxLength": 100
+          },
+          "language": {
+            "description": "Language used to render the digest.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationLocale"
+              }
+            ]
+          }
+        }
+      },
+      "DigestDeliveryStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "PROCESSING",
+          "SENT",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "description": "Current delivery status."
+      },
+      "DigestDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the digest delivery.",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "description": "Inclusive start of the delivery period.",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "description": "Exclusive end of the delivery period.",
+            "format": "date-time"
+          },
+          "status": {
+            "description": "Current delivery status.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DigestDeliveryStatus"
+              }
+            ]
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Number of delivery attempts.",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "When the mail provider accepted the digest, if sent.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the delivery was staged.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "attempts",
+          "sentAt",
+          "createdAt"
+        ]
+      },
+      "DigestDeliveryPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Deliveries in this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DigestDeliveryDto"
+            }
+          },
+          "meta": {
+            "description": "The pagination metadata of this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "DigestSubjectType": {
+        "type": "string",
+        "enum": [
+          "OUTPUT",
+          "OPPORTUNITY",
+          "SEMINAR",
+          "PROJECT"
+        ],
+        "description": "Type of research item included in the digest."
+      },
+      "DigestItemDto": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "description": "Type of research item included in the digest.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DigestSubjectType"
+              }
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "ID of the research item.",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "description": "ID of the selected research update.",
+            "format": "uuid"
+          },
+          "matchedReasons": {
+            "type": "array",
+            "description": "Follow targets that matched this research item.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "contentSnapshot": {
+            "type": "object",
+            "description": "Stored content for this research item in the delivery.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId",
+          "eventId",
+          "matchedReasons",
+          "contentSnapshot"
+        ]
+      },
+      "DigestDeliveryDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the digest delivery.",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "description": "Inclusive start of the delivery period.",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "description": "Exclusive end of the delivery period.",
+            "format": "date-time"
+          },
+          "status": {
+            "description": "Current delivery status.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DigestDeliveryStatus"
+              }
+            ]
+          },
+          "attempts": {
+            "type": "number",
+            "description": "Number of delivery attempts.",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "When the mail provider accepted the digest, if sent.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the delivery was staged.",
+            "format": "date-time"
+          },
+          "items": {
+            "description": "Visible items in this delivery.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DigestItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "attempts",
+          "sentAt",
+          "createdAt",
+          "items"
+        ]
+      },
       "SearchCountsResponseDto": {
         "type": "object",
         "properties": {
@@ -17161,6 +17701,78 @@
           },
           "data": {
             "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "DigestPreferencesDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/DigestPreferencesDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "DigestDeliveryPageDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/DigestDeliveryPageDto"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message"
+        ]
+      },
+      "DigestDeliveryDetailDtoEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/DigestDeliveryDetailDto"
           },
           "message": {
             "type": "string",

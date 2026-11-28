@@ -7,6 +7,7 @@ import { PrismaModule } from '@researchos/database';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { DigestModule } from './modules/digest/digest.module.js';
 import { DiscoveryModule } from './modules/discovery/discovery.module.js';
 import { FileAccessModule } from './modules/file-access/file-access.module.js';
 import { FollowModule } from './modules/follow/follow.module.js';
@@ -69,6 +70,7 @@ import { TaxonomyModule } from './modules/taxonomy/taxonomy.module.js';
     ChatModule,
     NotificationsModule,
     DemoModule,
+    DigestModule,
     DiscoveryModule,
     FileAccessModule,
     FollowModule,
